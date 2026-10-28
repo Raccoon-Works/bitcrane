@@ -1,0 +1,312 @@
+/*
+ * Design tokens of Bitcrane.
+ *
+ * Source of truth: Projekt/Design-System.md (accepted 27.10.2026; sizes raised
+ * 28.10.2026 after a design review: text 14px, rows 34/36px, controls 32px).
+ * The root element carries data-platform="mac|win" and data-theme="dark|light";
+ * every component reads only these variables, never hard-coded values.
+ */
+
+:root {
+  /* Brand and status colours shared by both platforms. */
+  --accent: #2a6de0;
+  --accent-hover: #3a7bea;
+  --accent-pressed: #1b4fb8;
+  --on-accent: #ffffff;
+
+  /* Spacing scale (4px grid). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Type scale: size / line height. */
+  --text-caption: 12px;
+  --lh-caption: 16px;
+  --text-small: 13px;
+  --lh-small: 18px;
+  --text-body: 14px;
+  --lh-body: 20px;
+  --text-title: 16px;
+  --lh-title: 22px;
+  --text-headline: 17px;
+  --lh-headline: 22px;
+  --text-display: 22px;
+  --lh-display: 28px;
+  --text-hero: 28px;
+  --lh-hero: 34px;
+
+  --font-mono: 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Motion. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-press: 120ms;
+  --motion-popover: 150ms;
+  --motion-dialog: 200ms;
+
+  /* Sizes. */
+  --control-h: 32px;
+  --control-h-small: 28px;
+  --hit-min: 24px;
+}
+
+/* ---------------------------------------------------------------- Mac */
+
+[data-platform='mac'] {
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  --radius-control: 8px;
+  --radius-button: 999px;
+  --radius-row: 6px;
+  --radius-card: 12px;
+  --radius-window: 16px;
+  --radius-box: 4px;
+  --radius-tip: 6px;
+  --row-h: 34px;
+  --toolbar-h: 56px;
+  --switch-w: 32px;
+}
+
+[data-platform='mac'][data-theme='dark'] {
+  --bg-desktop: radial-gradient(120% 90% at 20% 0%, #24314d 0%, #1a1d2b 45%, #141418 100%);
+  --bg-window: #161618;
+  --bg-sidebar: rgba(44, 44, 48, 0.72);
+  --sidebar-border: 1px solid rgba(255, 255, 255, 0.07);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --bg-card: #1e1e21;
+  --bg-section: #26262a;
+  --bg-control: #2a2a2e;
+  --bg-control-on: #3a3a3f;
+  --bg-second: #3a3a3f;
+  --bg-second-hover: #45454b;
+  --bg-second-pressed: #323236;
+  --bg-field: #2a2a2d;
+  --bg-terminal: #141416;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-sidebar-sel: rgba(255, 255, 255, 0.09);
+  --bg-popover: rgba(40, 40, 44, 0.97);
+  --bg-menu: rgba(42, 42, 46, 0.97);
+  --bg-tip: #2c2c30;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.1);
+  --field-line: #45454b;
+  --frame: #38383c;
+  --text: #ededef;
+  --text-2: #d2d2d7;
+  --text-muted: #a1a1a8;
+  --text-faint: #5e5e64;
+  --control-edge: #7c7c84;
+  --icon: #c4c4ca;
+  --icon-off: #5e5e64;
+  --accent-text: #5da2ff;
+  --focus: #5da2ff;
+  --accent-tint: rgba(93, 162, 255, 0.1);
+  --accent-ring: rgba(93, 162, 255, 0.25);
+  --sel-row: #2a6de0;
+  --sel-fg: #ffffff;
+  --sel-sub: #dce8fd;
+  --sel-row-inactive: #3a3a40;
+  --danger: #ff453a;
+  --danger-btn: #d70015;
+  --danger-tint: rgba(255, 69, 58, 0.1);
+  --warning: #ff9f0a;
+  --warning-tint: rgba(255, 159, 10, 0.1);
+  --success: #30d158;
+  --track: #38383c;
+  --folder: #4a86e8;
+  --folder-line: #3a6fc4;
+  --paper: #3a3a3f;
+  --paper-line: #6e6e75;
+  --shadow-popover: 0 20px 50px rgba(0, 0, 0, 0.55);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(0, 0, 0, 0.35);
+  --switch-off: #5a5a60;
+}
+
+[data-platform='mac'][data-theme='light'] {
+  --bg-desktop: radial-gradient(120% 90% at 20% 0%, #cfdcf5 0%, #e3e6ee 50%, #eceef2 100%);
+  --bg-window: #ececee;
+  --bg-sidebar: rgba(255, 255, 255, 0.7);
+  --sidebar-border: 1px solid rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --bg-card: #ffffff;
+  --bg-section: #f4f4f6;
+  --bg-control: #e4e4e8;
+  --bg-control-on: #ffffff;
+  --bg-second: #e4e4e8;
+  --bg-second-hover: #dadadf;
+  --bg-second-pressed: #d0d0d5;
+  --bg-field: #ffffff;
+  --bg-terminal: #1d1d1f;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-sidebar-sel: rgba(0, 0, 0, 0.07);
+  --bg-popover: rgba(250, 250, 252, 0.97);
+  --bg-menu: rgba(246, 246, 248, 0.97);
+  --bg-tip: #ffffff;
+  --line: rgba(0, 0, 0, 0.06);
+  --line-strong: rgba(0, 0, 0, 0.1);
+  --field-line: #c9c9ce;
+  --frame: #c9c9ce;
+  --text: #1d1d1f;
+  --text-2: #3a3a3f;
+  --text-muted: #5f5f66;
+  --text-faint: #b4b4ba;
+  --control-edge: #8e8e93;
+  --icon: #4a4a50;
+  --icon-off: #b4b4ba;
+  --accent-text: #1b4fb8;
+  --focus: #2a6de0;
+  --accent-tint: rgba(42, 109, 224, 0.08);
+  --accent-ring: rgba(42, 109, 224, 0.18);
+  --sel-row: #2a6de0;
+  --sel-fg: #ffffff;
+  --sel-sub: #dce8fd;
+  --sel-row-inactive: #dcdce1;
+  --danger: #d70015;
+  --danger-btn: #d70015;
+  --danger-tint: rgba(215, 0, 21, 0.07);
+  --warning: #c93400;
+  --warning-tint: rgba(201, 52, 0, 0.08);
+  --success: #1e7b34;
+  --track: #e2e2e6;
+  --folder: #7aa7ee;
+  --folder-line: #5b8fe3;
+  --paper: #ffffff;
+  --paper-line: #a0a0a7;
+  --shadow-popover: 0 20px 50px rgba(0, 0, 0, 0.18);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.22);
+  --scrim: rgba(0, 0, 0, 0.12);
+  --switch-off: #d0d0d5;
+}
+
+/* ------------------------------------------------------------ Windows */
+
+[data-platform='win'] {
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif;
+  --radius-control: 4px;
+  --radius-button: 4px;
+  --radius-row: 4px;
+  --radius-card: 8px;
+  --radius-window: 8px;
+  --radius-box: 3px;
+  --radius-tip: 4px;
+  --row-h: 36px;
+  --toolbar-h: 52px;
+  --switch-w: 40px;
+}
+
+[data-platform='win'][data-theme='dark'] {
+  --bg-desktop: radial-gradient(120% 90% at 30% 0%, #0f3a66 0%, #12253f 45%, #101522 100%);
+  --bg-window: #202020;
+  --bg-titlebar: #1a1a1a;
+  --bg-sidebar: transparent;
+  --sidebar-border: 0;
+  --shadow-float: none;
+  --bg-card: #2b2b2b;
+  --bg-section: #2b2b2b;
+  --bg-control: #323232;
+  --bg-control-on: #454545;
+  --bg-second: #3a3a3a;
+  --bg-second-hover: #454545;
+  --bg-second-pressed: #323232;
+  --bg-field: #2d2d2d;
+  --bg-terminal: #141414;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-sidebar-sel: rgba(255, 255, 255, 0.07);
+  --bg-popover: #2c2c2c;
+  --bg-menu: #2c2c2c;
+  --bg-tip: #2c2c2c;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.1);
+  --field-line: #3d3d3d;
+  --frame: #3a3a3a;
+  --text: #ffffff;
+  --text-2: #e0e0e0;
+  --text-muted: #ababab;
+  --text-faint: #6e6e6e;
+  --control-edge: #8a8a8a;
+  --icon: #d0d0d0;
+  --icon-off: #6e6e6e;
+  --accent-text: #5da2ff;
+  --focus: #5da2ff;
+  --accent-tint: rgba(93, 162, 255, 0.1);
+  --accent-ring: rgba(93, 162, 255, 0.25);
+  --sel-row: rgba(255, 255, 255, 0.08);
+  --sel-fg: #ffffff;
+  --sel-sub: #c8c8c8;
+  --sel-row-inactive: rgba(255, 255, 255, 0.05);
+  --danger: #ff453a;
+  --danger-btn: #c42b1c;
+  --danger-tint: rgba(255, 69, 58, 0.1);
+  --warning: #ff9f0a;
+  --warning-tint: rgba(255, 159, 10, 0.1);
+  --success: #30d158;
+  --track: #3d3d3d;
+  --folder: #e3a82b;
+  --folder-line: #c8962c;
+  --paper: #3a3a3a;
+  --paper-line: #7a7a7a;
+  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(0, 0, 0, 0.4);
+  --switch-off: transparent;
+}
+
+[data-platform='win'][data-theme='light'] {
+  --bg-desktop: radial-gradient(120% 90% at 30% 0%, #9cc3ee 0%, #cfdff2 50%, #e8eef6 100%);
+  --bg-window: #f3f3f3;
+  --bg-titlebar: #e9e9e9;
+  --bg-sidebar: transparent;
+  --sidebar-border: 0;
+  --shadow-float: none;
+  --bg-card: #ffffff;
+  --bg-section: #f9f9f9;
+  --bg-control: #ebebeb;
+  --bg-control-on: #ffffff;
+  --bg-second: #fbfbfb;
+  --bg-second-hover: #f3f3f3;
+  --bg-second-pressed: #ebebeb;
+  --bg-field: #ffffff;
+  --bg-terminal: #1c1c1c;
+  --bg-hover: rgba(0, 0, 0, 0.035);
+  --bg-sidebar-sel: rgba(0, 0, 0, 0.05);
+  --bg-popover: #f9f9f9;
+  --bg-menu: #f9f9f9;
+  --bg-tip: #f9f9f9;
+  --line: rgba(0, 0, 0, 0.07);
+  --line-strong: rgba(0, 0, 0, 0.1);
+  --field-line: #d6d6d6;
+  --frame: #c9c9c9;
+  --text: #1a1a1a;
+  --text-2: #3a3a3a;
+  --text-muted: #5f5f5f;
+  --text-faint: #b0b0b0;
+  --control-edge: #8a8a8a;
+  --icon: #444444;
+  --icon-off: #b0b0b0;
+  --accent-text: #1b4fb8;
+  --focus: #2a6de0;
+  --accent-tint: rgba(42, 109, 224, 0.08);
+  --accent-ring: rgba(42, 109, 224, 0.18);
+  --sel-row: rgba(0, 0, 0, 0.05);
+  --sel-fg: #1a1a1a;
+  --sel-sub: #5f5f5f;
+  --sel-row-inactive: rgba(0, 0, 0, 0.035);
+  --danger: #d70015;
+  --danger-btn: #c42b1c;
+  --danger-tint: rgba(215, 0, 21, 0.07);
+  --warning: #c93400;
+  --warning-tint: rgba(201, 52, 0, 0.08);
+  --success: #1e7b34;
+  --track: #e0e0e0;
+  --folder: #f8cd5c;
+  --folder-line: #e3a82b;
+  --paper: #ffffff;
+  --paper-line: #a0a0a0;
+  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.16);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.22);
+  --scrim: rgba(0, 0, 0, 0.12);
+  --switch-off: transparent;
+}

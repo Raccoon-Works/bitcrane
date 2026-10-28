@@ -1,0 +1,79 @@
+# Bitcrane
+
+File transfer for macOS and Windows with automatic folder watching. Published by RaccoonWorks.
+
+- Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS)
+- Two halves: this computer and a server, or two servers (server to server)
+- Folder watching: changed files are uploaded automatically, with excludes, a post-upload command and a warning when the server copy is newer
+- Transfer queue that survives a restart and resumes partial files
+- Host keys and self-signed certificates are confirmed once and remembered
+- Passwords and passphrases live in the macOS Keychain or the Windows Credential Manager, never in Bitcrane's files
+- Signed automatic updates
+- German and English interface
+
+## Download
+
+Get the newest version from the [releases page](https://github.com/Raccoon-Works/bitcrane/releases/latest):
+`Bitcrane_<version>_x64-setup.exe` for Windows, `Bitcrane_<version>_universal.dmg` for macOS (Apple Silicon and Intel).
+Installed copies update themselves.
+
+Bitcrane is not code-signed yet:
+
+- **macOS:** after moving Bitcrane to Applications, run once in Terminal
+  `xattr -dr com.apple.quarantine /Applications/Bitcrane.app`
+  (otherwise macOS reports the app as damaged).
+- **Windows:** if SmartScreen shows "Windows protected your PC", choose "More info", then "Run anyway".
+
+## Development
+
+Requirements: Node.js 22, Rust (stable), and the Tauri 2 prerequisites for your platform.
+
+```bash
+npm install
+npm run dev               # browser prototype with simulated servers on http://localhost:1420
+npx tauri dev             # the desktop app
+npx tauri build           # installers for the current platform
+npm run licenses          # refresh the third-party license list (src/licenses.json)
+```
+
+The interface runs in two modes: in the desktop app it talks to the Rust backend (`src/backend/tauriBackend.ts`);
+in a plain browser it uses an in-memory file system (`src/backend/mockFs.ts`) so the UI can be tried without servers.
+
+## Structure
+
+| Path | Purpose |
+|---|---|
+| `src/state/store.ts` | App state, user actions, the browser simulation |
+| `src/state/live.ts` | Desktop mode: connections, listings, transfer queue, folder watches |
+| `src/state/updates.ts` | Update check and installation |
+| `src/i18n.ts`, `src/i18n.en.ts` | Translation helper; German is the source language, English the translation |
+| `src/components/` | Main window, panes, sidebar, toolbar, activity, dialogs |
+| `src/styles/` | Design tokens and component styles |
+| `src-tauri/src/remote.rs` | One interface over SFTP (`ssh.rs`), FTP/FTPS (`ftp.rs`) and WebDAV (`dav.rs`) |
+| `src-tauri/src/transfer.rs` | Uploads, downloads and server-to-server copies with resume, temp names and versions |
+| `src-tauri/src/tls.rs` | Certificate checks (public CAs, otherwise a confirmed fingerprint) |
+| `src-tauri/src/watcher.rs` | File system events for folder watches |
+| `.github/workflows/build.yml` | Builds the installers and publishes updates (started by hand) |
+
+## Builds and updates
+
+Builds run on GitHub Actions when started by hand. Each build gets the version `0.2.<run number>` and becomes a
+release of this repository with notes in sections (Features, Improvements, Fixes), the installers and a signed `latest.json`.
+Installed copies look for updates at `releases/latest/download/latest.json` here. The secret
+`TAURI_SIGNING_PRIVATE_KEY` signs the update packages; while `RELEASES_TOKEN` or `RELEASES_DEPLOY_KEY` is set,
+each build is also copied to the former download repository `Raccoon-Works/bitcrane-releases`.
+
+## Tests
+
+`cargo test` in `src-tauri` runs the unit tests. Integration tests run against real servers when these
+variables are set: `BITCRANE_TEST_SSH`, `BITCRANE_TEST_FTP` (`host:plain,explicit,implicit`) and
+`BITCRANE_TEST_DAV` (comma-separated URLs).
+
+## License
+
+Bitcrane is free software under the GNU General Public License, version 3 or (at your option) any later version.
+See [LICENSE](LICENSE). Third-party components and their licenses are listed in `src/licenses.json`.
+
+## Acknowledgements
+
+Developed by RaccoonWorks with the help of Claude (Anthropic) as a coding assistant.
