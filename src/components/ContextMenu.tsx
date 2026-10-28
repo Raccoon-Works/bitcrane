@@ -12,6 +12,7 @@ import {
 } from '../state/store';
 import { $t } from '../i18n';
 import { addressOf } from './ServerList';
+import { runCustomCommand } from '../state/tools';
 
 interface Item { label: string; key?: string; run: () => void; danger?: boolean; checked?: boolean }
 
@@ -54,6 +55,8 @@ export function ContextMenu() {
   const leftServer = tab?.leftServerId ? getState().servers.find((x) => x.id === tab.leftServerId) : undefined;
   const otherName = (side: 'local' | 'remote') => (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
   const groups: Item[][] = [];
+  // Own commands (Einstellungen › Erweitert) run on SFTP servers only (they need SSH).
+  const commands = onServer && sftpTab && !!paneServer ? getState().settings.customCommands ?? [] : [];
 
   if (menu.kind === 'server' && menu.serverId) {
     const id = menu.serverId;
@@ -169,15 +172,19 @@ export function ContextMenu() {
     const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }];
     if (isDir && one) third.push({ label: $t('In neuem Tab öffnen'), run: () => { newTab(); setState({ contextMenu: null }); window.setTimeout(() => openEntry(menu.side, one), 0); } });
     groups.push(third);
+    if (commands.length) groups.push(commands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, menu.names) })));
     groups.push([{ label: onServer ? $t('Vom Server löschen …') : $t('In den Papierkorb …'), key: k('⌘⌫', $t('Entf')), run: () => askDelete(menu.side, menu.names), danger: true }]);
   } else {
     groups.push([
       ...(clip ? [{ label: clip.serverId === (onServer ? sid : '') ? $t('Hier einfügen (Kopie)') : !clip.serverId ? $t('Hier einfügen (hochladen)') : !onServer ? $t('Hier einfügen (herunterladen)') : $t('Hier einfügen (übertragen)'), key: sk('paste'), run: () => pasteClipboard(menu.side) }] : []),
       { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) },
       { label: $t('Pfad dieses Ordners kopieren'), run: () => copyPath(menu.side) },
+      { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
       ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),
       ...(remoteTerminal ? [{ label: onServer ? $t('Terminal hier öffnen (SSH)') : $t('Terminal hier öffnen'), run: () => openTerminal(menu.side) }] : []),
     ]);
+    const folderCommands = commands.filter((c) => !/\{(file|files|name)\}/.test(c.command));
+    if (folderCommands.length) groups.push(folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })));
     if (!onServer) groups.push([{ label: $t('Diesen Ordner überwachen …'), key: sk('newWatch'), run: () => openDialog({ type: 'watchSetup' }) }]);
   }
 

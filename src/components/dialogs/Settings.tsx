@@ -9,9 +9,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { KnownHost } from '../../backend/api';
-import { closeDialog, getState, LIVE, newRuleId, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { closeDialog, getState, LIVE, newRuleId, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { ListChecks } from '@phosphor-icons/react';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
+import { newCommandId } from '../../state/tools';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
 import { Button, Select, Switch, TextField } from '../ui';
@@ -158,6 +159,28 @@ function KnownHostsList() {
  * uses one for its manual transfers and watches; a watch can choose another.
  * Empty fields keep the general settings of "Übertragungen".
  */
+/** "Eigene Befehle" (WinSCP "Custom commands"): own commands in the context menu of server files. */
+function CustomCommands() {
+  const list = useStore((st) => st.settings.customCommands) ?? [];
+  const save = (next: CustomCommand[]) => updateSettings({ customCommands: next });
+  const set = (id: string, patch: Partial<CustomCommand>) => save(list.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  return (
+    <>
+      <p className="small muted">{$t('Erscheinen im Rechtsklick-Menü von Dateien auf SFTP-Servern und laufen dort im Ordner der Datei. Platzhalter: {file} Pfad der Datei (bei mehreren Dateien einmal je Datei), {files} alle Pfade, {name} nur der Name, {dir} der Ordner. Die Ausgabe steht im Protokoll.')}</p>
+      {list.map((c) => (
+        <div key={c.id} className="cmd-row">
+          <TextField label={$t('Name im Menü')} value={c.name} onChange={(v) => set(c.id, { name: v })} placeholder={$t('Name im Menü')} className="cmd-name" />
+          <TextField label={$t('Befehl')} value={c.command} onChange={(v) => set(c.id, { command: v })} placeholder="unzip -o {file}" mono className="flex-1" />
+          <Button small variant="ghost" onClick={() => save(list.filter((x) => x.id !== c.id))}>{$t('Entfernen')}</Button>
+        </div>
+      ))}
+      <span className="row-inline">
+        <Button small onClick={() => save([...list, { id: newCommandId(), name: $t('Entpacken'), command: 'unzip -o {file}' }])}>{$t('Befehl hinzufügen')}</Button>
+      </span>
+    </>
+  );
+}
+
 function RulesSettings() {
   const rules = useStore((st) => st.settings.rules ?? []);
   const servers = useStore((st) => st.servers);
@@ -352,6 +375,9 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
                 <Select value={s.startServer && servers.some((x) => x.id === s.startServer) ? s.startServer : ''} onChange={(v) => updateSettings({ startServer: v })} label={$t('Server beim Start')} options={[{ value: '', label: $t('Ohne Server') }, ...servers.filter((x) => !x.temporary).map((x) => ({ value: x.id, label: x.name }))]} />
               </span>
             </Row>
+            <Row label={$t('Tabs vom letzten Mal wieder öffnen')} note={$t('Beim Start öffnen sich die Tabs, die beim Beenden offen waren; der Server des vorderen Tabs verbindet sich gleich. Gespeicherte Tab-Sätze: Ablage › Arbeitsbereiche.')}>
+              <Switch checked={!!s.restoreTabs} onChange={(v) => updateSettings({ restoreTabs: v })} label={$t('Tabs vom letzten Mal wieder öffnen')} />
+            </Row>
             <Row label={$t('Neuer Tab: rechte Hälfte')} note={$t('„Dieser PC“ bzw. „Dieser Mac“ zeigt in beiden Hälften Ordner dieses Computers, zum Hin- und Herkopieren wie im Total Commander.')}>
               <Select value={s.newTabRight ?? 'servers'} onChange={(v) => updateSettings({ newTabRight: v as 'servers' | 'local' })} label={$t('Neuer Tab: rechte Hälfte')}
                 options={[{ value: 'servers', label: $t('Serverliste') }, { value: 'local', label: mac ? $t('Dieser Mac') : $t('Dieser PC') }]} />
@@ -455,6 +481,10 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
         )}
         {current === 'keys' && <KeysSettings />}
         {current === 'advanced' && (
+          <>
+          <Group title={$t('Eigene Befehle')}>
+            <CustomCommands />
+          </Group>
           <Group title={$t('Erweitert')}>
             <Row label={$t('Protokoll für die Fehlersuche')} note={$t('Verbindungen, Übertragungen und Fehler mit Uhrzeit. Bitcrane zeigt es immer an; auf Wunsch auch als Datei.')}>
               <Button small onClick={() => openDialog({ type: 'log' })}>{$t('Protokoll öffnen …')}</Button>
@@ -474,6 +504,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
             <Row label={$t('SSH-Konfiguration lesen')} note={$t('Kurznamen aus ~/.ssh/config funktionieren in „Schnell verbinden“, und neue Server lassen sich von dort übernehmen.')}><Switch checked={s.readSshConfig} onChange={(v) => updateSettings({ readSshConfig: v })} label={$t('SSH-Konfiguration lesen')} /></Row>
             <Row label={$t('Überwachungen pro Ordner')}><span className="small muted"><Radio size={13} strokeWidth={1.5} aria-hidden="true" /> {mac ? 'FSEvents' : 'ReadDirectoryChangesW'}</span></Row>
           </Group>
+          </>
         )}
       </div>
     </Dialog>

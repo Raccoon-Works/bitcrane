@@ -56,6 +56,9 @@ export type DialogState =
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
+  | { type: 'selectMask'; side: PaneSide }
+  | { type: 'afterQueue'; action: AfterQueue }
+  | { type: 'workspaces' }
   | { type: 'compare'; favoriteId?: string }
   | { type: 'import' }
   | { type: 'cloudPlaces'; found: CloudPlace[] }
@@ -151,6 +154,12 @@ export interface Settings {
   skipPatterns: string[];
   /** Transfer rules (settings > Regeln). */
   rules?: TransferRule[];
+  /** Open the tabs of the last session again when Bitcrane starts. */
+  restoreTabs?: boolean;
+  /** Own commands for the context menu of server files (WinSCP "Custom commands"). */
+  customCommands?: CustomCommand[];
+  /** Saved sets of tabs (WinSCP "Workspaces"). */
+  workspaces?: Workspace[];
   /** Skip files larger than this many MB when transferring by hand (0 = no limit). */
   skipLargerMb: number;
   /** Speed limit for all transfers together in KB/s (0 = unlimited). */
@@ -257,6 +266,18 @@ export interface SyncSchedule {
 }
 
 /** Rule for files that already exist at the target of a manual transfer. */
+/** What happens once the transfer queue is empty (WinSCP "Once empty"). */
+export type AfterQueue = 'none' | 'disconnect' | 'quit' | 'sleep' | 'shutdown';
+
+/** An own command run on the server for the selected files. Placeholders: {file}, {files}, {name}, {dir}. */
+export interface CustomCommand { id: string; name: string; command: string }
+
+/** A tab as saved in a workspace or for the next start. */
+export interface SavedTab { serverId: string; localPath: string; remotePath: string; leftServerId?: string; rightLocal?: boolean }
+
+/** A named set of tabs that can be opened again later. */
+export interface Workspace { id: string; name: string; tabs: SavedTab[]; active?: number }
+
 export type ExistingRule = 'ask' | 'overwrite' | 'newer' | 'keepBoth' | 'skip';
 
 /**
@@ -289,7 +310,7 @@ export interface WatchTemplate {
 
 export type ToolId =
   | 'nav' | 'newFolder' | 'refresh' | 'info' | 'activity' | 'upload' | 'download' | 'delete' | 'rename'
-  | 'perms' | 'hidden' | 'terminal' | 'disconnect' | 'copyPath' | 'editor' | 'sync' | 'syncBrowse' | 'palette';
+  | 'perms' | 'hidden' | 'terminal' | 'disconnect' | 'copyPath' | 'editor' | 'sync' | 'syncBrowse' | 'palette' | 'compareDirs' | 'selectMask';
 
 export interface AppState {
   platform: Platform;
@@ -354,6 +375,10 @@ export interface AppState {
   homeName: string;
   /** Bitcrane was started at login and keeps its window hidden (the status icon must then be shown). */
   startedHidden?: boolean;
+  /** "Verzeichnisse vergleichen": the halves mark entries that differ from the other half. */
+  compareDirs: boolean;
+  /** What happens once all transfers are finished; resets to "none" after it ran. */
+  afterQueue: AfterQueue;
   /** Update in progress or waiting (null: none known). */
   update: import('./updates').UpdateState | null;
   /** Where dragged files would land: a side and a folder name ('' = folder shown). */
@@ -441,6 +466,8 @@ export const allTools: Array<{ id: ToolId; label: string }> = [
   { id: 'editor', label: $t('Im Editor öffnen') },
   { id: 'sync', label: $t('Ordner abgleichen') },
   { id: 'syncBrowse', label: $t('Synchron blättern') },
+  { id: 'compareDirs', label: $t('Verzeichnisse vergleichen') },
+  { id: 'selectMask', label: $t('Auswählen nach Muster') },
   { id: 'palette', label: $t('Befehle') },
 ];
 
@@ -495,6 +522,8 @@ function initialState(): AppState {
     inspectorOpen: false,
     activityOpen: false,
     activityFilter: 'all',
+    compareDirs: false,
+    afterQueue: 'none',
     popoverOpen: false,
     menuBarWindowOpen: false,
     appMenu: null,
