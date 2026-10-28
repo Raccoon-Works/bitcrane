@@ -118,6 +118,10 @@ export function Activity() {
   const key = useKeyLabel()('activity') ?? '';
   const height = useStore((s) => s.settings.activityHeight ?? 240);
   const after = useStore((s) => s.afterQueue);
+  const rules = useStore((s) => s.settings.rules);
+  const chosenRule = useStore((s) => s.transferRule);
+  const chosenName = chosenRule === 'none' ? $t('ohne Regel') : rules?.find((r) => r.id === chosenRule)?.name;
+  const ruleOptions = [{ value: '', label: $t('Regel: wie beim Server') }, { value: 'none', label: $t('Regel: keine') }, ...(rules ?? []).map((r) => ({ value: r.id, label: $t('Regel: {0}', r.name) }))];
   const busy = running.length + queued.length > 0;
   const afterOptions = (['none', 'disconnect', 'quit', 'sleep', 'shutdown'] as AfterQueue[]).map((v) => ({ value: v, label: v === 'none' ? $t('Wenn fertig: nichts tun') : $t('Wenn fertig: {0}', afterQueueLabel(v)) }));
 
@@ -161,7 +165,7 @@ export function Activity() {
         {line}
         <span className="flex-1" />
         <span className="small muted nowrap">
-          {[restCount > 0 ? `${restCount} weitere` : '', running.length ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : ''].filter(Boolean).join(' · ')}
+          {[restCount > 0 ? `${restCount} weitere` : '', running.length ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : '', chosenName ? $t('Regel: {0}', chosenName) : ''].filter(Boolean).join(' · ')}
         </span>
         <IconButton label={$t('Aktivität aufklappen')} shortcut={key} onClick={toggleActivity} tipBelow={false}><ChevronUp size={14} strokeWidth={2} /></IconButton>
       </section>
@@ -190,6 +194,8 @@ export function Activity() {
         </div>
         <span className="flex-1" />
         {running.length > 0 && <span className="small muted">↑ {formatSpeed(speed)}</span>}
+        {/* WinSCP "Transfer settings": a rule for the next transfers by hand, instead of the server's. */}
+        {!!rules?.length && <Select value={chosenRule} onChange={(v) => setState({ transferRule: v })} options={ruleOptions} label={$t('Regel für Übertragungen von Hand')} />}
         {/* WinSCP "Once empty": what happens when everything is transferred. */}
         {(busy || after !== 'none') && <Select value={after} onChange={setAfterQueue} options={afterOptions} label={$t('Wenn alle Übertragungen fertig sind')} />}
         <Button small variant="ghost" onClick={() => setState({ dialog: { type: 'transfers' } })}>{$t('Alle Übertragungen')}</Button>

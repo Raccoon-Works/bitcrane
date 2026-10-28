@@ -59,6 +59,7 @@ export type DialogState =
   | { type: 'selectMask'; side: PaneSide }
   | { type: 'afterQueue'; action: AfterQueue }
   | { type: 'workspaces' }
+  | { type: 'mergeFolders'; fromDir: string; names: string[]; toDir: string; move: boolean; clashes: string[] }
   | { type: 'compare'; favoriteId?: string }
   | { type: 'import' }
   | { type: 'cloudPlaces'; found: CloudPlace[] }
@@ -379,6 +380,8 @@ export interface AppState {
   compareDirs: boolean;
   /** What happens once all transfers are finished; resets to "none" after it ran. */
   afterQueue: AfterQueue;
+  /** Rule for transfers by hand in this session: '' = the server's rule, 'none' = no rule, else a rule id. */
+  transferRule: string;
   /** Update in progress or waiting (null: none known). */
   update: import('./updates').UpdateState | null;
   /** Where dragged files would land: a side and a folder name ('' = folder shown). */
@@ -524,6 +527,7 @@ function initialState(): AppState {
     activityFilter: 'all',
     compareDirs: false,
     afterQueue: 'none',
+    transferRule: '',
     popoverOpen: false,
     menuBarWindowOpen: false,
     appMenu: null,
@@ -1100,8 +1104,10 @@ export function hiddenCount(side: PaneSide, s: AppState = state): number {
  * Rule in effect for a server, or for a watch (its own choice, else its server's).
  * Undefined = the general settings.
  */
-export function ruleFor(serverId: string, watchId?: string, s: AppState = state): TransferRule | undefined {
+export function ruleFor(serverId: string, watchId?: string, s: AppState = state, useChoice = true): TransferRule | undefined {
   const rules = s.settings.rules ?? [];
+  // Transfers by hand follow the rule chosen in the activity area (WinSCP "Transfer settings"), if any.
+  if (!watchId && useChoice && s.transferRule) return s.transferRule === 'none' ? undefined : rules.find((r) => r.id === s.transferRule);
   const w = watchId ? s.watches.find((x) => x.id === watchId) : undefined;
   if (w?.ruleId === 'none') return undefined;
   const id = w?.ruleId ?? s.servers.find((x) => x.id === serverId)?.ruleId;
@@ -2071,9 +2077,23 @@ function copyOrMoveLocal(fromDir: string, names: string[], toDir: string, move: 
   for (const [dir, list] of groups) {
     const src = dir ? paths.join(fromDir, dir) : fromDir;
     if (src === toDir) { showToast($t('Quelle und Ziel sind derselbe Ordner.')); continue; }
+    // Folders that already exist in the target: ask "Zusammenführen" or "Beide behalten" (Transmit).
+    const target = new Set((listEntries('local', '', toDir) ?? []).filter((e) => e.kind === 'dir').map((e) => e.name));
+    const clashes = list.filter((n) => target.has(n) && isDirEntry('local', '', paths.join(src, n)));
+    if (clashes.length) {
+      openDialog({ type: 'mergeFolders', fromDir: src, names: list, toDir, move, clashes });
+      continue;
+    }
     if (LIVE) { void (move ? live.moveLocal(src, list, toDir) : live.copyLocal(src, list, toDir)); continue; }
     showToast(move ? $t('{0} Objekte verschoben (simuliert).', list.length) : $t('{0} Objekte kopiert (simuliert).', list.length), 'ok');
   }
+}
+
+/** Answer of the "Ordner zusammenführen?" window: copies or moves, merging same-named folders or keeping both. */
+export function finishCopyOrMove(fromDir: string, names: string[], toDir: string, move: boolean, merge: boolean) {
+  setState({ dialog: null });
+  if (LIVE) { void (move ? live.moveLocal(fromDir, names, toDir, merge) : live.copyLocal(fromDir, names, toDir, merge)); return; }
+  showToast(merge ? $t('{0} Objekte zusammengeführt (simuliert).', names.length) : move ? $t('{0} Objekte verschoben (simuliert).', names.length) : $t('{0} Objekte kopiert (simuliert).', names.length), 'ok');
 }
 
 /** Two local halves: moves the selection of one half into the folder of the other. */

@@ -2166,3 +2166,10 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 
 /* "Wenn fertig" choice in the activity head stays compact. */
 .act-head .select select { height: 26px; font-size: var(--text-small); }
+
+/* Own server picture: rounded like an app symbol; in the server dialog the symbol is the button to choose it. */
+.server-glyph.has-image img { width: 100%; height: 100%; object-fit: contain; border-radius: 22%; display: block; }
+.server-picture { position: relative; cursor: pointer; border-radius: 12px; flex-shrink: 0; }
+.server-picture:hover { box-shadow: 0 0 0 2px var(--accent-tint); }
+.server-picture:focus-within { box-shadow: 0 0 0 2px var(--focus); }
+.segmented button { white-space: nowrap; }

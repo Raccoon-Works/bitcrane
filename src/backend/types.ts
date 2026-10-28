@@ -50,6 +50,8 @@ export interface Server {
   mono: string;
   /** Tile colour key, see `serverColors` in the UI. */
   color: ServerColor;
+  /** Own picture for the server (Transmit): a small PNG as data URL (64 px), shown instead of the globe. */
+  image?: string;
   host: string;
   port: number;
   user: string;

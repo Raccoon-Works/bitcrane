@@ -17,6 +17,31 @@ import { Button, Segmented, Select, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/** Reads an image file and shrinks it to a 64 px square PNG (centred, transparent edges). */
+function pictureFromFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const side = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = side;
+      canvas.height = side;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('canvas')); return; }
+      const scale = Math.min(side / img.width, side / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (side - w) / 2, (side - h) / 2, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src = url;
+  });
+}
+
 const colors: ServerColor[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'orange', 'red'];
 
 /** Time zones for FTP servers that list local times (UTC-12 to UTC+14). */
@@ -183,7 +208,12 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
 
         <div className="split-detail">
           <div className="detail-head">
-            <ServerTile mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()} color={draft.color} size={48} />
+            {/* Own picture (Transmit): click the symbol to choose one; it is shrunk to 64 px and kept in the settings. */}
+            <label className="server-picture" title={$t('Eigenes Bild wählen')}>
+              <ServerTile mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()} color={draft.color} image={draft.image} size={48} />
+              <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" className="vh" aria-label={$t('Eigenes Bild wählen')}
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pictureFromFile(f).then((url) => set('image', url)).catch(() => showToast($t('Das Bild ließ sich nicht lesen.'), 'error')); }} />
+            </label>
             <div className="detail-head-fields">
               <TextField value={draft.name} onChange={(v) => set('name', v)} placeholder={$t('Name, z. B. Cloud · Bots')} className="name-field" />
               <div className="swatches" role="radiogroup" aria-label={$t('Farbe')}>
@@ -193,6 +223,9 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
                   <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={c === 'gray' ? $t('Keine Farbe') : c} title={c === 'gray' ? $t('Keine Farbe') : undefined}
                     className={`swatch${c === 'gray' ? ' is-none' : ''}${draft.color === c ? ' is-on' : ''}`} style={c === 'gray' ? undefined : { background: swatch[c] }} onClick={() => set('color', c)} />
                 ))}
+                {draft.image
+                  ? <button type="button" className="link small" onClick={() => set('image', undefined)}>{$t('Bild entfernen')}</button>
+                  : <span className="small muted">{$t('Klick aufs Symbol: eigenes Bild')}</span>}
               </div>
             </div>
           </div>

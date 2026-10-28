@@ -204,8 +204,45 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// "Zusammenführen" (Transmit "Merge"): puts the contents of folder `from` into the existing
+/// folder `to`. Sub-folders present on both sides are merged as well; a file whose name is
+/// already taken is kept next to the existing one as "… Kopie" (nothing is overwritten).
+/// With `moving`, entries are moved (renamed) where possible and the emptied source is removed.
+fn merge_tree(from: &Path, to: &Path, moving: bool) -> std::io::Result<()> {
+    for item in fs::read_dir(from)? {
+        let item = item?;
+        let src = item.path();
+        let name = item.file_name().to_string_lossy().into_owned();
+        let existing = to.join(&name);
+        let src_is_dir = fs::symlink_metadata(&src)?.is_dir();
+        if src_is_dir && existing.is_dir() {
+            merge_tree(&src, &existing, moving)?;
+            continue;
+        }
+        let target = to.join(copy_name(|n| to.join(n).exists(), &name));
+        if !moving || fs::rename(&src, &target).is_err() {
+            copy_tree(&src, &target)?;
+            if moving {
+                if src_is_dir { fs::remove_dir_all(&src)?; } else { fs::remove_file(&src)?; }
+            }
+        }
+    }
+    if moving {
+        // Everything was moved out; the empty folder goes away (it is not data any more).
+        let _ = fs::remove_dir(from);
+    }
+    Ok(())
+}
+
+/// True when `name` exists as a folder in `dest` and `from` is a folder: the case "Zusammenführen" applies to.
+fn merges_into(from: &Path, dest: &Path, name: &str) -> bool {
+    fs::symlink_metadata(from).map(|m| m.is_dir()).unwrap_or(false) && dest.join(name).is_dir()
+}
+
 /// Copies files or folders into `dest_dir` on this computer. Returns the new names.
-pub fn copy(paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+/// With `merge`, a folder whose name already exists there is merged into it instead of
+/// getting a " Kopie" name.
+pub fn copy(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
     let dest = to_native(dest_dir);
     let mut out = Vec::new();
     for p in paths {
@@ -214,6 +251,11 @@ pub fn copy(paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
             return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
         }
         let name = from.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if merge && merges_into(&from, &dest, &name) {
+            merge_tree(&from, &dest.join(&name), false)?;
+            out.push(name);
+            continue;
+        }
         let target = copy_name(|n| dest.join(n).exists(), &name);
         copy_tree(&from, &dest.join(&target))?;
         out.push(target);
@@ -243,7 +285,7 @@ pub fn copy_file_over(from: &str, to: &str) -> AppResult<()> {
 /// this is a rename; across drives the item is copied and the original then
 /// goes to the trash (never deleted permanently). A name that already exists
 /// in the target gets " Kopie" like a copy. Returns the new names.
-pub fn move_into(paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
     let dest = to_native(dest_dir);
     let mut out = Vec::new();
     for p in paths {
@@ -252,6 +294,11 @@ pub fn move_into(paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
             return Err(AppError::other("Ein Ordner kann nicht in sich selbst verschoben werden."));
         }
         let name = from.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if merge && merges_into(&from, &dest, &name) {
+            merge_tree(&from, &dest.join(&name), true)?;
+            out.push(name);
+            continue;
+        }
         let target = copy_name(|n| dest.join(n).exists(), &name);
         let to = dest.join(&target);
         if fs::rename(&from, &to).is_err() {
@@ -492,6 +539,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn merge_puts_contents_into_existing_folder() {
+        let base = std::env::temp_dir().join(format!("bitcrane-merge-{}", std::process::id()));
+        let a = base.join("a/site");
+        let b = base.join("b/site");
+        fs::create_dir_all(a.join("css")).unwrap();
+        fs::create_dir_all(b.join("css")).unwrap();
+        fs::write(a.join("index.html"), "new").unwrap();
+        fs::write(a.join("css/x.css"), "x").unwrap();
+        fs::write(b.join("index.html"), "old").unwrap();
+        fs::write(b.join("css/y.css"), "y").unwrap();
+        let made = copy(&[to_ui(&a)], &to_ui(&base.join("b")), true).unwrap();
+        assert_eq!(made, vec!["site".to_string()]);
+        // Both css files side by side, the existing index.html kept, the new one as a copy.
+        assert!(b.join("css/x.css").exists() && b.join("css/y.css").exists());
+        assert_eq!(fs::read_to_string(b.join("index.html")).unwrap(), "old");
+        assert_eq!(fs::read_to_string(b.join("index Kopie.html")).unwrap(), "new");
+        // Moving merges as well and removes the emptied source.
+        fs::create_dir_all(base.join("c/site/js")).unwrap();
+        fs::write(base.join("c/site/js/app.js"), "a").unwrap();
+        move_into(&[to_ui(&base.join("c/site"))], &to_ui(&base.join("b")), true).unwrap();
+        assert!(b.join("js/app.js").exists() && !base.join("c/site").exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn move_into_renames_and_keeps_both_on_clash() {
         let base = std::env::temp_dir().join(format!("bitcrane-move-{}", std::process::id()));
         let (a, b) = (base.join("a"), base.join("b"));
@@ -499,7 +571,7 @@ mod tests {
         fs::create_dir_all(&b).unwrap();
         fs::write(a.join("x.txt"), "1").unwrap();
         fs::write(b.join("x.txt"), "2").unwrap();
-        let made = move_into(&[to_ui(&a.join("x.txt"))], &to_ui(&b)).unwrap();
+        let made = move_into(&[to_ui(&a.join("x.txt"))], &to_ui(&b), false).unwrap();
         assert_eq!(made, vec!["x Kopie.txt".to_string()]);
         assert!(!a.join("x.txt").exists());
         assert_eq!(fs::read_to_string(b.join("x.txt")).unwrap(), "2");
@@ -537,10 +609,10 @@ mod tests {
         assert_eq!(w[0].relative, "sub/a.py");
 
         // Copies: a clash gets "Kopie", folders are copied with content, never into themselves.
-        assert_eq!(copy(&[format!("{base}/c.txt")], &base).unwrap(), vec!["c Kopie.txt".to_string()]);
-        assert_eq!(copy(&[format!("{base}/c.txt")], &base).unwrap(), vec!["c Kopie 2.txt".to_string()]);
-        assert_eq!(copy(&[format!("{base}/sub")], &base).unwrap(), vec!["sub Kopie".to_string()]);
+        assert_eq!(copy(&[format!("{base}/c.txt")], &base, false).unwrap(), vec!["c Kopie.txt".to_string()]);
+        assert_eq!(copy(&[format!("{base}/c.txt")], &base, false).unwrap(), vec!["c Kopie 2.txt".to_string()]);
+        assert_eq!(copy(&[format!("{base}/sub")], &base, false).unwrap(), vec!["sub Kopie".to_string()]);
         assert!(dir.path().join("sub Kopie/a.py").exists());
-        assert!(copy(&[format!("{base}/sub")], &format!("{base}/sub")).is_err());
+        assert!(copy(&[format!("{base}/sub")], &format!("{base}/sub"), false).is_err());
     }
 }

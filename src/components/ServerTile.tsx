@@ -26,8 +26,20 @@ export const swatch: Record<ServerColor, string> = {
  * (default "gray" = none); when one is chosen, e.g. red for a live server,
  * it shows as a small dot on the symbol (like WinSCP's site colour).
  */
-export function ServerTile({ server, size = 20, color, protocol }: { server?: Server; size?: number; mono?: string; color?: ServerColor; protocol?: Server['protocol'] }) {
+export function ServerTile({ server, size = 20, color, protocol, image }: { server?: Server; size?: number; mono?: string; color?: ServerColor; protocol?: Server['protocol']; image?: string }) {
   const proto = protocol ?? server?.protocol ?? 'sftp';
+  const picture = image ?? server?.image;
+  // An own picture replaces the globe (the colour dot stays, so groups remain recognisable).
+  if (picture) {
+    const c = color ?? server?.color;
+    const dot = Math.max(7, Math.round(size * 0.36));
+    return (
+      <span className="server-glyph has-image" aria-hidden="true" style={{ width: size, height: size }}>
+        <img src={picture} alt="" width={size} height={size} draggable={false} />
+        {c && c !== 'gray' && <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />}
+      </span>
+    );
+  }
   // One globe for every protocol (Transmit): the drive stack for FTP looked restless in the list.
   // The protocol stays visible in the tooltip and the server dialog.
   const Icon = GlobeHemisphereWest;
