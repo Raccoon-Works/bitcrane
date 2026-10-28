@@ -594,17 +594,18 @@ export async function copyOnServer(serverId: string, fromDir: string, names: str
 
 /** Copies on this computer. */
 /** Moves files or folders between two folders of this computer (two local halves). */
-export async function moveLocal(fromDir: string, names: string[], toDir: string) {
+export async function moveLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
-  const ok = await run('local', '', toDir, async () => { made = await backend.localMove(names.map((n) => join(fromDir, n)), toDir); });
+  const ok = await run('local', '', toDir, async () => { made = await backend.localMove(names.map((n) => join(fromDir, n)), toDir, merge); });
   invalidate('local', '', fromDir);
   bump();
   if (ok) showToast(made.length === 1 ? $t('„{0}“ verschoben.', made[0]) : $t('{0} Objekte verschoben.', made.length), 'ok');
 }
 
-export async function copyLocal(fromDir: string, names: string[], toDir: string) {
+export async function copyLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
-  const ok = await run('local', '', toDir, async () => { made = await backend.localCopy(names.map((n) => join(fromDir, n)), toDir); });
+  const ok = await run('local', '', toDir, async () => { made = await backend.localCopy(names.map((n) => join(fromDir, n)), toDir, merge); });
+  if (ok && merge) invalidate('local', '', fromDir);
   if (ok) showToast(copiedText(made), 'ok');
 }
 

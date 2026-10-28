@@ -13,7 +13,7 @@ import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportD
 import { LogDialog } from './components/dialogs/LogDialog';
 import { PreviewDialog } from './components/dialogs/PreviewDialog';
 import { BatchRename } from './components/dialogs/BatchRename';
-import { AfterQueueDialog, SelectMaskDialog, WorkspacesDialog } from './components/dialogs/ToolDialogs';
+import { AfterQueueDialog, MergeFoldersDialog, SelectMaskDialog, WorkspacesDialog } from './components/dialogs/ToolDialogs';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { ImportDialog } from './components/dialogs/ImportDialog';
 import { ServerEdit } from './components/dialogs/ServerEdit';
@@ -67,6 +67,7 @@ function Dialogs() {
     case 'selectMask': return <SelectMaskDialog side={dialog.side} />;
     case 'afterQueue': return <AfterQueueDialog action={dialog.action} />;
     case 'workspaces': return <WorkspacesDialog />;
+    case 'mergeFolders': return <MergeFoldersDialog fromDir={dialog.fromDir} names={dialog.names} toDir={dialog.toDir} move={dialog.move} clashes={dialog.clashes} />;
     case 'compare': return <CompareDialog key={dialog.favoriteId ?? 'new'} favoriteId={dialog.favoriteId} />;
     case 'import': return <ImportDialog />;
     case 'cloudPlaces': return <CloudPlacesDialog found={dialog.found} />;

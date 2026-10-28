@@ -159,8 +159,9 @@ export interface Backend {
   /** Opens an http(s) address in the default browser. */
   openUrl(url: string): Promise<void>;
   /** Copies into a folder on this computer; returns the new names ("x Kopie" on a clash). */
-  localCopy(paths: string[], destDir: string): Promise<string[]>;
-  localMove(paths: string[], destDir: string): Promise<string[]>;
+  /** With `merge`, a folder whose name exists in the target is merged into it ("Zusammenführen"). */
+  localCopy(paths: string[], destDir: string, merge?: boolean): Promise<string[]>;
+  localMove(paths: string[], destDir: string, merge?: boolean): Promise<string[]>;
   /** Copies files to exact targets, replacing existing ones (comparing two local folders). */
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
   localWalk(path: string): Promise<WalkItem[]>;

@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { PaneSide } from '../../backend/types';
-import { closeDialog, serverById, useStore, type AfterQueue } from '../../state/store';
+import { closeDialog, finishCopyOrMove, serverById, useStore, type AfterQueue } from '../../state/store';
 import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue } from '../../state/tools';
 import { Button, Checkbox, Segmented, TextField } from '../ui';
 import { Dialog } from './Dialog';
@@ -101,6 +101,19 @@ export function WorkspacesDialog() {
           </div>
         ))}
       </div>
+    </Dialog>
+  );
+}
+
+/** A copied or moved folder already exists in the target: merge into it, or keep both ("… Kopie"). Transmit asks the same. */
+export function MergeFoldersDialog({ fromDir, names, toDir, move, clashes }: { fromDir: string; names: string[]; toDir: string; move: boolean; clashes: string[] }) {
+  const title = clashes.length === 1 ? $t('Ordner „{0}“ gibt es dort schon', clashes[0]) : $t('{0} Ordner gibt es dort schon', clashes.length);
+  return (
+    <Dialog label={title} title={title} width={500}
+      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
+        <Button onClick={() => finishCopyOrMove(fromDir, names, toDir, move, false)}>{$t('Beide behalten')}</Button>
+        <Button variant="primary" onClick={() => finishCopyOrMove(fromDir, names, toDir, move, true)}>{$t('Zusammenführen')}</Button></>}>
+      <p className="small muted">{$t('Zusammenführen legt den Inhalt in den vorhandenen Ordner. Gleichnamige Dateien werden nicht überschrieben, sondern bleiben beide erhalten („… Kopie“). Beide behalten legt einen zweiten Ordner „… Kopie“ an.')}</p>
     </Dialog>
   );
 }

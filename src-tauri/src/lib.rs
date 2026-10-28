@@ -196,8 +196,8 @@ fn local_checksum(path: String) -> AppResult<String> {
 /// Copies on a worker thread: two local halves can copy large folders,
 /// which must not block the window.
 #[tauri::command]
-async fn local_copy(paths: Vec<String>, dest_dir: String) -> AppResult<Vec<String>> {
-    tauri::async_runtime::spawn_blocking(move || local::copy(&paths, &dest_dir))
+async fn local_copy(paths: Vec<String>, dest_dir: String, merge: Option<bool>) -> AppResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || local::copy(&paths, &dest_dir, merge.unwrap_or(false)))
         .await
         .map_err(|e| AppError::other("Kopieren wurde unterbrochen.").with_detail(e.to_string()))?
 }
@@ -217,8 +217,8 @@ async fn local_copy_files(pairs: Vec<(String, String)>) -> AppResult<()> {
 
 /// Moves files or folders between two local folders (two local halves).
 #[tauri::command]
-async fn local_move(paths: Vec<String>, dest_dir: String) -> AppResult<Vec<String>> {
-    tauri::async_runtime::spawn_blocking(move || local::move_into(&paths, &dest_dir))
+async fn local_move(paths: Vec<String>, dest_dir: String, merge: Option<bool>) -> AppResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || local::move_into(&paths, &dest_dir, merge.unwrap_or(false)))
         .await
         .map_err(|e| AppError::other("Verschieben wurde unterbrochen.").with_detail(e.to_string()))?
 }

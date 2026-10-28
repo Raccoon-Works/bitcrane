@@ -63,7 +63,7 @@ export async function runScheduled(f: SyncFavorite): Promise<void> {
     // Left out: like in the window (watch or general patterns plus the servers' rules).
     const s = getState().settings;
     const own = (!leftServer ? watchForLocal(f.local)?.excludes : undefined) ?? s.defaultExcludes;
-    const excludes = [...new Set([...own, ...[leftServer, rightServer].filter(Boolean).flatMap((sid) => ruleFor(sid)?.excludes ?? [])])];
+    const excludes = [...new Set([...own, ...[leftServer, rightServer].filter(Boolean).flatMap((sid) => ruleFor(sid, undefined, undefined, false)?.excludes ?? [])])];
     const differs = f.byContent ? await contentDiffers(left, right, sameSizePairs(local, remote, excludes)) : null;
     const base = { direction: f.direction, bySize: f.bySize, days: f.days ?? 0, excludes, differs };
     const allowDelete = f.deletes && !!f.schedule?.allowDelete;
