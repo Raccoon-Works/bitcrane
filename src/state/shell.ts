@@ -1,0 +1,315 @@
+/**
+ * Desktop integration of the app (live mode only):
+ * - native menu bar on macOS, built from the same definitions as the
+ *   Windows "…" menu,
+ * - status icon in the menu bar / notification area,
+ * - keep running in the background when the window is closed,
+ * - system notifications and signal tones,
+ * - progress and count on the app icon (Dock / taskbar),
+ * - start at login.
+ */
+import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow, ProgressBarStatus } from '@tauri-apps/api/window';
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from '@tauri-apps/plugin-autostart';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { Transfer } from '../backend/types';
+import { menuDefs } from '../components/AppMenu';
+import { playDoneSound, playErrorSound } from '../util/sounds';
+import { quitApp } from '../util/appWindow';
+import { isConfigLoaded } from './live';
+import { getState, openSftpLink, pauseAllWatches, subscribeStore, type AppState } from './store';
+import { $t } from '../i18n';
+
+/* ------------------------------------------------------------------------ */
+/* macOS menu bar                                                           */
+/* ------------------------------------------------------------------------ */
+
+const KEY_NAMES: Record<string, string> = { '↑': 'Up', '↓': 'Down', '←': 'Left', '→': 'Right', '⌫': 'Backspace', '⌦': 'Delete', '↩': 'Enter', esc: 'Escape', '⇥': 'Tab', Leertaste: 'Space' };
+
+/**
+ * Converts a shortcut as shown in the menus ("⇧⌘N", "⌥⌘↓") into a Tauri
+ * accelerator ("Shift+Cmd+N", "Alt+Cmd+Down").
+ */
+export function toAccelerator(mac: string): string {
+  const parts: string[] = [];
+  let key = '';
+  for (const ch of mac) {
+    if (ch === '⌘') parts.push('Cmd');
+    else if (ch === '⇧') parts.push('Shift');
+    else if (ch === '⌥') parts.push('Alt');
+    else if (ch === '⌃') parts.push('Ctrl');
+    else key += ch;
+  }
+  return [...parts, KEY_NAMES[key] ?? key.toUpperCase()].join('+');
+}
+
+/**
+ * Shortcuts that also mean something while typing in a text field. They stay
+ * visible in the menus of the web view but are not bound natively, so text
+ * editing keeps working; the window's own key handling covers the file lists.
+ */
+const TEXT_KEYS = new Set(['⌘⌫', '⌘↑', '⌘A', '⌘↓']);
+
+async function installMacMenu() {
+  const defs = menuDefs();
+  const sub = async (id: string, text: string, items: Array<MenuItem | PredefinedMenuItem | Submenu>) => Submenu.new({ id, text, items });
+  const custom = async (defId: string, skip: string[] = []) => {
+    const def = defs.find((d) => d.id === defId)!;
+    const out: Array<MenuItem | PredefinedMenuItem> = [];
+    for (const it of def.items) {
+      if (skip.includes(it.label)) continue;
+      if (it.sep) {
+        out.push(await PredefinedMenuItem.new({ item: 'Separator' }));
+        continue;
+      }
+      out.push(await MenuItem.new({
+        text: it.label,
+        enabled: !!it.run,
+        accelerator: it.mac && !TEXT_KEYS.has(it.mac) ? toAccelerator(it.mac) : undefined,
+        action: () => it.run?.(),
+      }));
+    }
+    return out;
+  };
+  const appDef = defs.find((d) => d.id === 'app')!;
+  const item = (label: string) => appDef.items.find((i) => i.label === label)!;
+  const sep = () => PredefinedMenuItem.new({ item: 'Separator' });
+
+  const appMenu = await sub('app', 'Bitcrane', [
+    await MenuItem.new({ text: $t('Über Bitcrane'), action: () => item($t('Über Bitcrane')).run?.() }),
+    // Like other Mac apps: "Nach Updates suchen …" right below "Über Bitcrane".
+    await MenuItem.new({ text: $t('Nach Updates suchen …'), action: () => item($t('Nach Updates suchen …')).run?.() }),
+    await sep(),
+    await MenuItem.new({ text: $t('Einstellungen …'), accelerator: item($t('Einstellungen …')).mac ? toAccelerator(item($t('Einstellungen …')).mac!) : undefined, action: () => item($t('Einstellungen …')).run?.() }),
+    await MenuItem.new({ text: $t('Werkzeugleiste anpassen …'), action: () => item($t('Werkzeugleiste anpassen …')).run?.() }),
+    await sep(),
+    await PredefinedMenuItem.new({ item: 'Hide', text: $t('Bitcrane ausblenden') }),
+    await PredefinedMenuItem.new({ item: 'HideOthers', text: $t('Andere ausblenden') }),
+    await PredefinedMenuItem.new({ item: 'ShowAll', text: $t('Alle einblenden') }),
+    await sep(),
+    await MenuItem.new({ text: $t('Bitcrane beenden'), accelerator: 'Cmd+Q', action: quitApp }),
+  ]);
+  // "Bearbeiten" needs the standard text commands, otherwise ⌘C / ⌘V do not work in text fields.
+  const editMenu = await sub('edit', $t('Bearbeiten'), [
+    await PredefinedMenuItem.new({ item: 'Undo', text: $t('Widerrufen') }),
+    await PredefinedMenuItem.new({ item: 'Redo', text: $t('Wiederholen') }),
+    await sep(),
+    await PredefinedMenuItem.new({ item: 'Cut', text: $t('Ausschneiden') }),
+    await PredefinedMenuItem.new({ item: 'Copy', text: $t('Kopieren') }),
+    await PredefinedMenuItem.new({ item: 'Paste', text: $t('Einsetzen') }),
+    await PredefinedMenuItem.new({ item: 'SelectAll', text: $t('Alles auswählen') }),
+    await sep(),
+    // "Alles auswählen" is the standard entry above; it also selects all files in a list.
+    ...(await custom('edit', [$t('Alles auswählen'), $t('Kopieren'), $t('Einfügen')])),
+  ]);
+  const windowMenu = await sub('window', $t('Fenster'), [
+    await PredefinedMenuItem.new({ item: 'Minimize', text: $t('Im Dock ablegen') }),
+    await PredefinedMenuItem.new({ item: 'Maximize', text: $t('Zoomen') }),
+    await PredefinedMenuItem.new({ item: 'Fullscreen', text: $t('Vollbild') }),
+    await sep(),
+    await PredefinedMenuItem.new({ item: 'CloseWindow', text: $t('Fenster schließen') }),
+  ]);
+  const menu = await Menu.new({
+    items: [
+      appMenu,
+      await sub('file', $t('Ablage'), await custom('file')),
+      editMenu,
+      await sub('view', $t('Darstellung'), await custom('view')),
+      await sub('go', $t('Gehe zu'), await custom('go')),
+      await sub('server', $t('Server'), await custom('server')),
+      await sub('watch', $t('Überwachung'), await custom('watch')),
+      windowMenu,
+      await sub('help', $t('Hilfe'), await custom('help')),
+    ],
+  });
+  await menu.setAsAppMenu();
+}
+
+/* ------------------------------------------------------------------------ */
+/* Status icon                                                              */
+/* ------------------------------------------------------------------------ */
+
+function trayStatus(s: AppState): { text: string; paused: boolean } {
+  const active = s.transfers.filter((t) => t.state === 'running' || t.state === 'queued').length;
+  const errors = s.transfers.filter((t) => t.state === 'error').length;
+  const watching = s.watches.filter((w) => w.state !== 'paused').length;
+  const paused = s.watches.length > 0 && watching === 0;
+  if (errors) return { text: errors === 1 ? $t('1 Fehler, bitte ansehen') : $t('{0} Fehler, bitte ansehen', errors), paused };
+  if (active) return { text: active === 1 ? $t('Überträgt 1 Datei') : $t('Überträgt {0} Dateien', active), paused };
+  if (paused) return { text: $t('Alle Überwachungen pausiert'), paused };
+  if (watching) return { text: watching === 1 ? $t('1 Überwachung aktiv') : $t('{0} Überwachungen aktiv', watching), paused };
+  return { text: $t('Keine Überwachung aktiv'), paused };
+}
+
+let lastTray = '';
+function syncTray(s: AppState) {
+  const st = trayStatus(s);
+  // A hidden start needs the status icon, otherwise Bitcrane could not be reached.
+  const visible = s.settings.showMenuBarIcon || !!s.startedHidden;
+  const key = `${visible}|${st.text}|${st.paused}`;
+  if (key === lastTray) return;
+  lastTray = key;
+  backend.trayUpdate(visible, st.text, st.paused, { open: $t('Bitcrane öffnen'), pause: $t('Alle Überwachungen pausieren'), resume: $t('Alle Überwachungen fortsetzen'), quit: $t('Bitcrane beenden') }).catch(() => undefined);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Notifications, tones and app icon progress                               */
+/* ------------------------------------------------------------------------ */
+
+let notifyAllowed: boolean | null = null;
+export async function notify(title: string, body: string) {
+  try {
+    if (notifyAllowed === null) {
+      notifyAllowed = await isPermissionGranted();
+      if (!notifyAllowed) notifyAllowed = (await requestPermission()) === 'granted';
+    }
+    if (notifyAllowed) sendNotification({ title, body });
+  } catch {
+    // Notifications not available on this system.
+  }
+}
+
+let seen = new Map<string, Transfer['state']>();
+let batchDone = 0;
+let batchHadError = false;
+
+function onTransfers(s: AppState, focused: boolean) {
+  const next = new Map(s.transfers.map((t) => [t.id, t.state] as const));
+  for (const t of s.transfers) {
+    const before = seen.get(t.id);
+    if (before === t.state) continue;
+    if (t.state === 'error' && before !== 'error') {
+      batchHadError = true;
+      if (s.settings.soundOnError) playErrorSound();
+      if (s.settings.notify !== 'none') {
+        const server = s.servers.find((x) => x.id === t.serverId)?.name ?? $t('Server');
+        notify(`${t.name}: ${t.error ?? $t('Fehler')}`, $t('{0}, {1}. Bitcrane öffnen, um es zu beheben.', server, t.folder));
+      }
+    }
+    if (t.state === 'done' && before && before !== 'done' && t.direction !== 'command') batchDone++;
+  }
+  seen = next;
+  const busy = s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
+  if (!busy && batchDone > 0) {
+    if (!batchHadError) {
+      if (s.settings.soundOnDone) playDoneSound();
+      if (s.settings.notify === 'all' && !focused) notify($t('Alles übertragen'), batchDone === 1 ? $t('1 Datei übertragen.') : $t('{0} Dateien übertragen.', batchDone));
+    }
+    batchDone = 0;
+    batchHadError = false;
+  }
+}
+
+let lastProgress = '';
+function syncProgress(s: AppState) {
+  const win = getCurrentWindow();
+  const active = s.transfers.filter((t) => t.state === 'running' || t.state === 'queued');
+  const total = active.reduce((a, t) => a + Math.max(1, t.size), 0);
+  const done = active.reduce((a, t) => a + Math.min(t.done, t.size), 0);
+  const show = s.settings.dockProgress && active.length > 0;
+  const pct = show ? Math.max(1, Math.round((done / total) * 100)) : 0;
+  const key = `${show}|${pct}|${active.length}`;
+  if (key === lastProgress) return;
+  lastProgress = key;
+  win.setProgressBar(show ? { status: ProgressBarStatus.Normal, progress: pct } : { status: ProgressBarStatus.None }).catch(() => undefined);
+  // The count badge exists on macOS (and some Linux docks), not on Windows.
+  win.setBadgeCount(show ? active.length : undefined).catch(() => undefined);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Start                                                                    */
+/* ------------------------------------------------------------------------ */
+
+let started = false;
+
+/** Starts the desktop integration once (live mode only). */
+export async function startShell() {
+  if (started) return;
+  started = true;
+  const win = getCurrentWindow();
+  let focused = true;
+  win.onFocusChanged(({ payload }) => { focused = payload; }).catch(() => undefined);
+
+  if (getState().platform === 'mac') {
+    await installMacMenu().catch(() => undefined);
+    // Own shortcuts: rebuild the menu so it shows and uses the new keys.
+    let keys = getState().settings.shortcuts;
+    subscribeStore(() => {
+      const next = getState().settings.shortcuts;
+      if (next !== keys) {
+        keys = next;
+        void installMacMenu().catch(() => undefined);
+      }
+    });
+  }
+
+  // Closing the window keeps Bitcrane running when that is switched on.
+  await win.onCloseRequested(async (e) => {
+    if (getState().settings.runInBackground) {
+      e.preventDefault();
+      await win.hide();
+      return;
+    }
+    // Closing quits Bitcrane: install an update that is already loaded first.
+    if (getState().update?.status === 'ready') {
+      e.preventDefault();
+      quitApp();
+    }
+  });
+
+  // sftp:// links: the first one may have started the app.
+  const deepLink = await import('@tauri-apps/plugin-deep-link').catch(() => null);
+  if (deepLink) {
+    const open = (urls: string[] | null) => { for (const u of urls ?? []) if (u.startsWith('sftp:')) openSftpLink(u); };
+    const waitConfig = () => (isConfigLoaded() ? Promise.resolve() : new Promise<void>((r) => { const t = window.setInterval(() => { if (isConfigLoaded()) { window.clearInterval(t); r(); } }, 100); }));
+    void waitConfig().then(() => deepLink.getCurrent().then(open).catch(() => undefined));
+    await deepLink.onOpenUrl((urls) => { void waitConfig().then(() => open(urls)); }).catch(() => undefined);
+    // Windows registers the link type when the setting is on (the Mac declares it in the app bundle).
+    if (getState().platform === 'win') {
+      let linksOn: boolean | null = null;
+      const syncLinks = () => {
+        const on = getState().settings.sftpLinks;
+        if (!isConfigLoaded() || on === linksOn) return;
+        linksOn = on;
+        void (on ? deepLink.register('sftp') : deepLink.unregister('sftp')).catch(() => undefined);
+      };
+      subscribeStore(syncLinks);
+      syncLinks();
+    }
+  }
+
+  await listen<string>('tray-action', (e) => {
+    if (e.payload === 'pauseAll') pauseAllWatches();
+    if (e.payload === 'quit') quitApp();
+  });
+
+  // Start at login follows the setting.
+  let autostart = await autostartEnabled().catch(() => false);
+  let autostartSynced = false;
+
+  let prev: AppState | null = null;
+  const onChange = () => {
+    const s = getState();
+    if (prev === s) return;
+    if (!prev || prev.transfers !== s.transfers) {
+      onTransfers(s, focused);
+      syncProgress(s);
+    }
+    if (!prev || prev.transfers !== s.transfers || prev.watches !== s.watches || prev.settings !== s.settings) syncTray(s);
+    // Only after the saved settings are loaded, otherwise the defaults would switch it off.
+    if (isConfigLoaded() && (!prev || prev.settings.startAtLogin !== s.settings.startAtLogin || !autostartSynced)) {
+      autostartSynced = true;
+      const want = s.settings.startAtLogin;
+      // First sync after the start: register again, so an older entry gets the "--autostart" argument.
+      if (want !== autostart || (want && !prev)) {
+        autostart = want;
+        (want ? enableAutostart() : disableAutostart()).catch(() => undefined);
+      }
+    }
+    prev = s;
+  };
+  subscribeStore(onChange);
+  onChange();
+}

@@ -1,0 +1,48 @@
+# Compiles the Rust part on Windows and macOS without building installers or
+# publishing anything. Used to check platform-specific code (e.g. the system
+# file symbols in sysicons.rs) that cannot be compiled on Linux.
+name: Check native code
+
+# Runs on a push to the branch "native-check" (manual dispatch would need the
+# file on the default branch, which stays untouched).
+on:
+  push:
+    branches: [native-check]
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows only: GitHub often has no free Mac runner (a cancelled job sends a
+        # "Run failed" mail), and the release build compiles for the Mac anyway.
+        platform: [windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # tauri::generate_context! needs the frontend folder to exist; an empty page is enough here.
+      - name: Placeholder frontend
+        shell: bash
+        run: mkdir -p dist && echo '<!doctype html><title>check</title>' > dist/index.html
+
+      - name: Check
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml --message-format=short 2>&1 | tee check.log
+
+      # The full log is not always reachable from outside; errors and warnings also become annotations.
+      - name: Report problems as annotations
+        if: failure()
+        shell: bash
+        run: |
+          grep -E 'error|warning: unused' check.log | head -40 | sed 's/^/::error::/' || true

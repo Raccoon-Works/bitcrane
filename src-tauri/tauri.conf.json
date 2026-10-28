@@ -1,0 +1,77 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Bitcrane",
+  "version": "0.2.0",
+  "identifier": "de.raccoonworks.bitcrane",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Bitcrane",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "app",
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "RaccoonWorks",
+    "copyright": "© 2026 RaccoonWorks",
+    "category": "DeveloperTool",
+    "shortDescription": "SFTP mit Ordnerüberwachung",
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "German",
+          "English"
+        ],
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUxMDRFRUU2MDBENEQ3RUUKUldUdTE5UUE1dTRFNGVXcGp4d1J1M0RRSjBvL3NQT1ZTb2dZMWxDeG1ndFYrVXNOaTNFTEh5ZmIK",
+      "endpoints": [
+        "https://github.com/Raccoon-Works/bitcrane/releases/latest/download/latest.json",
+        "https://raw.githubusercontent.com/Raccoon-Works/bitcrane-releases/main/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
