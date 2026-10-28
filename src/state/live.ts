@@ -18,9 +18,10 @@ import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { FileEntry, PaneSide, Server, Tab, Transfer, Watch } from '../backend/types';
 import { basename, join, parent } from '../util/paths';
 import { addLog } from './log';
+import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
 import {
-  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, openDialog, paneLoc, ruleFor, serverById, setState, showToast, subscribeStore, uid, watchExcludes, type AppState,
+  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, watchExcludes, type AppState, type SavedTab,
 } from './store';
 import { $t } from '../i18n';
 
@@ -1403,6 +1404,22 @@ export async function testCommand(serverId: string, command: string): Promise<{ 
   }
 }
 
+/** Runs a command on the server (own commands from the context menu); connects first when needed. */
+export async function runRemoteCommand(serverId: string, command: string): Promise<{ code: number; output: string } | { error: string }> {
+  if (!connected.has(serverId)) {
+    const ok = await connectServer(serverId);
+    if (!ok) return { error: $t('Keine Verbindung zum Server.') };
+  }
+  try {
+    addLog('info', $t('Befehl: {0}', command), serverId);
+    const r = await backend.remoteExec(serverId, command);
+    addLog(r.code === 0 ? 'ok' : 'error', $t('Befehl endete mit Code {0}', r.code), serverId, r.output.trim() || undefined);
+    return r;
+  } catch (e) {
+    return { error: toBackendError(e).message };
+  }
+}
+
 /** "Testlauf": tells the user how many files the watch would cover. */
 export async function testRun(localPath: string, excludes: string[]) {
   try {
@@ -1427,7 +1444,7 @@ interface StoredConfig {
   /** Unfinished manual transfers; they continue after a restart. Watches catch up on their own. */
   queue?: Transfer[];
   /** Open tabs of the last session ("Beim Start öffnen: Zuletzt geöffnete Tabs"). */
-  tabs?: Array<{ serverId: string; localPath: string; remotePath: string; leftServerId?: string }>;
+  tabs?: SavedTab[];
   activeTab?: number;
 }
 
@@ -1453,12 +1470,7 @@ function snapshot(s: AppState): string {
     settings: s.settings,
     toolbar: s.toolbar,
     toolbarLabels: s.toolbarLabels,
-    tabs: s.tabs.filter((t) => !s.servers.find((x) => x.id === t.serverId)?.temporary)
-      .map((t) => {
-        // A temporary server on the left is not kept; the left half shows this computer then.
-        const left = t.leftServerId && !s.servers.find((x) => x.id === t.leftServerId)?.temporary ? t.leftServerId : undefined;
-        return { serverId: t.serverId, localPath: left || !t.leftServerId ? t.localPath : '~', remotePath: t.remotePath, ...(left ? { leftServerId: left } : {}) };
-      }),
+    tabs: savedTabs(s.tabs),
     activeTab: Math.max(0, s.tabs.findIndex((t) => t.id === s.activeTabId)),
     // Progress is left out, so the file is not rewritten on every progress step.
     queue: s.transfers
@@ -1559,10 +1571,16 @@ async function loadConfig() {
     firstRun: false,
     // Unfinished transfers of the last session continue (from their partial files).
     transfers: (cfg?.queue ?? []).filter((t) => servers.some((x) => x.id === t.serverId)).map((t) => ({ ...t, id: uid('t') })),
-    // Bitcrane starts locally without a server (like WinSCP's "Neuer Tab"), unless a start server is set.
+    // Bitcrane starts locally without a server (like WinSCP's "Neuer Tab"), unless a start server is set
+    // or "Tabs vom letzten Mal wieder öffnen" is on.
     tabs: [startTab(servers, { ...s.settings, ...(cfg?.settings ?? {}) })],
   }));
-  setState((s) => ({ activeTabId: s.tabs[0]?.id ?? '' }));
+  const restored = cfg?.settings?.restoreTabs && cfg.tabs?.length ? tabsFromSaved(cfg.tabs) : [];
+  if (restored.length) {
+    setState({ tabs: restored });
+    // Selecting the tab connects its server(s); the other tabs connect when they are opened.
+    selectTab(restored[Math.min(cfg?.activeTab ?? 0, restored.length - 1)].id);
+  } else setState((s) => ({ activeTabId: s.tabs[0]?.id ?? '' }));
   lastSaved = snapshot(getState());
   loaded = true;
   void decideStartWindow();

@@ -7,6 +7,7 @@
  * Edge) and with the Alt key; the icon in the title bar keeps the system menu.
  */
 import { checkForUpdates } from '../state/updates';
+import { invertSelection, toggleCompareDirs } from '../state/tools';
 import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
@@ -54,6 +55,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Herunterladen'), ...sc('download'), run: () => download() },
         sep,
         { label: $t('Tab schließen'), ...sc('closeTab'), run: () => { const t = activeTab(); if (t) closeTab(t.id); } },
+        { label: $t('Arbeitsbereiche …'), ...sc('workspaces'), run: () => openDialog({ type: 'workspaces' }) },
         sep,
         { label: $t('Server und Überwachungen exportieren …'), run: () => void exportConfig() },
         { label: $t('Exportdatei importieren …'), run: () => void importConfig() },
@@ -65,6 +67,8 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Einfügen'), ...sc('paste'), run: () => pasteClipboard(focus()) },
         { label: $t('Pfad kopieren'), ...sc('copyPath'), run: () => copyPath(focus()) },
         { label: $t('Alles auswählen'), mac: '⌘A', win: 'Strg+A', run: () => selectAll(focus()) },
+        { label: $t('Auswählen nach Muster …'), ...sc('selectMask'), run: () => openDialog({ type: 'selectMask', side: focus() }) },
+        { label: $t('Auswahl umkehren'), ...sc('invertSelection'), run: () => invertSelection(focus()) },
         sep,
         { label: $t('Löschen …'), mac: '⌘⌫', win: 'Entf', run: () => askDelete(focus()), danger: true },
       ],
@@ -82,6 +86,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Spalte „Rechte“ ein/aus'), run: togglePermsColumn },
         { label: $t('Seiten tauschen'), run: toggleSwapSides },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
+        { label: $t('Verzeichnisse vergleichen'), ...sc('compareDirs'), run: toggleCompareDirs },
         { label: $t('Suche in Unterordnern'), ...sc('deepSearch'), run: () => setDeepSearch(!getState().deepSearchOn) },
         { label: $t('Aktualisieren'), ...sc('refresh'), run: refresh },
       ],

@@ -35,6 +35,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'shortcuts', group: $t('Fenster'), label: $t('Tastenkürzel anzeigen'), mac: ['Mod+/'], win: ['Mod+/'], run: () => openDialog({ type: 'shortcuts' }) },
   { id: 'palette', group: $t('Fenster'), label: $t('Befehle suchen'), mac: ['Mod+Shift+P'], win: ['Mod+Shift+P'], run: () => openDialog({ type: 'palette' }) },
   { id: 'transfers', group: $t('Fenster'), label: $t('Übertragungen'), mac: ['Mod+Alt+T'], win: ['Mod+Alt+T'], run: () => openDialog({ type: 'transfers' }) },
+  { id: 'workspaces', group: $t('Fenster'), label: $t('Arbeitsbereiche'), mac: [], win: [], run: () => openDialog({ type: 'workspaces' }) },
 
   { id: 'inspector', group: $t('Darstellung'), label: $t('Info-Spalte ein/aus'), mac: ['Mod+I'], win: ['Mod+I'], run: toggleInspector },
   { id: 'activity', group: $t('Darstellung'), label: $t('Aktivität ein/aus'), mac: ['Mod+Alt+A'], win: ['Mod+Shift+A'], run: toggleActivity },
@@ -43,6 +44,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'viewList', group: $t('Darstellung'), label: $t('Als Liste'), mac: ['Mod+1'], win: ['Mod+Shift+6'], run: () => setViewMode(focus(), 'list') },
   { id: 'viewIcons', group: $t('Darstellung'), label: $t('Als Symbole'), mac: ['Mod+2'], win: ['Mod+Shift+2'], run: () => setViewMode(focus(), 'icons') },
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
+  { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
   { id: 'deepSearch', group: $t('Darstellung'), label: $t('Suche in Unterordnern ein/aus'), mac: ['Mod+Shift+F'], win: ['Mod+Shift+F'], run: () => setDeepSearch(!getState().deepSearchOn) },
   { id: 'zoomIn', group: $t('Darstellung'), label: $t('Vergrößern'), mac: ['Mod++', 'Mod+='], win: ['Mod++', 'Mod+='], run: () => stepZoom(1) },
   { id: 'zoomOut', group: $t('Darstellung'), label: $t('Verkleinern'), mac: ['Mod+-'], win: ['Mod+-'], run: () => stepZoom(-1) },
@@ -60,6 +62,8 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'paste', group: $t('Dateien'), label: $t('In die andere Hälfte einfügen'), mac: ['Mod+V'], win: ['Mod+V'], run: () => pasteClipboard(focus()), notInText: true },
   { id: 'copyPath', group: $t('Dateien'), label: $t('Pfad kopieren'), mac: ['Mod+Alt+C'], win: ['Mod+Shift+C'], run: () => copyPath(focus()), notInText: true },
   { id: 'newFolder', group: $t('Dateien'), label: $t('Neuer Ordner'), mac: ['Mod+Shift+N'], win: ['Mod+Shift+N'], run: () => newFolder() },
+  { id: 'selectMask', group: $t('Dateien'), label: $t('Auswählen nach Muster'), mac: ['Mod+Alt+S'], win: ['Mod+Alt+S'], run: () => openDialog({ type: 'selectMask', side: focus() }) },
+  { id: 'invertSelection', group: $t('Dateien'), label: $t('Auswahl umkehren'), mac: ['Mod+Shift+I'], win: ['Mod+Shift+I'], run: () => void import('./tools').then((m) => m.invertSelection(focus())), notInText: true },
 
   { id: 'newWatch', group: $t('Überwachung'), label: $t('Neue Überwachung'), mac: ['Mod+U'], win: ['Mod+U'], run: () => openDialog({ type: 'watchSetup' }) },
   { id: 'watchTab', group: $t('Überwachung'), label: $t('Überwachung für diesen Tab starten'), mac: ['Mod+Shift+U'], win: ['Mod+Shift+U'], run: () => openDialog({ type: 'watchSetup' }) },

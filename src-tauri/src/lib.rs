@@ -126,6 +126,36 @@ fn open_full_disk_access() -> AppResult<()> {
     }
 }
 
+/// "Nach Abschluss" (WinSCP "Once empty"): puts the computer to sleep or shuts it down
+/// once all transfers are done. The interface asks with a countdown before calling this.
+#[tauri::command]
+fn system_power(action: String) -> AppResult<()> {
+    let (program, args): (&str, Vec<&str>) = match action.as_str() {
+        #[cfg(target_os = "macos")]
+        "sleep" => ("osascript", vec!["-e", "tell application \"System Events\" to sleep"]),
+        #[cfg(target_os = "macos")]
+        "shutdown" => ("osascript", vec!["-e", "tell application \"System Events\" to shut down"]),
+        #[cfg(windows)]
+        "sleep" => ("rundll32.exe", vec!["powrprof.dll,SetSuspendState", "0,1,0"]),
+        #[cfg(windows)]
+        "shutdown" => ("shutdown", vec!["/s", "/t", "0"]),
+        #[cfg(all(unix, not(target_os = "macos")))]
+        "sleep" => ("systemctl", vec!["suspend"]),
+        #[cfg(all(unix, not(target_os = "macos")))]
+        "shutdown" => ("systemctl", vec!["poweroff"]),
+        _ => return Err(AppError::other("Unbekannte Aktion.")),
+    };
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: no console window flashes up.
+        cmd.creation_flags(0x0800_0000);
+    }
+    cmd.spawn().map(|_| ()).map_err(AppError::from)
+}
+
 #[tauri::command]
 fn open_url(url: String) -> AppResult<()> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
@@ -1141,6 +1171,7 @@ pub fn run() {
             local_move,
             local_copy_files,
             open_full_disk_access,
+            system_power,
             local_checksum,
             open_url,
             local_places,

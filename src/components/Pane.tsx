@@ -26,6 +26,7 @@ import * as paths from '../util/paths';
 import { LocalTile, ServerTile } from './ServerTile';
 import { Button, IconButton } from './ui';
 import { $t } from '../i18n';
+import { compareMarks, selectDifferences, toggleCompareDirs, type CompareMark } from '../state/tools';
 
 
 /** Symbol size of the icons view per size step. */
@@ -199,6 +200,11 @@ export function Pane({ side }: { side: PaneSide }) {
     row?.scrollIntoView({ block: 'nearest' });
   }, [sel.cursor]);
 
+  // "Verzeichnisse vergleichen" (WinSCP): marks for what differs from the other half.
+  const compareOn = useStore((s) => s.compareDirs);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
+
   if (!tab) return null;
 
   if (showServers) {
@@ -225,6 +231,7 @@ export function Pane({ side }: { side: PaneSide }) {
     : offline ? { text: $t('getrennt'), tone: 'warn' } : status.connecting ? { text: $t('verbindet'), tone: 'muted' } : server?.online ? { text: $t('verbunden'), tone: 'ok' } : { text: $t('nicht verbunden'), tone: 'muted' };
 
   const selectedCount = sel.names.length;
+  const markLabel: Record<CompareMark, string> = { only: $t('fehlt drüben'), newer: $t('neuer'), older: $t('älter'), size: $t('andere Größe') };
   const hidden = search ? 0 : hiddenCount(side);
   const footText = (() => {
     if (status.notConnected) return '';
@@ -233,6 +240,7 @@ export function Pane({ side }: { side: PaneSide }) {
     // Hidden entries are counted, so nobody wonders where a file went (WinSCP: "2 versteckt").
     const base = `${n} ${n === 1 ? $t('Objekt') : $t('Objekte')}${hidden ? `, ${$t('{0} versteckt', hidden)}` : ''}`;
     if (selectedCount) return $t('{0}, {1} ausgewählt', base, selectedCount);
+    if (marks) return marks.size ? $t('{0}, {1} anders als drüben', base, marks.size) : $t('{0}, gleich wie drüben', base);
     if (side === 'remote' && otherNames) {
       const only = entries.filter((e) => !otherNames.has(e.name)).length;
       if (only) return $t('{0}, {1} nur auf dem Server', base, only);
@@ -293,6 +301,7 @@ export function Pane({ side }: { side: PaneSide }) {
       selected ? (focused ? 'is-sel' : 'is-sel-inactive') : '',
       selected && focused && sel.cursor === index ? 'is-cursor' : '',
       dropHint === entry.name ? 'is-drop' : '',
+      marks && (entry.depth ?? 0) === 0 && marks.get(entry.name) ? `cmp-${marks.get(entry.name)}` : '',
     ].join(' ');
   };
 
@@ -361,7 +370,8 @@ export function Pane({ side }: { side: PaneSide }) {
           {nameEl}
           {link}
           {busyTag}
-          {onlyHere && <span className="tag">{$t('nur Server')}</span>}
+          {onlyHere && !marks && <span className="tag">{$t('nur Server')}</span>}
+          {marks && depth === 0 && marks.get(entry.name) && <span className={`tag cmp-tag is-${marks.get(entry.name)}`}>{markLabel[marks.get(entry.name)!]}</span>}
         </span>
         {columns.mtime && <span className="row-sub nowrap">{formatDate(entry.mtime)}</span>}
         {columns.kind && <span className="row-sub ellipsis">{kindOf(entry)}</span>}
@@ -533,6 +543,8 @@ export function Pane({ side }: { side: PaneSide }) {
 
       <div className="pane-foot">
         <span className="flex-1">{footText}</span>
+        {marks && marks.size > 0 && <Button small variant="ghost" onClick={() => selectDifferences(side)} title={$t('Alles auswählen, was drüben fehlt oder hier neuer ist')}>{$t('Unterschiede auswählen')}</Button>}
+        {marks && side === 'remote' && <Button small variant="ghost" onClick={toggleCompareDirs}>{$t('Vergleich beenden')}</Button>}
         {/* Two local halves (Total Commander): copy or move into the other half's folder. */}
         {bothLocal && selectedCount > 0 && (
           <>

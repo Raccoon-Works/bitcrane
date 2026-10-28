@@ -13,6 +13,7 @@ import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportD
 import { LogDialog } from './components/dialogs/LogDialog';
 import { PreviewDialog } from './components/dialogs/PreviewDialog';
 import { BatchRename } from './components/dialogs/BatchRename';
+import { AfterQueueDialog, SelectMaskDialog, WorkspacesDialog } from './components/dialogs/ToolDialogs';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { ImportDialog } from './components/dialogs/ImportDialog';
 import { ServerEdit } from './components/dialogs/ServerEdit';
@@ -26,6 +27,7 @@ import { PrototypeBar } from './components/PrototypeBar';
 import { STAGE_ID } from './components/stage';
 import { activeTab, copySelection, getState, LIVE, pasteClipboard, setState, startSimulation, useStore } from './state/store';
 import { actionFor } from './state/keys';
+import { startAfterQueueWatch } from './state/tools';
 
 /** Smallest size at which the window is laid out; smaller screens scale it down. */
 const MIN_W = LIVE ? 960 : 1100;
@@ -62,6 +64,9 @@ function Dialogs() {
     case 'log': return <LogDialog />;
     case 'preview': return <PreviewDialog side={dialog.side} />;
     case 'batchRename': return <BatchRename side={dialog.side} names={dialog.names} />;
+    case 'selectMask': return <SelectMaskDialog side={dialog.side} />;
+    case 'afterQueue': return <AfterQueueDialog action={dialog.action} />;
+    case 'workspaces': return <WorkspacesDialog />;
     case 'compare': return <CompareDialog key={dialog.favoriteId ?? 'new'} favoriteId={dialog.favoriteId} />;
     case 'import': return <ImportDialog />;
     case 'cloudPlaces': return <CloudPlacesDialog found={dialog.found} />;
@@ -150,6 +155,8 @@ export default function App() {
   const palette = useStore((s) => (s.palette === 'auto' ? (s.platform === 'win' ? 'explorer' : 'transmit') : s.palette));
   const { w, h, scale } = useStageSize(platform);
   useShortcuts();
+  // "Nach Abschluss": watches the transfer queue for the chosen action.
+  useEffect(() => { const off = startAfterQueueWatch(); return () => { off(); }; }, []);
   useEffect(() => {
     startSimulation();
     if (LIVE) {

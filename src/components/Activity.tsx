@@ -9,13 +9,14 @@ import { useKeyLabel } from '../state/keys';
 import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, Check, ChevronDown, ChevronUp, Clock, SquareTerminal } from './glyphs';
 import type { Transfer } from '../backend/types';
 import {
-  activeTab, activityExpanded, fixDemoPermissions, isOffline, retryTransfer, setActivityFilter, setState, skipTransfer, toggleActivity, updateSettings, useStore,
+  activeTab, activityExpanded, fixDemoPermissions, isOffline, retryTransfer, setActivityFilter, setState, skipTransfer, toggleActivity, updateSettings, useStore, type AfterQueue,
 } from '../state/store';
 import { formatSpeed, formatTime } from '../util/format';
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { getLog, subscribeLog } from '../state/log';
 import { ResizeHandle } from './ResizeHandle';
-import { Button, IconButton } from './ui';
+import { Button, IconButton, Select } from './ui';
+import { afterQueueLabel, setAfterQueue } from '../state/tools';
 import { $t } from '../i18n';
 
 export function TransferIcon({ t }: { t: Transfer }) {
@@ -116,6 +117,9 @@ export function Activity() {
   const done = transfers.filter((t) => t.state === 'done');
   const key = useKeyLabel()('activity') ?? '';
   const height = useStore((s) => s.settings.activityHeight ?? 240);
+  const after = useStore((s) => s.afterQueue);
+  const busy = running.length + queued.length > 0;
+  const afterOptions = (['none', 'disconnect', 'quit', 'sleep', 'shutdown'] as AfterQueue[]).map((v) => ({ value: v, label: v === 'none' ? $t('Wenn fertig: nichts tun') : $t('Wenn fertig: {0}', afterQueueLabel(v)) }));
 
   if (!expanded) {
     const current = running[0] ?? queued[0];
@@ -157,7 +161,7 @@ export function Activity() {
         {line}
         <span className="flex-1" />
         <span className="small muted nowrap">
-          {[restCount > 0 ? `${restCount} weitere` : '', running.length ? `↑ ${formatSpeed(speed)}` : ''].filter(Boolean).join(' · ')}
+          {[restCount > 0 ? `${restCount} weitere` : '', running.length ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : ''].filter(Boolean).join(' · ')}
         </span>
         <IconButton label={$t('Aktivität aufklappen')} shortcut={key} onClick={toggleActivity} tipBelow={false}><ChevronUp size={14} strokeWidth={2} /></IconButton>
       </section>
@@ -186,6 +190,8 @@ export function Activity() {
         </div>
         <span className="flex-1" />
         {running.length > 0 && <span className="small muted">↑ {formatSpeed(speed)}</span>}
+        {/* WinSCP "Once empty": what happens when everything is transferred. */}
+        {(busy || after !== 'none') && <Select value={after} onChange={setAfterQueue} options={afterOptions} label={$t('Wenn alle Übertragungen fertig sind')} />}
         <Button small variant="ghost" onClick={() => setState({ dialog: { type: 'transfers' } })}>{$t('Alle Übertragungen')}</Button>
         <IconButton label={errors.length ? $t('Zuklappen geht erst, wenn kein Fehler mehr offen ist') : $t('Aktivität zuklappen')} shortcut={key} disabled={errors.length > 0} onClick={toggleActivity} tipBelow={false}><ChevronDown size={14} strokeWidth={2} /></IconButton>
       </div>

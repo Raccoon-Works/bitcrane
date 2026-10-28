@@ -4,7 +4,7 @@
  * On Windows the tabs live in the title bar instead (MainWindow.tsx).
  */
 import {
-  ArrowClockwise, ArrowsClockwise, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
+  ArrowClockwise, ArrowsClockwise, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
 } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 import {
@@ -18,6 +18,7 @@ import { useKeyLabel } from '../state/keys';
 import { IconButton, Tooltip } from './ui';
 import { WatchPopover } from './WatchPopover';
 import { WinMoreMenu } from './AppMenu';
+import { toggleCompareDirs } from '../state/tools';
 import { $t } from '../i18n';
 
 /** Platform-specific shortcut label. */
@@ -79,6 +80,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
   const selLocal = useStore((s) => s.selection.local.names.length);
   const selRemote = useStore((s) => s.selection.remote.names.length);
   const sel = focus === 'local' ? selLocal : selRemote;
+  const compareOn = useStore((s) => s.compareDirs);
   const ic = (n: ReactNode) => n;
   return {
     nav: { label: $t('Zurück'), key: sk('back'), icon: ic(<CaretLeft size={19} />), run: goBack, disabled: !tab?.back.length },
@@ -99,6 +101,8 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
     sync: { label: $t('Ordner abgleichen'), icon: ic(<ArrowsClockwise size={19} />), run: () => openDialog({ type: 'compare' }) },
     syncBrowse: { label: $t('Synchron blättern'), key: sk('syncBrowse'), icon: ic(<LinkSimple size={19} />), run: toggleSyncBrowse, active: !!tab?.syncBrowse },
     palette: { label: $t('Befehle'), key: sk('palette'), icon: ic(<Command size={19} />), run: () => openDialog({ type: 'palette' }) },
+    compareDirs: { label: $t('Verzeichnisse vergleichen'), key: sk('compareDirs'), icon: ic(<Columns size={19} />), run: toggleCompareDirs, active: compareOn },
+    selectMask: { label: $t('Auswählen nach Muster'), key: sk('selectMask'), icon: ic(<Checks size={19} />), run: () => openDialog({ type: 'selectMask', side: focus }) },
   };
 }
 
