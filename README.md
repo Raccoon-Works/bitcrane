@@ -1,6 +1,13 @@
-# Bitcrane
+<p align="center">
+  <img src="docs/bitcrane-icon.png" width="128" height="128" alt="Bitcrane icon">
+</p>
 
-File transfer for macOS and Windows with automatic folder watching. Published by RaccoonWorks.
+<h1 align="center">Bitcrane</h1>
+
+<p align="center">
+  File transfer for macOS and Windows with automatic folder watching. Published by RaccoonWorks.<br>
+  <a href="https://github.com/Raccoon-Works/bitcrane/releases/latest"><strong>Download the latest version</strong></a>
+</p>
 
 - Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS)
 - Two halves: this computer and a server, or two servers (server to server)
