@@ -3,7 +3,7 @@
  * Verbindungen, Darstellung, Erweitert. Changes apply immediately.
  */
 import { ArrowUpDown, Eye, Radio, Settings as Gear, Shield, SlidersHorizontal, SunMoon, X, Plus, Keyboard } from '../glyphs';
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
@@ -101,7 +101,7 @@ function TerminalSettingsPage() {
       <Group title={$t('Snippets')}>
         <SnippetSettings />
       </Group>
-      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), getState().platform === 'mac' ? '⌃`' : 'Strg+`')}</span>
+      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), formatCombo(keysFor('terminal', getState().platform)[0] ?? '', getState().platform))}</span>
     </>
   );
 }
@@ -118,10 +118,14 @@ function Row({ label, note, children, column }: { label: string; note?: ReactNod
   );
 }
 
+/** Title of the settings area shown; a group with the same name needs no caption of its own. */
+const SectionTitle = createContext('');
+
 function Group({ title, children }: { title: string; children: ReactNode }) {
+  const section = useContext(SectionTitle);
   return (
     <section className="set-group" aria-label={title}>
-      <span className="caption-strong">{title}</span>
+      {title !== section && <span className="caption-strong">{title}</span>}
       <div className="set-card">{children}</div>
     </section>
   );
@@ -301,12 +305,18 @@ function RulesSettings() {
   return (
     <>
       <p className="small muted">{$t('Eine Regel bündelt Einstellungen fürs Übertragen und gilt für einen Server (Server bearbeiten › Regel) oder eine Überwachung. Leere Felder nehmen die allgemeinen Einstellungen.')}</p>
-      <div className="rules-layout">
+      {!rules.length && (
+        <div className="set-card">
+          <Row label={$t('Noch keine Regel')} note={$t('Zum Beispiel „Bot“: .git, __pycache__ und *.log nie hochladen, Rechte 644/755. Danach unter Server bearbeiten › Regel auswählen.')}>
+            <Button small onClick={() => add()}><Plus size={13} strokeWidth={2} /> {$t('Erste Regel anlegen')}</Button>
+          </Row>
+        </div>
+      )}
+      {rules.length > 0 && <div className="rules-layout">
         <div className="rules-list" role="listbox" aria-label={$t('Regeln')}>
           {rules.map((r) => (
             <button key={r.id} type="button" role="option" aria-selected={r.id === sel?.id} className={`rules-item${r.id === sel?.id ? ' is-sel' : ''}`} onClick={() => setSelId(r.id)}>{r.name || $t('Ohne Namen')}</button>
           ))}
-          {!rules.length && <span className="small muted">{$t('Noch keine Regel.')}</span>}
           <span className="row-inline rules-buttons">
             <Button small onClick={() => add()}>{$t('Neue Regel')}</Button>
             {sel && <Button small onClick={() => add(sel)}>{$t('Duplizieren')}</Button>}
@@ -343,7 +353,7 @@ function RulesSettings() {
             <span className="row-inline"><span className="flex-1" /><Button small variant="danger" onClick={() => { removeRule(sel.id); setSelId(null); }}>{$t('Regel löschen')}</Button></span>
           </div>
         )}
-      </div>
+      </div>}
     </>
   );
 }
@@ -400,6 +410,9 @@ function AboutHeader() {
 export function SettingsPage({ section }: { section: SettingsTab }) {
   const current = section;
   const setCurrent = setSettingsSection;
+  // Another area starts at its top, not where the last one was scrolled to.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [section]);
   const s = useStore((st) => st.settings);
   const platform = useStore((st) => st.platform);
   const [pattern, setPattern] = useState<string | null>(null);
@@ -456,7 +469,8 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
           </button>
         ))}
       </nav>
-      <div className="set-scroll">
+      <div className="set-scroll" ref={scrollRef}>
+      <SectionTitle.Provider value={title}>
       <div className="set-body" role="tabpanel" aria-label={title}>
         {current === 'general' && <AboutHeader />}
         <h1 className="set-heading">{title}</h1>
@@ -660,6 +674,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
           </>
         )}
       </div>
+      </SectionTitle.Provider>
       </div>
     </div>
   );

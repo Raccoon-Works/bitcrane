@@ -12,7 +12,7 @@ import {
   activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, goBack, goForward, LIVE, newFolder, newTab, openDialog,
   pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
-import { $t } from '../i18n';
+import { $t, LANG } from '../i18n';
 
 export interface ShortcutAction {
   id: string;
@@ -106,7 +106,8 @@ export function formatCombo(combo: string, platform: Platform = getState().platf
   // "Mod++" (plus key) splits into an empty last part.
   const key = combo.endsWith('++') ? '+' : parts[parts.length - 1];
   const mods = new Set(parts.slice(0, -1));
-  const keyText = NAMED[key] ? NAMED[key][platform === 'mac' ? 0 : 1] : key;
+  // The key left of 1 (Backquote) shows "^" on German keyboards, where the shortcut is pressed with it.
+  const keyText = NAMED[key] ? NAMED[key][platform === 'mac' ? 0 : 1] : key === '`' && LANG === 'de' ? '^' : key;
   if (platform === 'mac') {
     return `${mods.has('Ctrl') ? '⌃' : ''}${mods.has('Alt') ? '⌥' : ''}${mods.has('Shift') ? '⇧' : ''}${mods.has('Mod') ? '⌘' : ''}${keyText}`;
   }
