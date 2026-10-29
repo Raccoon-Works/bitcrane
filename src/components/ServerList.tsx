@@ -339,8 +339,10 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
       <div className="server-welcome-actions">
         <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}><Plus size={14} strokeWidth={2} aria-hidden="true" />{$t('Server hinzufügen')}</Button>
         <Button onClick={onQuick}><Zap size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Schnell verbinden')}</Button>
-        <Button onClick={importSshConfig}><SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />
-          {found === 1 ? $t('1 Server aus anderen Programmen übernehmen') : found > 1 ? $t('{0} Server aus anderen Programmen übernehmen', found) : $t('Aus anderen Programmen')}
+        {/* The number of servers found elsewhere is a small badge, so the label stays short. */}
+        <Button onClick={importSshConfig} title={found > 0 ? (found === 1 ? $t('1 Server aus anderen Programmen übernehmen') : $t('{0} Server aus anderen Programmen übernehmen', found)) : undefined}>
+          <SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Aus anderen Programmen')}
+          {found > 0 && <span className="count-badge" aria-label={found === 1 ? $t('1 Server gefunden') : $t('{0} Server gefunden', found)}>{found}</span>}
         </Button>
       </div>
     </div>

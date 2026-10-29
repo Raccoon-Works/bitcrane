@@ -1124,6 +1124,48 @@ fn file_write(path: String, text: String) -> AppResult<()> {
     Ok(())
 }
 
+/// Shared settings file in a folder the user's cloud keeps in step between
+/// computers ("Zwischen Rechnern abgleichen", after Panic Sync): "<folder>/Bitcrane/bitcrane-sync.json".
+fn sync_file(dir: &str) -> std::path::PathBuf {
+    paths::to_native(dir).join("Bitcrane").join("bitcrane-sync.json")
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncFile {
+    text: String,
+    /// Modification time in milliseconds (to notice changes from the other computer).
+    mtime: i64,
+}
+
+/// Reads the shared settings file; None when there is none yet.
+#[tauri::command]
+fn sync_read(dir: String) -> AppResult<Option<SyncFile>> {
+    let p = sync_file(&dir);
+    let meta = match std::fs::metadata(&p) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    let mtime = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+    Ok(Some(SyncFile { text: std::fs::read_to_string(&p)?, mtime }))
+}
+
+/// Writes the shared settings file (through a temporary file, so the cloud never copies half a file).
+#[tauri::command]
+fn sync_write(dir: String, text: String) -> AppResult<i64> {
+    let p = sync_file(&dir);
+    if !paths::to_native(&dir).is_dir() {
+        return Err(AppError::new(ErrorKind::NotFound, "Der Ordner für den Abgleich ist nicht da (Cloud-Programm nicht angemeldet oder Ordner verschoben?)."));
+    }
+    std::fs::create_dir_all(p.parent().unwrap())?;
+    let tmp = p.with_extension("json.tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, &p)?;
+    let mtime = std::fs::metadata(&p)?.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+    Ok(mtime)
+}
+
 /// Reads a text file chosen by the user (import of the settings).
 #[tauri::command]
 fn file_read(path: String) -> AppResult<String> {
@@ -1319,6 +1361,8 @@ pub fn run() {
             ssh_config_hosts,
             import_find,
             file_write,
+            sync_read,
+            sync_write,
             file_read,
             local_read_text,
             local_preview,

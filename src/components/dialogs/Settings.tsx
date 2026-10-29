@@ -8,7 +8,8 @@ import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import type { KnownHost } from '../../backend/api';
+import type { CloudPlace, KnownHost } from '../../backend/api';
+import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
 import { closeDialog, getState, LIVE, newRuleId, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { ListChecks } from '@phosphor-icons/react';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
@@ -19,7 +20,7 @@ import { Button, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
-function Row({ label, note, children, column }: { label: string; note?: string; children?: ReactNode; column?: boolean }) {
+function Row({ label, note, children, column }: { label: string; note?: ReactNode; children?: ReactNode; column?: boolean }) {
   return (
     <div className={`set-row${column ? ' is-column' : ''}`}>
       <div className="col-text flex-1">
@@ -360,6 +361,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
           </>
         )}
         {current === 'general' && (
+          <>
           <Group title={$t('Allgemein')}>
             <Row label={$t('Sprache')} note={$t('Gilt ab dem nächsten Start.')}><Select value={s.language} onChange={(v) => updateSettings({ language: v })} label={$t('Sprache')} options={[{ value: 'de', label: $t('Deutsch') }, { value: 'en', label: $t('English') }]} /></Row>
             <Row label={$t('Updates')} note={s.updateMode === 'auto' ? $t('Neue Versionen werden im Hintergrund geladen und beim Beenden installiert.') : s.updateMode === 'notify' ? $t('Beim Start und alle paar Stunden. Installiert wird erst, wenn du zustimmst.') : $t('Nur wenn du „Jetzt suchen“ klickst.')}>
@@ -415,6 +417,8 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
               </span>
             </Row>
           </Group>
+          <SyncSettings />
+          </>
         )}
         {current === 'transfers' && (
           <>
@@ -508,5 +512,49 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
         )}
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * "Zwischen Rechnern abgleichen" (after Panic Sync): a folder the user's cloud
+ * keeps in step; optional sync password for the passwords (see state/sync.ts).
+ */
+function SyncSettings() {
+  const s = useStore((st) => st.settings);
+  const platform = useStore((st) => st.platform);
+  const [found, setFound] = useState<CloudPlace[]>([]);
+  const [pw, setPw] = useState('');
+  // Cloud folders of this computer as quick choices (the same detection as for the places bar).
+  useEffect(() => { if (LIVE) void backend.localCloudPlaces().then((l) => setFound(l.filter((c) => c.service !== 'other'))).catch(() => undefined); }, []);
+  const choose = async () => {
+    const picked = await openDialogPicker({ directory: true, multiple: false, title: $t('Ordner für den Abgleich') }).catch(() => null);
+    if (typeof picked === 'string') await setSyncFolder(await invoke<string>('path_to_ui', { path: picked }));
+  };
+  const status = syncStatus();
+  return (
+    <Group title={$t('Zwischen Rechnern abgleichen')}>
+      <Row label={$t('Ordner für den Abgleich')} note={s.syncFolder
+        ? <><span className="mono">{s.syncFolder}</span>{status && <><br /><span className={s.syncError ? 'tone-danger' : ''}>{status}</span></>}</>
+        : $t('Server, Gruppen, Regeln und eigene Befehle gleich auf Mac und PC. Wähle einen Ordner, den Dropbox, OneDrive, iCloud Drive oder Google Drive ohnehin abgleicht, und auf dem anderen Rechner denselben.')}>
+        <span className="row-inline wrap">
+          {!s.syncFolder && found.map((f) => <Button key={f.path} small onClick={() => void setSyncFolder(f.path)}>{f.name}</Button>)}
+          {s.syncFolder && <Button small onClick={() => void runSync()}>{$t('Jetzt abgleichen')}</Button>}
+          {LIVE && <Button small onClick={() => void choose()}>{s.syncFolder ? $t('Ändern …') : $t('Anderer Ordner …')}</Button>}
+          {s.syncFolder && <Button small variant="ghost" onClick={() => void setSyncFolder(null)}>{$t('Aus')}</Button>}
+        </span>
+      </Row>
+      {s.syncFolder && (
+        <Row label={$t('Passwörter mit abgleichen')} note={s.syncPasswords
+          ? $t('An. Verschlüsselt mit deinem Abgleich-Passwort; das Passwort selbst liegt nur {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Anmeldeinformationsverwaltung'))
+          : $t('Aus: Passwörter bleiben auf jedem Rechner für sich. Mit einem Abgleich-Passwort (auf allen Rechnern dasselbe) wandern sie verschlüsselt mit.')}>
+          {s.syncPasswords
+            ? <Button small variant="ghost" onClick={() => void setSyncPassword(null)}>{$t('Ausschalten')}</Button>
+            : <span className="row-inline">
+              <TextField type="password" value={pw} onChange={setPw} placeholder={$t('Abgleich-Passwort')} label={$t('Abgleich-Passwort')} onEnter={() => { if (pw.length >= 8) { void setSyncPassword(pw); setPw(''); } }} />
+              <Button small disabled={pw.length < 8} onClick={() => { void setSyncPassword(pw); setPw(''); }}>{$t('Einschalten')}</Button>
+            </span>}
+        </Row>
+      )}
+    </Group>
   );
 }

@@ -156,6 +156,15 @@ export interface Settings {
   updateMode: 'auto' | 'notify' | 'off';
   /** Client id of the user's own Google app (Google Drive); its secret is in the keychain. */
   googleClientId?: string;
+  /** "Zwischen Rechnern abgleichen": folder the user's cloud keeps in step (see sync.ts). */
+  syncFolder?: string;
+  /** Passwords travel too (encrypted with the sync password from the keychain). */
+  syncPasswords?: boolean;
+  /** State after the last sync (hashes), last successful sync, file time seen, last error. */
+  syncBase?: import('./sync').SyncBase;
+  syncAt?: number;
+  syncSeen?: number;
+  syncError?: string;
   /** Version that ran last time; a different one at start means an update was installed. */
   lastVersion?: string;
   /** Names / patterns never transferred by hand (".DS_Store", "*.tmp"). */
