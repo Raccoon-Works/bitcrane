@@ -221,6 +221,13 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     return backend.connectDropbox(id, { refreshToken });
   }
+  if (srv.protocol === 'gdrive') {
+    const refreshToken = await keychain(cloudAccount(srv));
+    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    const key = await (await import('./cloud')).googleKey();
+    if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
+    return backend.connectGDrive(id, { refreshToken, ...key });
+  }
   return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, jump, proxy });
 }
 
@@ -276,7 +283,7 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox' };
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox', gdrive: 'Google Drive' };
 const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
@@ -620,6 +627,18 @@ export async function copyLocal(fromDir: string, names: string[], toDir: string,
   const ok = await run('local', '', toDir, async () => { made = await backend.localCopy(names.map((n) => join(fromDir, n)), toDir, merge); });
   if (ok && merge) invalidate('local', '', fromDir);
   if (ok) showToast(copiedText(made), 'ok');
+}
+
+/** "Link kopieren" (cloud services): a sharing link goes to the clipboard. */
+export async function copyShareLink(serverId: string, path: string) {
+  try {
+    showToast($t('Link wird erstellt …'));
+    const url = await backend.remoteShareLink(serverId, path);
+    await navigator.clipboard.writeText(url);
+    showToast($t('Link kopiert.'), 'ok');
+  } catch (e) {
+    showToast(toBackendError(e).message, 'error');
+  }
 }
 
 /** "Komprimieren": a zip of the chosen entries next to them (this computer). */

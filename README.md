@@ -10,6 +10,7 @@
 </p>
 
 - Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS)
+- Cloud services: Dropbox, Google Drive (with your own free app key, see [docs/google-drive.md](docs/google-drive.md))
 - Two halves: this computer and a server, or two servers (server to server)
 - Folder watching: changed files are uploaded automatically, with excludes, a post-upload command and a warning when the server copy is newer
 - Transfer queue that survives a restart and resumes partial files

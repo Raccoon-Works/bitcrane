@@ -31,7 +31,7 @@ export function ServerTile({ server, size = 20, color, protocol, image }: { serv
   const proto = protocol ?? server?.protocol ?? 'sftp';
   const picture = image ?? server?.image;
   // Cloud services show their own symbol (unless the user chose a picture).
-  if (!picture && proto === 'dropbox') return <CloudTile service="dropbox" size={size} />;
+  if (!picture && (proto === 'dropbox' || proto === 'gdrive')) return <CloudTile service={proto} size={size} />;
   // An own picture replaces the globe (the colour dot stays, so groups remain recognisable).
   if (picture) {
     const c = color ?? server?.color;

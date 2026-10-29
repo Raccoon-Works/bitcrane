@@ -82,6 +82,10 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
 fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
     let summary = serde_json::from_str::<Value>(body).ok().and_then(|v| v.get("error_summary").and_then(|s| s.as_str()).map(String::from)).unwrap_or_default();
     let detail = format!("{status}: {}", if summary.is_empty() { body } else { &summary });
+    // The app's permissions in the Dropbox App Console do not cover this action.
+    if summary.contains("missing_scope") || body.contains("missing_scope") {
+        return AppError::new(ErrorKind::Other, format!("{what}: Die Bitcrane-App bei Dropbox hat dafür keine Berechtigung.")).with_detail(detail);
+    }
     if status.as_u16() == 401 {
         return AppError::new(ErrorKind::AuthFailed, "Die Anmeldung bei Dropbox ist nicht mehr gültig. Bitte neu anmelden.").with_detail(detail);
     }
@@ -170,6 +174,38 @@ impl DropboxConn {
             return Err(api_err(status, &text, what));
         }
         serde_json::from_str(&text).map_err(|e| AppError::other("Unerwartete Antwort von Dropbox.").with_detail(e.to_string()))
+    }
+
+    /// Link to share a file or folder (Transmit "Copy Link"). An existing link is
+    /// reused, otherwise a new one is made with the account's default settings.
+    pub async fn share_link(&self, path: &str) -> AppResult<String> {
+        let what = format!("Link für „{}“", remote_name(path));
+        let token = self.access().await?;
+        let resp = self
+            .client
+            .post(format!("{API}/sharing/create_shared_link_with_settings"))
+            .bearer_auth(token)
+            .header("Content-Type", "application/json")
+            .body(json!({ "path": dbx_path(path) }).to_string())
+            .send()
+            .await
+            .map_err(net)?;
+        let status = resp.status();
+        let text = resp.text().await.map_err(net)?;
+        if status.is_success() {
+            let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+            if let Some(url) = v.get("url").and_then(|u| u.as_str()) {
+                return Ok(url.to_string());
+            }
+        } else if !text.contains("shared_link_already_exists") {
+            return Err(api_err(status, &text, &what));
+        }
+        // A link exists already: take it.
+        let v = self.rpc("sharing/list_shared_links", json!({ "path": dbx_path(path), "direct_only": true }), &what).await?;
+        v.pointer("/links/0/url")
+            .and_then(|u| u.as_str())
+            .map(String::from)
+            .ok_or_else(|| AppError::other(format!("{what}: Dropbox hat keinen Link geliefert.")))
     }
 
     /// E-mail address of the signed-in account.

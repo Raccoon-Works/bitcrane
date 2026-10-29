@@ -166,6 +166,8 @@ export interface Backend {
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
   /** Packs files and folders into a zip next to them; returns the archive's name. */
   localZip(paths: string[]): Promise<string>;
+  /** Link to share a file or folder (cloud services only). */
+  remoteShareLink(serverId: string, path: string): Promise<string>;
   /** Unpacks a zip into a new folder next to it; returns the folder's name. */
   localUnzip(path: string): Promise<string>;
   localWalk(path: string): Promise<WalkItem[]>;
@@ -188,7 +190,10 @@ export interface Backend {
   /** Which cloud services this build has app keys for. */
   cloudServices(): Promise<{ dropbox: boolean; onedrive: boolean }>;
   /** Sign-in in the browser; resolves with the refresh token and the account name. */
-  cloudSignIn(service: string): Promise<{ refreshToken: string; account: string }>;
+  /** Google Drive needs the user's own app key (client id and secret). */
+  cloudSignIn(service: string, clientId?: string, clientSecret?: string): Promise<{ refreshToken: string; account: string }>;
+  /** Google Drive with the refresh token and the user's own app key. */
+  connectGDrive(serverId: string, params: { refreshToken: string; clientId: string; clientSecret: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
   cloudSignInCancel(): Promise<void>;
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;

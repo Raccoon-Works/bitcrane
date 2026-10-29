@@ -40,7 +40,7 @@ function Dialogs() {
   if (!dialog) return null;
   switch (dialog.type) {
     case 'watchSetup': return <WatchSetup key={dialog.editId ?? 'new'} editId={dialog.editId} />;
-    case 'serverEdit': return <ServerEdit key={dialog.serverId ?? 'new'} serverId={dialog.serverId} />;
+    case 'serverEdit': return <ServerEdit key={dialog.serverId ?? `new-${dialog.cloud ?? ''}`} serverId={dialog.serverId} cloud={dialog.cloud} />;
     case 'quickConnect': return <QuickConnect />;
     case 'fingerprint': return <Fingerprint mode={dialog.mode} keyInfo={dialog.key} serverId={dialog.serverId} />;
     case 'conflict': return <ConflictDialog />;

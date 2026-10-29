@@ -8,7 +8,7 @@ import { ArrowLeft, Plus, SquareTerminal, X, Zap } from './glyphs';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowsClockwise, ClockCounterClockwise, FolderSimple, GlobeHemisphereWest, FolderSimplePlus, DownloadSimple, Globe, Lightning, Plus as PlusP, Stack } from '@phosphor-icons/react';
 import { isCloudProtocol, type PaneSide, type Protocol, type Server } from '../backend/types';
-import { showCloudNotSetUp } from '../state/cloud';
+import { addCloudService } from '../state/cloud';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import {
   activeTab, addServerGroup, getState, importSshConfig, LIVE, moveServer, renameServerGroup, serverGroupNames, openDialog, openServerIn, openSyncFavorite, quickConnect, setLeftServer,
@@ -127,11 +127,11 @@ export function ServerList({ side }: { side: PaneSide }) {
 /** What the right column of the server list shows (left column of Transmit's connection panel). */
 type Source = 'all' | 'recent' | 'syncs' | 'cloud' | `g:${string}`;
 
-/** Cloud services that can be added (Dropbox now; OneDrive and Google Drive follow in the next versions). */
+/** Cloud services that can be added (OneDrive follows in one of the next versions). */
 const CLOUD_SERVICES: Array<{ id: CloudService; protocol?: Protocol; name: string }> = [
   { id: 'dropbox', protocol: 'dropbox', name: 'Dropbox' },
+  { id: 'gdrive', protocol: 'gdrive', name: 'Google Drive' },
   { id: 'onedrive', name: 'OneDrive' },
-  { id: 'gdrive', name: 'Google Drive' },
 ];
 
 function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
@@ -226,8 +226,9 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
 
   // "Hinzufügen" rows of the cloud services: sign in through the browser.
   const cloudAddRow = (c: (typeof CLOUD_SERVICES)[number]) => {
-    const ready = !!c.protocol && (c.protocol === 'dropbox' ? cloudAvailable.dropbox : false);
-    const add = () => (ready && c.protocol ? openDialog({ type: 'cloudSignIn', service: c.protocol }) : c.protocol ? showCloudNotSetUp(c.protocol) : undefined);
+    // Google Drive works with the user's own app key (asked for on the first double click).
+    const ready = !!c.protocol && (c.protocol === 'dropbox' ? cloudAvailable.dropbox || !LIVE : true);
+    const add = () => { if (c.protocol) void addCloudService(c.protocol); };
     return (
       <div key={`add-${c.id}`} role="option" aria-selected={false} aria-disabled={!ready} tabIndex={ready ? 0 : -1} className={`server-row${ready ? '' : ' is-preview'}`}
         title={ready ? $t('Doppelklick: bei {0} anmelden', c.name) : $t('Kommt mit einem der nächsten Updates.')}
