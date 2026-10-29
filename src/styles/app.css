@@ -2299,3 +2299,14 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 /* xterm.js paints unused space black; the area takes the scheme's background instead. */
 .term-host .xterm, .term-host .xterm-viewport, .term-host .xterm-scrollable-element { background-color: var(--term-bg, var(--bg-terminal)) !important; }
 .tab-gear { display: grid; place-items: center; width: 18px; color: var(--accent-text); }
+
+.confirm-detail { margin: 0; max-height: 160px; overflow: auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: var(--bg-field); white-space: pre-wrap; word-break: break-all; }
+
+/* Colour schemes of the terminal as previews (Settings › Terminal). */
+.scheme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: var(--space-2); max-height: 420px; overflow: auto; padding: 2px; }
+.scheme-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-control); border: 1px solid var(--line); text-align: left; background: var(--bg-card); }
+.scheme-card:hover { border-color: var(--line-strong); background: var(--bg-hover); }
+.scheme-card.is-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.scheme-preview { display: flex; flex-direction: column; gap: 1px; padding: 8px 9px; border-radius: 5px; font-size: 11px; line-height: 15px; white-space: nowrap; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.18); }
+.scheme-cursor { display: inline-block; width: 6px; height: 12px; margin-left: 4px; vertical-align: -2px; }
+.scheme-name { font-size: var(--text-small); padding: 0 2px; }

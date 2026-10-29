@@ -13,15 +13,16 @@ import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state
 import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { Bug, GithubLogo, ListChecks, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
-import { SCHEMES, terminalSettings, type TerminalSettings } from '../../state/terminal';
+import { terminalSettings, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
 import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
 import { Button, IconButton, Select, Switch, TextField } from '../ui';
-import { $t } from '../../i18n';
+import { $t, LANG } from '../../i18n';
 import { SnippetSettings } from './SnippetSettings';
+import { SchemePicker } from '../SchemePicker';
 
 /** Stable empty list for the store selector (a new [] would redraw endlessly). */
 const NO_RULES: TransferRule[] = [];
@@ -53,11 +54,13 @@ function TerminalSettingsPage() {
   const t = terminalSettings();
   const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const [historyN, setHistoryN] = useState(historyCount);
+  const [shells, setShells] = useState<Array<{ id: string; name: string }>>(LIVE ? [] : getState().platform === 'mac' ? [{ id: 'zsh', name: 'zsh' }, { id: 'bash', name: 'bash' }] : [{ id: 'pwsh', name: 'PowerShell 7' }, { id: 'powershell', name: 'Windows PowerShell' }, { id: 'cmd', name: 'Eingabeaufforderung (cmd)' }, { id: 'gitbash', name: 'Git Bash' }]);
+  useEffect(() => { if (LIVE) invoke<Array<{ id: string; name: string }>>('term_shells').then(setShells).catch(() => undefined); }, []);
   return (
     <>
       <Group title={$t('Darstellung')}>
-        <Row label={$t('Farbschema')} note={$t('„Automatisch“ folgt Bitcrane hell/dunkel. Einzelne Server können ein eigenes haben (Server bearbeiten), z. B. rot für Produktivserver.')}>
-          <Select value={t.scheme} onChange={(v) => set({ scheme: v })} label={$t('Farbschema')} options={[{ value: 'auto', label: $t('Automatisch') }, ...SCHEMES.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
+        <Row column label={$t('Farbschema')} note={$t('„Automatisch“ folgt Bitcrane hell/dunkel. Einzelne Server können ein eigenes haben (Server bearbeiten), z. B. rot für Produktivserver.')}>
+          <SchemePicker value={t.scheme} onChange={(v) => set({ scheme: v })} />
         </Row>
         <Row label={$t('Schrift')} note={$t('Mehrere Schriften mit Komma: die erste vorhandene wird genommen.')}>
           <TextField value={t.fontFamily} onChange={(v) => set({ fontFamily: v })} mono className="term-font-field" />
@@ -70,6 +73,21 @@ function TerminalSettingsPage() {
         </Row>
         <Row label={$t('Beim Markieren kopieren')} note={$t('Markierter Text landet sofort in der Zwischenablage, wie in PuTTY.')}><Switch checked={t.copyOnSelect} onChange={(v) => set({ copyOnSelect: v })} label={$t('Beim Markieren kopieren')} /></Row>
         <Row label={$t('Im angezeigten Ordner starten')} note={$t('Das Terminal beginnt im Ordner, den die Serverhälfte gerade zeigt.')}><Switch checked={t.startInFolder} onChange={(v) => set({ startInFolder: v })} label={$t('Im angezeigten Ordner starten')} /></Row>
+      </Group>
+      <Group title={$t('Verhalten')}>
+        <Row label={$t('Shell auf diesem Computer')} note={$t('Für das Terminal ohne Server.')}>
+          <Select value={t.localShell} onChange={(v) => set({ localShell: v })} label={$t('Shell auf diesem Computer')} options={[{ value: '', label: $t('Standard') }, ...shells.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
+        </Row>
+        <Row label={$t('Rechtsklick')} note={$t('Mit Auswahl wird kopiert, sonst eingefügt – wie in PuTTY und Windows Terminal.')}>
+          <Select<'smart' | 'off'> value={t.rightClick} onChange={(v) => set({ rightClick: v })} label={$t('Rechtsklick')} options={[{ value: 'smart', label: $t('Kopieren oder einfügen') }, { value: 'off', label: $t('Nichts') }]} />
+        </Row>
+        <Row label={$t('Vor dem Einfügen mehrerer Zeilen fragen')} note={$t('Jede Zeile würde sofort ausgeführt.')}><Switch checked={t.pasteWarn} onChange={(v) => set({ pasteWarn: v })} label={$t('Vor dem Einfügen mehrerer Zeilen fragen')} /></Row>
+        <Row label={$t('Zeilen zum Zurückblättern')}>
+          <Select value={String(t.scrollback)} onChange={(v) => set({ scrollback: Number(v) })} label={$t('Zeilen zum Zurückblättern')} options={[1000, 5000, 10000, 25000, 50000, 100000].map((n) => ({ value: String(n), label: n.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') }))} />
+        </Row>
+        <Row label={$t('Terminals beim Start wieder öffnen')} note={$t('Zusammen mit „Tabs vom letzten Mal wieder öffnen“ (Allgemein); Terminals auf Servern starten, sobald die Verbindung steht.')}>
+          <Switch checked={t.restore} onChange={(v) => set({ restore: v })} label={$t('Terminals beim Start wieder öffnen')} />
+        </Row>
       </Group>
       <Group title={$t('Vorschläge')}>
         <Row label={$t('Vorschläge aus dem Verlauf')} note={$t('Beim Tippen erscheint ausgegraut ein früherer Befehl dieses Servers oder ein Snippet; die Pfeiltaste nach rechts übernimmt ihn. Tab vervollständigt weiter wie gewohnt über die Shell.')}>

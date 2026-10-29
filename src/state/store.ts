@@ -34,7 +34,7 @@ export const LIVE = isTauri;
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
   | { type: 'serverEdit'; serverId?: string; cloud?: Protocol }
-  | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void }
+  | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
   | { type: 'palette' }
@@ -311,7 +311,12 @@ export type AfterQueue = 'none' | 'disconnect' | 'quit' | 'sleep' | 'shutdown';
 export interface CustomCommand { id: string; name: string; command: string }
 
 /** A tab as saved in a workspace or for the next start. */
-export interface SavedTab { serverId: string; localPath: string; remotePath: string; leftServerId?: string; rightLocal?: boolean }
+export interface SavedTab {
+  serverId: string; localPath: string; remotePath: string; leftServerId?: string; rightLocal?: boolean;
+  /** Terminals of the tab ('' = this computer), when "Terminals wieder öffnen" is on. */
+  terminals?: string[];
+  terminalOpen?: boolean;
+}
 
 /** A named set of tabs that can be opened again later. */
 export interface Workspace { id: string; name: string; tabs: SavedTab[]; active?: number }
