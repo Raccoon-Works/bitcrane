@@ -566,8 +566,8 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
         {current === 'appearance' && (
           <Group title={$t('Darstellung')}>
             <Row label={$t('Erscheinungsbild')}><Select value={s.themeSetting} onChange={(v) => setThemeSetting(v)} label={$t('Erscheinungsbild')} options={[{ value: 'system', label: $t('Wie das System') }, { value: 'dark', label: $t('Dunkel') }, { value: 'light', label: $t('Hell') }]} /></Row>
-            <Row label={$t('Dunkle Farben')} note={$t('„Tabby“ ist fast schwarz mit hellblauen Akzenten, wie das Terminal Tabby.')}>
-              <Select<'system' | 'tabby'> value={s.darkPalette ?? 'system'} onChange={(v) => updateSettings({ darkPalette: v })} label={$t('Dunkle Farben')} options={[{ value: 'system', label: getState().platform === 'mac' ? $t('Wie macOS') : $t('Wie Windows') }, { value: 'tabby', label: 'Tabby' }]} />
+            <Row label={$t('Dunkle Farben')} note={$t('„Mitternacht“ ist fast schwarz mit hellblauen Akzenten; die andere Wahl folgt den Farben des Systems.')}>
+              <Select<'midnight' | 'system'> value={s.darkPalette === 'system' ? 'system' : 'midnight'} onChange={(v) => updateSettings({ darkPalette: v })} label={$t('Dunkle Farben')} options={[{ value: 'midnight', label: $t('Mitternacht') }, { value: 'system', label: getState().platform === 'mac' ? $t('Wie macOS') : $t('Wie Windows') }]} />
             </Row>
             <Row label={$t('Zoom')} note={$t('Alles im Fenster größer oder kleiner, auch mit Strg + Plus/Minus, Strg + 0 setzt zurück.')}>
               <Select value={String(s.zoom ?? 1)} onChange={(v) => updateSettings({ zoom: Number(v) })} label={$t('Zoom')} options={ZOOM_STEPS.map((z) => ({ value: String(z), label: `${Math.round(z * 100)} %` }))} />

@@ -1889,7 +1889,8 @@ export const EN: Record<string, string> = {
   "{0} Befehle löschen": "Delete {0} commands",
   "Keine": "None",
   "Dunkle Farben": "Dark colors",
-  "„Tabby“ ist fast schwarz mit hellblauen Akzenten, wie das Terminal Tabby.": "“Tabby” is almost black with light blue accents, like the Tabby terminal.",
   "Wie macOS": "Like macOS",
   "Wie Windows": "Like Windows",
+  "„Mitternacht“ ist fast schwarz mit hellblauen Akzenten; die andere Wahl folgt den Farben des Systems.": "“Midnight” is almost black with light blue accents; the other choice follows the system's colors.",
+  "Mitternacht": "Midnight",
 };

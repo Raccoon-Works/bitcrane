@@ -192,8 +192,8 @@ export interface Settings {
   restoreTabs?: boolean;
   /** Own commands for the context menu of server files (WinSCP "Custom commands"). */
   customCommands?: CustomCommand[];
-  /** Look of the dark mode: the system's (Explorer/Transmit) or the darker Tabby one. */
-  darkPalette?: 'system' | 'tabby';
+  /** Look of the dark mode: "midnight" (default) or the system's (Explorer/Transmit). 0.2.49 stored "tabby" for midnight. */
+  darkPalette?: 'midnight' | 'system' | 'tabby';
   /** Saved sets of tabs (WinSCP "Workspaces"). */
   workspaces?: Workspace[];
   /** Skip files larger than this many MB when transferring by hand (0 = no limit). */
@@ -356,7 +356,7 @@ export interface AppState {
   explorerFolders: Record<string, string>;
   theme: Theme;
   /** Dark colour palette (draft): 'auto' = Explorer on Windows, Transmit on the Mac. */
-  palette: 'auto' | 'explorer' | 'transmit' | 'tabby' | 'old';
+  palette: 'auto' | 'explorer' | 'transmit' | 'midnight' | 'old';
   firstRun: boolean;
   servers: Server[];
   tabs: Tab[];
