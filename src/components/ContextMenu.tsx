@@ -59,7 +59,7 @@ export function ContextMenu() {
   const otherName = (side: 'local' | 'remote') => (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
   const groups: Item[][] = [];
   // Own commands (Einstellungen › Erweitert) run on SFTP servers only (they need SSH).
-  const commands = onServer && sftpTab && !!paneServer ? getState().settings.customCommands ?? [] : [];
+  const commands = onServer && sftpTab && !!paneServer ? (getState().settings.customCommands ?? []).filter((c) => c.name.trim() && c.command.trim()) : [];
 
   if (menu.kind === 'server' && menu.serverId) {
     const id = menu.serverId;
