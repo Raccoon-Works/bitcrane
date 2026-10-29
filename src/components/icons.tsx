@@ -14,58 +14,69 @@ import {
 
 type BVariant = 'macApp' | 'winApp' | 'mono' | 'brand';
 
-const bColors: Record<Exclude<BVariant, 'mono'>, { arrowA: string; arrowB: string; bowlA: string; bowlB: string }> = {
-  macApp: { arrowA: '#2A6DE0', arrowB: '#9AD8FF', bowlA: '#FFFFFF', bowlB: '#DCE6F5' },
-  winApp: { arrowA: '#4C9BFF', arrowB: '#9FDCFF', bowlA: '#2A6DE0', bowlB: '#1B4FB8' },
-  // Interim free-standing mark in light blue with a slight edge (variant "D"), until the reworked logo arrives.
-  brand: { arrowA: '#9FD6FF', arrowB: '#DDF2FF', bowlA: '#6FB8FF', bowlB: '#4A9EF2' },
-};
+const BOWL = 'M34 33 H54 A11 11 0 0 1 54 55 H34 M34 55 H56.5 A12 12 0 0 1 56.5 79 H34';
+/** Steps of the side edge (relief), towards the lower left as in the logo files. */
+const EDGE = Array.from({ length: 14 }, (_, i) => 14 - i).map((k) => [-0.114 * k, 0.371 * k] as const);
 
 /**
- * Bitcrane mark.
- * - macApp: B on a dark graphite tile (Mac app icon, welcome, about).
- * - winApp: B without background (Windows icon, title bar).
+ * Bitcrane mark ("relief" logo, Projekt/PROJEKT-LOGO.md and Logos/bitcrane-relief-*):
+ * a light blue B whose stem is an upload arrow, with a darker side edge.
+ * - macApp: on the near-black app tile (Mac app symbol, welcome).
+ * - winApp / brand: free-standing (Windows, title bar, settings).
  * - mono: single colour, e.g. accent blue in small UI places.
+ * Below 32 px the edge is left out (flat version), as in the small icon files.
+ * On a light background the arrow gets a thin darker rim so it stays visible.
  */
 export function BMark({ variant, size, color = 'currentColor' }: { variant: BVariant; size: number; color?: string }) {
   const id = useId().replace(/:/g, '');
+  const light = useStore((s) => s.theme === 'light');
   const tile = variant === 'macApp';
-  const c = variant === 'mono' ? { arrowA: color, arrowB: color, bowlA: color, bowlB: color } : bColors[variant];
+  const mono = variant === 'mono';
+  const relief = !mono && size >= 32;
+  const rim = !mono && !tile && light;
   const vb = tile ? '-7.17 -7.17 114.34 114.34' : '0 0 100 100';
-  const tf = tile
-    ? 'translate(1.5 3) translate(50 50) scale(0.94) translate(-50 -50)'
-    : 'translate(1.5 3) translate(50 50) scale(1.14) translate(-50 -50)';
+  // The tile version is moved so the mark sits optically in the middle of the tile.
+  const tf = tile ? 'translate(48.32 51.12) scale(0.94) translate(-44.5 -48)' : 'translate(50 50) scale(1.12) translate(-44.5 -48)';
+  const fill = (k: string) => (mono ? color : `url(#${id}${k})`);
+  const shape = (bowl: string, arrow: string, key?: string | number, t?: string, withRim = false) => (
+    <g key={key} transform={t}>
+      <path d={BOWL} fill="none" stroke={bowl} strokeWidth="10.5" strokeLinejoin="round" strokeLinecap="round" />
+      {withRim && (
+        <>
+          <path d="M34 79 V25" stroke="#4E8FCB" strokeWidth="13.4" strokeLinecap="round" fill="none" />
+          <path d="M34 11 L47.5 27 H20.5 Z" fill="#4E8FCB" stroke="#4E8FCB" strokeWidth="5.9" strokeLinejoin="round" />
+        </>
+      )}
+      <path d="M34 79 V25" stroke={arrow} strokeWidth="11" strokeLinecap="round" fill="none" />
+      <path d="M34 11 L47.5 27 H20.5 Z" fill={arrow} stroke={arrow} strokeWidth="3.5" strokeLinejoin="round" />
+    </g>
+  );
   return (
     <svg width={size} height={size} viewBox={vb} role="img" aria-label="Bitcrane">
       <defs>
-        <linearGradient id={`${id}t`} x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0" stopColor="#30343D" /><stop offset="1" stopColor="#0D0E12" /></linearGradient>
-        <linearGradient id={`${id}r`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.22" /><stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0" /></linearGradient>
-        <linearGradient id={`${id}a`} gradientUnits="userSpaceOnUse" x1="0" y1="84" x2="0" y2="10"><stop offset="0" stopColor={c.arrowA} /><stop offset="1" stopColor={c.arrowB} /></linearGradient>
-        <linearGradient id={`${id}b`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="84"><stop offset="0" stopColor={c.bowlA} /><stop offset="1" stopColor={c.bowlB} /></linearGradient>
+        <linearGradient id={`${id}b`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="84"><stop offset="0" stopColor="#6FB8FF" /><stop offset="1" stopColor="#4A9EF2" /></linearGradient>
+        <linearGradient id={`${id}a`} gradientUnits="userSpaceOnUse" x1="0" y1="84" x2="0" y2="10"><stop offset="0" stopColor="#9FD6FF" /><stop offset="1" stopColor="#DDF2FF" /></linearGradient>
+        <linearGradient id={`${id}sb`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="88"><stop offset="0" stopColor="#2A6DBA" /><stop offset="1" stopColor="#1F5FA8" /></linearGradient>
+        <linearGradient id={`${id}sa`} gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="88"><stop offset="0" stopColor="#5E9DD6" /><stop offset="1" stopColor="#4E8FCB" /></linearGradient>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1C1C1E" /><stop offset="1" stopColor="#0D0D0D" /></linearGradient>
+        <linearGradient id={`${id}r`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" /><stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0" /></linearGradient>
       </defs>
       {tile && (
         <>
-          <rect x="4" y="4" width="92" height="92" rx="22" fill={`url(#${id}t)`} />
-          <rect x="4.5" y="4.5" width="91" height="91" rx="21.5" fill="none" stroke={`url(#${id}r)`} strokeWidth="1" />
+          <rect x="4" y="4" width="92" height="92" rx="20.6" fill={`url(#${id}t)`} />
+          <rect x="4.3" y="4.3" width="91.4" height="91.4" rx="20.3" fill="none" stroke={`url(#${id}r)`} strokeWidth="0.6" />
         </>
       )}
       <g transform={tf}>
-        {variant === 'brand' && [5, 4, 3, 2, 1].map((i) => (
-          <g key={i} transform={`translate(${i * 0.7} ${i * 0.9})`}>
-            <path d="M34 33 H54 A11 11 0 0 1 54 55 H34 M34 55 H56.5 A12 12 0 0 1 56.5 79 H34" fill="none" stroke="#1F5FA8" strokeWidth="10.5" strokeLinejoin="round" strokeLinecap="round" />
-            <path d="M34 79 V25" stroke="#4E8FCB" strokeWidth="11" strokeLinecap="round" fill="none" />
-            <path d="M34 11 L47.5 27 H20.5 Z" fill="#4E8FCB" stroke="#4E8FCB" strokeWidth="3.5" strokeLinejoin="round" />
-          </g>
-        ))}
-        <path d="M34 33 H54 A11 11 0 0 1 54 55 H34 M34 55 H56.5 A12 12 0 0 1 56.5 79 H34" fill="none" stroke={`url(#${id}b)`} strokeWidth="10.5" strokeLinejoin="round" strokeLinecap="round" />
-        <path d="M34 79 V25" stroke={`url(#${id}a)`} strokeWidth="11" strokeLinecap="round" fill="none" />
-        <path d="M34 11 L47.5 27 H20.5 Z" fill={`url(#${id}a)`} stroke={`url(#${id}a)`} strokeWidth="3.5" strokeLinejoin="round" />
+        <g transform={relief ? 'translate(0.80 -2.60)' : undefined}>
+          {relief && EDGE.map(([x, y], i) => shape(fill('sb'), fill('sa'), i, `translate(${x.toFixed(3)} ${y.toFixed(3)})`))}
+          {shape(fill('b'), fill('a'), undefined, undefined, rim)}
+        </g>
       </g>
     </svg>
   );
 }
 
-/** Watch symbol: a dot with radio waves (from the mockups). */
 export function WatchIcon({ size = 16, waves = 1, strokeWidth = 1.5 }: { size?: number; waves?: 1 | 2; strokeWidth?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" aria-hidden="true">
