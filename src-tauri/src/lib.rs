@@ -166,8 +166,16 @@ fn open_url(url: String) -> AppResult<()> {
     }
     #[cfg(target_os = "macos")]
     let mut cmd = std::process::Command::new("open");
+    // Windows: "explorer <url>" fails on long addresses with "&" and "=" (sign-in
+    // pages) and then opens the Documents folder instead; the URL handler of the
+    // shell passes the address unchanged to the default browser.
     #[cfg(target_os = "windows")]
-    let mut cmd = std::process::Command::new("explorer");
+    let mut cmd = {
+        use std::os::windows::process::CommandExt;
+        let mut c = std::process::Command::new("rundll32");
+        c.arg("url.dll,FileProtocolHandler").creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        c
+    };
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = std::process::Command::new("xdg-open");
     cmd.arg(&url).spawn().map(|_| ()).map_err(AppError::from)
