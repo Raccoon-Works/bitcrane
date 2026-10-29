@@ -56,6 +56,7 @@ percent-encoding = "2"
 png = "0.18"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+keepawake = "0.5"
 
 [dev-dependencies]
 tempfile = "3"

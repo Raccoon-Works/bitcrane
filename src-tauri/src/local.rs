@@ -343,6 +343,60 @@ pub fn thumb(uri_path: &str) -> Option<(&'static str, Vec<u8>)> {
     Some((mime, fs::read(native).ok()?))
 }
 
+/// MIME type of files the preview plays or shows in the web view (PDF, audio, video).
+pub fn media_mime(name: &str) -> Option<&'static str> {
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "pdf" => "application/pdf",
+        "mp3" => "audio/mpeg",
+        "m4a" | "aac" => "audio/mp4",
+        "wav" => "audio/wav",
+        "ogg" | "oga" => "audio/ogg",
+        "flac" => "audio/flac",
+        "mp4" | "m4v" => "video/mp4",
+        "mov" => "video/quicktime",
+        "webm" => "video/webm",
+        _ => return None,
+    })
+}
+
+/// Answer of the "media" address scheme: a PDF, audio or video file of this
+/// computer, with HTTP ranges so players can seek. Other file types are refused.
+pub fn media_response(uri_path: &str, range: Option<&str>) -> tauri::http::Response<Vec<u8>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let not_found = || tauri::http::Response::builder().status(404).body(Vec::new()).unwrap();
+    let Some(decoded) = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok() else { return not_found() };
+    let Some(mime) = media_mime(&decoded) else { return not_found() };
+    let native = to_native(&decoded);
+    let Ok(mut file) = fs::File::open(&native) else { return not_found() };
+    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    // "bytes=start-end"; pieces of at most 4 MB so large videos stream.
+    let (start, end) = range
+        .and_then(|r| r.strip_prefix("bytes="))
+        .and_then(|r| {
+            let (a, b) = r.split_once('-')?;
+            let start: u64 = a.trim().parse().ok()?;
+            let end: u64 = if b.trim().is_empty() { len.saturating_sub(1) } else { b.trim().parse().ok()? };
+            Some((start, end.min(len.saturating_sub(1)).min(start + 4 * 1024 * 1024 - 1)))
+        })
+        .unwrap_or((0, len.saturating_sub(1).min(4 * 1024 * 1024 - 1)));
+    if len == 0 || start > end {
+        return tauri::http::Response::builder().status(200).header("Content-Type", mime).body(Vec::new()).unwrap();
+    }
+    let mut buf = vec![0u8; (end - start + 1) as usize];
+    if file.seek(SeekFrom::Start(start)).is_err() || file.read_exact(&mut buf).is_err() {
+        return not_found();
+    }
+    tauri::http::Response::builder()
+        .status(if range.is_some() || end + 1 < len { 206 } else { 200 })
+        .header("Content-Type", mime)
+        .header("Accept-Ranges", "bytes")
+        .header("Content-Range", format!("bytes {start}-{end}/{len}"))
+        .header("Content-Length", buf.len().to_string())
+        .body(buf)
+        .unwrap()
+}
+
 /// Standard places for the sidebar (only those that exist).
 pub fn places() -> Vec<Place> {
     let mut out = vec![];
@@ -540,6 +594,24 @@ pub fn cloud_places() -> Vec<CloudPlace> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn media_answers_ranges_and_refuses_other_files() {
+        let dir = std::env::temp_dir().join(format!("bitcrane-media-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("clip.mp3");
+        fs::write(&f, b"0123456789").unwrap();
+        let uri = format!("/{}", percent_encoding::utf8_percent_encode(&f.to_string_lossy(), percent_encoding::NON_ALPHANUMERIC));
+        let r = media_response(&uri, Some("bytes=2-5"));
+        assert_eq!(r.status(), 206);
+        assert_eq!(r.body().as_slice(), b"2345");
+        assert_eq!(r.headers()["content-range"], "bytes 2-5/10");
+        assert_eq!(media_response(&uri, None).body().as_slice(), b"0123456789");
+        fs::write(dir.join("secret.txt"), b"x").unwrap();
+        let other = format!("/{}", percent_encoding::utf8_percent_encode(&dir.join("secret.txt").to_string_lossy(), percent_encoding::NON_ALPHANUMERIC));
+        assert_eq!(media_response(&other, None).status(), 404);
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn merge_puts_contents_into_existing_folder() {

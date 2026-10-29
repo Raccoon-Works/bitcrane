@@ -35,6 +35,13 @@ Bitcrane is not code-signed yet, so the first start needs one extra step. Update
   (German: „Der Computer wurde durch Windows geschützt“). Click "More info" („Weitere Informationen“),
   then "Run anyway" („Trotzdem ausführen“).
 
+## Roadmap
+
+- **Servers as drives** in Finder and Explorer (like Mountain Duck): planned for Windows through the built-in Cloud Files interface. On macOS, the File Provider interface requires an app extension signed by Apple; it will follow together with notarized macOS releases.
+- **Notarized macOS builds and signed Windows builds**: planned. Until then, see the notes under Download.
+- **Built-in SSH terminal** with snippets, next to the file view.
+- Distribution through the **Microsoft Store**.
+
 ## Development
 
 Requirements: Node.js 22, Rust (stable), and the Tauri 2 prerequisites for your platform.

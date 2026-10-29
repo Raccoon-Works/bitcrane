@@ -128,6 +128,7 @@ export const tauriBackend: Backend = {
 
   localPreview: (path) => invoke('local_preview', { path }),
   remotePreview: (serverId, path) => invoke('remote_preview', { serverId, path }),
+  remoteMedia: (serverId, path) => invoke('remote_media', { serverId, path }),
   keyInfo: (path) => invoke('key_info', { path }),
   keyGenerate: (path, comment, passphrase) => invoke('key_generate', { path, comment, passphrase: passphrase || null }),
   keyPublic: (path) => invoke('key_public', { path }),

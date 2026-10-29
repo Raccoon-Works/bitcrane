@@ -951,6 +951,32 @@ async fn local_preview(path: String) -> AppResult<Preview> {
     Ok(make_preview(&path, buf))
 }
 
+/// Largest server file loaded for playing in the preview.
+const MEDIA_LIMIT: u64 = 500 * 1024 * 1024;
+
+/// Copies a PDF, audio or video file from the server into a temporary file
+/// (kept until Bitcrane ends) and returns its path for the "media" scheme.
+#[tauri::command]
+async fn remote_media(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
+    use tokio::io::AsyncWriteExt;
+    let entry = remote!(state, server_id, |c| c.stat(&path))?;
+    if entry.size > MEDIA_LIMIT {
+        return Err(AppError::other("Die Datei ist für eine Vorschau zu groß (über 500 MB). Bitte herunterladen."));
+    }
+    let name = crate::paths::remote_name(&path);
+    let dir = std::env::temp_dir().join("bitcrane-preview");
+    std::fs::create_dir_all(&dir)?;
+    let target = dir.join(format!("{}-{}", uuid::Uuid::new_v4().simple(), name));
+    let conn = state.conn(&server_id).await?;
+    let mut reader = conn.reader(&path, 0).await?;
+    let mut file = tokio::fs::File::create(&target).await?;
+    let copied = tokio::io::copy(&mut reader, &mut file).await;
+    reader.close(copied.is_ok()).await?;
+    copied?;
+    file.flush().await?;
+    Ok(paths::to_ui(&target))
+}
+
 #[tauri::command]
 async fn remote_preview(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<Preview> {
     let limit = if image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
@@ -1124,6 +1150,35 @@ fn file_write(path: String, text: String) -> AppResult<()> {
     Ok(())
 }
 
+/// While transfers or watches are busy, the computer must not fall asleep
+/// (idle sleep; the display may still turn off). One thread owns the lock,
+/// because Windows ties it to the thread that took it.
+static KEEP_AWAKE: std::sync::Mutex<Option<std::sync::mpsc::Sender<()>>> = std::sync::Mutex::new(None);
+
+#[tauri::command]
+fn keep_awake(on: bool) {
+    let mut slot = KEEP_AWAKE.lock().unwrap();
+    if on && slot.is_none() {
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            let guard = keepawake::Builder::default()
+                .idle(true)
+                .reason("Bitcrane überträgt Dateien")
+                .app_name("Bitcrane")
+                .app_reverse_domain("de.raccoonworks.bitcrane")
+                .create();
+            // Waits until "off" (or the app ends); dropping the guard here releases the lock.
+            let _ = rx.recv();
+            drop(guard);
+        });
+        *slot = Some(tx);
+    } else if !on {
+        if let Some(tx) = slot.take() {
+            let _ = tx.send(());
+        }
+    }
+}
+
 /// Shared settings file in a folder the user's cloud keeps in step between
 /// computers ("Zwischen Rechnern abgleichen", after Panic Sync): "<folder>/Bitcrane/bitcrane-sync.json".
 fn sync_file(dir: &str) -> std::path::PathBuf {
@@ -1251,6 +1306,12 @@ pub fn run() {
                 }
             });
         })
+        // PDF, audio and video in the preview window (see local::media_response).
+        .register_asynchronous_uri_scheme_protocol("media", |_ctx, request, responder| {
+            let path = request.uri().path().to_string();
+            let range = request.headers().get("range").and_then(|r| r.to_str().ok()).map(String::from);
+            std::thread::spawn(move || responder.respond(local::media_response(&path, range.as_deref())));
+        })
         // Preview pictures of local images in the icons view (images only, see local::thumb).
         .register_asynchronous_uri_scheme_protocol("thumb", |_ctx, request, responder| {
             let path = request.uri().path().to_string();
@@ -1274,6 +1335,8 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 app.handle().plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())?;
             }
+            // Server files copied for playing in the preview are only needed while Bitcrane runs.
+            let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-preview"));
             let dir = app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane"));
             app.manage(AppState::new(dir));
             // The window is created invisible (tauri.conf.json). A normal start shows it at once;
@@ -1362,11 +1425,13 @@ pub fn run() {
             import_find,
             file_write,
             sync_read,
+            keep_awake,
             sync_write,
             file_read,
             local_read_text,
             local_preview,
             remote_preview,
+            remote_media,
             remote_read_text,
             tray_update,
             app_quit,

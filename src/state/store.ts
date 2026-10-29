@@ -154,6 +154,8 @@ export interface Settings {
   /** Look for a new Bitcrane version at start and every few hours. */
   /** Updates (after Transmit): install automatically when quitting, only tell, or never look. */
   updateMode: 'auto' | 'notify' | 'off';
+  /** Keep the computer from falling asleep while transfers run (missing = on). */
+  keepAwake?: boolean;
   /** Client id of the user's own Google app (Google Drive); its secret is in the keychain. */
   googleClientId?: string;
   /** "Zwischen Rechnern abgleichen": folder the user's cloud keeps in step (see sync.ts). */
@@ -492,7 +494,14 @@ export const allTools: Array<{ id: ToolId; label: string }> = [
   { id: 'palette', label: $t('Befehle') },
 ];
 
-export const defaultToolbar: ToolId[] = ['nav', 'newFolder', 'refresh', 'info', 'activity'];
+/**
+ * Standard toolbar: the everyday actions, grouped (see Toolbar.tsx); everything
+ * else is in the menus, the context menu and the command palette, and can be
+ * added via "Werkzeugleiste anpassen".
+ */
+export const defaultToolbar: ToolId[] = ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity'];
+/** The standard toolbar up to 0.2.38 (kept by users who never changed it are moved to the new one). */
+export const oldDefaultToolbar: ToolId[] = ['nav', 'newFolder', 'refresh', 'info', 'activity'];
 
 function detectPlatform(): Platform {
   const p = (navigator.platform || '') + ' ' + navigator.userAgent;
