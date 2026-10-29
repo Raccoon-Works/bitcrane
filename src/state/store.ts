@@ -107,6 +107,8 @@ export interface Settings {
   snippets?: Snippet[];
   /** Height of the terminal panel in pixels. */
   terminalHeight?: number;
+  /** The terminal button was added to a changed toolbar once (0.2.45). */
+  toolbarTerminalAdded?: boolean;
   runInBackground: boolean;
   showMenuBarIcon: boolean;
   startAtLogin: boolean;

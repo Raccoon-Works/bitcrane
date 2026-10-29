@@ -19,6 +19,9 @@ import { Button, Segmented, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/** Stable empty list for the store selector (a new [] would redraw endlessly). */
+const NO_RULES: import('../../state/store').TransferRule[] = [];
+
 /** Reads an image file and shrinks it to a 64 px square PNG (centred, transparent edges). */
 function pictureFromFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -56,7 +59,7 @@ function cloudDefaults(service: Protocol): Partial<Server> {
 
 export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string; cloud?: Protocol }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
-  const rules = useStore((s) => s.settings.rules ?? []);
+  const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
   const platform = useStore((s) => s.platform);
   const [currentId, setCurrentId] = useState<string | undefined>(serverId);
   const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : newServerTemplate()));

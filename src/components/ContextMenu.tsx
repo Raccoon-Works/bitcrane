@@ -11,7 +11,7 @@ import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
   activeTab, LIVE, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
-import { $t } from '../i18n';
+import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
 import { addressOf } from './ServerList';
 import { openExplorerFolder, setExplorerFolder } from '../state/mount';
@@ -70,6 +70,7 @@ export function ContextMenu() {
       { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) },
       ...(tab && tab.serverId !== id && tab.leftServerId !== id ? [{ label: other === 'local' ? $t('In der linken Hälfte öffnen') : $t('In der rechten Hälfte öffnen'), run: () => openServerIn(other, id) }] : []),
       ...(srv?.online ? [{ label: $t('Verbindung trennen'), run: () => disconnect(id) }] : []),
+      ...(srv && (!srv.protocol || srv.protocol === 'sftp') ? [{ label: $t('SSH-Terminal öffnen'), run: () => { if (activeTab()?.serverId !== id) openServerInNewTab(id); window.setTimeout(() => void import('../state/terminal').then((m) => m.newTerminal()), srv.online ? 0 : 2500); } }] : []),
     ]);
     groups.push([
       ...(srv?.temporary ? [{ label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'), run: () => keepServer(id) }] : srv?.protocol === 'vault' ? [] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
@@ -239,7 +240,7 @@ export function ContextMenu() {
             <button key={it.label} type="button" role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={it.checked} className={`menu-item${it.danger ? ' is-danger' : ''}`} onClick={() => { setState({ contextMenu: null }); it.run(); }}>
               {/* As in the system menus: once any item can carry a tick, all texts start at the same edge. */}
               {(it.checked !== undefined || anyCheck) && <span className="menu-check" aria-hidden="true">{it.checked ? <Check size={13} strokeWidth={2.2} /> : null}</span>}
-              <span className="flex-1">{it.label}</span>
+              <span className="flex-1">{menuText(it.label)}</span>
               {it.key && <span className="menu-key">{it.key}</span>}
             </button>
           ))}

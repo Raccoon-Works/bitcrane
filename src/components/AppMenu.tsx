@@ -20,7 +20,7 @@ import { formatTime } from '../util/format';
 import { keyLabel } from '../state/keys';
 import { BMark } from './icons';
 import { Tooltip } from './ui';
-import { $t, LANG } from '../i18n';
+import { $t, LANG, menuText } from '../i18n';
 
 export interface MenuItem { label: string; mac?: string; win?: string; run?: () => void; danger?: boolean; sep?: boolean }
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
@@ -108,6 +108,9 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Server importieren …'), run: () => openDialog({ type: 'import' }) },
         { label: $t('Diesen Server bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: activeTab()?.serverId }) },
         sep,
+        { label: $t('SSH-Terminal ein/aus'), ...sc('terminal'), run: () => void import('../state/terminal').then((m) => m.toggleTerminal()) },
+        { label: $t('Neues SSH-Terminal'), ...sc('terminalNew'), run: () => void import('../state/terminal').then((m) => m.newTerminal()) },
+        sep,
         { label: $t('Ordner abgleichen …'), run: () => openDialog({ type: 'compare' }) },
         { label: $t('Bearbeitete Dateien …'), run: () => openDialog({ type: 'edits' }) },
         sep,
@@ -146,7 +149,7 @@ function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () => void }
       {items.map((it, i) =>
         it.sep ? <div key={`sep${i}`} className="menu-sep" role="separator" /> : (
           <button key={it.label} type="button" role="menuitem" className={`menu-item${it.danger ? ' is-danger' : ''}`} disabled={!it.run} onClick={() => { onClose(); it.run?.(); }}>
-            <span className="flex-1">{it.label}</span>
+            <span className="flex-1">{menuText(it.label)}</span>
             {(platform === 'mac' ? it.mac : it.win) && <span className="menu-key">{platform === 'mac' ? it.mac : it.win}</span>}
           </button>
         ),

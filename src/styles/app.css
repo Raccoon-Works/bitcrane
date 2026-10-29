@@ -1240,8 +1240,9 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 .detail-note { padding-left: 144px; }
 
 /* Settings. */
-.set-tabs { display: flex; justify-content: center; gap: var(--space-1); padding: 0 var(--space-4) var(--space-2); }
-.set-tab { min-width: 88px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: 0 var(--space-3); border-radius: var(--radius-control); color: var(--icon); font-size: var(--text-small); }
+.set-tabs { display: flex; justify-content: center; gap: 2px; padding: 0 var(--space-3) var(--space-2); }
+/* Nine areas have to fit: the buttons share the width, long names may break into two lines. */
+.set-tab { flex: 0 1 92px; min-width: 0; height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 var(--space-1); text-align: center; line-height: 1.15; border-radius: var(--radius-control); color: var(--icon); font-size: var(--text-small); }
 .set-tab:hover { background: var(--bg-hover); }
 .set-tab.is-sel { background: var(--bg-control-on); color: var(--accent-text); }
 .set-body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-6) var(--space-6); overflow: auto; }

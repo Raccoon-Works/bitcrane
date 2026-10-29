@@ -1826,7 +1826,7 @@ export const EN: Record<string, string> = {
   "Entsperren abgebrochen.": "Unlocking canceled.",
   "Anlegen abgebrochen.": "Creation canceled.",
   "Dateikopf": "file header",
-  "Block": "block",
+  "Block": "Block",
   "Terminal": "Terminal",
   "Terminal ein/aus": "Toggle terminal",
   "Neues Terminal": "New terminal",
