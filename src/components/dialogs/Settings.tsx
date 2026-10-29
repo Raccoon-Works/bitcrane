@@ -90,8 +90,9 @@ function TerminalSettingsPage() {
         </Row>
       </Group>
       <Group title={$t('Vorschläge')}>
-        <Row label={$t('Vorschläge aus dem Verlauf')} note={$t('Beim Tippen erscheint ausgegraut ein früherer Befehl dieses Servers oder ein Snippet; die Pfeiltaste nach rechts übernimmt ihn. Tab vervollständigt weiter wie gewohnt über die Shell.')}>
-          <Switch checked={t.suggestions} onChange={(v) => set({ suggestions: v })} label={$t('Vorschläge aus dem Verlauf')} />
+        <Row label={$t('Vorschläge beim Tippen')} note={$t('Aus dem Verlauf dieses Servers, den Snippets, üblichen Befehlen und den Dateien und Ordnern auf dem Server. ↑/↓ wählt, → übernimmt, Esc schließt die Liste; Tab vervollständigt weiter über die Shell.')}>
+          <Select<'list' | 'ghost' | 'off'> value={t.suggest} onChange={(v) => set({ suggest: v })} label={$t('Vorschläge beim Tippen')}
+            options={[{ value: 'list', label: $t('Mit Liste') }, { value: 'ghost', label: $t('Nur ausgegraut') }, { value: 'off', label: $t('Aus') }]} />
         </Row>
         <Row label={$t('Gemerkte Befehle')} note={$t('Nur auf diesem Computer, höchstens 300 je Server. Befehle mit einem Leerzeichen am Anfang merkt sich Bitcrane nicht, z. B. für Passwörter in der Befehlszeile.')}>
           <Button small disabled={!historyN} onClick={() => { clearHistory(); setHistoryN(0); }}>{historyN ? $t('{0} Befehle löschen', String(historyN)) : $t('Keine')}</Button>

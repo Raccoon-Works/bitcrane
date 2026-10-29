@@ -1882,8 +1882,6 @@ export const EN: Record<string, string> = {
   "nur der Name": "just the name",
   "der Ordner": "the folder",
   "Vorschläge": "Suggestions",
-  "Vorschläge aus dem Verlauf": "Suggestions from history",
-  "Beim Tippen erscheint ausgegraut ein früherer Befehl dieses Servers oder ein Snippet; die Pfeiltaste nach rechts übernimmt ihn. Tab vervollständigt weiter wie gewohnt über die Shell.": "While you type, an earlier command of this server or a snippet appears dimmed; the right arrow key accepts it. Tab still completes through the shell as usual.",
   "Gemerkte Befehle": "Remembered commands",
   "Nur auf diesem Computer, höchstens 300 je Server. Befehle mit einem Leerzeichen am Anfang merkt sich Bitcrane nicht, z. B. für Passwörter in der Befehlszeile.": "Only on this computer, at most 300 per server. Commands that start with a space are not remembered, e.g. for passwords on the command line.",
   "{0} Befehle löschen": "Delete {0} commands",
@@ -1950,4 +1948,9 @@ export const EN: Record<string, string> = {
   "1 Tunnel": "1 tunnel",
   "{0} Tunnel": "{0} tunnels",
   "Proxy, Terminal, Tunnel, Web-Adresse, Notiz": "Proxy, terminal, tunnels, web address, note",
+  "Vorschläge beim Tippen": "Suggestions while typing",
+  "Aus dem Verlauf dieses Servers, den Snippets, üblichen Befehlen und den Dateien und Ordnern auf dem Server. ↑/↓ wählt, → übernimmt, Esc schließt die Liste; Tab vervollständigt weiter über die Shell.": "From this server's history, the snippets, common commands and the files and folders on the server. ↑/↓ chooses, → accepts, Esc closes the list; Tab still completes through the shell.",
+  "Mit Liste": "With list",
+  "Nur ausgegraut": "Dimmed only",
+  "Snippet": "Snippet",
 };

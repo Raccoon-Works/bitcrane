@@ -50,8 +50,10 @@ export interface TerminalSettings {
   copyOnSelect: boolean;
   /** Start in the folder the server half shows. */
   startInFolder: boolean;
-  /** Dimmed suggestions from the history while typing (termSuggest.ts). */
-  suggestions: boolean;
+  /** Old switch (0.2.48): on meant the dimmed suggestions; `suggest` replaces it. */
+  suggestions?: boolean;
+  /** Suggestions while typing (termSuggest.ts): off, only the dimmed rest, or with the list. */
+  suggest: 'off' | 'ghost' | 'list';
   /** Lines kept for scrolling back. */
   scrollback: number;
   /** Right click: copy the selection, or paste when nothing is selected (PuTTY, Windows Terminal). */
@@ -121,7 +123,7 @@ export const defaultTerminalSettings = (): TerminalSettings => ({
   cursor: 'block',
   copyOnSelect: false,
   startInFolder: true,
-  suggestions: false,
+  suggest: 'list',
   scrollback: 10000,
   rightClick: getState().platform === 'mac' ? 'off' : 'smart',
   pasteWarn: true,
@@ -129,7 +131,10 @@ export const defaultTerminalSettings = (): TerminalSettings => ({
   restore: false,
 });
 
-export const terminalSettings = (): TerminalSettings => ({ ...defaultTerminalSettings(), ...(getState().settings.terminal ?? {}) });
+export const terminalSettings = (): TerminalSettings => {
+  const saved = getState().settings.terminal ?? {};
+  return { ...defaultTerminalSettings(), ...saved, ...(saved.suggest ? {} : saved.suggestions ? { suggest: 'list' as const } : {}) };
+};
 
 /** Scheme for a server: its own, else the setting ("auto" follows Bitcrane's light/dark). */
 export function themeFor(serverId: string): ITheme {
@@ -204,12 +209,16 @@ function makeTerminal(session: TermSession): Live {
       term.clearSelection();
     } else void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
   });
-  const suggest = new Suggester(term, host, session.serverId, () => terminalSettings().suggestions, () => getState().settings.snippets ?? []);
-  term.onData((input) => {
-    const d = suggest.input(input);
+  const write = (d: string) => {
     if (LIVE) void invoke('term_write', { id: session.id, data: d }).catch(() => undefined);
     else previewEcho(term, d);
-  });
+  };
+  const suggest = new Suggester(term, host, session.serverId, {
+    mode: () => terminalSettings().suggest,
+    snippets: () => getState().settings.snippets ?? [],
+    startDir: () => { const t = getState().tabs.find((x) => x.id === session.tabId); return (session.serverId ? t?.remotePath : t?.localPath) || '~'; },
+  }, (d) => { suggest.input(d); write(d); });
+  term.onData((input) => write(suggest.input(input)));
   term.onResize(({ cols, rows }) => {
     if (LIVE) void invoke('term_resize', { id: session.id, cols, rows }).catch(() => undefined);
   });
@@ -219,6 +228,8 @@ function makeTerminal(session: TermSession): Live {
   // Windows and Linux: Strg+C stays "interrupt"; copying and pasting is Strg+Umschalt+C/V.
   term.attachCustomKeyEventHandler((e) => {
     if (e.type !== 'keydown') return true;
+    // Arrow keys and Esc belong to the suggestion list while it is open.
+    if (suggest.handleKey(e)) { e.preventDefault(); return false; }
     const mac = getState().platform === 'mac';
     const copy = mac ? e.metaKey && e.key === 'c' : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c';
     const paste = mac ? e.metaKey && e.key === 'v' : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'v';
