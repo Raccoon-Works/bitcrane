@@ -13,6 +13,7 @@
 
 use crate::error::{AppError, AppResult};
 
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 fn fail(e: impl ToString) -> AppError {
     AppError::other("Der Eintrag im Kontextmenü konnte nicht geändert werden.").with_detail(e.to_string())
 }

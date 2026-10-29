@@ -30,6 +30,7 @@ mod remote;
 mod tls;
 mod ssh;
 mod smb;
+mod scp;
 mod sshconfig;
 mod sysicons;
 mod tray;
@@ -667,7 +668,7 @@ async fn ssh_connect(app: tauri::AppHandle, state: State<'_, AppState>, server_i
         old.close().await;
     }
     let prompter = make_prompter(app, state.prompts.clone(), server_id.clone());
-    let conn = remote::Remote::Sftp(ssh::connect_with(&params, state.known_hosts.clone(), Some(prompter)).await?);
+    let conn = remote::connect_ssh(&params, state.known_hosts.clone(), Some(prompter)).await?;
     let home = conn.home().to_string();
     let clock_offset_ms = conn.clock_offset_ms().await;
     state.connections.lock().await.insert(server_id, Arc::new(conn));
@@ -929,9 +930,9 @@ fn key_public(path: String) -> AppResult<String> {
 #[tauri::command]
 async fn ssh_test(app: tauri::AppHandle, state: State<'_, AppState>, params: ConnectParams) -> AppResult<String> {
     let prompter = make_prompter(app, state.prompts.clone(), String::new());
-    match ssh::connect_with(&params, state.known_hosts.clone(), Some(prompter)).await {
+    match remote::connect_ssh(&params, state.known_hosts.clone(), Some(prompter)).await {
         Ok(c) => {
-            let home = c.home.clone();
+            let home = c.home().to_string();
             c.close().await;
             Ok(home)
         }

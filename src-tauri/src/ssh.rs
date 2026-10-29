@@ -134,6 +134,10 @@ pub struct ConnectParams {
     /// Send a keepalive every 30 seconds (setting "Verbindung offen halten").
     #[serde(default = "default_true")]
     pub keepalive: bool,
+    /// Transfer files over shell commands instead of SFTP (old servers and
+    /// devices without an SFTP server). Without SFTP Bitcrane switches by itself.
+    #[serde(default)]
+    pub scp: bool,
     /// Reach this server through another one ("Sprungserver", like ProxyJump).
     #[serde(default)]
     pub jump: Option<Box<ConnectParams>>,
@@ -155,7 +159,7 @@ struct SeenKey {
     fingerprint: String,
 }
 
-struct Handler {
+pub(crate) struct Handler {
     host_id: String,
     known: Arc<KnownHosts>,
     trust: Option<String>,
@@ -458,6 +462,18 @@ pub async fn connect(params: &ConnectParams, known: Arc<KnownHosts>) -> AppResul
 
 /// Like `connect`, with a way to answer questions of the server (one-time codes).
 pub async fn connect_with(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Connection> {
+    open(params, known, prompter).await?.into_sftp().await.map_err(|(_, e)| e)
+}
+
+/// A logged-in SSH session, before it becomes an SFTP connection (or, for
+/// servers without SFTP, a shell based one, see `scp.rs`).
+pub struct Session {
+    pub(crate) handle: client::Handle<Handler>,
+    pub(crate) jump: Option<client::Handle<Handler>>,
+}
+
+/// Opens the session: host key check and login (through the jump server if set).
+pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Session> {
     let (handle, jump) = match &params.jump {
         None => (open_session(params, known.clone(), Transport::Direct, prompter.clone()).await?, None),
         Some(jump_params) => {
@@ -474,14 +490,29 @@ pub async fn connect_with(params: &ConnectParams, known: Arc<KnownHosts>, prompt
         }
     };
 
-    let channel = handle.channel_open_session().await?;
-    channel.request_subsystem(true, "sftp").await?;
-    let sftp = SftpSession::new(channel.into_stream())
-        .await
-        .map_err(|e| AppError::other("Der Server bietet kein SFTP an.").with_detail(e.to_string()))?;
-    sftp.set_timeout(30);
-    let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
-    Ok(Connection { handle, sftp, home, jump })
+    Ok(Session { handle, jump })
+}
+
+impl Session {
+    /// Starts SFTP on the session. Without SFTP on the server, the session
+    /// comes back with the error, so it can still be used another way.
+    pub async fn into_sftp(self) -> Result<Connection, (Session, AppError)> {
+        let no_sftp = |e: String| AppError::other("Der Server bietet kein SFTP an.").with_detail(e);
+        let channel = match self.handle.channel_open_session().await {
+            Ok(c) => c,
+            Err(e) => return Err((self, AppError::from(e))),
+        };
+        if let Err(e) = channel.request_subsystem(true, "sftp").await {
+            return Err((self, no_sftp(e.to_string())));
+        }
+        let sftp = match SftpSession::new(channel.into_stream()).await {
+            Ok(s) => s,
+            Err(e) => return Err((self, no_sftp(e.to_string()))),
+        };
+        sftp.set_timeout(30);
+        let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
+        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump })
+    }
 }
 
 /// Agent sockets to try on macOS and Linux, in this order. Apps started from
@@ -933,7 +964,7 @@ mod integration {
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
-        ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, jump: None, proxy: None }
+        ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None }
     }
 
     #[tokio::test]

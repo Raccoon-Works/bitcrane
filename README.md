@@ -9,7 +9,7 @@
   <a href="https://github.com/Raccoon-Works/bitcrane/releases/latest"><strong>Download the latest version</strong></a>
 </p>
 
-- Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS), SMB 2/3 (Windows shares, NAS)
+- Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS), SMB 2/3 (Windows shares, NAS), SCP for SSH servers without SFTP
 - Cloud services: Dropbox, OneDrive, Google Drive (with your own free app key, see [docs/google-drive.md](docs/google-drive.md))
 - Servers and shared settings stay in step between your computers through a folder your own cloud already syncs (passwords optionally, encrypted)
 - Two halves: this computer and a server, or two servers (server to server)

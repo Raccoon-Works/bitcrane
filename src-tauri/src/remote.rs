@@ -10,6 +10,7 @@ use crate::dropbox::DropboxConn;
 use crate::gdrive::GDriveConn;
 use crate::onedrive::OneDriveConn;
 use crate::smb::SmbConn;
+use crate::scp::ScpConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::model::{FileEntry, WalkItem};
@@ -28,6 +29,8 @@ pub enum Remote {
     GDrive(Arc<GDriveConn>),
     OneDrive(Arc<OneDriveConn>),
     Smb(Arc<SmbConn>),
+    /// SSH without SFTP: files over shell commands (scp.rs).
+    Scp(Arc<ScpConn>),
 }
 
 /// Size, modification time (seconds) and permission bits of a server file.
@@ -51,6 +54,7 @@ impl Remote {
             Remote::GDrive(c) => &c.home,
             Remote::OneDrive(c) => &c.home,
             Remote::Smb(c) => &c.home,
+            Remote::Scp(c) => &c.home,
         }
     }
 
@@ -63,6 +67,7 @@ impl Remote {
             Remote::GDrive(_) => "Google Drive",
             Remote::OneDrive(_) => "OneDrive",
             Remote::Smb(_) => "SMB",
+            Remote::Scp(_) => "SCP",
         }
     }
 
@@ -70,6 +75,7 @@ impl Remote {
     pub fn is_closed(&self) -> bool {
         match self {
             Remote::Sftp(c) => c.is_closed(),
+            Remote::Scp(c) => c.is_closed(),
             _ => false,
         }
     }
@@ -79,6 +85,7 @@ impl Remote {
             Remote::Sftp(c) => c.close().await,
             Remote::Ftp(c) => c.close().await,
             Remote::Smb(c) => c.close().await,
+            Remote::Scp(c) => c.close().await,
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }
     }
@@ -92,6 +99,7 @@ impl Remote {
             Remote::GDrive(c) => c.list(path).await,
             Remote::OneDrive(c) => c.list(path).await,
             Remote::Smb(c) => c.list(path).await,
+            Remote::Scp(c) => c.list(path).await,
         }?;
         list.retain(|e| safe_name(&e.name));
         Ok(list)
@@ -106,6 +114,7 @@ impl Remote {
             Remote::GDrive(c) => c.stat(path).await,
             Remote::OneDrive(c) => c.stat(path).await,
             Remote::Smb(c) => c.stat(path).await,
+            Remote::Scp(c) => c.stat(path).await,
         }
     }
 
@@ -118,6 +127,7 @@ impl Remote {
             Remote::GDrive(c) => c.exists(path).await,
             Remote::OneDrive(c) => c.exists(path).await,
             Remote::Smb(c) => c.exists(path).await,
+            Remote::Scp(c) => c.exists(path).await,
         }
     }
 
@@ -130,6 +140,7 @@ impl Remote {
             Remote::GDrive(c) => c.mkdir(path).await,
             Remote::OneDrive(c) => c.mkdir(path).await,
             Remote::Smb(c) => c.mkdir(path).await,
+            Remote::Scp(c) => c.mkdir(path).await,
         }
     }
 
@@ -152,6 +163,7 @@ impl Remote {
             Remote::GDrive(c) => c.mkdir_all(path).await,
             Remote::OneDrive(c) => c.mkdir_all(path).await,
             Remote::Smb(c) => c.mkdir_all(path).await,
+            Remote::Scp(c) => c.mkdir_all(path).await,
         }
     }
 
@@ -164,6 +176,7 @@ impl Remote {
             Remote::GDrive(c) => c.rename(from, to).await,
             Remote::OneDrive(c) => c.rename(from, to).await,
             Remote::Smb(c) => c.rename(from, to).await,
+            Remote::Scp(c) => c.rename(from, to).await,
         }
     }
 
@@ -184,6 +197,9 @@ impl Remote {
             return c.replace(from, to).await;
         }
         if let Remote::Smb(c) = self {
+            return c.replace(from, to).await;
+        }
+        if let Remote::Scp(c) = self {
             return c.replace(from, to).await;
         }
         if !self.exists(to).await {
@@ -211,6 +227,7 @@ impl Remote {
             Remote::GDrive(c) => c.remove(path).await,
             Remote::OneDrive(c) => c.remove(path).await,
             Remote::Smb(c) => c.remove(path).await,
+            Remote::Scp(c) => c.remove(path).await,
         }
     }
 
@@ -223,6 +240,7 @@ impl Remote {
             Remote::GDrive(c) => c.remove(path).await,
             Remote::OneDrive(c) => c.remove(path).await,
             Remote::Smb(c) => c.remove(path).await,
+            Remote::Scp(c) => c.remove(path).await,
         }
     }
 
@@ -235,6 +253,7 @@ impl Remote {
             Remote::GDrive(_) => Err(unsupported("Rechte setzen", "Google Drive")),
             Remote::OneDrive(_) => Err(unsupported("Rechte setzen", "OneDrive")),
             Remote::Smb(_) => Err(unsupported("Rechte setzen", "SMB")),
+            Remote::Scp(c) => c.chmod(path, mode, recursive).await,
         }
     }
 
@@ -248,6 +267,7 @@ impl Remote {
             Remote::Ftp(_) => Err(unsupported("Ein Link zum Teilen", "FTP")),
             Remote::Dav(_) => Err(unsupported("Ein Link zum Teilen", "WebDAV")),
             Remote::Smb(_) => Err(unsupported("Ein Link zum Teilen", "SMB")),
+            Remote::Scp(_) => Err(unsupported("Ein Link zum Teilen", "SCP")),
         }
     }
 
@@ -260,6 +280,7 @@ impl Remote {
             Remote::GDrive(c) => c.walk(path).await,
             Remote::OneDrive(c) => c.walk(path).await,
             Remote::Smb(c) => c.walk(path).await,
+            Remote::Scp(c) => c.walk(path).await,
         }?;
         // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
         items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
@@ -269,6 +290,7 @@ impl Remote {
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
         match self {
             Remote::Sftp(c) => c.exec(command).await,
+            Remote::Scp(c) => c.exec(command).await,
             _ => Err(AppError::new(ErrorKind::Other, format!("Befehle auf dem Server gibt es nur mit SFTP (SSH), nicht über {}.", self.protocol()))),
         }
     }
@@ -276,6 +298,7 @@ impl Remote {
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
         match self {
             Remote::Sftp(c) => c.symlink(link, target).await,
+            Remote::Scp(c) => c.symlink(link, target).await,
             _ => Err(unsupported("Symbolische Links anlegen", self.protocol())),
         }
     }
@@ -332,6 +355,7 @@ impl Remote {
             Remote::GDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::OneDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::Smb(c) => c.copy_within(paths, dest_dir).await,
+            Remote::Scp(c) => c.copy_within(paths, dest_dir).await,
             Remote::Ftp(_) => {
                 let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
                 let mut out = Vec::new();
@@ -402,7 +426,7 @@ impl Remote {
     /// Whether a partial upload can be continued (append) for this file.
     pub fn can_append(&self, path: &str) -> bool {
         match self {
-            Remote::Sftp(_) | Remote::Smb(_) => true,
+            Remote::Sftp(_) | Remote::Smb(_) | Remote::Scp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => false,
         }
@@ -435,6 +459,7 @@ impl Remote {
             Remote::GDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::OneDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Smb(c) => RemoteReader::Plain(c.reader(path, offset).await?),
+            Remote::Scp(c) => RemoteReader::Plain(c.reader(path, offset).await?),
         })
     }
 
@@ -477,6 +502,10 @@ impl Remote {
                 let (w, task) = c.writer(path, offset, mtime).await?;
                 RemoteWriter::Dav(Some(w), Some(task))
             }
+            Remote::Scp(c) => {
+                let (w, task) = c.writer(path, offset).await?;
+                RemoteWriter::Dav(Some(w), Some(task))
+            }
         })
     }
 
@@ -493,6 +522,7 @@ impl Remote {
                     c.set_mtime(path, m).await;
                 }
             }
+            Remote::Scp(c) => c.set_attrs(path, mtime, perms).await,
             // Set with the upload itself where the server supports it.
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }
@@ -611,12 +641,12 @@ impl AsyncWrite for RemoteWriter {
 /// Transfers through `transfer.rs` over FTP(S) and WebDAV (needs the same
 /// test servers as the protocol tests).
 #[cfg(test)]
-mod integration {
+pub(crate) mod integration {
     use super::*;
     use crate::transfer::{TransferOptions, PAUSE, RUN};
     use std::sync::atomic::AtomicU8;
 
-    async fn check(conn: Remote, home: String) {
+    pub(crate) async fn check(conn: Remote, home: String) {
         let dir = tempfile::tempdir().unwrap();
         let data: Vec<u8> = (0..1_500_000u32).map(|i| (i % 251) as u8).collect();
         let local = dir.path().join("big.bin");
@@ -654,7 +684,8 @@ mod integration {
         assert_eq!(conn.checksum(&target).await.unwrap(), local_sum);
         assert_eq!(conn.copy_within(&[target.clone()], &format!("{base}/sub")).await.unwrap(), vec!["big Kopie.bin".to_string()]);
         assert_eq!(conn.stat(&format!("{base}/sub/big Kopie.bin")).await.unwrap().size, 1_500_000);
-        assert!(conn.exec("true").await.is_err());
+        // Only SSH connections (SFTP, SCP) run commands.
+        assert_eq!(conn.exec("true").await.is_ok(), matches!(conn, Remote::Sftp(_) | Remote::Scp(_)));
         conn.remove(&base).await.unwrap();
     }
 
@@ -766,5 +797,21 @@ mod name_tests {
         assert!(!safe_name(".."));
         assert!(!safe_name("../../.ssh/authorized_keys"));
         assert!(!safe_name("a\0b"));
+    }
+}
+
+/// Opens an SSH connection: SFTP, or shell commands when the server has no
+/// SFTP (or the server settings ask for SCP).
+pub async fn connect_ssh(params: &crate::ssh::ConnectParams, known: Arc<crate::ssh::KnownHosts>, prompter: Option<crate::ssh::Prompter>) -> AppResult<Remote> {
+    let session = crate::ssh::open(params, known, prompter).await?;
+    if params.scp {
+        return Ok(Remote::Scp(Arc::new(ScpConn::new(session).await?)));
+    }
+    match session.into_sftp().await {
+        Ok(c) => Ok(Remote::Sftp(c)),
+        Err((session, e)) => match ScpConn::new(session).await {
+            Ok(c) => Ok(Remote::Scp(Arc::new(c))),
+            Err(_) => Err(e),
+        },
     }
 }

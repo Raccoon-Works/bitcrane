@@ -96,6 +96,8 @@ export interface Server {
   davPath?: string;
   /** WebDAV: https (default) or plain http. */
   davHttps?: boolean;
+  /** SFTP servers: always use shell commands ("SCP") instead of SFTP. */
+  scp?: boolean;
   /** SMB: share to start in (empty: the list of shares). */
   smbShare?: string;
   /** SMB: insist on SMB 3 encryption. */

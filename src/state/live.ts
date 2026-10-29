@@ -239,7 +239,7 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
     return backend.connectGDrive(id, { refreshToken, ...key });
   }
-  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, jump, proxy });
+  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy });
 }
 
 /**
@@ -478,7 +478,7 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
       return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
     }
     const jump = await jumpParams(srv);
-    const home = await backend.sshTest({ host: srv.host, port: srv.port, user: srv.user, auth, keepalive: false, jump, proxy: jump ? undefined : await proxyParams(srv) });
+    const home = await backend.sshTest({ host: srv.host, port: srv.port, user: srv.user, auth, keepalive: false, scp: !!srv.scp, jump, proxy: jump ? undefined : await proxyParams(srv) });
     return { ok: true, text: home ? $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.') };
   } catch (e) {
     const err = toBackendError(e);

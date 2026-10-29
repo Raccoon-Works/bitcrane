@@ -204,7 +204,7 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
     };
     let mut params: crate::ssh::ConnectParams = serde_json::from_value(json!({
         "host": host, "port": port, "user": user, "auth": auth,
-        "keepalive": true,
+        "keepalive": true, "scp": s.get("scp").and_then(Value::as_bool).unwrap_or(false),
     }))
     .map_err(|e| AppError::other("Server entry not readable.").with_detail(e.to_string()))?;
     params.jump = jump;
@@ -292,10 +292,10 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             }
             Remote::GDrive(Arc::new(crate::gdrive::GDriveConn::connect(crate::gdrive::GDriveParams { refresh_token: cloud_token()?, client_id, client_secret }).await?))
         }
-        _ => Remote::Sftp(crate::ssh::connect_with(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e.kind {
+        _ => crate::remote::connect_ssh(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e.kind {
             ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => AppError::new(e.kind, format!("The host key of {name} is not confirmed. Connect once in Bitcrane.")),
             _ => e,
-        })?),
+        })?,
     };
     Ok(conn)
 }

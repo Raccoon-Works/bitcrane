@@ -90,6 +90,7 @@ mod tests {
 
 /// Windows Explorer folder of a mounted server (`mount_win.rs`): path below
 /// `root` as a server path below `remote_root`; `None` outside the folder.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn sync_root_to_remote(root: &Path, remote_root: &str, local: &Path) -> Option<String> {
     let root_s = root.to_string_lossy().trim_end_matches('\\').to_lowercase();
     let local_s = local.to_string_lossy().to_string();
