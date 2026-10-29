@@ -80,7 +80,8 @@ export interface TransferOptions {
 
 /** Start of a file for the preview: text, an image (base64) or "binary". */
 export interface Preview {
-  kind: 'text' | 'image' | 'binary';
+  /** "media": PDF, audio or video; `data` is the address the web view loads. */
+  kind: 'text' | 'image' | 'binary' | 'media';
   mime: string;
   data: string;
   truncated: boolean;
@@ -244,6 +245,8 @@ export interface Backend {
 
   localPreview(path: string): Promise<Preview>;
   remotePreview(serverId: string, path: string): Promise<Preview>;
+  /** Copies a PDF/audio/video file of a server into a temporary file; returns its path. */
+  remoteMedia(serverId: string, path: string): Promise<string>;
   keyInfo(path: string): Promise<KeyInfo>;
   keyGenerate(path: string, comment: string, passphrase?: string): Promise<string>;
   keyPublic(path: string): Promise<string>;

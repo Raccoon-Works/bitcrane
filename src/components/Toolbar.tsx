@@ -68,6 +68,23 @@ function WatchButton() {
   );
 }
 
+/** Kind of each tool: neighbours of the same kind share one capsule, so the bar reads in groups. */
+const TOOL_KIND: Record<ToolId, string> = {
+  nav: 'nav', upload: 'transfer', download: 'transfer', newFolder: 'files', refresh: 'files', rename: 'files', delete: 'files', editor: 'files', copyPath: 'files', selectMask: 'files',
+  sync: 'compare', syncBrowse: 'compare', compareDirs: 'compare', info: 'view', activity: 'view', hidden: 'view', perms: 'view', terminal: 'more', disconnect: 'more', palette: 'more',
+};
+
+/** Splits the tools (in the user's order) into runs of the same kind. */
+function toolRuns(tools: ToolId[]): ToolId[][] {
+  const runs: ToolId[][] = [];
+  for (const t of tools) {
+    const last = runs[runs.length - 1];
+    if (last && TOOL_KIND[last[0]] === TOOL_KIND[t]) last.push(t);
+    else runs.push([t]);
+  }
+  return runs;
+}
+
 /** Icon and action for each customisable tool. */
 export function useToolDefs(): Record<ToolId, { label: string; key?: string; icon: ReactNode; run: () => void; active?: boolean; disabled?: boolean }> {
   const sk = useKeyLabel();
@@ -136,9 +153,9 @@ export function Toolbar() {
       {/* The tabs live in their own row (Mac, see MainWindow) or in the title bar (Windows). */}
       <span className="flex-1" data-tauri-drag-region />
       <div className="tool-group"><WatchButton /></div>
-      {groupTools.length > 0 && (
-        <div className={`tool-group${labels === 'iconsText' ? ' with-text' : ''}`}>
-          {groupTools.map((id) => {
+      {toolRuns(groupTools).map((run) => (
+        <div key={run.join()} className={`tool-group${labels === 'iconsText' ? ' with-text' : ''}`}>
+          {run.map((id) => {
             const d = defs[id];
             return labels === 'iconsText' ? (
               <Tooltip key={id} text={d.label} shortcut={d.key}>
@@ -151,7 +168,7 @@ export function Toolbar() {
             );
           })}
         </div>
-      )}
+      ))}
       {/* Windows: the "…" menu sits with the tools, so the search field ends the bar (Explorer, Transmit). */}
       {platform === 'win' && <WinMoreMenu />}
       <label className="search">

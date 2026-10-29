@@ -19,7 +19,7 @@ export function PreviewDialog({ side }: { side: PaneSide }) {
   const entries = paneEntries(side);
   const entry = entries[sel.cursor] ?? entries.find((e) => e.name === sel.names[0]);
   const path = entry && entry.kind === 'file' ? join(panePath(side), entry.name) : null;
-  const { preview, error } = usePreview(...paneLoc(side, tab), path);
+  const { preview, error } = usePreview(...paneLoc(side, tab), path, true);
 
   useEffect(() => {
     // The space press that opened the preview is still on its way; ignore it.

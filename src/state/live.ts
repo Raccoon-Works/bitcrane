@@ -21,7 +21,7 @@ import { addLog } from './log';
 import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
 import {
-  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
+  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, oldDefaultToolbar, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
 } from './store';
 import { $t } from '../i18n';
 
@@ -1634,7 +1634,8 @@ async function loadConfig() {
     watches: (cfg?.watches ?? []).map((w) => ({ ...w, state: w.state === 'paused' || w.options?.startWithApp === false ? 'paused' : 'active' })),
     // Older versions had a single switch "Automatisch nach Updates suchen".
     settings: { ...s.settings, ...(cfg?.settings ?? {}), ...(cfg?.settings && !cfg.settings.updateMode && (cfg.settings as { autoUpdate?: boolean }).autoUpdate === false ? { updateMode: 'off' as const } : {}), coloursReset: true },
-    toolbar: (cfg?.toolbar ?? s.toolbar).filter((x) => (x as string) !== 'sidebar'),
+    // A toolbar never changed by hand moves to the new standard set.
+    toolbar: (cfg?.toolbar && cfg.toolbar.join() !== oldDefaultToolbar.join() ? cfg.toolbar : s.toolbar).filter((x) => (x as string) !== 'sidebar'),
     toolbarLabels: cfg?.toolbarLabels ?? s.toolbarLabels,
     // The server list in the right half greets new users; no separate first-run screen.
     firstRun: false,
@@ -1777,6 +1778,16 @@ export function startLive() {
     reconcileWatches(getState());
     void announceUpdate();
     startUpdateChecks();
+    // No sleep while transfers run (keepawake in the backend; Settings › Übertragungen).
+    let awake = false;
+    subscribeStore(() => {
+      const s = getState();
+      const busy = s.settings.keepAwake !== false && s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
+      if (busy !== awake) {
+        awake = busy;
+        void invoke('keep_awake', { on: busy }).catch(() => undefined);
+      }
+    });
     // Servers and shared settings between the user's computers (sync.ts).
     void import('./sync').then((m) => m.startSync());
   });

@@ -220,6 +220,14 @@ pub fn load_private_key(path: &str, passphrase: Option<&str>) -> AppResult<russh
             }
         });
     }
+    // Keys on a hardware token (YubiKey and other FIDO2 keys, "sk-…") cannot sign from the file:
+    // the token has to be touched, which the SSH agent does.
+    if text.contains("sk-ssh-ed25519@openssh.com") || text.contains("sk-ecdsa-sha2-nistp256@openssh.com") || std::fs::read_to_string(format!("{}.pub", native.display())).map(|p| p.starts_with("sk-")).unwrap_or(false) {
+        return Err(AppError::new(
+            ErrorKind::AuthFailed,
+            "Das ist ein Hardware-Schlüssel (FIDO2, z. B. YubiKey). Bitte über den SSH-Agent nutzen: einmal „ssh-add“ mit dem Schlüssel ausführen und bei Anmeldung „SSH-Agent“ wählen.",
+        ));
+    }
     match russh::keys::decode_secret_key(&text, passphrase) {
         Ok(k) => Ok(k),
         Err(russh::keys::Error::KeyIsEncrypted) => Err(AppError::new(ErrorKind::PassphraseRequired, "Der Schlüssel ist mit einer Passphrase geschützt.")),
@@ -565,8 +573,13 @@ where
     }
     let hash = handle.best_supported_rsa_hash().await?.flatten();
     for id in identities {
-        let key = id.public_key().into_owned();
-        match handle.authenticate_publickey_with(user, key, hash, agent).await {
+        // Certificates in the agent (company SSH CAs) are offered as certificates;
+        // keys on hardware tokens (FIDO2, "sk-" keys) sign inside the agent like any other key.
+        let result = match &id {
+            russh::keys::agent::AgentIdentity::Certificate { certificate, .. } => handle.authenticate_certificate_with(user, certificate.clone(), hash, agent).await,
+            _ => handle.authenticate_publickey_with(user, id.public_key().into_owned(), hash, agent).await,
+        };
+        match result {
             Ok(r) if r.success() => return Ok(AgentOutcome::Accepted),
             _ => continue,
         }

@@ -1700,4 +1700,10 @@ export const EN: Record<string, string> = {
   "Abgleich-Passwort": "Sync password",
   "Einschalten": "Turn on",
   "Der Ordner für den Abgleich ist nicht da (Cloud-Programm nicht angemeldet oder Ordner verschoben?).": "The sync folder is missing (cloud app not signed in or folder moved?).",
+  "Ruhezustand verhindern, solange übertragen wird": "Prevent sleep while transferring",
+  "Der Bildschirm darf ausgehen, der Rechner schläft aber erst ein, wenn alles fertig ist.": "The display may turn off, but the computer only goes to sleep when everything is done.",
+  "Ruhezustand verhindern": "Prevent sleep",
+  "PDF-Vorschau": "PDF preview",
+  "Die Datei ist für eine Vorschau zu groß (über 500 MB). Bitte herunterladen.": "The file is too large for a preview (over 500 MB). Please download it.",
+  "Das ist ein Hardware-Schlüssel (FIDO2, z. B. YubiKey). Bitte über den SSH-Agent nutzen: einmal „ssh-add“ mit dem Schlüssel ausführen und bei Anmeldung „SSH-Agent“ wählen.": "This is a hardware key (FIDO2, e.g. YubiKey). Please use it through the SSH agent: run “ssh-add” with the key once and choose “SSH agent” as sign-in method.",
 };
