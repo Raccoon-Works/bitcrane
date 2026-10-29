@@ -166,6 +166,10 @@ export interface Backend {
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
   /** Packs files and folders into a zip next to them; returns the archive's name. */
   localZip(paths: string[]): Promise<string>;
+  /** Shared settings file in a sync folder (null when there is none yet). */
+  syncRead(dir: string): Promise<{ text: string; mtime: number } | null>;
+  /** Writes the shared settings file; returns its new modification time. */
+  syncWrite(dir: string, text: string): Promise<number>;
   /** Link to share a file or folder (cloud services only). */
   remoteShareLink(serverId: string, path: string): Promise<string>;
   /** Unpacks a zip into a new folder next to it; returns the folder's name. */

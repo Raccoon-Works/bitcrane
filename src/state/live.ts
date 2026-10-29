@@ -1777,5 +1777,7 @@ export function startLive() {
     reconcileWatches(getState());
     void announceUpdate();
     startUpdateChecks();
+    // Servers and shared settings between the user's computers (sync.ts).
+    void import('./sync').then((m) => m.startSync());
   });
 }
