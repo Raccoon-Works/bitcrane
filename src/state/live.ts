@@ -195,6 +195,18 @@ export async function restoreSecrets(secrets: Record<string, string>): Promise<n
 /** SFTP (SSH) or one of the other protocols. */
 export const isSftp = (srv: Pick<Server, 'protocol'>) => !srv.protocol || srv.protocol === 'sftp';
 
+/**
+ * 0.2.44 brought the built-in terminal: a toolbar the user had changed gets
+ * its button once (before "Informationen"), so it can be found. Removing it
+ * afterwards sticks (settings.toolbarTerminalAdded).
+ */
+function withTerminalButton(cfg: Partial<StoredConfig> | null | undefined, toolbar: AppState['toolbar']): AppState['toolbar'] {
+  const settings = cfg?.settings as { toolbarTerminalAdded?: boolean } | undefined;
+  if (!cfg?.toolbar || settings?.toolbarTerminalAdded || toolbar.includes('terminal')) return toolbar;
+  const at = toolbar.indexOf('info');
+  return at < 0 ? [...toolbar, 'terminal'] : [...toolbar.slice(0, at), 'terminal', ...toolbar.slice(at)];
+}
+
 /** Address of a WebDAV server. */
 export function davUrl(srv: Server): string {
   const https = srv.davHttps !== false;
@@ -1669,9 +1681,9 @@ async function loadConfig() {
     // Watches run again after a start, unless paused or set not to start with Bitcrane.
     watches: (cfg?.watches ?? []).map((w) => ({ ...w, state: w.state === 'paused' || w.options?.startWithApp === false ? 'paused' : 'active' })),
     // Older versions had a single switch "Automatisch nach Updates suchen".
-    settings: { ...s.settings, ...(cfg?.settings ?? {}), ...(cfg?.settings && !cfg.settings.updateMode && (cfg.settings as { autoUpdate?: boolean }).autoUpdate === false ? { updateMode: 'off' as const } : {}), coloursReset: true },
+    settings: { ...s.settings, ...(cfg?.settings ?? {}), toolbarTerminalAdded: true, ...(cfg?.settings && !cfg.settings.updateMode && (cfg.settings as { autoUpdate?: boolean }).autoUpdate === false ? { updateMode: 'off' as const } : {}), coloursReset: true },
     // A toolbar never changed by hand moves to the new standard set.
-    toolbar: (cfg?.toolbar && !oldDefaultToolbars.some((old) => old.join() === cfg.toolbar!.join()) ? cfg.toolbar : s.toolbar).filter((x) => (x as string) !== 'sidebar'),
+    toolbar: withTerminalButton(cfg, (cfg?.toolbar && !oldDefaultToolbars.some((old) => old.join() === cfg.toolbar!.join()) ? cfg.toolbar : s.toolbar).filter((x) => (x as string) !== 'sidebar')),
     toolbarLabels: cfg?.toolbarLabels ?? s.toolbarLabels,
     // The server list in the right half greets new users; no separate first-run screen.
     firstRun: false,

@@ -53,3 +53,34 @@ export function tr(message: string): string {
   }
   return message;
 }
+
+/* Mac menus in English use title case ("Open in New Tab"); Windows keeps
+   sentence case ("Open in new tab"), as each system does in its own apps. */
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'to', 'of', 'in', 'on', 'at', 'by', 'as', 'via', 'per', 'vs', 'with', 'from', 'into', 'onto']);
+const IS_MAC = typeof navigator !== 'undefined' && !/Win/i.test(`${navigator.platform} ${navigator.userAgent}`);
+
+/** Title case for one English menu text; quoted parts (file names) stay as they are. */
+export function titleCase(text: string): string {
+  // Split into quoted and unquoted parts; only the unquoted ones change.
+  const parts = text.split(/(“[^”]*”|„[^“]*“|"[^"]*"|'[^']*')/);
+  const words = parts.flatMap((p, i) => (i % 2 ? [] : p.split(/(\s+)/).filter((w) => w.trim()).map((w) => w)));
+  const last = words.length - 1;
+  let n = -1;
+  return parts
+    .map((p, i) => (i % 2 ? p : p.replace(/\S+/g, (w) => {
+      n++;
+      const bare = w.replace(/^[^A-Za-z]+/, '');
+      // Words with capitals, digits or symbols inside (macOS, SFTP, Ctrl+C, …) stay as they are.
+      if (!bare || /[A-Z0-9@./\\:+_]/.test(bare.slice(1)) || /^[A-Z]/.test(bare)) return w;
+      const lower = bare.toLowerCase();
+      if (n !== 0 && n !== last && SMALL_WORDS.has(lower)) return w;
+      const cap = bare.split('-').map((s) => (s ? s[0].toUpperCase() + s.slice(1) : s)).join('-');
+      return w.slice(0, w.length - bare.length) + cap;
+    })))
+    .join('');
+}
+
+/** Menu text as the system expects it (title case for English on the Mac). */
+export function menuText(text: string): string {
+  return LANG === 'en' && IS_MAC ? titleCase(text) : text;
+}

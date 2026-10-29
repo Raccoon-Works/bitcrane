@@ -10,8 +10,12 @@ import { ArrowsInSimple, ArrowsOutSimple, BracketsCurly, CaretDown, MagnifyingGl
 import { $t } from '../i18n';
 import { openDialog, serverById, updateSettings, useStore } from '../state/store';
 import { themeFor, attachTerminal, clearTerminal, closeTerminal, findInTerminal, fitTerminal, newTerminal, sendSnippet, setActiveTerminal, terminalBackToPanel, terminalInOwnTab, toggleTerminal } from '../state/terminal';
+import type { Snippet } from '../state/terminal';
 import { ResizeHandle } from './ResizeHandle';
 import { IconButton } from './ui';
+
+/** Stable empty list: a new [] on every render would redraw the store endlessly. */
+const NO_SNIPPETS: Snippet[] = [];
 
 /** Hosts one session's xterm element and keeps it fitted to the area. */
 function TerminalView({ id }: { id: string }) {
@@ -30,7 +34,7 @@ function TerminalView({ id }: { id: string }) {
 }
 
 function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
-  const snippets = useStore((s) => s.settings.snippets ?? []);
+  const snippets = useStore((s) => s.settings.snippets) ?? NO_SNIPPETS;
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('.term-snippets')) onClose();

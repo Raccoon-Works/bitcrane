@@ -21,6 +21,9 @@ import { Button, Checkbox, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/** Stable empty list for the store selector (a new [] would redraw endlessly). */
+const NO_RULES: import('../../state/store').TransferRule[] = [];
+
 const templates: Record<string, string[]> = {
   python: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp', '.venv'],
   web: ['.git', 'node_modules', '.DS_Store', '*.log', '.cache'],
@@ -51,7 +54,7 @@ export function WatchSetup({ editId }: { editId?: string }) {
   const [excludes, setExcludes] = useState<string[]>(existing?.excludes ?? defaults.defaultExcludes);
   // Transfer rule: '' = the server's rule, 'none' = no rule, else a rule id (settings > Regeln).
   const [ruleId, setRuleId] = useState<string>(existing?.ruleId ?? '');
-  const rules = useStore((s) => s.settings.rules ?? []);
+  const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
   const serverRule = useStore((s) => { const id = s.servers.find((x) => x.id === serverId)?.ruleId; return (s.settings.rules ?? []).find((r) => r.id === id)?.name ?? ''; });
   const [newPattern, setNewPattern] = useState<string | null>(null);
   const [more, setMore] = useState(false);

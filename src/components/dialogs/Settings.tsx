@@ -21,6 +21,12 @@ import { Button, IconButton, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/** Stable empty list for the store selector (a new [] would redraw endlessly). */
+const NO_RULES: TransferRule[] = [];
+
+/** Stable empty list: a new [] on every render would redraw the store endlessly. */
+const NO_SNIPPETS: Snippet[] = [];
+
 const CLI_GUIDE_URL = 'https://github.com/Raccoon-Works/bitcrane/blob/main/docs/cli.md';
 
 /** Where the program lives, for `bitcrane upload …` in scripts (cli.rs). */
@@ -42,7 +48,7 @@ function CliRow() {
 /** Settings › Terminal: look of the built-in terminal and the snippets. */
 function TerminalSettingsPage() {
   useStore((s) => s.settings.terminal);
-  const snippets = useStore((s) => s.settings.snippets ?? []);
+  const snippets = useStore((s) => s.settings.snippets) ?? NO_SNIPPETS;
   const t = terminalSettings();
   const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const setSnippets = (list: Snippet[]) => updateSettings({ snippets: list });
@@ -245,7 +251,7 @@ function CustomCommands() {
 }
 
 function RulesSettings() {
-  const rules = useStore((st) => st.settings.rules ?? []);
+  const rules = useStore((st) => st.settings.rules) ?? NO_RULES;
   const servers = useStore((st) => st.servers);
   const watches = useStore((st) => st.watches);
   const [selId, setSelId] = useState<string | null>(rules[0]?.id ?? null);
@@ -314,7 +320,7 @@ function RulesSettings() {
 
 /** Colour of each settings area's symbol. */
 const TAB_COLORS: Record<SettingsTab, string> = {
-  general: '#8e8e93', watch: '#2a6de0', transfers: '#e8a600', rules: '#3fbfaa', connections: '#30b158', appearance: '#af52de', terminal: '#3a3a40', keys: '#5ac8fa', advanced: '#ff7a3d',
+  general: '#8e8e93', watch: '#2a6de0', transfers: '#e8a600', rules: '#3fbfaa', connections: '#30b158', appearance: '#af52de', terminal: '#30b0c7', keys: '#5ac8fa', advanced: '#ff7a3d',
 };
 
 /** Choices for default upload permissions: octal value with its rwx text. */
@@ -371,7 +377,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
   };
 
   return (
-    <Dialog label={$t('Einstellungen')} windowLike windowTitle={mac ? title : $t('Einstellungen')} width={780} maxHeight={760} onClose={closeDialog} className="settings-dialog">
+    <Dialog label={$t('Einstellungen')} windowLike windowTitle={mac ? title : $t('Einstellungen')} width={860} maxHeight={760} onClose={closeDialog} className="settings-dialog">
       <div role="tablist" aria-label={$t('Bereiche')} className="set-tabs">
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === current} className={`set-tab${t.id === current ? ' is-sel' : ''}`} onClick={() => setCurrent(t.id)}>

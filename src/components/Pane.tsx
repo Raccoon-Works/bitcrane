@@ -12,7 +12,7 @@
  */
 import { ArrowLeft, ArrowRight, ChevronDown, CornerDownRight, Download, Link2, Loader2, Lock, PlugZap, WifiOff } from './glyphs';
 import { isVaultListing, unlockVault } from '../state/vault';
-import { ArrowElbowLeftUp, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour } from '@phosphor-icons/react';
+import { ArrowElbowLeftUp, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
 import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer } from '../state/store';
@@ -147,6 +147,9 @@ export function Pane({ side }: { side: PaneSide }) {
   const path = tab ? (side === 'local' ? tab.localPath : tab.remotePath) : '';
   const server = onServer ? servers.find((x) => x.id === sid) : undefined;
   const offline = onServer && !!offlineInfo;
+  // SSH servers get a button for the built-in terminal next to "Trennen".
+  const sshPane = useStore((s) => { const id = paneLoc(side)[1]; const p = s.servers.find((x) => x.id === id)?.protocol; return !p || p === 'sftp'; });
+  const terminalOpen = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.open);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const entries = useMemo(() => paneEntries(side), [side, path, fsRev, search, showHidden, tab?.serverId, tab?.leftServerId, sort, viewMode, expanded, showServers]);
   // A Cryptomator vault: its folder shows the encrypted files plus a way to unlock it.
@@ -440,6 +443,11 @@ export function Pane({ side }: { side: PaneSide }) {
           <IconButton label={$t('Liste')} active={!icons} onClick={() => setViewMode(side, 'list')}><ListBullets size={18} weight="bold" /></IconButton>
           <IconButton label={$t('Symbole')} active={icons} onClick={() => setViewMode(side, 'icons')}><SquaresFour size={18} weight="duotone" /></IconButton>
         </span>
+        {onServer && sshPane && (
+          <IconButton label={$t('SSH-Terminal')} active={terminalOpen} onClick={() => void import('../state/terminal').then((m) => m.toggleTerminal())}>
+            <TerminalWindow size={18} weight="bold" />
+          </IconButton>
+        )}
         {onServer && (
           <IconButton label={$t('Trennen')} onClick={() => closePaneServer(side)}>
             {platform === 'mac' ? <EjectSimple size={18} weight="bold" /> : <Plugs size={18} weight="bold" />}

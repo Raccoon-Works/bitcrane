@@ -23,7 +23,7 @@ import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAl
 import { checkForUpdates } from './updates';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
 import { initMounts } from './mount';
-import { $t } from '../i18n';
+import { $t, menuText } from '../i18n';
 
 /* ------------------------------------------------------------------------ */
 /* macOS menu bar                                                           */
@@ -57,7 +57,7 @@ const TEXT_KEYS = new Set(['⌘⌫', '⌘↑', '⌘A', '⌘↓']);
 
 async function installMacMenu() {
   const defs = menuDefs();
-  const sub = async (id: string, text: string, items: Array<MenuItem | PredefinedMenuItem | Submenu>) => Submenu.new({ id, text, items });
+  const sub = async (id: string, text: string, items: Array<MenuItem | PredefinedMenuItem | Submenu>) => Submenu.new({ id, text: menuText(text), items });
   const custom = async (defId: string, skip: string[] = []) => {
     const def = defs.find((d) => d.id === defId)!;
     const out: Array<MenuItem | PredefinedMenuItem> = [];
@@ -68,7 +68,7 @@ async function installMacMenu() {
         continue;
       }
       out.push(await MenuItem.new({
-        text: it.label,
+        text: menuText(it.label),
         enabled: !!it.run,
         accelerator: it.mac && !TEXT_KEYS.has(it.mac) ? toAccelerator(it.mac) : undefined,
         action: () => it.run?.(),
@@ -81,38 +81,38 @@ async function installMacMenu() {
   const sep = () => PredefinedMenuItem.new({ item: 'Separator' });
 
   const appMenu = await sub('app', 'Bitcrane', [
-    await MenuItem.new({ text: $t('Über Bitcrane'), action: () => item($t('Über Bitcrane')).run?.() }),
+    await MenuItem.new({ text: menuText($t('Über Bitcrane')), action: () => item($t('Über Bitcrane')).run?.() }),
     // Like other Mac apps: "Nach Updates suchen …" right below "Über Bitcrane".
-    await MenuItem.new({ text: $t('Nach Updates suchen …'), action: () => item($t('Nach Updates suchen …')).run?.() }),
+    await MenuItem.new({ text: menuText($t('Nach Updates suchen …')), action: () => item($t('Nach Updates suchen …')).run?.() }),
     await sep(),
-    await MenuItem.new({ text: $t('Einstellungen …'), accelerator: item($t('Einstellungen …')).mac ? toAccelerator(item($t('Einstellungen …')).mac!) : undefined, action: () => item($t('Einstellungen …')).run?.() }),
-    await MenuItem.new({ text: $t('Werkzeugleiste anpassen …'), action: () => item($t('Werkzeugleiste anpassen …')).run?.() }),
+    await MenuItem.new({ text: menuText($t('Einstellungen …')), accelerator: item($t('Einstellungen …')).mac ? toAccelerator(item($t('Einstellungen …')).mac!) : undefined, action: () => item($t('Einstellungen …')).run?.() }),
+    await MenuItem.new({ text: menuText($t('Werkzeugleiste anpassen …')), action: () => item($t('Werkzeugleiste anpassen …')).run?.() }),
     await sep(),
-    await PredefinedMenuItem.new({ item: 'Hide', text: $t('Bitcrane ausblenden') }),
-    await PredefinedMenuItem.new({ item: 'HideOthers', text: $t('Andere ausblenden') }),
-    await PredefinedMenuItem.new({ item: 'ShowAll', text: $t('Alle einblenden') }),
+    await PredefinedMenuItem.new({ item: 'Hide', text: menuText($t('Bitcrane ausblenden')) }),
+    await PredefinedMenuItem.new({ item: 'HideOthers', text: menuText($t('Andere ausblenden')) }),
+    await PredefinedMenuItem.new({ item: 'ShowAll', text: menuText($t('Alle einblenden')) }),
     await sep(),
-    await MenuItem.new({ text: $t('Bitcrane beenden'), accelerator: 'Cmd+Q', action: quitApp }),
+    await MenuItem.new({ text: menuText($t('Bitcrane beenden')), accelerator: 'Cmd+Q', action: quitApp }),
   ]);
   // "Bearbeiten" needs the standard text commands, otherwise ⌘C / ⌘V do not work in text fields.
   const editMenu = await sub('edit', $t('Bearbeiten'), [
-    await PredefinedMenuItem.new({ item: 'Undo', text: $t('Widerrufen') }),
-    await PredefinedMenuItem.new({ item: 'Redo', text: $t('Wiederholen') }),
+    await PredefinedMenuItem.new({ item: 'Undo', text: menuText($t('Widerrufen')) }),
+    await PredefinedMenuItem.new({ item: 'Redo', text: menuText($t('Wiederholen')) }),
     await sep(),
-    await PredefinedMenuItem.new({ item: 'Cut', text: $t('Ausschneiden') }),
-    await PredefinedMenuItem.new({ item: 'Copy', text: $t('Kopieren') }),
-    await PredefinedMenuItem.new({ item: 'Paste', text: $t('Einsetzen') }),
-    await PredefinedMenuItem.new({ item: 'SelectAll', text: $t('Alles auswählen') }),
+    await PredefinedMenuItem.new({ item: 'Cut', text: menuText($t('Ausschneiden')) }),
+    await PredefinedMenuItem.new({ item: 'Copy', text: menuText($t('Kopieren')) }),
+    await PredefinedMenuItem.new({ item: 'Paste', text: menuText($t('Einsetzen')) }),
+    await PredefinedMenuItem.new({ item: 'SelectAll', text: menuText($t('Alles auswählen')) }),
     await sep(),
     // "Alles auswählen" is the standard entry above; it also selects all files in a list.
     ...(await custom('edit', [$t('Alles auswählen'), $t('Kopieren'), $t('Einfügen')])),
   ]);
   const windowMenu = await sub('window', $t('Fenster'), [
-    await PredefinedMenuItem.new({ item: 'Minimize', text: $t('Im Dock ablegen') }),
-    await PredefinedMenuItem.new({ item: 'Maximize', text: $t('Zoomen') }),
-    await PredefinedMenuItem.new({ item: 'Fullscreen', text: $t('Vollbild') }),
+    await PredefinedMenuItem.new({ item: 'Minimize', text: menuText($t('Im Dock ablegen')) }),
+    await PredefinedMenuItem.new({ item: 'Maximize', text: menuText($t('Zoomen')) }),
+    await PredefinedMenuItem.new({ item: 'Fullscreen', text: menuText($t('Vollbild')) }),
     await sep(),
-    await PredefinedMenuItem.new({ item: 'CloseWindow', text: $t('Fenster schließen') }),
+    await PredefinedMenuItem.new({ item: 'CloseWindow', text: menuText($t('Fenster schließen')) }),
   ]);
   const menu = await Menu.new({
     items: [
@@ -141,9 +141,9 @@ function trayStatus(s: AppState): { text: string; paused: boolean } {
   const paused = s.watches.length > 0 && watching === 0;
   if (errors) return { text: errors === 1 ? $t('1 Fehler, bitte ansehen') : $t('{0} Fehler, bitte ansehen', errors), paused };
   if (active) return { text: active === 1 ? $t('Überträgt 1 Datei') : $t('Überträgt {0} Dateien', active), paused };
-  if (paused) return { text: $t('Alle Überwachungen pausiert'), paused };
+  if (paused) return { text: menuText($t('Alle Überwachungen pausiert')), paused };
   if (watching) return { text: watching === 1 ? $t('1 Überwachung aktiv') : $t('{0} Überwachungen aktiv', watching), paused };
-  return { text: $t('Keine Überwachung aktiv'), paused };
+  return { text: menuText($t('Keine Überwachung aktiv')), paused };
 }
 
 /** One entry of the status icon's menu (see tray.rs); no id and no label = separator. */
@@ -161,30 +161,30 @@ function trayMenu(s: AppState, st: { text: string; paused: boolean }): TrayItem[
   const items: TrayItem[] = [
     { id: 'status', label: st.text, enabled: false },
     SEP,
-    { id: 'open', label: $t('Bitcrane öffnen') },
-    { id: 'newTab', label: $t('Neuer Tab') },
-    { id: 'quick', label: $t('Schnell verbinden …') },
+    { id: 'open', label: menuText($t('Bitcrane öffnen')) },
+    { id: 'newTab', label: menuText($t('Neuer Tab')) },
+    { id: 'quick', label: menuText($t('Schnell verbinden …')) },
   ];
-  if (servers.length) items.push({ id: 'servers', label: $t('Server öffnen'), items: servers.map((x) => ({ id: `server:${x.id}`, label: x.name })) });
+  if (servers.length) items.push({ id: 'servers', label: menuText($t('Server öffnen')), items: servers.map((x) => ({ id: `server:${x.id}`, label: x.name })) });
   if (s.watches.length) {
     items.push({
       id: 'watches',
-      label: $t('Überwachungen'),
+      label: menuText($t('Überwachungen')),
       items: [
         ...s.watches.map((w) => ({ id: `watch:${w.id}`, label: w.name, checked: w.state !== 'paused' })),
         SEP,
-        { id: 'pauseAll', label: st.paused ? $t('Alle Überwachungen fortsetzen') : $t('Alle Überwachungen pausieren') },
+        { id: 'pauseAll', label: menuText(st.paused ? $t('Alle Überwachungen fortsetzen') : $t('Alle Überwachungen pausieren')) },
       ],
     });
   }
   items.push(
-    { id: 'transfers', label: $t('Übertragungen …') },
+    { id: 'transfers', label: menuText($t('Übertragungen …')) },
     SEP,
-    { id: 'updates', label: $t('Nach Updates suchen …') },
-    { id: 'settings', label: $t('Einstellungen …') },
-    { id: 'hideIcon', label: mac ? $t('Symbol in der Menüleiste ausblenden') : $t('Symbol im Infobereich ausblenden') },
+    { id: 'updates', label: menuText($t('Nach Updates suchen …')) },
+    { id: 'settings', label: menuText($t('Einstellungen …')) },
+    { id: 'hideIcon', label: menuText(mac ? $t('Symbol in der Menüleiste ausblenden') : $t('Symbol im Infobereich ausblenden')) },
     SEP,
-    { id: 'quit', label: $t('Bitcrane beenden') },
+    { id: 'quit', label: menuText($t('Bitcrane beenden')) },
   );
   return items;
 }
