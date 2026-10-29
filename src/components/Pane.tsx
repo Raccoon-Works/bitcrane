@@ -10,7 +10,8 @@
  * → and ← open and close a folder in the list. Multi-selection with Shift/⌘,
  * inline rename, context menu, and drag & drop between the two halves.
  */
-import { ArrowLeft, ArrowRight, ChevronDown, CornerDownRight, Download, Link2, Loader2, PlugZap, WifiOff } from './glyphs';
+import { ArrowLeft, ArrowRight, ChevronDown, CornerDownRight, Download, Link2, Loader2, Lock, PlugZap, WifiOff } from './glyphs';
+import { isVaultListing, unlockVault } from '../state/vault';
 import { ArrowElbowLeftUp, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
@@ -148,6 +149,8 @@ export function Pane({ side }: { side: PaneSide }) {
   const offline = onServer && !!offlineInfo;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const entries = useMemo(() => paneEntries(side), [side, path, fsRev, search, showHidden, tab?.serverId, tab?.leftServerId, sort, viewMode, expanded, showServers]);
+  // A Cryptomator vault: its folder shows the encrypted files plus a way to unlock it.
+  const isVault = useMemo(() => isVaultListing(entries.map((e) => e.name)), [entries]);
   const openSet = useMemo(() => new Set(expanded), [expanded]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const status = useMemo(() => paneStatus(side), [side, path, fsRev, tab?.serverId, tab?.leftServerId]);
@@ -465,6 +468,14 @@ export function Pane({ side }: { side: PaneSide }) {
             <Button variant="primary" onClick={() => reconnect(sid)}>{$t('Jetzt verbinden')}</Button>
             <Button onClick={() => setState({ dialog: { type: 'log' } })}>{$t('Protokoll')}</Button>
           </span>
+        </div>
+      )}
+
+      {!offline && isVault && (
+        <div role="note" className="offline-box">
+          <span className="offline-title tone-accent"><Lock size={16} aria-hidden="true" />{$t('Cryptomator-Tresor')}</span>
+          <span className="small text-2">{$t('Die Dateien in diesem Ordner sind verschlüsselt. Entsperrt zeigt Bitcrane sie im Klartext, in einem eigenen Tab.')}</span>
+          <span className="row-buttons"><Button variant="primary" onClick={() => unlockVault(side)}>{$t('Entsperren …')}</Button></span>
         </div>
       )}
 

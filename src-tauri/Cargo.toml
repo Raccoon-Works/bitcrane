@@ -60,6 +60,14 @@ tauri-plugin-process = "2"
 keepawake = "0.5"
 tar = "0.4"
 flate2 = "1"
+hmac = "0.12"
+sha1 = "0.10"
+data-encoding = "2"
+unicode-normalization = "0.1"
+aes-gcm = "0.10"
+aes-siv = "0.7"
+aes-kw = { version = "0.2", features = ["alloc"] }
+scrypt = { version = "0.11", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

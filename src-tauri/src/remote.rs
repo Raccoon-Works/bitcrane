@@ -11,6 +11,7 @@ use crate::gdrive::GDriveConn;
 use crate::onedrive::OneDriveConn;
 use crate::smb::SmbConn;
 use crate::scp::ScpConn;
+use crate::vault::VaultConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::model::{FileEntry, WalkItem};
@@ -31,6 +32,8 @@ pub enum Remote {
     Smb(Arc<SmbConn>),
     /// SSH without SFTP: files over shell commands (scp.rs).
     Scp(Arc<ScpConn>),
+    /// An unlocked Cryptomator vault (vault.rs).
+    Vault(Arc<VaultConn>),
 }
 
 /// Size, modification time (seconds) and permission bits of a server file.
@@ -55,6 +58,7 @@ impl Remote {
             Remote::OneDrive(c) => &c.home,
             Remote::Smb(c) => &c.home,
             Remote::Scp(c) => &c.home,
+            Remote::Vault(c) => &c.home,
         }
     }
 
@@ -68,6 +72,7 @@ impl Remote {
             Remote::OneDrive(_) => "OneDrive",
             Remote::Smb(_) => "SMB",
             Remote::Scp(_) => "SCP",
+            Remote::Vault(_) => "Cryptomator",
         }
     }
 
@@ -86,7 +91,7 @@ impl Remote {
             Remote::Ftp(c) => c.close().await,
             Remote::Smb(c) => c.close().await,
             Remote::Scp(c) => c.close().await,
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) => {}
         }
     }
 
@@ -100,6 +105,7 @@ impl Remote {
             Remote::OneDrive(c) => c.list(path).await,
             Remote::Smb(c) => c.list(path).await,
             Remote::Scp(c) => c.list(path).await,
+            Remote::Vault(c) => c.list(path).await,
         }?;
         list.retain(|e| safe_name(&e.name));
         Ok(list)
@@ -115,6 +121,7 @@ impl Remote {
             Remote::OneDrive(c) => c.stat(path).await,
             Remote::Smb(c) => c.stat(path).await,
             Remote::Scp(c) => c.stat(path).await,
+            Remote::Vault(c) => c.stat(path).await,
         }
     }
 
@@ -128,6 +135,7 @@ impl Remote {
             Remote::OneDrive(c) => c.exists(path).await,
             Remote::Smb(c) => c.exists(path).await,
             Remote::Scp(c) => c.exists(path).await,
+            Remote::Vault(c) => c.exists(path).await,
         }
     }
 
@@ -141,6 +149,7 @@ impl Remote {
             Remote::OneDrive(c) => c.mkdir(path).await,
             Remote::Smb(c) => c.mkdir(path).await,
             Remote::Scp(c) => c.mkdir(path).await,
+            Remote::Vault(c) => c.mkdir(path).await,
         }
     }
 
@@ -164,6 +173,7 @@ impl Remote {
             Remote::OneDrive(c) => c.mkdir_all(path).await,
             Remote::Smb(c) => c.mkdir_all(path).await,
             Remote::Scp(c) => c.mkdir_all(path).await,
+            Remote::Vault(c) => c.mkdir_all(path).await,
         }
     }
 
@@ -177,6 +187,7 @@ impl Remote {
             Remote::OneDrive(c) => c.rename(from, to).await,
             Remote::Smb(c) => c.rename(from, to).await,
             Remote::Scp(c) => c.rename(from, to).await,
+            Remote::Vault(c) => c.rename(from, to).await,
         }
     }
 
@@ -200,6 +211,9 @@ impl Remote {
             return c.replace(from, to).await;
         }
         if let Remote::Scp(c) = self {
+            return c.replace(from, to).await;
+        }
+        if let Remote::Vault(c) = self {
             return c.replace(from, to).await;
         }
         if !self.exists(to).await {
@@ -228,6 +242,7 @@ impl Remote {
             Remote::OneDrive(c) => c.remove(path).await,
             Remote::Smb(c) => c.remove(path).await,
             Remote::Scp(c) => c.remove(path).await,
+            Remote::Vault(c) => c.remove(path).await,
         }
     }
 
@@ -241,6 +256,7 @@ impl Remote {
             Remote::OneDrive(c) => c.remove(path).await,
             Remote::Smb(c) => c.remove(path).await,
             Remote::Scp(c) => c.remove(path).await,
+            Remote::Vault(c) => c.remove(path).await,
         }
     }
 
@@ -254,6 +270,7 @@ impl Remote {
             Remote::OneDrive(_) => Err(unsupported("Rechte setzen", "OneDrive")),
             Remote::Smb(_) => Err(unsupported("Rechte setzen", "SMB")),
             Remote::Scp(c) => c.chmod(path, mode, recursive).await,
+            Remote::Vault(_) => Err(unsupported("Rechte setzen", "Cryptomator")),
         }
     }
 
@@ -268,6 +285,7 @@ impl Remote {
             Remote::Dav(_) => Err(unsupported("Ein Link zum Teilen", "WebDAV")),
             Remote::Smb(_) => Err(unsupported("Ein Link zum Teilen", "SMB")),
             Remote::Scp(_) => Err(unsupported("Ein Link zum Teilen", "SCP")),
+            Remote::Vault(_) => Err(unsupported("Ein Link zum Teilen", "Cryptomator")),
         }
     }
 
@@ -281,6 +299,7 @@ impl Remote {
             Remote::OneDrive(c) => c.walk(path).await,
             Remote::Smb(c) => c.walk(path).await,
             Remote::Scp(c) => c.walk(path).await,
+            Remote::Vault(c) => c.walk(path).await,
         }?;
         // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
         items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
@@ -356,7 +375,7 @@ impl Remote {
             Remote::OneDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::Smb(c) => c.copy_within(paths, dest_dir).await,
             Remote::Scp(c) => c.copy_within(paths, dest_dir).await,
-            Remote::Ftp(_) => {
+            Remote::Ftp(_) | Remote::Vault(_) => {
                 let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
                 let mut out = Vec::new();
                 for from in paths {
@@ -428,7 +447,7 @@ impl Remote {
         match self {
             Remote::Sftp(_) | Remote::Smb(_) | Remote::Scp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => false,
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) => false,
         }
     }
 
@@ -460,6 +479,7 @@ impl Remote {
             Remote::OneDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Smb(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Scp(c) => RemoteReader::Plain(c.reader(path, offset).await?),
+            Remote::Vault(c) => RemoteReader::Plain(c.reader(path, offset).await?),
         })
     }
 
@@ -506,6 +526,10 @@ impl Remote {
                 let (w, task) = c.writer(path, offset).await?;
                 RemoteWriter::Dav(Some(w), Some(task))
             }
+            Remote::Vault(c) => {
+                let (w, task) = c.writer(path, size.map(|s| s - offset)).await?;
+                RemoteWriter::Dav(Some(w), Some(task))
+            }
         })
     }
 
@@ -523,6 +547,7 @@ impl Remote {
                 }
             }
             Remote::Scp(c) => c.set_attrs(path, mtime, perms).await,
+            Remote::Vault(_) => {}
             // Set with the upload itself where the server supports it.
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }

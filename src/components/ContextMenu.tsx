@@ -72,7 +72,7 @@ export function ContextMenu() {
       ...(srv?.online ? [{ label: $t('Verbindung trennen'), run: () => disconnect(id) }] : []),
     ]);
     groups.push([
-      ...(srv?.temporary ? [{ label: $t('Als Server speichern'), run: () => keepServer(id) }] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
+      ...(srv?.temporary ? [{ label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'), run: () => keepServer(id) }] : srv?.protocol === 'vault' ? [] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
       { label: $t('Duplizieren'), run: () => duplicateServer(id) },
       { label: $t('Adresse kopieren'), run: () => { if (srv) void navigator.clipboard?.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`); } },
     ]);
@@ -212,6 +212,7 @@ export function ContextMenu() {
       ...(clip ? [{ label: clip.serverId === (onServer ? sid : '') ? $t('Hier einfügen (Kopie)') : !clip.serverId ? $t('Hier einfügen (hochladen)') : !onServer ? $t('Hier einfügen (herunterladen)') : $t('Hier einfügen (übertragen)'), key: sk('paste'), run: () => pasteClipboard(menu.side) }] : []),
       { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) },
       { label: $t('Pfad dieses Ordners kopieren'), run: () => copyPath(menu.side) },
+      ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
       { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
       ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),
       ...(remoteTerminal ? [{ label: onServer ? $t('Terminal hier öffnen (SSH)') : $t('Terminal hier öffnen'), run: () => openTerminal(menu.side) }] : []),

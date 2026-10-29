@@ -56,6 +56,7 @@ export type DialogState =
   | { type: 'diff'; transferId: string }
   | { type: 'compareFiles'; a: CompareRef; b: CompareRef }
   | { type: 'uploadTo'; paths: string[] }
+  | { type: 'vaultCreate'; side: PaneSide }
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }

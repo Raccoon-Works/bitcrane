@@ -35,6 +35,7 @@ mod sshconfig;
 mod sysicons;
 mod tray;
 mod transfer;
+mod vault;
 mod watcher;
 
 use error::{AppError, AppResult, ErrorKind};
@@ -707,6 +708,30 @@ async fn smb_connect(state: State<'_, AppState>, server_id: String, params: smb:
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
     Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+}
+
+/// Unlocks a Cryptomator vault and keeps it under `server_id` like a server.
+/// `storage_id` is the connection of the server the vault lies on (none: this computer).
+#[tauri::command]
+async fn vault_open(state: State<'_, AppState>, server_id: String, location: String, storage_id: Option<String>, password: String) -> AppResult<ConnectResult> {
+    let store = match storage_id {
+        Some(id) => vault::Store::Remote { connections: state.connections.clone(), id },
+        None => vault::Store::Local,
+    };
+    let conn = remote::Remote::Vault(Arc::new(vault::VaultConn::open(store, &location, &password).await?));
+    let home = conn.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+}
+
+/// Creates a new, empty Cryptomator vault in the folder `location`.
+#[tauri::command]
+async fn vault_create(state: State<'_, AppState>, location: String, storage_id: Option<String>, password: String) -> AppResult<()> {
+    let store = match storage_id {
+        Some(id) => vault::Store::Remote { connections: state.connections.clone(), id },
+        None => vault::Store::Local,
+    };
+    vault::VaultConn::create(store, &location, &password).await
 }
 
 #[tauri::command]
@@ -1516,6 +1541,8 @@ pub fn run() {
             ftp_connect,
             dav_connect,
             smb_connect,
+            vault_open,
+            vault_create,
             auth_prompt_answer,
             ssh_is_connected,
             remote_list,

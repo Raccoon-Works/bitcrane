@@ -102,6 +102,8 @@ export interface Server {
   smbShare?: string;
   /** SMB: insist on SMB 3 encryption. */
   smbEncrypt?: boolean;
+  /** Cryptomator vault: the server it lies on (none: this computer); `host` is the vault folder. */
+  vaultStorageId?: string;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
   mountExplorer?: boolean;
 }
@@ -114,7 +116,7 @@ export interface ServerProxy {
   user?: string;
 }
 
-export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 'dropbox' | 'gdrive' | 'onedrive';
+export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 'vault' | 'dropbox' | 'gdrive' | 'onedrive';
 
 /** Cloud services that Bitcrane treats like a server (signed in through the browser). */
 export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];

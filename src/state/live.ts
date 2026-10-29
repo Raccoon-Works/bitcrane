@@ -215,6 +215,14 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
   if (srv.protocol === 'webdav') {
     return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only });
   }
+  if (srv.protocol === 'vault') {
+    // The vault's files lie on another server, which has to be connected first.
+    const storage = srv.vaultStorageId ? serverById(srv.vaultStorageId) : undefined;
+    if (srv.vaultStorageId && !connected.has(srv.vaultStorageId)) {
+      throw { kind: 'notConnected', message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', storage?.name ?? '?') };
+    }
+    return backend.vaultOpen(id, srv.host, srv.vaultStorageId, password ?? '');
+  }
   if (srv.protocol === 'smb') {
     return backend.connectSmb(id, { host: srv.host, port: srv.port || 445, user: srv.user, password, share: srv.smbShare ?? '', encrypt: !!srv.smbEncrypt });
   }
@@ -309,7 +317,7 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', vault: 'Cryptomator', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
 const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : srv.protocol === 'smb' ? $t(', Gast') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
