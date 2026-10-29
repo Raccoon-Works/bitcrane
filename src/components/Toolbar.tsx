@@ -59,7 +59,7 @@ function WatchButton() {
   return (
     <div className="pill-anchor watch-anchor">
       <Tooltip text={`${$t('Überwachungen')}: ${text}`} shortcut={sk('watchOverview')}>
-        <button type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={`${$t('Überwachungen')}: ${text}`} className={`icon-btn watch-btn${open ? ' is-on' : ''}`} onClick={togglePopover}>
+        <button type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={`${$t('Überwachungen')}: ${text}`} className={`icon-btn watch-btn is-${tone}${open ? ' is-on' : ''}`} onClick={togglePopover}>
           <Broadcast size={20} weight="duotone" />
           <span className={`watch-lamp tone-${tone}`} aria-hidden="true" />
         </button>
