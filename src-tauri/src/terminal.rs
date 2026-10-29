@@ -91,6 +91,65 @@ impl Terminals {
         Ok(())
     }
 
+    /// A shell on this computer (zsh/bash on the Mac, PowerShell on Windows)
+    /// in a pseudo terminal, starting in `cwd`.
+    pub fn open_local(&self, app: AppHandle, id: String, cols: u32, rows: u32, cwd: Option<String>) -> AppResult<()> {
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+        use std::io::{Read, Write};
+        let fail = |e: &dyn std::fmt::Display| AppError::other("Das Terminal konnte nicht gestartet werden.").with_detail(e.to_string());
+        let size = PtySize { rows: rows.max(2) as u16, cols: cols.max(10) as u16, pixel_width: 0, pixel_height: 0 };
+        let pair = native_pty_system().openpty(size).map_err(|e| fail(&e))?;
+        let mut cmd = local_shell();
+        if let Some(dir) = cwd.map(|c| crate::paths::to_native(&c)).filter(|d| d.is_dir()) {
+            cmd.cwd(dir);
+        } else {
+            cmd.cwd(crate::paths::home());
+        }
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+        let mut child = pair.slave.spawn_command(cmd).map_err(|e| fail(&e))?;
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().map_err(|e| fail(&e))?;
+        let mut writer = pair.master.take_writer().map_err(|e| fail(&e))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        self.0.lock().unwrap().insert(id.clone(), tx);
+        // Output: a thread of its own, the reader blocks.
+        let out_app = app.clone();
+        let out_id = id.clone();
+        std::thread::spawn(move || {
+            let b64 = base64::engine::general_purpose::STANDARD;
+            let mut buf = vec![0u8; 16 * 1024];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let _ = out_app.emit("term-data", TermData { id: out_id.clone(), data: b64.encode(&buf[..n]) });
+                    }
+                }
+            }
+            let _ = out_app.emit("term-exit", TermExit { id: out_id, code: None });
+        });
+        // Input, size and closing.
+        let master = pair.master;
+        tokio::task::spawn_blocking(move || {
+            while let Some(cmd) = rx.blocking_recv() {
+                match cmd {
+                    Command::Input(bytes) => {
+                        if writer.write_all(&bytes).and_then(|_| writer.flush()).is_err() {
+                            break;
+                        }
+                    }
+                    Command::Resize(c, r) => {
+                        let _ = master.resize(PtySize { rows: r.max(2) as u16, cols: c.max(10) as u16, pixel_width: 0, pixel_height: 0 });
+                    }
+                    Command::Close => break,
+                }
+            }
+            let _ = child.kill();
+        });
+        Ok(())
+    }
+
     fn send(&self, id: &str, cmd: Command) -> AppResult<()> {
         let map = self.0.lock().unwrap();
         let tx = map.get(id).ok_or_else(|| AppError::other("Das Terminal ist beendet."))?;
@@ -110,6 +169,22 @@ impl Terminals {
         if let Some(tx) = tx {
             let _ = tx.send(Command::Close);
         }
+    }
+}
+
+/// The user's shell: on Windows PowerShell 7 if installed, else Windows
+/// PowerShell; elsewhere the login shell.
+fn local_shell() -> portable_pty::CommandBuilder {
+    #[cfg(windows)]
+    {
+        let pwsh = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).any(|d| d.join("pwsh.exe").is_file())).unwrap_or(false);
+        let mut cmd = portable_pty::CommandBuilder::new(if pwsh { "pwsh.exe" } else { "powershell.exe" });
+        cmd.arg("-NoLogo");
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        portable_pty::CommandBuilder::new_default_prog()
     }
 }
 

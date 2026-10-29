@@ -74,7 +74,7 @@ export function TerminalPanel() {
   if (!tab || !t?.open || !sessions.length) return null;
   const active = sessions.find((x) => x.id === t.active) ?? sessions[0];
   const full = !!t.full;
-  const label = (n: number, serverId: string) => `${serverById(serverId)?.name ?? ''}${n > 1 ? ` ${n}` : ''}`;
+  const label = (n: number, serverId: string) => `${serverId ? serverById(serverId)?.name ?? '' : $t('Lokal')}${n > 1 ? ` ${n}` : ''}`;
   return (
     <section className={`term-panel${full ? ' is-full' : ''}`} style={{ ...(full ? {} : { height }), '--term-bg': themeFor(active.serverId).background } as CSSProperties} aria-label={$t('Terminal')}>
       {!full && (
@@ -90,7 +90,7 @@ export function TerminalPanel() {
               <button type="button" className="term-tab-close" aria-label={$t('Terminal schließen')} onClick={(e) => { e.stopPropagation(); closeTerminal(x.id); }}><X size={11} weight="bold" /></button>
             </span>
           ))}
-          <IconButton label={$t('Neues Terminal')} onClick={() => newTerminal()}><Plus size={15} weight="bold" /></IconButton>
+          <IconButton label={$t('Neues Terminal')} onClick={() => newTerminal(active.serverId ? 'server' : 'local')}><Plus size={15} weight="bold" /></IconButton>
         </div>
         <span className="flex-1" />
         {find !== null && (
@@ -106,7 +106,7 @@ export function TerminalPanel() {
         {full
           ? <IconButton label={$t('Zurück unter die Dateien')} onClick={terminalBackToPanel}><ArrowsInSimple size={16} /></IconButton>
           : <IconButton label={$t('In eigenem Tab öffnen')} onClick={() => terminalInOwnTab(active.id)}><ArrowsOutSimple size={16} /></IconButton>}
-        {!full && <IconButton label={$t('Terminal ausblenden')} onClick={toggleTerminal}><CaretDown size={16} weight="bold" /></IconButton>}
+        {!full && <IconButton label={$t('Terminal ausblenden')} onClick={() => toggleTerminal()}><CaretDown size={16} weight="bold" /></IconButton>}
       </div>
       <TerminalView key={active.id} id={active.id} />
     </section>

@@ -70,7 +70,7 @@ export function ContextMenu() {
       { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) },
       ...(tab && tab.serverId !== id && tab.leftServerId !== id ? [{ label: other === 'local' ? $t('In der linken Hälfte öffnen') : $t('In der rechten Hälfte öffnen'), run: () => openServerIn(other, id) }] : []),
       ...(srv?.online ? [{ label: $t('Verbindung trennen'), run: () => disconnect(id) }] : []),
-      ...(srv && (!srv.protocol || srv.protocol === 'sftp') ? [{ label: $t('SSH-Terminal öffnen'), run: () => { if (activeTab()?.serverId !== id) openServerInNewTab(id); window.setTimeout(() => void import('../state/terminal').then((m) => m.newTerminal()), srv.online ? 0 : 2500); } }] : []),
+      ...(srv && (!srv.protocol || srv.protocol === 'sftp') ? [{ label: $t('SSH-Terminal öffnen'), run: () => { if (activeTab()?.serverId !== id) openServerInNewTab(id); window.setTimeout(() => void import('../state/terminal').then((m) => m.newTerminal('server')), srv.online ? 0 : 2500); } }] : []),
     ]);
     groups.push([
       ...(srv?.temporary ? [{ label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'), run: () => keepServer(id) }] : srv?.protocol === 'vault' ? [] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
@@ -216,8 +216,8 @@ export function ContextMenu() {
       ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
       { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
       ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),
-      ...(onServer && sftpTab ? [{ label: $t('Terminal hier öffnen'), run: () => void import('../state/terminal').then((m) => m.newTerminal()) }] : []),
-      ...(remoteTerminal ? [{ label: onServer ? $t('Im System-Terminal öffnen (SSH)') : $t('Terminal hier öffnen'), run: () => openTerminal(menu.side) }] : []),
+      ...(!onServer || sftpTab ? [{ label: $t('Terminal hier öffnen'), run: () => void import('../state/terminal').then((m) => m.newTerminal(onServer ? 'server' : 'local')) }] : []),
+      ...(remoteTerminal ? [{ label: onServer ? $t('Im System-Terminal öffnen (SSH)') : $t('Im System-Terminal öffnen'), run: () => openTerminal(menu.side) }] : []),
     ]);
     const folderCommands = commands.filter((c) => !/\{(file|files|name)\}/.test(c.command));
     if (folderCommands.length) groups.push(folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })));

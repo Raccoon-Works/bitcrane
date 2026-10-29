@@ -2268,3 +2268,5 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .snippet-row { gap: var(--space-2); }
 .snippet-name { width: 160px; flex-shrink: 0; }
 .term-font-field { width: 280px; }
+/* xterm.js paints unused space black; the area takes the scheme's background instead. */
+.term-host .xterm, .term-host .xterm-viewport, .term-host .xterm-scrollable-element { background-color: var(--term-bg, var(--bg-terminal)) !important; }

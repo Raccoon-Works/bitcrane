@@ -177,19 +177,24 @@ function makeTerminal(session: TermSession): Live {
 }
 
 /** Starts a terminal for the active tab's server (in the folder it shows). */
-export function newTerminal(full = false) {
+/**
+ * Starts a terminal: on the tab's SSH server when it is connected (and the
+ * server half has the focus), otherwise on this computer like Tabby or the
+ * system terminal. `where` forces one of the two.
+ */
+export function newTerminal(where?: 'local' | 'server', full = false) {
   const t = activeTab();
-  if (!t || !canHaveTerminal(t)) {
-    showToast($t('Ein Terminal gibt es für SSH-Server (SFTP). Erst mit einem verbinden.'));
+  if (!t) return;
+  const srv = t.serverId ? serverById(t.serverId) : undefined;
+  const sshReady = !!srv && canHaveTerminal(t) && (srv.online || !LIVE);
+  const onServer = where === 'server' || (where !== 'local' && sshReady && getState().focusSide === 'remote');
+  if (onServer && !sshReady) {
+    showToast(srv && canHaveTerminal(t) ? $t('Erst mit {0} verbinden.', srv.name) : $t('Ein SSH-Terminal gibt es für SSH-Server (SFTP).'));
     return;
   }
-  const srv = serverById(t.serverId);
-  if (!srv?.online && LIVE) {
-    showToast($t('Erst mit {0} verbinden.', srv?.name ?? ''));
-    return;
-  }
-  const number = getState().terminals.filter((x) => x.serverId === t.serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
-  const session: TermSession = { id: uid('term'), serverId: t.serverId, tabId: t.id, number, alive: true };
+  const serverId = onServer ? t.serverId : '';
+  const number = getState().terminals.filter((x) => x.serverId === serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
+  const session: TermSession = { id: uid('term'), serverId, tabId: t.id, number, alive: true };
   live.set(session.id, makeTerminal(session));
   setState((s) => ({ terminals: [...s.terminals, session] }));
   patchTab(t.id, { open: true, active: session.id, full: full || t.terminal?.full });
@@ -207,7 +212,9 @@ export function attachTerminal(id: string, container: HTMLElement) {
     l.fit.fit();
     const t = getState().tabs.find((x) => x.id === session.tabId);
     const srv = serverById(session.serverId);
-    const cwd = terminalSettings().startInFolder && t?.remotePath ? t.remotePath : undefined;
+    // A local terminal starts in the folder of the left half, one on the server in the server half's folder.
+    const folder = session.serverId ? t?.remotePath : t?.localPath;
+    const cwd = terminalSettings().startInFolder && folder ? folder : undefined;
     if (LIVE) {
       void invoke('term_open', { id, serverId: session.serverId, cols: l.term.cols, rows: l.term.rows, cwd, startup: srv?.termStart || null }).catch((e) => {
         l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
@@ -257,12 +264,12 @@ export function closeTerminal(id: string) {
 }
 
 /** Panel on/off (toolbar button and shortcut); the first time it starts a session. */
-export function toggleTerminal() {
+export function toggleTerminal(where?: 'local' | 'server') {
   const t = activeTab();
   if (!t) return;
-  const has = getState().terminals.some((x) => x.tabId === t.id);
+  const has = getState().terminals.some((x) => x.tabId === t.id && (!where || (where === 'server') === !!x.serverId));
   if (!has) {
-    newTerminal();
+    newTerminal(where);
     return;
   }
   patchTab(t.id, { open: !t.terminal?.open });

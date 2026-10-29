@@ -1871,4 +1871,8 @@ export const EN: Record<string, string> = {
   "Produktivserver (rot)": "Production server (red)",
   "Ein Terminal gibt es nur mit SSH, nicht über {0}.": "A terminal is only available with SSH, not over {0}.",
   "Das Terminal ist beendet.": "The terminal session has ended.",
+  "Neues lokales Terminal": "New local terminal",
+  "Ein SSH-Terminal gibt es für SSH-Server (SFTP).": "An SSH terminal is available for SSH servers (SFTP).",
+  "Im System-Terminal öffnen": "Open in system terminal",
+  "Das Terminal konnte nicht gestartet werden.": "The terminal could not be started.",
 };

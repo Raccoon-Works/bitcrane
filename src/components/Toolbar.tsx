@@ -113,7 +113,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
     rename: { label: $t('Umbenennen'), key: key('↩', 'F2'), icon: ic(<PencilSimple size={19} />), run: () => startRename(focus), disabled: !sel },
     perms: { label: $t('Rechte'), icon: ic(<LockSimple size={19} />), run: () => toggleInspector(), disabled: false },
     hidden: { label: showHidden ? $t('Versteckte Dateien ausblenden') : $t('Versteckte Dateien zeigen'), key: sk('hidden'), icon: ic(<EyeSlash size={19} />), run: toggleHidden, active: !showHidden },
-    terminal: { label: $t('Terminal (SSH)'), key: sk('terminal'), icon: ic(<TerminalWindow size={19} />), run: toggleTerminal, active: terminalOpen },
+    terminal: { label: $t('Terminal'), key: sk('terminal'), icon: ic(<TerminalWindow size={19} />), run: () => toggleTerminal(), active: terminalOpen },
     disconnect: { label: $t('Trennen'), icon: ic(<Plugs size={19} />), run: () => disconnect() },
     copyPath: { label: $t('Pfad kopieren'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
     editor: { label: $t('Im Editor öffnen'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },
