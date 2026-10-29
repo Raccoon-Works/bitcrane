@@ -1888,4 +1888,8 @@ export const EN: Record<string, string> = {
   "Nur auf diesem Computer, höchstens 300 je Server. Befehle mit einem Leerzeichen am Anfang merkt sich Bitcrane nicht, z. B. für Passwörter in der Befehlszeile.": "Only on this computer, at most 300 per server. Commands that start with a space are not remembered, e.g. for passwords on the command line.",
   "{0} Befehle löschen": "Delete {0} commands",
   "Keine": "None",
+  "Dunkle Farben": "Dark colors",
+  "„Tabby“ ist fast schwarz mit hellblauen Akzenten, wie das Terminal Tabby.": "“Tabby” is almost black with light blue accents, like the Tabby terminal.",
+  "Wie macOS": "Like macOS",
+  "Wie Windows": "Like Windows",
 };
