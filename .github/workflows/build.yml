@@ -4,13 +4,9 @@
 #   release notes in sections (Features / Improvements / Fixes), the installers
 #   and the signed update description latest.json. Installed copies look for
 #   updates at releases/latest/download/latest.json of this repository.
-# - Transition: while RELEASES_DEPLOY_KEY or RELEASES_TOKEN is set, the build
-#   is also copied to Raccoon-Works/bitcrane-releases, so copies installed
-#   before the move still find the update (which then knows the new address).
 #
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   TAURI_SIGNING_PRIVATE_KEY  private key that signs updates
-#   RELEASES_TOKEN / RELEASES_DEPLOY_KEY  (transition only) write access to bitcrane-releases
 name: Build
 
 # Builds run only when started by hand (Actions tab or `gh workflow run`),
@@ -130,7 +126,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    # Publishes the build as a release of this repository and, during the move, to bitcrane-releases.
+    # Publishes the build as a release of this repository.
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -138,10 +134,8 @@ jobs:
         id: check
         env:
           HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
-          HAS_OLD: ${{ secrets.RELEASES_DEPLOY_KEY != '' || secrets.RELEASES_TOKEN != '' }}
         run: |
           if [ "$HAS_KEY" = true ]; then echo "go=true" >> "$GITHUB_OUTPUT"; else echo "Update key missing, nothing published."; fi
-          if [ "$HAS_KEY" = true ] && [ "$HAS_OLD" = true ]; then echo "old=true" >> "$GITHUB_OUTPUT"; fi
 
       - uses: actions/download-artifact@v5
         if: steps.check.outputs.go == 'true'
@@ -176,7 +170,7 @@ jobs:
           const v = process.env.APP_VERSION;
           const mac = fs.readFileSync('mac.sig', 'utf8').trim();
           const win = fs.readFileSync('win.sig', 'utf8').trim();
-          // latest.json for a download base (the new release, or the old repository during the move).
+          // latest.json pointing at the files of this release.
           const latest = (base) => {
             const macEntry = { signature: mac, url: `${base}/Bitcrane_${v}_universal.app.tar.gz` };
             const winEntry = { signature: win, url: `${base}/Bitcrane_${v}_x64-setup.exe` };
@@ -184,7 +178,6 @@ jobs:
               platforms: { 'darwin-aarch64': macEntry, 'darwin-x86_64': macEntry, 'windows-x86_64': winEntry } }, null, 2);
           };
           fs.writeFileSync('out/latest.json', latest(`https://github.com/${process.env.REPO}/releases/download/v${v}`));
-          fs.writeFileSync('latest-old.json', latest('https://raw.githubusercontent.com/Raccoon-Works/bitcrane-releases/main'));
           const list = (s) => (s || '').split('|').map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join('\n');
           const section = (title, s) => (list(s) ? `## ${title}\n\n${list(s)}\n\n` : '');
           let body = section('Features', process.env.ADDED) + section('Improvements', process.env.IMPROVED) + section('Fixes', process.env.FIXED);
@@ -224,31 +217,3 @@ jobs:
         run: |
           gh release create "v$APP_VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Bitcrane $APP_VERSION" --notes-file notes.md --latest
-
-      - uses: actions/checkout@v5
-        if: steps.check.outputs.old == 'true'
-        with:
-          repository: Raccoon-Works/bitcrane-releases
-          ssh-key: ${{ secrets.RELEASES_DEPLOY_KEY }}
-          token: ${{ secrets.RELEASES_TOKEN || github.token }}
-          path: releases
-
-      - name: Copy to bitcrane-releases (transition)
-        if: steps.check.outputs.old == 'true'
-        run: |
-          set -euo pipefail
-          V="$APP_VERSION"
-          cat > out/README.md <<EOF
-          # Bitcrane
-
-          Bitcrane has moved: downloads and updates are now at https://github.com/Raccoon-Works/bitcrane/releases
-          EOF
-          cp latest-old.json out/latest.json
-          # Only the newest version is kept, so the repository stays small.
-          cd releases
-          git checkout --orphan next
-          git rm -rfq . || true
-          cp ../out/* .
-          git add -A
-          git -c user.name="Bitcrane Build" -c user.email="build@raccoonworks.de" commit -qm "Bitcrane $V"
-          git push --force origin next:main

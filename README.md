@@ -79,8 +79,7 @@ in a plain browser it uses an in-memory file system (`src/backend/mockFs.ts`) so
 Builds run on GitHub Actions when started by hand. Each build gets the version `0.2.<run number>` and becomes a
 release of this repository with notes in sections (Features, Improvements, Fixes), the installers and a signed `latest.json`.
 Installed copies look for updates at `releases/latest/download/latest.json` here. The secret
-`TAURI_SIGNING_PRIVATE_KEY` signs the update packages; while `RELEASES_TOKEN` or `RELEASES_DEPLOY_KEY` is set,
-each build is also copied to the former download repository `Raccoon-Works/bitcrane-releases`.
+`TAURI_SIGNING_PRIVATE_KEY` signs the update packages.
 
 ## Tests
 
