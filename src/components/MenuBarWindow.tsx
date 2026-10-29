@@ -42,7 +42,7 @@ export function MenuBarWindow() {
       <div className="tray-head">
         {platform === 'mac' ? <BMark variant="macApp" size={30} /> : <BMark variant="winApp" size={26} />}
         <span className="col-text flex-1"><span className="strong">Bitcrane</span><span className="small muted">{active} {active === 1 ? $t('Überwachung') : $t('Überwachungen')} {$t('aktiv')}{paused ? $t(', {0} pausiert', paused) : ''}</span></span>
-        <button type="button" className="icon-btn" aria-label={$t('Einstellungen')} onClick={() => openDialog({ type: 'settings', tab: 'watch' })}><Settings size={15} strokeWidth={1.5} /></button>
+        <button type="button" className="icon-btn" aria-label={$t('Einstellungen')} onClick={() => openDialog({ type: 'settings', tab: 'general' })}><Settings size={15} strokeWidth={1.5} /></button>
       </div>
       {watches.map((w) => (
         <div key={w.id} className="tray-watch">

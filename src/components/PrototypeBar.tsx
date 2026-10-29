@@ -39,7 +39,7 @@ export function PrototypeBar() {
     null,
     { label: platform === 'mac' ? $t('Fenster der Menüleiste zeigen') : $t('Fenster im Infobereich zeigen'), note: $t('Für den Hintergrundbetrieb.'), run: () => setState({ menuBarWindowOpen: true }) },
     { label: $t('Übertragungen als Fenster'), note: '', run: () => openDialog({ type: 'transfers' }) },
-    { label: $t('Einstellungen'), note: '', run: () => openDialog({ type: 'settings', tab: 'watch' }) },
+    { label: $t('Einstellungen'), note: '', run: () => openDialog({ type: 'settings', tab: 'general' }) },
     { label: $t('Werkzeugleiste anpassen'), note: $t('Auch per Rechtsklick auf die Leiste.'), run: () => openDialog({ type: 'toolbar' }) },
     { label: $t('Über Bitcrane'), note: '', run: () => openDialog({ type: 'about' }) },
     null,
