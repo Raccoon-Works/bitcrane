@@ -192,6 +192,8 @@ export interface Backend {
   /** Sign-in in the browser; resolves with the refresh token and the account name. */
   /** Google Drive needs the user's own app key (client id and secret). */
   cloudSignIn(service: string, clientId?: string, clientSecret?: string): Promise<{ refreshToken: string; account: string }>;
+  /** OneDrive; `refreshToken` in the answer is the renewed sign-in to keep. */
+  connectOneDrive(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null; refreshToken?: string }>;
   /** Google Drive with the refresh token and the user's own app key. */
   connectGDrive(serverId: string, params: { refreshToken: string; clientId: string; clientSecret: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
   cloudSignInCancel(): Promise<void>;

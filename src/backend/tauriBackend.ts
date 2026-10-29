@@ -55,6 +55,7 @@ export const tauriBackend: Backend = {
   cloudServices: () => invoke('cloud_services'),
   cloudSignIn: (service, clientId, clientSecret) => invoke('cloud_sign_in', { service, clientId: clientId ?? null, clientSecret: clientSecret ?? null }),
   connectGDrive: (serverId, params) => invoke('gdrive_connect', { serverId, params }),
+  connectOneDrive: (serverId, params) => invoke('onedrive_connect', { serverId, params }),
   cloudSignInCancel: () => invoke('cloud_sign_in_cancel'),
   remoteList: (serverId, path) => invoke('remote_list', { serverId, path }),
   remoteStat: (serverId, path) => invoke('remote_stat', { serverId, path }),

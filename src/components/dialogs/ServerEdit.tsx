@@ -50,7 +50,7 @@ const TIMEZONES = Array.from({ length: 27 }, (_, i) => i - 12).map((h) => ({ val
 
 /** Fixed fields of a cloud service entry (no address, port or password of its own). */
 function cloudDefaults(service: Protocol): Partial<Server> {
-  return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
+  return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
 }
 
 export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string; cloud?: Protocol }) {
@@ -103,7 +103,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
     const service = draft.protocol;
     if (!service) return;
     if (service === 'gdrive') await saveGoogleKey(googleId, googleSecret);
-    if (service === 'dropbox' && LIVE && !getState().cloudAvailable.dropbox) { showCloudNotSetUp(service); return; }
+    if ((service === 'dropbox' || service === 'onedrive') && LIVE && !getState().cloudAvailable[service]) { showCloudNotSetUp(service); return; }
     openDialog({ type: 'cloudSignIn', service });
   };
   const cloud = isCloudProtocol(draft.protocol);
@@ -269,8 +269,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
-                  <Select<'dropbox' | 'gdrive'> label={$t('Dienst')} value={draft.protocol === 'gdrive' ? 'gdrive' : 'dropbox'} onChange={(v) => isNew && setDraft((d) => ({ ...d, ...cloudDefaults(v) }))} options={isNew ? [{ value: 'dropbox', label: 'Dropbox' }, { value: 'gdrive', label: 'Google Drive' }] : [{ value: draft.protocol === 'gdrive' ? 'gdrive' : 'dropbox', label: CLOUD_NAMES[draft.protocol ?? ''] ?? '' }]} />
-                  {isNew && <span className="small muted">{$t('OneDrive folgt mit einem der nächsten Updates.')}</span>}
+                  <Select<'dropbox' | 'gdrive' | 'onedrive'> label={$t('Dienst')} value={draft.protocol === 'gdrive' || draft.protocol === 'onedrive' ? draft.protocol : 'dropbox'} onChange={(v) => isNew && setDraft((d) => ({ ...d, ...cloudDefaults(v) }))} options={isNew ? [{ value: 'dropbox', label: 'Dropbox' }, { value: 'gdrive', label: 'Google Drive' }, { value: 'onedrive', label: 'OneDrive' }] : [{ value: draft.protocol === 'gdrive' || draft.protocol === 'onedrive' ? draft.protocol : 'dropbox', label: CLOUD_NAMES[draft.protocol ?? ''] ?? '' }]} />
                 </div>
                 {draft.protocol === 'gdrive' && (
                   <>

@@ -106,10 +106,10 @@ export interface ServerProxy {
   user?: string;
 }
 
-export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'dropbox' | 'gdrive';
+export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'dropbox' | 'gdrive' | 'onedrive';
 
 /** Cloud services that Bitcrane treats like a server (signed in through the browser). */
-export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive'];
+export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];
 export const isCloudProtocol = (p?: Protocol) => !!p && CLOUD_PROTOCOLS.includes(p);
 
 /** A saved folder pair: server folder and, optionally, the matching local folder. */

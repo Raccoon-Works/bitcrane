@@ -12,6 +12,7 @@ mod dav;
 mod archive;
 mod dropbox;
 mod gdrive;
+mod onedrive;
 mod oauth;
 mod ftp;
 mod import;
@@ -198,6 +199,7 @@ async fn cloud_sign_in(service: String, client_id: Option<String>, client_secret
     match service.as_str() {
         "dropbox" => dropbox::sign_in(open).await,
         // Google Drive: with the user's own app key (see docs/google-drive.md).
+        "onedrive" => onedrive::sign_in(open).await,
         "gdrive" => gdrive::sign_in(client_id.as_deref().unwrap_or(""), client_secret.as_deref().unwrap_or(""), open).await,
         _ => Err(AppError::other("Diesen Cloud-Dienst kennt Bitcrane noch nicht.")),
     }
@@ -215,7 +217,7 @@ async fn dropbox_connect(state: State<'_, AppState>, server_id: String, params: 
     let conn = remote::Remote::Dropbox(Arc::new(dropbox::DropboxConn::connect(params).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None })
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
 }
 
 #[tauri::command]
@@ -224,7 +226,18 @@ async fn gdrive_connect(state: State<'_, AppState>, server_id: String, params: g
     let conn = remote::Remote::GDrive(Arc::new(gdrive::GDriveConn::connect(params).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None })
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+}
+
+#[tauri::command]
+async fn onedrive_connect(state: State<'_, AppState>, server_id: String, params: onedrive::OneDriveParams) -> AppResult<ConnectResult> {
+    state.connections.lock().await.remove(&server_id);
+    let conn = Arc::new(onedrive::OneDriveConn::connect(params).await?);
+    let refresh_token = Some(conn.refresh_token().await);
+    let remote = remote::Remote::OneDrive(conn);
+    let home = remote.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(remote));
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token })
 }
 
 /// How Bitcrane was started: `autostart` is true for a start at login.
@@ -521,6 +534,9 @@ struct ConnectResult {
     home: String,
     /// Server clock minus local clock in milliseconds, if it could be measured.
     clock_offset_ms: Option<i64>,
+    /// OneDrive: the renewed sign-in, to be kept in place of the old one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    refresh_token: Option<String>,
 }
 
 /// Event payload for a question of the server (shown as a dialog).
@@ -569,7 +585,7 @@ async fn ssh_connect(app: tauri::AppHandle, state: State<'_, AppState>, server_i
     let home = conn.home().to_string();
     let clock_offset_ms = conn.clock_offset_ms().await;
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms })
+    Ok(ConnectResult { home, clock_offset_ms, refresh_token: None })
 }
 
 #[tauri::command]
@@ -582,7 +598,7 @@ async fn ftp_connect(state: State<'_, AppState>, server_id: String, params: ftp:
     let conn = remote::Remote::Ftp(Arc::new(ftp::FtpConn::connect(params, state.known_hosts.clone()).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None })
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
 }
 
 #[tauri::command]
@@ -591,7 +607,7 @@ async fn dav_connect(state: State<'_, AppState>, server_id: String, params: dav:
     let conn = remote::Remote::Dav(dav::DavConn::connect(params, state.known_hosts.clone()).await?);
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None })
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
 }
 
 #[tauri::command]
@@ -1255,6 +1271,7 @@ pub fn run() {
             cloud_sign_in_cancel,
             dropbox_connect,
             gdrive_connect,
+            onedrive_connect,
             system_power,
             local_checksum,
             open_url,

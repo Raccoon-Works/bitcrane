@@ -127,11 +127,11 @@ export function ServerList({ side }: { side: PaneSide }) {
 /** What the right column of the server list shows (left column of Transmit's connection panel). */
 type Source = 'all' | 'recent' | 'syncs' | 'cloud' | `g:${string}`;
 
-/** Cloud services that can be added (OneDrive follows in one of the next versions). */
+/** Cloud services that can be added. */
 const CLOUD_SERVICES: Array<{ id: CloudService; protocol?: Protocol; name: string }> = [
   { id: 'dropbox', protocol: 'dropbox', name: 'Dropbox' },
   { id: 'gdrive', protocol: 'gdrive', name: 'Google Drive' },
-  { id: 'onedrive', name: 'OneDrive' },
+  { id: 'onedrive', protocol: 'onedrive', name: 'OneDrive' },
 ];
 
 function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
@@ -227,7 +227,7 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   // "Hinzufügen" rows of the cloud services: sign in through the browser.
   const cloudAddRow = (c: (typeof CLOUD_SERVICES)[number]) => {
     // Google Drive works with the user's own app key (asked for on the first double click).
-    const ready = !!c.protocol && (c.protocol === 'dropbox' ? cloudAvailable.dropbox || !LIVE : true);
+    const ready = !!c.protocol && (c.protocol === 'dropbox' || c.protocol === 'onedrive' ? cloudAvailable[c.protocol] || !LIVE : true);
     const add = () => { if (c.protocol) void addCloudService(c.protocol); };
     return (
       <div key={`add-${c.id}`} role="option" aria-selected={false} aria-disabled={!ready} tabIndex={ready ? 0 : -1} className={`server-row${ready ? '' : ' is-preview'}`}
