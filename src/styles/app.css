@@ -329,7 +329,7 @@ kbd,
 
 .menu-item:disabled { color: var(--text-faint); }
 .menu-item.is-danger { color: var(--danger); }
-.menu-item.is-danger:hover { color: #fff; background: var(--danger-btn); }
+.menu-item.is-danger:hover { color: var(--danger); background: var(--danger-tint); }
 .menu-key { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .menu-item:hover .menu-key,
 .menu-item:focus-visible .menu-key,
@@ -629,8 +629,10 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 .btn-secondary:hover:not(:disabled) { background: var(--bg-second-hover); }
 .btn-secondary:active:not(:disabled) { background: var(--bg-second-pressed); }
 [data-platform='win'][data-theme='light'] .btn-secondary { border: 1px solid var(--field-line); }
-.btn-danger { background: var(--danger-btn); color: #fff; font-weight: 600; }
-.btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+/* Destructive action: a calm button with red text instead of a red block (see the
+   "Entfernen" window); Cancel keeps the focus so Enter never deletes by accident. */
+.btn-danger { background: var(--bg-second); color: var(--danger); font-weight: 600; }
+.btn-danger:hover:not(:disabled) { background: var(--danger-tint); }
 .btn-ghost { background: transparent; color: var(--text-muted); }
 .btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .btn-link { background: transparent; padding: 0 var(--space-1); color: var(--accent-text); }
@@ -1029,11 +1031,13 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
   text-align: center;
 }
 
-.toast { display: flex; align-items: center; gap: var(--space-2); text-align: left; }
+/* The text stays in the normal colour; only the small symbol carries the kind of message. */
+.toast { display: flex; align-items: center; gap: var(--space-2); text-align: left; color: var(--text); font-size: var(--text-small); }
 .toast-icon { flex-shrink: 0; color: var(--text-muted); }
-.toast.tone-ok .toast-icon { color: var(--success); }
-.toast.tone-error .toast-icon { color: var(--danger); }
-.toast.tone-error { border-color: color-mix(in srgb, var(--danger) 40%, var(--line-strong)); }
+.toast.toast-ok .toast-icon { color: var(--success); }
+.toast.toast-update .toast-icon { color: var(--accent-text); }
+.toast.toast-error .toast-icon { color: var(--danger); }
+.toast.toast-error { border-color: color-mix(in srgb, var(--danger) 35%, var(--line-strong)); }
 
 /* ------------------------------------------------------------- Dialogs */
 
@@ -1062,7 +1066,6 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
   transform-origin: 50% 50%;
 }
 
-.dialog.is-danger { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 
 .dialog-titlebar {
   height: 40px;

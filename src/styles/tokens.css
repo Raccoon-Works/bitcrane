@@ -108,12 +108,14 @@
   --sel-fg: #ffffff;
   --sel-sub: #dce8fd;
   --sel-row-inactive: #3a3a40;
-  --danger: #ff453a;
-  --danger-btn: #d70015;
-  --danger-tint: rgba(255, 69, 58, 0.1);
+  /* Muted signal colours: they sit next to the blue accent without shouting. */
+  --danger: #ef6b63;
+  --danger-btn: #a8423c;
+  --danger-tint: rgba(239, 107, 99, 0.14);
   --warning: #ff9f0a;
   --warning-tint: rgba(255, 159, 10, 0.1);
-  --success: #30d158;
+  --success: #63c486;
+  --success-tint: rgba(99, 196, 134, 0.16);
   --track: #38383c;
   --folder: #4a86e8;
   --folder-line: #3a6fc4;
@@ -164,12 +166,13 @@
   --sel-fg: #ffffff;
   --sel-sub: #dce8fd;
   --sel-row-inactive: #dcdce1;
-  --danger: #d70015;
-  --danger-btn: #d70015;
-  --danger-tint: rgba(215, 0, 21, 0.07);
+  --danger: #c4302b;
+  --danger-btn: #b03a34;
+  --danger-tint: rgba(196, 48, 43, 0.09);
   --warning: #c93400;
   --warning-tint: rgba(201, 52, 0, 0.08);
-  --success: #1e7b34;
+  --success: #2f8a4e;
+  --success-tint: rgba(47, 138, 78, 0.12);
   --track: #e2e2e6;
   --folder: #7aa7ee;
   --folder-line: #5b8fe3;

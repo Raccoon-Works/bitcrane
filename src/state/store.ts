@@ -153,6 +153,8 @@ export interface Settings {
   /** Look for a new Bitcrane version at start and every few hours. */
   /** Updates (after Transmit): install automatically when quitting, only tell, or never look. */
   updateMode: 'auto' | 'notify' | 'off';
+  /** Version that ran last time; a different one at start means an update was installed. */
+  lastVersion?: string;
   /** Names / patterns never transferred by hand (".DS_Store", "*.tmp"). */
   skipPatterns: string[];
   /** Transfer rules (settings > Regeln). */
@@ -368,7 +370,7 @@ export interface AppState {
   /** Clock used for "vor 12 Sek." texts; updated every second. */
   now: number;
   /** A short message shown at the bottom of the window. */
-  toast: { text: string; tone: 'info' | 'ok' | 'error' } | null;
+  toast: { text: string; tone: 'info' | 'ok' | 'error' | 'update' } | null;
   speed: number;
   /** Local places in the sidebar. */
   places: Place[];
@@ -895,7 +897,7 @@ export function activityExpanded(s: AppState = state): boolean {
 /* ------------------------------------------------------------------------ */
 
 let toastTimer: number | undefined;
-export function showToast(text: string, tone: 'info' | 'ok' | 'error' = 'info') {
+export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info') {
   setState({ toast: { text, tone } });
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => setState({ toast: null }), 2600);
