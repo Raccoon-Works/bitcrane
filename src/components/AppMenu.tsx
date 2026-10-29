@@ -39,7 +39,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Über Bitcrane'), run: () => openDialog({ type: 'about' }) },
         { label: $t('Nach Updates suchen …'), run: () => void checkForUpdates(true) },
         sep,
-        { label: $t('Einstellungen …'), ...sc('settings'), run: () => openDialog({ type: 'settings', tab: 'watch' }) },
+        { label: $t('Einstellungen …'), ...sc('settings'), run: () => openDialog({ type: 'settings', tab: 'general' }) },
         { label: $t('Werkzeugleiste anpassen …'), run: () => openDialog({ type: 'toolbar' }) },
         sep,
         { label: $t('Bitcrane beenden'), mac: '⌘Q', win: 'Alt+F4', run: quitApp },
@@ -282,7 +282,7 @@ export function WinMoreMenu() {
       {/* Settings in one click (gear), next to the main menu (three lines), both as tool buttons. */}
       <span className="tool-group more-group">
         <Tooltip text={$t('Einstellungen')} shortcut="Strg+,">
-          <button type="button" className="icon-btn" aria-label={$t('Einstellungen')} onClick={() => { close(); openDialog({ type: 'settings', tab: 'watch' }); }}>
+          <button type="button" className="icon-btn" aria-label={$t('Einstellungen')} onClick={() => { close(); openDialog({ type: 'settings', tab: 'general' }); }}>
             <GearSix size={19} />
           </button>
         </Tooltip>
