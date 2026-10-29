@@ -93,6 +93,9 @@ function useShortcuts() {
         return;
       }
       if (s.firstRun) return;
+      // In the terminal, Strg combinations belong to the shell (Strg+C, Strg+R, Strg+W …);
+      // only Strg+Umschalt and the terminal's own shortcut reach Bitcrane. On the Mac ⌘ never goes to the shell.
+      if (target.closest?.('.term-view') && s.platform !== 'mac' && !(e.ctrlKey && e.shiftKey) && !(e.ctrlKey && e.code === 'Backquote')) return;
       const action = actionFor(e, s.platform, typing);
       if (action) {
         e.preventDefault();

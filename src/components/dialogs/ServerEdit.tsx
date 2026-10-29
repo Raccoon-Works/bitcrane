@@ -2,6 +2,7 @@
  * Server management: list of saved servers on the left, the selected
  * server's settings on the right. Opens for a new server when no id is given.
  */
+import { SCHEMES } from '../../state/terminal';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, Check, ChevronRight, FolderPlus, KeyRound, Plus, Search, Trash2 } from '../glyphs';
@@ -459,6 +460,19 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                       <Select<'sftp' | 'scp'> id="s-scp" label={$t('Dateiübertragung')} value={draft.scp ? 'scp' : 'sftp'} onChange={(v) => set('scp', v === 'scp' || undefined)}
                         options={[{ value: 'sftp', label: $t('SFTP (Standard)') }, { value: 'scp', label: $t('SCP über Shell-Befehle') }]} />
                       <span className="small muted">{$t('Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.')}</span>
+                    </div>
+                  </>
+                )}
+                {family === 'sftp' && (
+                  <>
+                    <label htmlFor="s-termscheme">{$t('Terminal')}</label>
+                    <div className="col-text">
+                      <div className="field-row">
+                        <Select id="s-termscheme" label={$t('Farbschema des Terminals')} value={draft.termScheme ?? ''} onChange={(v) => set('termScheme', v || undefined)}
+                          options={[{ value: '', label: $t('Farbschema wie eingestellt') }, ...SCHEMES.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
+                        <TextField label={$t('Befehl beim Start')} value={draft.termStart ?? ''} onChange={(v) => set('termStart', v || undefined)} placeholder={$t('Befehl beim Start, z. B. tmux attach')} mono className="flex-1" />
+                      </div>
+                      <span className="small muted">{$t('Für das eingebaute Terminal. Ein eigenes Farbschema (z. B. rot) zeigt sofort, auf welchem Server du tippst.')}</span>
                     </div>
                   </>
                 )}

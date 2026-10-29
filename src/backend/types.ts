@@ -104,6 +104,10 @@ export interface Server {
   smbEncrypt?: boolean;
   /** Cryptomator vault: the server it lies on (none: this computer); `host` is the vault folder. */
   vaultStorageId?: string;
+  /** Built-in terminal: colour scheme for this server (e.g. red for production), else the setting. */
+  termScheme?: string;
+  /** Built-in terminal: command typed in after connecting. */
+  termStart?: string;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
   mountExplorer?: boolean;
 }
@@ -164,6 +168,8 @@ export interface Tab {
   serverList?: Partial<Record<PaneSide, boolean>>;
   /** Two local halves (Total Commander): the right half shows this computer; `remotePath` is then a local path. */
   rightLocal?: boolean;
+  /** Built-in terminal of this tab (state/terminal.ts): panel shown, session in front, filling the tab. */
+  terminal?: { open: boolean; active?: string; full?: boolean };
 }
 
 /** Options of a folder watch. Mirrors the "Überwachung einrichten" dialog. */

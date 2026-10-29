@@ -50,6 +50,8 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'zoomOut', group: $t('Darstellung'), label: $t('Verkleinern'), mac: ['Mod+-'], win: ['Mod+-'], run: () => stepZoom(-1) },
   { id: 'zoomReset', group: $t('Darstellung'), label: $t('Originalgröße'), mac: ['Mod+0'], win: ['Mod+0'], run: () => stepZoom(0) },
   { id: 'refresh', group: $t('Darstellung'), label: $t('Aktualisieren'), mac: ['Mod+R'], win: ['F5', 'Mod+R'], run: refresh },
+  { id: 'terminal', group: $t('Darstellung'), label: $t('Terminal ein/aus'), mac: ['Ctrl+`'], win: ['Mod+`'], run: () => void import('./terminal').then((m) => m.toggleTerminal()) },
+  { id: 'terminalNew', group: $t('Darstellung'), label: $t('Neues Terminal'), mac: ['Ctrl+Shift+`'], win: ['Mod+Shift+`'], run: () => void import('./terminal').then((m) => m.newTerminal()) },
 
   { id: 'back', group: $t('Gehe zu'), label: $t('Zurück'), mac: ['Mod+['], win: ['Alt+ArrowLeft'], run: goBack, notInText: true },
   { id: 'forward', group: $t('Gehe zu'), label: $t('Vor'), mac: ['Mod+]'], win: ['Alt+ArrowRight'], run: goForward, notInText: true },

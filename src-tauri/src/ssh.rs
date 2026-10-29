@@ -904,6 +904,11 @@ impl Connection {
         Ok(())
     }
 
+    /// Opens an interactive shell with a terminal (built-in terminal, terminal.rs).
+    pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
+        open_shell(&self.handle, cols, rows, command).await
+    }
+
     /// Runs a command on the server and returns exit code and combined output.
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
         let mut channel = self.handle.channel_open_session().await?;
@@ -1221,4 +1226,17 @@ mod params_tests {
         assert!(p.keepalive, "keepalive defaults to on");
         assert!(p.jump.is_some());
     }
+}
+
+/// A shell with a pseudo terminal on an SSH session. `command` replaces the
+/// plain login shell (e.g. to start in a folder); empty starts the shell.
+pub(crate) async fn open_shell(handle: &client::Handle<Handler>, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
+    let channel = handle.channel_open_session().await?;
+    channel.request_pty(false, "xterm-256color", cols.max(10), rows.max(2), 0, 0, &[]).await?;
+    if command.is_empty() {
+        channel.request_shell(true).await?;
+    } else {
+        channel.exec(true, command).await?;
+    }
+    Ok(channel)
 }

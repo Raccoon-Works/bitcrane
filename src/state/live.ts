@@ -21,7 +21,7 @@ import { addLog } from './log';
 import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
 import {
-  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, oldDefaultToolbar, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
+  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, oldDefaultToolbars, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
 } from './store';
 import { $t } from '../i18n';
 
@@ -1671,7 +1671,7 @@ async function loadConfig() {
     // Older versions had a single switch "Automatisch nach Updates suchen".
     settings: { ...s.settings, ...(cfg?.settings ?? {}), ...(cfg?.settings && !cfg.settings.updateMode && (cfg.settings as { autoUpdate?: boolean }).autoUpdate === false ? { updateMode: 'off' as const } : {}), coloursReset: true },
     // A toolbar never changed by hand moves to the new standard set.
-    toolbar: (cfg?.toolbar && cfg.toolbar.join() !== oldDefaultToolbar.join() ? cfg.toolbar : s.toolbar).filter((x) => (x as string) !== 'sidebar'),
+    toolbar: (cfg?.toolbar && !oldDefaultToolbars.some((old) => old.join() === cfg.toolbar!.join()) ? cfg.toolbar : s.toolbar).filter((x) => (x as string) !== 'sidebar'),
     toolbarLabels: cfg?.toolbarLabels ?? s.toolbarLabels,
     // The server list in the right half greets new users; no separate first-run screen.
     firstRun: false,

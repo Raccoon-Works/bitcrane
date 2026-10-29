@@ -371,6 +371,7 @@ export async function startShell() {
     syncShell();
     // Servers shown as folders in the Windows Explorer.
     void initMounts();
+    void import('./terminal').then((m) => m.initTerminals());
   });
 
   // Start at login follows the setting.

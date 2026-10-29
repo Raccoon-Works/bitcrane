@@ -34,6 +34,7 @@ mod scp;
 mod sshconfig;
 mod sysicons;
 mod tray;
+mod terminal;
 mod transfer;
 mod vault;
 mod watcher;
@@ -52,6 +53,7 @@ use tauri::{Emitter, Manager, State};
 /// Shared state of the running app.
 pub struct AppState {
     connections: Arc<tokio::sync::Mutex<HashMap<String, Arc<remote::Remote>>>>,
+    terminals: terminal::Terminals,
     /// Servers shown as folders in the Windows Explorer.
     #[cfg(windows)]
     mounts: mount_win::Mounts,
@@ -69,6 +71,7 @@ impl AppState {
             connections: Default::default(),
             known_hosts: Arc::new(KnownHosts::load(config_dir.join("known_hosts.json"))),
             watches: Default::default(),
+            terminals: Default::default(),
             #[cfg(windows)]
             mounts: Default::default(),
             cancels: Default::default(),
@@ -732,6 +735,29 @@ async fn vault_create(state: State<'_, AppState>, location: String, storage_id: 
         None => vault::Store::Local,
     };
     vault::VaultConn::create(store, &location, &password).await
+}
+
+/// Built-in terminal: a shell on the server's SSH session, optionally in `cwd`.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>, id: String, server_id: String, cols: u32, rows: u32, cwd: Option<String>, startup: Option<String>) -> AppResult<()> {
+    let conn = state.conn(&server_id).await?;
+    state.terminals.open(app, conn, id, cols, rows, cwd, startup).await
+}
+
+#[tauri::command]
+fn term_write(state: State<'_, AppState>, id: String, data: String) -> AppResult<()> {
+    state.terminals.write(&id, &data)
+}
+
+#[tauri::command]
+fn term_resize(state: State<'_, AppState>, id: String, cols: u32, rows: u32) -> AppResult<()> {
+    state.terminals.resize(&id, cols, rows)
+}
+
+#[tauri::command]
+fn term_close(state: State<'_, AppState>, id: String) {
+    state.terminals.close(&id);
 }
 
 #[tauri::command]
@@ -1541,6 +1567,10 @@ pub fn run() {
             ftp_connect,
             dav_connect,
             smb_connect,
+            term_open,
+            term_write,
+            term_resize,
+            term_close,
             vault_open,
             vault_create,
             auth_prompt_answer,
