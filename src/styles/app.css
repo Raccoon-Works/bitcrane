@@ -2318,3 +2318,10 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .fw-line .fw-host { width: 112px; flex: 1 1 112px; min-width: 80px; }
 .fw-line .fw-port { width: 64px; flex: none; }
 .fw-arrow { padding: 0 2px; }
+
+/* Completion list of the terminal (termSuggest.ts), in the terminal's font. */
+.term-complete { position: absolute; display: none; z-index: 6; overflow-y: auto; scrollbar-width: thin; min-width: 220px; max-width: min(640px, 90%); padding: 4px; border-radius: 8px; background: var(--bg-menu); border: 1px solid var(--line-strong); box-shadow: var(--shadow-popover); color: var(--text); }
+.term-complete-item { display: flex; align-items: center; gap: 16px; padding: 3px 8px; border-radius: 5px; cursor: default; white-space: nowrap; }
+.term-complete-item.is-sel { background: var(--accent); color: var(--on-accent); }
+.term-complete-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.term-complete-kind { flex: none; font-family: var(--font-ui); font-size: 11px; opacity: 0.65; }
