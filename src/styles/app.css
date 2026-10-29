@@ -932,6 +932,7 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 
 .activity.is-compact {
   height: 44px;
+  transition: height 150ms var(--ease-out);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -940,6 +941,9 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 }
 
 .compact-bar { width: 160px; flex-shrink: 0; }
+/* Nothing transferred yet: a slim bar that only keeps the way to the activity open. */
+.activity.is-compact.is-idle { height: 30px; }
+.activity.is-compact.is-idle .icon-btn { width: 24px; height: 24px; }
 
 .activity.is-open {
   display: flex;
@@ -1590,6 +1594,10 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 .edit-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .edit-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-control); background: var(--bg-section); }
 .server-dialog .dialog-body { overflow: hidden; display: flex; flex-direction: column; }
+/* Grows with the window (large screens), within sensible limits. */
+.page.is-app .dialog.server-dialog { width: min(1240px, calc(100vw - 96px)) !important; height: min(900px, calc(100vh - 96px)); max-height: none !important; }
+.page.is-app .dialog.transfers-dialog { width: min(1400px, calc(100vw - 96px)) !important; height: min(900px, calc(100vh - 96px)); max-height: none !important; }
+.page.is-app .dialog.preview-dialog { width: min(1400px, calc(100vw - 96px)) !important; max-height: calc(100vh - 96px) !important; }
 .server-dialog .split { flex: 1; min-height: 0; height: auto; }
 .form-grid > .select { justify-self: start; }
 .col-text > .select { align-self: flex-start; }
@@ -2025,7 +2033,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
   --text: #ececf1; --text-2: #d3d6de; --text-muted: #9ea4b0; --text-faint: #7d8390;
   --line: rgba(255, 255, 255, 0.07); --line-strong: rgba(255, 255, 255, 0.11); --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-control: #2c303b; --bg-control-on: #343946; --bg-field: #252933; --field-line: #3b404c; --icon: #c9ccd4; --icon-off: #5f6470;
-  --sel-row: #2a6de0; --sel-fg: #fff; --sel-sub: #dce8fd; --accent-text: #5da2ff; --focus: #5da2ff; --accent-tint: rgba(93, 162, 255, 0.12);
+  --sel-row: #1b74db; --sel-fg: #fff; --sel-sub: #dce8fd; --accent-text: #5fb0ff; --focus: #5fb0ff; --accent-tint: rgba(95, 176, 255, 0.12);
   --success: #3ccf6b; --warning: #ff9f0a; --paper: #3a3f4b; --folder: #4a86e8;
   color-scheme: dark; color: var(--text); background: var(--bg-card); border-color: rgba(0, 0, 0, 0.35);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
@@ -2033,19 +2041,11 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .pane.is-servers .server-panel-head, .pane.is-servers .server-sources, .pane.is-servers .server-foot { background: var(--bg-pane-head); }
 .pane.is-servers { --bg-second: #343946; --bg-second-hover: #3d4352; --bg-second-pressed: #2c303b; }
 
-/* A little colour in the toolbar (Transmit), each symbol in its own tone; disabled ones stay grey. */
-.toolbar [data-tool='newFolder']:not(:disabled) svg { color: #4a9cf0; }
-.toolbar [data-tool='activity']:not(:disabled) svg, .toolbar [data-tool='upload']:not(:disabled) svg, .toolbar [data-tool='download']:not(:disabled) svg { color: #4a9cf0; }
-.toolbar [data-tool='refresh']:not(:disabled) svg { color: #3fbfaa; }
-.toolbar [data-tool='info']:not(:disabled) svg { color: #f2a33a; }
-.toolbar [data-tool='sync']:not(:disabled) svg { color: #a874f0; }
-.toolbar [data-tool='delete']:not(:disabled) svg { color: #ef5b52; }
-.toolbar [data-tool='terminal']:not(:disabled) svg { color: #9aa3b2; }
-.toolbar .watch-btn svg { color: #3fbf6a; }
-[data-theme='light'] .toolbar [data-tool='refresh']:not(:disabled) svg { color: #1f9a86; }
-[data-theme='light'] .toolbar [data-tool='info']:not(:disabled) svg { color: #d4861a; }
-[data-theme='light'] .toolbar [data-tool='newFolder']:not(:disabled) svg,
-[data-theme='light'] .toolbar [data-tool='activity']:not(:disabled) svg { color: #2a6de0; }
+/* Calm toolbar: every symbol in the normal icon colour; colour only shows a state
+   (watches running or waiting, a panel or view that is switched on). */
+.toolbar .watch-btn.is-ok svg { color: var(--success); }
+.toolbar .watch-btn.is-warn svg { color: var(--warning); }
+.toolbar .icon-btn.is-on:not(.watch-btn) svg { color: var(--accent-text); }
 
 /* ------------------------------------------------------------- Round 3e (28.10.2026) */
 

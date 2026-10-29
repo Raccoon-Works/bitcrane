@@ -115,3 +115,21 @@
 .page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab { border-right-color: var(--line); }
 .page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab.is-sel { background: var(--bg-window); box-shadow: -1px 0 0 var(--line-strong), 1px 0 0 var(--line-strong); }
 .page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tabs { border-left-color: var(--line); }
+
+/*
+ * Light mode: the accent is a deeper shade of the logo's light blue, so white
+ * text on it and blue text on white stay readable (contrast above 4.5:1).
+ */
+.page[data-theme='light'] {
+  --accent: #1b74db;
+  --accent-hover: #2a82e6;
+  --accent-pressed: #155fb5;
+  --on-accent: #ffffff;
+  --accent-text: #1667c4;
+  --focus: #1b74db;
+  --accent-tint: rgba(27, 116, 219, 0.1);
+  --accent-ring: rgba(27, 116, 219, 0.25);
+}
+/* The Mac shows selections filled with the accent; Windows keeps its light grey (Explorer). */
+.page[data-platform='mac'][data-theme='light'] { --sel-row: #1b74db; }
+.page[data-theme='light'] .server-glyph { --glyph-server: #1b74db; }

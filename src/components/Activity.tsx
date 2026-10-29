@@ -161,7 +161,7 @@ export function Activity() {
     }
     const restCount = running.length + queued.length - (current ? 1 : 0);
     return (
-      <section className="activity is-compact" aria-label={$t('Aktivität')} role="status" aria-live="polite">
+      <section className={`activity is-compact${!current && !done.length && !restCount ? ' is-idle' : ''}`} aria-label={$t('Aktivität')} role="status" aria-live="polite">
         {line}
         <span className="flex-1" />
         <span className="small muted nowrap">
