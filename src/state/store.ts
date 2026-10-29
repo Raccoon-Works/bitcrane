@@ -359,6 +359,8 @@ export interface AppState {
   platform: Platform;
   /** Built-in terminal sessions (state/terminal.ts). */
   terminals: TermSession[];
+  /** Ids of the SSH tunnels that are running (state/forward.ts). */
+  tunnels: string[];
   /** Windows: Explorer folder of each server shown there (mount.ts), by server id. */
   explorerFolders: Record<string, string>;
   theme: Theme;
@@ -563,6 +565,7 @@ function initialState(): AppState {
   return {
     platform: detectPlatform(),
     terminals: [],
+    tunnels: [],
     explorerFolders: {},
     theme: detectTheme(),
     palette: 'auto',

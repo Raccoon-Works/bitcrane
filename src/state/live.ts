@@ -19,6 +19,7 @@ import { isCloudProtocol, type FileEntry, type PaneSide, type Server, type Tab, 
 import { basename, insideArchive, join, parent } from '../util/paths';
 import { addLog } from './log';
 import { reopenTerminals } from './terminal';
+import { refreshForwards, startAutoForwards } from './forward';
 import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
 import {
@@ -423,6 +424,8 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     if (!opts.silent) showToast($t('Verbunden mit {0}', srv.name), 'ok');
     else showToast($t('Wieder verbunden mit {0}. Wartende Dateien werden hochgeladen.', srv.name), 'ok');
     pump();
+    // Tunnels marked "beim Verbinden starten".
+    void startAutoForwards(serverId);
     // Start comparison for watches of this server that have not synced yet.
     for (const w of getState().watches) {
       if (w.serverId === serverId && w.state !== 'paused' && w.options.syncOnStart && !synced.has(w.id)) void initialSync(w);
@@ -522,6 +525,7 @@ export async function disconnectServer(serverId: string) {
   }
   for (const k of [...listings.keys()]) if (k.startsWith(`R|${serverId}|`)) listings.delete(k);
   setState((s) => ({ servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: false } : x)) }));
+  void refreshForwards();
   bump();
 }
 

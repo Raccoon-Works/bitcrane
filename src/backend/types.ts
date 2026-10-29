@@ -110,6 +110,21 @@ export interface Server {
   termStart?: string;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
   mountExplorer?: boolean;
+  /** SSH tunnels of the server (forward.rs, state/forward.ts). */
+  forwards?: PortForward[];
+}
+
+/** An SSH tunnel: like ssh -L (local), -R (remote) or -D (dynamic, SOCKS5). */
+export interface PortForward {
+  id: string;
+  kind: 'local' | 'remote' | 'dynamic';
+  bindHost: string;
+  bindPort: number;
+  destHost: string;
+  destPort: number;
+  /** Start it whenever the server connects. */
+  auto?: boolean;
+  note?: string;
 }
 
 export interface ServerProxy {

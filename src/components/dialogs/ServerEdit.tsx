@@ -18,6 +18,7 @@ import { ServerTile, swatch } from '../ServerTile';
 import { Button, Segmented, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
+import { ForwardEditor } from './ForwardEditor';
 
 /** Stable empty list for the store selector (a new [] would redraw endlessly). */
 const NO_RULES: import('../../state/store').TransferRule[] = [];
@@ -431,7 +432,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
             <button type="button" className="disclosure-head" aria-expanded={more} onClick={() => setMore(!more)}>
               <ChevronRight size={13} strokeWidth={2} className={`chev${more ? ' is-open' : ''}`} aria-hidden="true" />
               <span className="strong">{$t('Weitere Einstellungen')}</span>
-              <span className="small muted ellipsis">{[draft.proxy?.host && $t('Proxy'), draft.webUrl && $t('Web-Adresse'), draft.note && $t('Notiz')].filter(Boolean).join(', ') || (family === 'ftp' ? $t('Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz') : $t('Proxy, Web-Adresse, Notiz'))}</span>
+              <span className="small muted ellipsis">{[draft.proxy?.host && $t('Proxy'), draft.forwards?.length && (draft.forwards.length === 1 ? $t('1 Tunnel') : $t('{0} Tunnel', draft.forwards.length)), draft.webUrl && $t('Web-Adresse'), draft.note && $t('Notiz')].filter(Boolean).join(', ') || (family === 'ftp' ? $t('Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz') : family === 'sftp' ? $t('Proxy, Terminal, Tunnel, Web-Adresse, Notiz') : $t('Proxy, Web-Adresse, Notiz'))}</span>
             </button>
             {more && (
               <div className="disclosure-body form-grid">
@@ -477,6 +478,12 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                       </div>
                       <span className="small muted">{$t('Für das eingebaute Terminal. Ein eigenes Farbschema (z. B. rot) zeigt sofort, auf welchem Server du tippst.')}</span>
                     </div>
+                  </>
+                )}
+                {family === 'sftp' && (
+                  <>
+                    <label>{$t('Tunnel')}</label>
+                    <ForwardEditor serverId={draft.id} value={draft.forwards ?? []} onChange={(v) => set('forwards', v.length ? v : undefined)} />
                   </>
                 )}
                 {family === 'smb' && (

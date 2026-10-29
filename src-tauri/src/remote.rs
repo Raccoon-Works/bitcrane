@@ -323,6 +323,15 @@ impl Remote {
         }
     }
 
+    /// SSH handle and remote forwards of an SSH connection (port forwarding).
+    pub(crate) fn tunnel(&self) -> AppResult<(&russh::client::Handle<crate::ssh::Handler>, &crate::ssh::RemoteForwards)> {
+        match self {
+            Remote::Sftp(c) => Ok(c.tunnel()),
+            Remote::Scp(c) => Ok(c.tunnel()),
+            _ => Err(AppError::new(ErrorKind::Other, format!("Port-Weiterleitungen gibt es nur mit SSH, nicht über {}.", self.protocol()))),
+        }
+    }
+
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
         match self {
             Remote::Sftp(c) => c.symlink(link, target).await,
