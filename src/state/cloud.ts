@@ -1,5 +1,5 @@
 /**
- * Cloud services as servers (Dropbox, Google Drive; OneDrive follows).
+ * Cloud services as servers (Dropbox, Google Drive, OneDrive).
  *
  * Adding one signs in through the browser (see src-tauri/src/oauth.rs). The
  * sign-in (a refresh token) is kept in the keychain under "cloud:<server id>";
@@ -44,7 +44,7 @@ export async function addCloudService(service: Protocol) {
     openDialog({ type: 'serverEdit', cloud: 'gdrive' });
     return;
   }
-  if (service === 'dropbox' && LIVE && !getState().cloudAvailable.dropbox) {
+  if ((service === 'dropbox' || service === 'onedrive') && LIVE && !getState().cloudAvailable[service]) {
     showCloudNotSetUp(service);
     return;
   }
@@ -84,7 +84,7 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
     const existing = serverId ? serverById(serverId) : undefined;
     const srv: Server = existing
       ? { ...existing, user: account || existing.user }
-      : { ...newServerTemplate(), name: getState().servers.some((x) => x.protocol === service) ? `${name} · ${account}` : name, protocol: service, host: service === 'gdrive' ? 'drive.google.com' : `${service}.com`, port: 443, user: account, auth: 'agent', keyPath: '', remoteStart: '/', group: '' };
+      : { ...newServerTemplate(), name: getState().servers.some((x) => x.protocol === service) ? `${name} · ${account}` : name, protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : `${service}.com`, port: 443, user: account, auth: 'agent', keyPath: '', remoteStart: '/', group: '' };
     await backend.secretSet(cloudAccount(srv), refreshToken);
     addLog('ok', $t('Bei {0} angemeldet als {1}', name, account), srv.id);
     closeDialog();

@@ -221,6 +221,14 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     return backend.connectDropbox(id, { refreshToken });
   }
+  if (srv.protocol === 'onedrive') {
+    const refreshToken = await keychain(cloudAccount(srv));
+    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    const r = await backend.connectOneDrive(id, { refreshToken });
+    // Microsoft renews the sign-in with each use; keep the newest one.
+    if (r.refreshToken && r.refreshToken !== refreshToken) void backend.secretSet(cloudAccount(srv), r.refreshToken).catch(() => undefined);
+    return r;
+  }
   if (srv.protocol === 'gdrive') {
     const refreshToken = await keychain(cloudAccount(srv));
     if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
@@ -283,7 +291,7 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox', gdrive: 'Google Drive' };
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
 const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
