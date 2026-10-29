@@ -242,7 +242,8 @@ impl Remote {
             Remote::GDrive(c) => c.walk(path).await,
             Remote::OneDrive(c) => c.walk(path).await,
         }?;
-        items.retain(|i| i.relative.split('/').all(safe_name));
+        // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
+        items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
         Ok(items)
     }
 

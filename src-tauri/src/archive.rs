@@ -84,6 +84,11 @@ fn write_zip(items: &[PathBuf], target: &Path) -> AppResult<()> {
 /// ("../" tricks) are refused.
 pub fn extract(path: &str) -> AppResult<String> {
     let archive = to_native(path);
+    // tar and tar.gz: through the archive reader (same "../" protection).
+    if !archive.to_string_lossy().to_ascii_lowercase().ends_with(".zip") {
+        let dir = archive.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
+        return crate::archive_vfs::extract(&archive, "", &dir);
+    }
     let dir = archive.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
     let stem = archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into());
     let file = fs::File::open(&archive).map_err(|e| AppError::other("Das Archiv konnte nicht geöffnet werden.").with_detail(e.to_string()))?;

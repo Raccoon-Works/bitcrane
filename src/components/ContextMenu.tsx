@@ -7,9 +7,9 @@ import { Check } from './glyphs';
 import { useEffect, useRef } from 'react';
 import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
-import { crumbs, join } from '../util/paths';
+import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -181,9 +181,13 @@ export function ContextMenu() {
       second.push({ label: $t('Mit „{0}“ vergleichen', otherPick[0]), run: () => compareFiles(a, b) });
     }
     // Zip archives on this computer (after ForkLift).
-    if (!onServer) {
+    // Inside an opened archive nothing can be added, so no "komprimieren" there.
+    if (!onServer && !archiveFolder(panePath(menu.side))) {
       second.push({ label: one ? $t('„{0}“ komprimieren', one) : $t('{0} Objekte komprimieren', menu.names.length), run: () => compressEntries(menu.side, menu.names) });
-      if (one && !isDir && /\.zip$/i.test(one)) second.push({ label: $t('Entpacken'), run: () => extractArchive(menu.side, one) });
+      if (one && !isDir && isArchiveName(one)) {
+        second.push({ label: $t('Entpacken'), run: () => extractArchive(menu.side, one) });
+        second.push({ label: $t('Mit Standardprogramm öffnen'), run: () => openWithDefaultApp(menu.side, one) });
+      }
     }
     if (one && menu.side === 'remote' && sftpTab) second.push({ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: join(panePath('remote'), one) }) });
     if (one) second.push({ label: $t('Informationen und Rechte …'), key: k('⌘I', 'Strg+I'), run: () => openDialog({ type: 'perms', side: menu.side, path: join(panePath(menu.side), one) }) });

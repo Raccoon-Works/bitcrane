@@ -29,6 +29,22 @@ export function parent(path: string): string {
 }
 
 /** Last path segment. */
+/** True when a local path lies inside a zip or tar archive opened like a folder (archive_vfs.rs). */
+export function insideArchive(path: string): boolean {
+  const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts.slice(0, -1).some(isArchiveName);
+}
+
+/** True when a folder shown in a half is an archive or lies inside one (read-only). */
+export function archiveFolder(path: string): boolean {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean).some(isArchiveName);
+}
+
+/** True for file names Bitcrane opens like a folder. */
+export function isArchiveName(name: string): boolean {
+  return /\.(zip|tar|tgz|tar\.gz)$/i.test(name);
+}
+
 export function basename(path: string): string {
   const s = segments(path);
   return s.length ? s[s.length - 1] : path;

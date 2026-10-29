@@ -10,6 +10,7 @@ mod config;
 mod error;
 mod dav;
 mod archive;
+mod archive_vfs;
 mod dropbox;
 mod gdrive;
 mod onedrive;
@@ -284,6 +285,14 @@ async fn local_zip(paths: Vec<String>) -> AppResult<String> {
 #[tauri::command]
 async fn local_unzip(path: String) -> AppResult<String> {
     tauri::async_runtime::spawn_blocking(move || archive::extract(&path))
+        .await
+        .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
+}
+
+/// Extracts entries of archives into a temporary folder (to upload them); returns the folder and the names.
+#[tauri::command]
+async fn archive_extract_temp(paths: Vec<String>) -> AppResult<(String, Vec<String>)> {
+    tauri::async_runtime::spawn_blocking(move || archive_vfs::extract_to_temp(&paths))
         .await
         .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
 }
@@ -751,6 +760,9 @@ fn bytes_to_text(mut bytes: Vec<u8>) -> AppResult<TextContent> {
 #[tauri::command]
 async fn local_read_text(path: String) -> AppResult<TextContent> {
     use tokio::io::AsyncReadExt;
+    if let Some((archive, inner)) = archive_vfs::split(&path) {
+        return bytes_to_text(archive_vfs::read(&archive, &inner, TEXT_LIMIT + 1)?);
+    }
     let file = tokio::fs::File::open(paths::to_native(&path)).await?;
     let mut buf = Vec::new();
     file.take(TEXT_LIMIT as u64 + 1).read_to_end(&mut buf).await?;
@@ -945,6 +957,9 @@ fn make_preview(path: &str, mut bytes: Vec<u8>) -> Preview {
 async fn local_preview(path: String) -> AppResult<Preview> {
     use tokio::io::AsyncReadExt;
     let limit = if image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
+    if let Some((archive, inner)) = archive_vfs::split(&path) {
+        return Ok(make_preview(&path, archive_vfs::read(&archive, &inner, limit + 1)?));
+    }
     let file = tokio::fs::File::open(paths::to_native(&path)).await?;
     let mut buf = Vec::new();
     file.take(limit as u64 + 1).read_to_end(&mut buf).await?;
@@ -986,10 +1001,10 @@ async fn remote_preview(state: State<'_, AppState>, server_id: String, path: Str
 
 /* ------------------------------------------------------------------ App shell */
 
-/// Shows or hides the status icon and updates its texts.
+/// Shows or hides the status icon and sets its tooltip and menu.
 #[tauri::command]
-fn tray_update(app: tauri::AppHandle, visible: bool, status: String, paused: bool, labels: Option<tray::TrayLabels>) -> AppResult<()> {
-    tray::update(&app, visible, &status, paused, labels).map_err(|e| AppError::other("Das Symbol in der Menüleiste konnte nicht gesetzt werden.").with_detail(e.to_string()))
+fn tray_update(app: tauri::AppHandle, visible: bool, tooltip: String, items: Vec<tray::TrayItem>) -> AppResult<()> {
+    tray::update(&app, visible, &tooltip, &items).map_err(|e| AppError::other("Das Symbol in der Menüleiste konnte nicht gesetzt werden.").with_detail(e.to_string()))
 }
 
 /// Quits the app for real (also when it would otherwise keep running in the background).
@@ -1337,6 +1352,7 @@ pub fn run() {
             }
             // Server files copied for playing in the preview are only needed while Bitcrane runs.
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-preview"));
+            let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-archive"));
             let dir = app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane"));
             app.manage(AppState::new(dir));
             // The window is created invisible (tauri.conf.json). A normal start shows it at once;
@@ -1384,6 +1400,7 @@ pub fn run() {
             local_drives,
             local_cloud_places,
             local_zip,
+            archive_extract_temp,
             remote_share_link,
             local_unzip,
             local_open,

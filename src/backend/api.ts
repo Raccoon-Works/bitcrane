@@ -167,6 +167,8 @@ export interface Backend {
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
   /** Packs files and folders into a zip next to them; returns the archive's name. */
   localZip(paths: string[]): Promise<string>;
+  /** Extracts entries of archives into a new temporary folder; returns [folder, names]. */
+  archiveExtractTemp(paths: string[]): Promise<[string, string[]]>;
   /** Shared settings file in a sync folder (null when there is none yet). */
   syncRead(dir: string): Promise<{ text: string; mtime: number } | null>;
   /** Writes the shared settings file; returns its new modification time. */
@@ -240,7 +242,8 @@ export interface Backend {
 
   localReadText(path: string): Promise<TextContent>;
   remoteReadText(serverId: string, path: string): Promise<TextContent>;
-  trayUpdate(visible: boolean, status: string, paused: boolean, labels?: { open: string; pause: string; resume: string; quit: string }): Promise<void>;
+  /** Status icon: shown or not, tooltip, and the whole menu (see src-tauri/src/tray.rs). */
+  trayUpdate(visible: boolean, tooltip: string, items: Array<{ id?: string; label?: string; enabled?: boolean; checked?: boolean; items?: unknown[] }>): Promise<void>;
   appQuit(): Promise<void>;
 
   localPreview(path: string): Promise<Preview>;

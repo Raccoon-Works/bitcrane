@@ -1783,7 +1783,8 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 .server-welcome p { max-width: 360px; margin: 0; }
 .server-welcome-actions { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: 280px; }
 .server-welcome-actions .btn { justify-content: center; }
-.count-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 600; display: inline-grid; place-items: center; margin-left: 2px; }
+/* Number in a pill: line box as tall as the pill, so the digit sits in the middle in every system font. */
+.count-badge { box-sizing: border-box; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; display: inline-block; margin-left: 2px; }
 
 /* "Schnell verbinden" form. */
 .quick-form { flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-6) var(--space-4); }

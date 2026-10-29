@@ -1193,6 +1193,8 @@ export function openEntry(side: PaneSide, name: string) {
   if (!t) return;
   const [ls] = paneLoc(side, t);
   if (isDirEntry(...paneLoc(side, t), path)) navigate(side, path);
+  // zip and tar on this computer open like a folder (ForkLift); "Mit Standardprogramm öffnen" is in the context menu.
+  else if (ls === 'local' && LIVE && paths.isArchiveName(name)) navigate(side, path);
   else if (LIVE) {
     // Local files open with their default program; server files in the editor (uploaded on save).
     if (ls === 'local') live.openLocal(path);
@@ -1957,6 +1959,13 @@ export function copyShareLink(side: PaneSide, name: string) {
   void live.copyShareLink(serverId, paths.join(panePath(side), name));
 }
 
+/** Opens a local file with its default program (archives otherwise open like a folder). */
+export function openWithDefaultApp(side: PaneSide, name: string) {
+  setState({ contextMenu: null });
+  if (LIVE) live.openLocal(paths.join(panePath(side), name));
+  else showToast($t('„{0}“ wird im Standard-Programm geöffnet.', name));
+}
+
 /** "Komprimieren" (this computer only): the chosen entries go into one zip next to them. */
 export function compressEntries(side: PaneSide, names: string[]) {
   setState({ contextMenu: null });
@@ -2106,6 +2115,11 @@ function enqueue(items: Transfer[]) {
  */
 function transferNames(from: string, fromDir: string, names: string[], to: string, toDir: string) {
   if (!names.length) return;
+  // An opened archive on this computer is read-only.
+  if (!to && paths.archiveFolder(toDir)) {
+    showToast($t('Archive sind schreibgeschützt. Zum Ändern zuerst entpacken.'), 'error');
+    return;
+  }
   // Two local halves: a plain copy on this computer (Total Commander).
   if (!from && !to) { copyOrMoveLocal(fromDir, names, toDir, false); return; }
   if (from === to) return;
