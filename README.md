@@ -81,6 +81,24 @@ variables are set: `BITCRANE_TEST_SSH`, `BITCRANE_TEST_FTP` (`host:plain,explici
 Bitcrane is free software under the GNU General Public License, version 3 or (at your option) any later version.
 See [LICENSE](LICENSE). Third-party components and their licenses are listed in `src/licenses.json`.
 
+## Code signing policy
+
+Windows releases are signed through SignPath: free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+Until the first signed release, installers are unsigned (see Download above).
+
+- Only builds made by the public GitHub Actions workflow (`.github/workflows/build.yml`) from this repository are signed.
+- Every signing request is approved by hand.
+- Committers and reviewers: members of the [Raccoon-Works](https://github.com/Raccoon-Works) organization.
+- Approvers: owners of the Raccoon-Works organization.
+- All team members use multi-factor authentication for GitHub and SignPath.
+
+### Privacy
+
+Bitcrane connects only to the servers and services you set up yourself, and, for updates, to GitHub
+(`github.com/Raccoon-Works/bitcrane/releases`; this can be turned off in Settings › General › Updates).
+It sends no usage data or analytics anywhere. Passwords and keys stay in the macOS Keychain or the
+Windows Credential Manager on your computer.
+
 ## Acknowledgements
 
 Developed by RaccoonWorks with the help of Claude (Anthropic) as a coding assistant.
