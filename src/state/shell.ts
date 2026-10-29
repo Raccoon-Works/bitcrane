@@ -19,7 +19,8 @@ import { menuDefs } from '../components/AppMenu';
 import { playDoneSound, playErrorSound } from '../util/sounds';
 import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';
-import { getState, openSftpLink, pauseAllWatches, subscribeStore, type AppState } from './store';
+import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, updateSettings, type AppState } from './store';
+import { checkForUpdates } from './updates';
 import { $t } from '../i18n';
 
 /* ------------------------------------------------------------------------ */
@@ -143,15 +144,77 @@ function trayStatus(s: AppState): { text: string; paused: boolean } {
   return { text: $t('Keine Überwachung aktiv'), paused };
 }
 
+/** One entry of the status icon's menu (see tray.rs); no id and no label = separator. */
+interface TrayItem { id?: string; label?: string; enabled?: boolean; checked?: boolean; items?: TrayItem[] }
+const SEP: TrayItem = {};
+
+/**
+ * Menu of the status icon (after Dropbox and Transmit): status, open, new tab,
+ * quick connect, the saved servers, the watches (click pauses or resumes one),
+ * transfers, updates, settings, hiding the icon, quit.
+ */
+function trayMenu(s: AppState, st: { text: string; paused: boolean }): TrayItem[] {
+  const mac = s.platform === 'mac';
+  const servers = s.servers.filter((x) => !x.temporary).slice(0, 20);
+  const items: TrayItem[] = [
+    { id: 'status', label: st.text, enabled: false },
+    SEP,
+    { id: 'open', label: $t('Bitcrane öffnen') },
+    { id: 'newTab', label: $t('Neuer Tab') },
+    { id: 'quick', label: $t('Schnell verbinden …') },
+  ];
+  if (servers.length) items.push({ id: 'servers', label: $t('Server öffnen'), items: servers.map((x) => ({ id: `server:${x.id}`, label: x.name })) });
+  if (s.watches.length) {
+    items.push({
+      id: 'watches',
+      label: $t('Überwachungen'),
+      items: [
+        ...s.watches.map((w) => ({ id: `watch:${w.id}`, label: w.name, checked: w.state !== 'paused' })),
+        SEP,
+        { id: 'pauseAll', label: st.paused ? $t('Alle Überwachungen fortsetzen') : $t('Alle Überwachungen pausieren') },
+      ],
+    });
+  }
+  items.push(
+    { id: 'transfers', label: $t('Übertragungen …') },
+    SEP,
+    { id: 'updates', label: $t('Nach Updates suchen …') },
+    { id: 'settings', label: $t('Einstellungen …') },
+    { id: 'hideIcon', label: mac ? $t('Symbol in der Menüleiste ausblenden') : $t('Symbol im Infobereich ausblenden') },
+    SEP,
+    { id: 'quit', label: $t('Bitcrane beenden') },
+  );
+  return items;
+}
+
 let lastTray = '';
 function syncTray(s: AppState) {
   const st = trayStatus(s);
   // A hidden start needs the status icon, otherwise Bitcrane could not be reached.
   const visible = s.settings.showMenuBarIcon || !!s.startedHidden;
-  const key = `${visible}|${st.text}|${st.paused}`;
+  const items = trayMenu(s, st);
+  const key = `${visible}|${JSON.stringify(items)}`;
   if (key === lastTray) return;
   lastTray = key;
-  backend.trayUpdate(visible, st.text, st.paused, { open: $t('Bitcrane öffnen'), pause: $t('Alle Überwachungen pausieren'), resume: $t('Alle Überwachungen fortsetzen'), quit: $t('Bitcrane beenden') }).catch(() => undefined);
+  backend.trayUpdate(visible, st.text, items).catch(() => undefined);
+}
+
+/** Actions from the status icon's menu. */
+function onTrayAction(id: string) {
+  if (id === 'pauseAll') pauseAllWatches();
+  else if (id === 'quit') void quitApp();
+  else if (id === 'newTab') newTab();
+  else if (id === 'quick') openDialog({ type: 'quickConnect' });
+  else if (id === 'transfers') openDialog({ type: 'transfers' });
+  else if (id === 'updates') void checkForUpdates(true);
+  else if (id === 'settings') openDialog({ type: 'settings', tab: 'general' });
+  else if (id === 'hideIcon') {
+    updateSettings({ showMenuBarIcon: false });
+    void notify('Bitcrane', getState().platform === 'mac'
+      ? $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol in der Menüleiste.')
+      : $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol im Infobereich.'));
+  } else if (id.startsWith('server:')) openServerInNewTab(id.slice(7));
+  else if (id.startsWith('watch:')) toggleWatch(id.slice(6));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -280,10 +343,7 @@ export async function startShell() {
     }
   }
 
-  await listen<string>('tray-action', (e) => {
-    if (e.payload === 'pauseAll') pauseAllWatches();
-    if (e.payload === 'quit') quitApp();
-  });
+  await listen<string>('tray-action', (e) => onTrayAction(e.payload));
 
   // Start at login follows the setting.
   let autostart = await autostartEnabled().catch(() => false);
@@ -297,7 +357,7 @@ export async function startShell() {
       onTransfers(s, focused);
       syncProgress(s);
     }
-    if (!prev || prev.transfers !== s.transfers || prev.watches !== s.watches || prev.settings !== s.settings) syncTray(s);
+    if (!prev || prev.transfers !== s.transfers || prev.watches !== s.watches || prev.settings !== s.settings || prev.servers !== s.servers) syncTray(s);
     // Only after the saved settings are loaded, otherwise the defaults would switch it off.
     if (isConfigLoaded() && (!prev || prev.settings.startAtLogin !== s.settings.startAtLogin || !autostartSynced)) {
       autostartSynced = true;

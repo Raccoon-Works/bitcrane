@@ -72,6 +72,10 @@ fn hidden_mark(_meta: &fs::Metadata) -> u8 {
 
 /// Lists a local folder. Folders first, then files, both case-insensitively sorted.
 pub fn list(path: &str) -> AppResult<Vec<FileEntry>> {
+    // Inside a zip or tar: the archive is listed like a folder (archive_vfs.rs).
+    if let Some((archive, inner)) = crate::archive_vfs::split(path) {
+        return crate::archive_vfs::list(&archive, &inner);
+    }
     let dir = to_native(path);
     let mut out = Vec::new();
     for item in fs::read_dir(&dir)? {
@@ -106,6 +110,11 @@ pub fn list(path: &str) -> AppResult<Vec<FileEntry>> {
 }
 
 pub fn stat(path: &str) -> AppResult<FileEntry> {
+    if let Some((archive, inner)) = crate::archive_vfs::split(path) {
+        if !inner.is_empty() {
+            return crate::archive_vfs::stat(&archive, &inner);
+        }
+    }
     let p = to_native(path);
     let meta = fs::metadata(&p)?;
     let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
@@ -113,6 +122,9 @@ pub fn stat(path: &str) -> AppResult<FileEntry> {
 }
 
 pub fn mkdir(path: &str) -> AppResult<()> {
+    if crate::archive_vfs::split(path).is_some() {
+        return Err(crate::archive_vfs::read_only());
+    }
     fs::create_dir(to_native(path))?;
     Ok(())
 }
@@ -120,6 +132,9 @@ pub fn mkdir(path: &str) -> AppResult<()> {
 pub fn rename(path: &str, new_name: &str) -> AppResult<()> {
     if new_name.contains('/') || new_name.contains('\\') {
         return Err(AppError::new(ErrorKind::Other, "Der Name darf keinen Schrägstrich enthalten."));
+    }
+    if crate::archive_vfs::split(path).is_some_and(|(_, inner)| !inner.is_empty()) {
+        return Err(crate::archive_vfs::read_only());
     }
     let from = to_native(path);
     let to = from.with_file_name(new_name);
@@ -132,6 +147,9 @@ pub fn rename(path: &str, new_name: &str) -> AppResult<()> {
 
 /// Moves files or folders to the system trash (never deletes permanently).
 pub fn trash(paths: &[String]) -> AppResult<()> {
+    if paths.iter().any(|p| crate::archive_vfs::split(p).is_some_and(|(_, inner)| !inner.is_empty())) {
+        return Err(crate::archive_vfs::read_only());
+    }
     let natives: Vec<_> = paths.iter().map(|p| to_native(p)).collect();
     trash::delete_all(&natives).map_err(|e| AppError::other("Konnte nicht in den Papierkorb legen.").with_detail(e.to_string()))
 }
@@ -139,12 +157,19 @@ pub fn trash(paths: &[String]) -> AppResult<()> {
 /// Recursively lists all files below `path` (or the file itself).
 /// `relative` is relative to the parent of `path`, so it starts with the item's own name.
 pub fn walk(path: &str) -> AppResult<Vec<WalkItem>> {
+    if let Some((archive, inner)) = crate::archive_vfs::split(path) {
+        // The archive file itself is walked as a file (uploading a zip uploads the zip).
+        if !inner.is_empty() {
+            return crate::archive_vfs::walk(&archive, &inner, path);
+        }
+    }
     let root = to_native(path);
     let base = root.parent().map(Path::to_path_buf).unwrap_or_else(|| root.clone());
     let mut out = Vec::new();
     for entry in walkdir::WalkDir::new(&root).follow_links(false) {
         let entry = entry.map_err(|e| AppError::other("Ordner konnte nicht gelesen werden.").with_detail(e.to_string()))?;
-        if !entry.file_type().is_file() {
+        // Half-written files of Bitcrane's own transfers (".name.bitcrane-part") are never transferred.
+        if !entry.file_type().is_file() || entry.file_name().to_string_lossy().ends_with(".bitcrane-part") {
             continue;
         }
         let meta = entry.metadata().map_err(|e| AppError::other("Datei konnte nicht gelesen werden.").with_detail(e.to_string()))?;
@@ -243,9 +268,19 @@ fn merges_into(from: &Path, dest: &Path, name: &str) -> bool {
 /// With `merge`, a folder whose name already exists there is merged into it instead of
 /// getting a " Kopie" name.
 pub fn copy(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
+    if crate::archive_vfs::split(dest_dir).is_some() {
+        return Err(crate::archive_vfs::read_only());
+    }
     let dest = to_native(dest_dir);
     let mut out = Vec::new();
     for p in paths {
+        // Out of an archive: the entry is extracted into the target.
+        if let Some((archive, inner)) = crate::archive_vfs::split(p) {
+            if !inner.is_empty() {
+                out.push(crate::archive_vfs::extract(&archive, &inner, &dest)?);
+                continue;
+            }
+        }
         let from = to_native(p);
         if dest.starts_with(&from) {
             return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
@@ -286,6 +321,9 @@ pub fn copy_file_over(from: &str, to: &str) -> AppResult<()> {
 /// goes to the trash (never deleted permanently). A name that already exists
 /// in the target gets " Kopie" like a copy. Returns the new names.
 pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
+    if crate::archive_vfs::split(dest_dir).is_some() || paths.iter().any(|p| crate::archive_vfs::split(p).is_some_and(|(_, inner)| !inner.is_empty())) {
+        return Err(crate::archive_vfs::read_only());
+    }
     let dest = to_native(dest_dir);
     let mut out = Vec::new();
     for p in paths {

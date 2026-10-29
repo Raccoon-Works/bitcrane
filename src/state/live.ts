@@ -16,7 +16,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { isCloudProtocol, type FileEntry, type PaneSide, type Server, type Tab, type Transfer, type Watch } from '../backend/types';
-import { basename, join, parent } from '../util/paths';
+import { basename, insideArchive, join, parent } from '../util/paths';
 import { addLog } from './log';
 import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
@@ -829,6 +829,16 @@ function reportSkipped(n: number, serverId: string) {
 
 /** Uploads local files or folders (selected names in `localDir`) to `remoteDir`. */
 export async function uploadNames(serverId: string, localDir: string, remoteDir: string, names: string[]) {
+  // Inside an archive opened like a folder: extract the entries first, then upload those.
+  if (insideArchive(join(localDir, names[0] ?? ''))) {
+    try {
+      const [dir, extracted] = await backend.archiveExtractTemp(names.map((n) => join(localDir, n)));
+      return uploadNames(serverId, dir, remoteDir, extracted);
+    } catch (e) {
+      showToast(toBackendError(e).message, 'error');
+      return;
+    }
+  }
   const items: Transfer[] = [];
   let skipped = 0;
   for (const n of names) {

@@ -323,7 +323,6 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
           <>
             <Group title={$t('Hintergrund')}>
               <Row label={$t('Im Hintergrund weiterlaufen')} note={$t('Überwachungen laufen weiter, wenn das Fenster geschlossen ist.')}><Switch checked={s.runInBackground} onChange={(v) => updateSettings({ runInBackground: v })} label={$t('Im Hintergrund weiterlaufen')} /></Row>
-              <Row label={mac ? $t('Symbol in der Menüleiste zeigen') : $t('Symbol im Infobereich zeigen')} note={$t('Zeigt Zustand und letzte Uploads, auch ohne geöffnetes Fenster.')}><Switch checked={s.showMenuBarIcon} onChange={(v) => updateSettings({ showMenuBarIcon: v })} label={$t('Symbol zeigen')} /></Row>
               <Row label={mac ? $t('Beim Anmelden am Mac starten') : $t('Mit Windows starten')} note={$t('Gespeicherte Überwachungen starten automatisch.')}><Switch checked={s.startAtLogin} onChange={(v) => updateSettings({ startAtLogin: v })} label={$t('Beim Anmelden starten')} /></Row>
               <Row label={mac ? $t('Nur in der Menüleiste starten') : $t('Nur im Infobereich starten')} note={mac ? $t('Beim Anmelden öffnet sich kein Fenster; Bitcrane ist über das Symbol in der Menüleiste erreichbar.') : $t('Beim Anmelden öffnet sich kein Fenster; Bitcrane ist über das B im Infobereich bei der Uhr erreichbar.')}>
                 <Switch checked={!!s.startHidden} disabled={!s.startAtLogin} onChange={(v) => updateSettings({ startHidden: v })} label={$t('Nur im Infobereich starten')} />
@@ -364,6 +363,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
           <>
           <Group title={$t('Allgemein')}>
             <Row label={$t('Sprache')} note={$t('Gilt ab dem nächsten Start.')}><Select value={s.language} onChange={(v) => updateSettings({ language: v })} label={$t('Sprache')} options={[{ value: 'de', label: $t('Deutsch') }, { value: 'en', label: $t('English') }]} /></Row>
+            <Row label={mac ? $t('Symbol in der Menüleiste zeigen') : $t('Symbol im Infobereich zeigen')} note={$t('Zeigt den Zustand und ein Menü mit Servern, Überwachungen und Einstellungen, auch ohne geöffnetes Fenster. Aus: Bitcrane ist dann nur über das Programmsymbol erreichbar.')}><Switch checked={s.showMenuBarIcon} onChange={(v) => updateSettings({ showMenuBarIcon: v })} label={$t('Symbol zeigen')} /></Row>
             <Row label={$t('Updates')} note={s.updateMode === 'auto' ? $t('Neue Versionen werden im Hintergrund geladen und beim Beenden installiert.') : s.updateMode === 'notify' ? $t('Beim Start und alle paar Stunden. Installiert wird erst, wenn du zustimmst.') : $t('Nur wenn du „Jetzt suchen“ klickst.')}>
               <span className="row-inline">
                 <Button small onClick={() => void checkForUpdates(true)}>{$t('Jetzt suchen')}</Button>

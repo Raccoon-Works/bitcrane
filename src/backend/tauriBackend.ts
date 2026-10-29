@@ -37,6 +37,7 @@ export const tauriBackend: Backend = {
   localMove: (paths, destDir, merge) => invoke('local_move', { paths, destDir, merge: !!merge }),
   localCopyFiles: (pairs) => invoke('local_copy_files', { pairs }),
   localZip: (paths) => invoke('local_zip', { paths }),
+  archiveExtractTemp: (paths) => invoke('archive_extract_temp', { paths }),
   syncRead: (dir) => invoke('sync_read', { dir }),
   syncWrite: (dir, text) => invoke('sync_write', { dir, text }),
   remoteShareLink: (serverId, path) => invoke('remote_share_link', { serverId, path }),
@@ -123,7 +124,7 @@ export const tauriBackend: Backend = {
 
   localReadText: (path) => invoke('local_read_text', { path }),
   remoteReadText: (serverId, path) => invoke('remote_read_text', { serverId, path }),
-  trayUpdate: (visible, status, paused, labels) => invoke('tray_update', { visible, status, paused, labels }),
+  trayUpdate: (visible, tooltip, items) => invoke('tray_update', { visible, tooltip, items }),
   appQuit: () => invoke('app_quit'),
 
   localPreview: (path) => invoke('local_preview', { path }),
