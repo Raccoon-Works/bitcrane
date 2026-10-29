@@ -1788,4 +1788,11 @@ export const EN: Record<string, string> = {
   "Kommandozeile": "Command line",
   "Für Skripte: Übertragungen mit gespeicherten Servern, ohne Fenster.": "For scripts: transfers with saved servers, without a window.",
   "Anleitung": "Guide",
+  "Dateiübertragung": "File transfer",
+  "SFTP (Standard)": "SFTP (default)",
+  "SCP über Shell-Befehle": "SCP over shell commands",
+  "Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.": "If the server has no SFTP, Bitcrane uses SCP by itself. Only needed for routers, NAS devices and very old servers.",
+  "Der Server bietet weder SFTP noch eine Shell für Dateibefehle an.": "The server offers neither SFTP nor a shell for file commands.",
+  "Auf dem Server ist kein Platz mehr.": "The server is out of space.",
+  "Der Server antwortet nicht mehr.": "The server no longer responds.",
 };

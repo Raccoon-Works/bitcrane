@@ -34,6 +34,7 @@ fn kind_of(name: &str) -> Option<Kind> {
 }
 
 /// True for file names Bitcrane opens like a folder.
+#[allow(dead_code)]
 pub fn is_archive_name(name: &str) -> bool {
     kind_of(name).is_some()
 }

@@ -34,6 +34,8 @@ export interface ConnectParams {
   trust?: string;
   /** Send keepalive messages (setting "Verbindung offen halten"). */
   keepalive?: boolean;
+  /** Transfer over shell commands instead of SFTP (scp.rs); without SFTP this happens by itself. */
+  scp?: boolean;
   /** Connect through this server first (jump server). */
   jump?: ConnectParams;
   /** SOCKS5 or HTTP proxy for the connection. */

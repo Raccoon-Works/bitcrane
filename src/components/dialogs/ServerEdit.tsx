@@ -452,6 +452,16 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                   {draft.jumpServerId && draft.proxy && <span className="small muted">{$t('Mit Sprungserver gilt dessen Proxy-Einstellung.')}</span>}
                 </div>}
 
+                {family === 'sftp' && (
+                  <>
+                    <label htmlFor="s-scp">{$t('Dateiübertragung')}</label>
+                    <div className="col-text">
+                      <Select<'sftp' | 'scp'> id="s-scp" label={$t('Dateiübertragung')} value={draft.scp ? 'scp' : 'sftp'} onChange={(v) => set('scp', v === 'scp' || undefined)}
+                        options={[{ value: 'sftp', label: $t('SFTP (Standard)') }, { value: 'scp', label: $t('SCP über Shell-Befehle') }]} />
+                      <span className="small muted">{$t('Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.')}</span>
+                    </div>
+                  </>
+                )}
                 {family === 'smb' && (
                   <>
                     <label htmlFor="s-smbenc">{$t('Verschlüsselung')}</label>
