@@ -54,6 +54,7 @@ export type DialogState =
   | { type: 'shortcuts' }
   | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
   | { type: 'diff'; transferId: string }
+  | { type: 'compareFiles'; a: CompareRef; b: CompareRef }
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
@@ -1926,6 +1927,36 @@ export function openExternal(url: string) {
 export const folderSizeKey = (side: PaneSide, serverId: string, path: string) => `${side}|${side === 'local' ? '' : serverId}|${path}`;
 
 /** "Größe berechnen": adds up all files in a folder (with subfolders). */
+/** "Komprimieren" (this computer only): the chosen entries go into one zip next to them. */
+export function compressEntries(side: PaneSide, names: string[]) {
+  setState({ contextMenu: null });
+  if (!LIVE) { showToast($t('Komprimieren geht im echten Programm.')); return; }
+  void live.zipLocal(panePath(side), names);
+}
+
+/** "Entpacken" (this computer only): a zip is unpacked into a new folder next to it. */
+export function extractArchive(side: PaneSide, name: string) {
+  setState({ contextMenu: null });
+  if (!LIVE) { showToast($t('Entpacken geht im echten Programm.')); return; }
+  void live.unzipLocal(panePath(side), name);
+}
+
+/** One file for "Dateien vergleichen": where it is and how it is called in the window. */
+export interface CompareRef { side: PaneSide; serverId: string; path: string; label: string }
+
+/** Opens the comparison of two files; each may be on this computer or a server. */
+export function compareFiles(a: { side: PaneSide; name: string }, b: { side: PaneSide; name: string }) {
+  const t = activeTab();
+  if (!t) return;
+  const ref = (x: { side: PaneSide; name: string }): CompareRef => {
+    const [side, serverId] = paneLoc(x.side, t);
+    const where = side === 'local' ? $t('Dieser Computer') : serverById(serverId)?.name ?? '';
+    return { side, serverId, path: paths.join(panePath(x.side), x.name), label: `${paths.basename(x.name)} · ${where}` };
+  };
+  setState({ contextMenu: null });
+  openDialog({ type: 'compareFiles', a: ref(a), b: ref(b) });
+}
+
 export async function computeFolderSize(side: PaneSide, name: string) {
   const t = activeTab();
   if (!t) return;

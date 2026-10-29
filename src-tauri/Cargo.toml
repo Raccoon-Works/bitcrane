@@ -37,6 +37,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 trash = "5"
 walkdir = "2"
+zip = { version = "4", default-features = false, features = ["deflate"] }
 filetime = "0.2"
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"

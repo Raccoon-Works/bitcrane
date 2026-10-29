@@ -2,7 +2,8 @@
  * Small symbols in front of servers and of this computer (Phosphor icons,
  * duotone, after the filled symbols of Transmit).
  */
-import { Cloud, Database, DropboxLogo, GlobeHemisphereWest, GoogleDriveLogo } from '@phosphor-icons/react';
+import { Database, GlobeHemisphereWest } from '@phosphor-icons/react';
+import { BrandLogo } from './BrandLogo';
 import type { Server, ServerColor, Theme } from '../backend/types';
 
 export const serverColors: Record<ServerColor, Record<Theme, { bg: string; fg: string }>> = {
@@ -70,18 +71,11 @@ export function CloudServicesIcon({ size = 22 }: { size?: number }) {
 /** Cloud services shown as a preview in the prototype (not connectable yet). */
 export type CloudService = 'dropbox' | 'gdrive' | 'onedrive' | 's3';
 
-/**
- * Symbol of a cloud service. Draft: Dropbox and Google Drive use the
- * monochrome brand glyphs of the Phosphor icon set, OneDrive and S3 plain
- * symbols. The finished feature takes the logos from the services' official
- * brand kits and follows their usage rules.
- */
+/** Symbol of a cloud service: its own logo (Simple Icons), S3 a plain symbol. */
 export function CloudTile({ service, size = 20 }: { service: CloudService; size?: number }) {
-  const Icon = service === 'dropbox' ? DropboxLogo : service === 'gdrive' ? GoogleDriveLogo : service === 'onedrive' ? Cloud : Database;
   return (
     <span className={`server-glyph cloud-${service}`} aria-hidden="true" style={{ width: size, height: size }}>
-      {/* OneDrive's placeholder is drawn as an outline so it differs from the "Cloud-Dienste" symbol. */}
-      <Icon size={size} weight={service === 'onedrive' ? 'duotone' : 'fill'} />
+      {service === 's3' ? <Database size={size} weight="fill" /> : <BrandLogo service={service} size={size - 2} />}
     </span>
   );
 }

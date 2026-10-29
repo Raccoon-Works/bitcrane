@@ -8,7 +8,8 @@
  * - Places can be reordered by dragging; dragging one out of the bar and letting
  *   go removes it (also in the context menu, which is the way on Windows).
  */
-import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, DropboxLogo, FileText, FolderSimple, GoogleDriveLogo, House } from '@phosphor-icons/react';
+import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, House } from '@phosphor-icons/react';
+import { BrandLogo, isBrandService } from './BrandLogo';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PaneSide, Place } from '../backend/types';
 import { activeTab, movePlace, navigate, placesFor, removePlace, setState, useStore } from '../state/store';
@@ -18,8 +19,8 @@ import { $t } from '../i18n';
 function PlaceIcon({ place }: { place: Place }) {
   const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
   const props = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
-  if (place.cloud === 'dropbox') return <DropboxLogo {...props} />;
-  if (place.cloud === 'gdrive') return <GoogleDriveLogo {...props} />;
+  // Cloud folders show the service's own logo (single-colour, like the Finder sidebar).
+  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={16} />;
   if (place.cloud) return <Cloud {...props} />;
   if (place.path === '~') return <House {...props} />;
   if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...props} />;

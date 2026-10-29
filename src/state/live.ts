@@ -622,6 +622,20 @@ export async function copyLocal(fromDir: string, names: string[], toDir: string,
   if (ok) showToast(copiedText(made), 'ok');
 }
 
+/** "Komprimieren": a zip of the chosen entries next to them (this computer). */
+export async function zipLocal(dir: string, names: string[]) {
+  let made = '';
+  const ok = await run('local', '', dir, async () => { made = await backend.localZip(names.map((n) => join(dir, n))); });
+  if (ok) showToast($t('„{0}“ erstellt.', made), 'ok');
+}
+
+/** "Entpacken": the zip's content goes into a new folder next to it (this computer). */
+export async function unzipLocal(dir: string, name: string) {
+  let made = '';
+  const ok = await run('local', '', dir, async () => { made = await backend.localUnzip(join(dir, name)); });
+  if (ok) showToast($t('Entpackt nach „{0}“.', made), 'ok');
+}
+
 export function changePerms(serverId: string, path: string, perms: string, recursive: boolean) {
   return run('remote', serverId, parent(path), () => backend.remoteChmod(serverId, path, perms, recursive), $t('Rechte gesetzt: {0}{1}', perms, recursive ? $t(' (mit Unterordnern)') : ''));
 }

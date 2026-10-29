@@ -164,6 +164,10 @@ export interface Backend {
   localMove(paths: string[], destDir: string, merge?: boolean): Promise<string[]>;
   /** Copies files to exact targets, replacing existing ones (comparing two local folders). */
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
+  /** Packs files and folders into a zip next to them; returns the archive's name. */
+  localZip(paths: string[]): Promise<string>;
+  /** Unpacks a zip into a new folder next to it; returns the folder's name. */
+  localUnzip(path: string): Promise<string>;
   localWalk(path: string): Promise<WalkItem[]>;
   localPlaces(): Promise<Place[]>;
   /** Drives and volumes (C:, D:, USB sticks, network drives; volumes on the Mac). */
