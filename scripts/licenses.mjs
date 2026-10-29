@@ -32,8 +32,15 @@ const seen = new Set();
 const meta = JSON.parse(execSync('cargo metadata --format-version 1 --locked', { cwd: path.join(root, 'src-tauri'), encoding: 'utf8', maxBuffer: 256 << 20 }));
 const used = new Set(meta.resolve.nodes.map((n) => n.id));
 for (const p of meta.packages) {
-  if (p.name === 'bitcrane' || !used.has(p.id) || p.source == null) continue;
+  // Crates from crates.io, plus the patched copies in src-tauri/vendor.
+  const vendored = p.source == null && p.manifest_path.includes(`${path.sep}vendor${path.sep}`);
+  if (p.name === 'bitcrane' || !used.has(p.id) || (p.source == null && !vendored)) continue;
   out.push({ name: p.name, version: p.version, license: p.license ?? '', kind: 'rust' });
+}
+
+// Not packages, but taken over: the terminal's colour schemes (published palettes).
+for (const name of ['Dracula (colour scheme)', 'Nord (colour scheme)', 'Gruvbox (colour scheme)', 'Solarized (colour scheme)', 'One Dark (colour scheme)', 'Tomorrow Night (colour scheme)']) {
+  out.push({ name, version: '', license: 'MIT', kind: 'other' });
 }
 
 out.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));

@@ -9,6 +9,7 @@ import { setState, updateSettings, useStore } from '../state/store';
 import { ResizeHandle } from './ResizeHandle';
 import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../util/appWindow';
 import { Activity } from './Activity';
+import { TerminalPanel } from './TerminalPanel';
 import { WinSystemMenu } from './AppMenu';
 import { Inspector } from './Inspector';
 import { Pane } from './Pane';
@@ -45,6 +46,7 @@ export function MainWindow() {
   const swap = useStore((s) => s.settings.swapSides);
   const split = useStore((s) => s.settings.splitRatio ?? 0.5);
   const panesRef = useRef<HTMLDivElement>(null);
+  const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
 
   return (
     <div className="window" role="application" aria-label="Bitcrane">
@@ -61,15 +63,17 @@ export function MainWindow() {
             <Toolbar />
             <div className="content">
               <div className="content-main">
-                <div className="panes" ref={panesRef} style={{ '--split': split } as CSSProperties}>
+                {/* A terminal in a tab of its own fills the place of the two halves. */}
+                {!termFull && <div className="panes" ref={panesRef} style={{ '--split': split } as CSSProperties}>
                   {swap ? <Pane side="remote" /> : <Pane side="local" />}
                   {/* The line between the halves: drag to share the width differently (double click: half and half). */}
                   <ResizeHandle orientation="vertical" label={$t('Breite der Hälften (ziehen, Doppelklick: zurücksetzen)')} value={split} min={0.2} max={0.8} step={0.02}
                     toValue={(start, d) => start + d / Math.max(1, panesRef.current?.offsetWidth ?? 1)}
                     onChange={(v) => updateSettings({ splitRatio: v })} onReset={() => updateSettings({ splitRatio: 0.5 })} className="split-handle" />
                   {swap ? <Pane side="local" /> : <Pane side="remote" />}
-                </div>
-                <Activity />
+                </div>}
+                <TerminalPanel />
+                {!termFull && <Activity />}
               </div>
               {inspector && <Inspector />}
             </div>

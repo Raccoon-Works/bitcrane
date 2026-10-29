@@ -284,6 +284,10 @@ impl ScpConn {
         self.ok(&format!("ln -s -- {} {}", quote(target), quote(link)), &quoted(link)).await.map(|_| ())
     }
 
+    pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
+        crate::ssh::open_shell(&self.handle, cols, rows, command).await
+    }
+
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
         let o = self.run(command).await?;
         let mut text = String::from_utf8_lossy(&o.out).into_owned();

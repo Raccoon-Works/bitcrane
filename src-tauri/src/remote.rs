@@ -314,6 +314,15 @@ impl Remote {
         }
     }
 
+    /// Interactive shell for the built-in terminal (SSH only).
+    pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<russh::client::Msg>> {
+        match self {
+            Remote::Sftp(c) => c.open_shell(cols, rows, command).await,
+            Remote::Scp(c) => c.open_shell(cols, rows, command).await,
+            _ => Err(AppError::new(ErrorKind::Other, format!("Ein Terminal gibt es nur mit SSH, nicht über {}.", self.protocol()))),
+        }
+    }
+
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
         match self {
             Remote::Sftp(c) => c.symlink(link, target).await,

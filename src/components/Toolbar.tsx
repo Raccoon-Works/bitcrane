@@ -3,6 +3,7 @@
  * button in the middle, the customisable tool group and the search field.
  * On Windows the tabs live in the title bar instead (MainWindow.tsx).
  */
+import { toggleTerminal } from '../state/terminal';
 import {
   ArrowClockwise, ArrowsClockwise, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
 } from '@phosphor-icons/react';
@@ -11,7 +12,7 @@ import {
   activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
   refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
   upload, useStore, type ToolId,
-  getState, openInEditor, searchTarget, openTerminal, setDeepSearch, toggleSyncBrowse,
+  getState, openInEditor, searchTarget, setDeepSearch, toggleSyncBrowse,
 } from '../state/store';
 import { formatAgo } from '../util/format';
 import { useKeyLabel } from '../state/keys';
@@ -90,6 +91,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
   const sk = useKeyLabel();
   const key = useKey();
   const inspector = useStore((s) => s.inspectorOpen);
+  const terminalOpen = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.open);
   const activity = useStore((s) => activityExpanded(s));
   const focus = useStore((s) => s.focusSide);
   const showHidden = useStore((s) => s.settings.showHidden);
@@ -111,7 +113,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
     rename: { label: $t('Umbenennen'), key: key('↩', 'F2'), icon: ic(<PencilSimple size={19} />), run: () => startRename(focus), disabled: !sel },
     perms: { label: $t('Rechte'), icon: ic(<LockSimple size={19} />), run: () => toggleInspector(), disabled: false },
     hidden: { label: showHidden ? $t('Versteckte Dateien ausblenden') : $t('Versteckte Dateien zeigen'), key: sk('hidden'), icon: ic(<EyeSlash size={19} />), run: toggleHidden, active: !showHidden },
-    terminal: { label: $t('Terminal (SSH)'), icon: ic(<TerminalWindow size={19} />), run: () => openTerminal('remote') },
+    terminal: { label: $t('Terminal (SSH)'), key: sk('terminal'), icon: ic(<TerminalWindow size={19} />), run: toggleTerminal, active: terminalOpen },
     disconnect: { label: $t('Trennen'), icon: ic(<Plugs size={19} />), run: () => disconnect() },
     copyPath: { label: $t('Pfad kopieren'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
     editor: { label: $t('Im Editor öffnen'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },

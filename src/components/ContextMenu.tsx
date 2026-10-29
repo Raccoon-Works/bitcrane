@@ -215,7 +215,8 @@ export function ContextMenu() {
       ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
       { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
       ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),
-      ...(remoteTerminal ? [{ label: onServer ? $t('Terminal hier öffnen (SSH)') : $t('Terminal hier öffnen'), run: () => openTerminal(menu.side) }] : []),
+      ...(onServer && sftpTab ? [{ label: $t('Terminal hier öffnen'), run: () => void import('../state/terminal').then((m) => m.newTerminal()) }] : []),
+      ...(remoteTerminal ? [{ label: onServer ? $t('Im System-Terminal öffnen (SSH)') : $t('Terminal hier öffnen'), run: () => openTerminal(menu.side) }] : []),
     ]);
     const folderCommands = commands.filter((c) => !/\{(file|files|name)\}/.test(c.command));
     if (folderCommands.length) groups.push(folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })));

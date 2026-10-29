@@ -11,12 +11,13 @@ import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
 import { closeDialog, getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
-import { ListChecks } from '@phosphor-icons/react';
+import { ListChecks, TerminalWindow } from '@phosphor-icons/react';
+import { SCHEMES, terminalSettings, type Snippet, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
-import { Button, Select, Switch, TextField } from '../ui';
+import { Button, IconButton, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -35,6 +36,49 @@ function CliRow() {
         <Button small onClick={() => openExternal(CLI_GUIDE_URL)}>{$t('Anleitung')}</Button>
       </span>
     </Row>
+  );
+}
+
+/** Settings › Terminal: look of the built-in terminal and the snippets. */
+function TerminalSettingsPage() {
+  useStore((s) => s.settings.terminal);
+  const snippets = useStore((s) => s.settings.snippets ?? []);
+  const t = terminalSettings();
+  const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
+  const setSnippets = (list: Snippet[]) => updateSettings({ snippets: list });
+  const edit = (id: string, patch: Partial<Snippet>) => setSnippets(snippets.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  return (
+    <>
+      <Group title={$t('Darstellung')}>
+        <Row label={$t('Farbschema')} note={$t('„Automatisch“ folgt Bitcrane hell/dunkel. Einzelne Server können ein eigenes haben (Server bearbeiten), z. B. rot für Produktivserver.')}>
+          <Select value={t.scheme} onChange={(v) => set({ scheme: v })} label={$t('Farbschema')} options={[{ value: 'auto', label: $t('Automatisch') }, ...SCHEMES.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
+        </Row>
+        <Row label={$t('Schrift')} note={$t('Mehrere Schriften mit Komma: die erste vorhandene wird genommen.')}>
+          <TextField value={t.fontFamily} onChange={(v) => set({ fontFamily: v })} mono className="term-font-field" />
+        </Row>
+        <Row label={$t('Schriftgröße')}>
+          <Select value={String(t.fontSize)} onChange={(v) => set({ fontSize: Number(v) })} label={$t('Schriftgröße')} options={[10, 11, 12, 13, 14, 15, 16, 18, 20, 24].map((n) => ({ value: String(n), label: `${n} pt` }))} />
+        </Row>
+        <Row label={$t('Cursor')}>
+          <Select<'block' | 'bar' | 'underline'> value={t.cursor} onChange={(v) => set({ cursor: v })} label={$t('Cursor')} options={[{ value: 'block', label: $t('Block') }, { value: 'bar', label: $t('Strich') }, { value: 'underline', label: $t('Unterstrich') }]} />
+        </Row>
+        <Row label={$t('Beim Markieren kopieren')} note={$t('Markierter Text landet sofort in der Zwischenablage, wie in PuTTY.')}><Switch checked={t.copyOnSelect} onChange={(v) => set({ copyOnSelect: v })} label={$t('Beim Markieren kopieren')} /></Row>
+        <Row label={$t('Im angezeigten Ordner starten')} note={$t('Das Terminal beginnt im Ordner, den die Serverhälfte gerade zeigt.')}><Switch checked={t.startInFolder} onChange={(v) => set({ startInFolder: v })} label={$t('Im angezeigten Ordner starten')} /></Row>
+      </Group>
+      <Group title={$t('Snippets')}>
+        {snippets.length === 0 && <div className="set-row"><span className="small muted">{$t('Snippets sind gespeicherte Befehle, die du im Terminal mit einem Klick einfügst, z. B. „sudo systemctl restart nginx“.')}</span></div>}
+        {snippets.map((sn) => (
+          <div key={sn.id} className="set-row snippet-row">
+            <TextField value={sn.name} onChange={(v) => edit(sn.id, { name: v })} placeholder={$t('Name')} className="snippet-name" />
+            <TextField value={sn.command} onChange={(v) => edit(sn.id, { command: v })} placeholder={$t('Befehl')} mono className="flex-1" />
+            <span className="row-inline small" title={$t('Nach dem Einfügen gleich ausführen')}><Switch checked={sn.run} onChange={(v) => edit(sn.id, { run: v })} label={$t('Gleich ausführen')} />{$t('ausführen')}</span>
+            <IconButton label={$t('Entfernen')} onClick={() => setSnippets(snippets.filter((x) => x.id !== sn.id))}><X size={14} strokeWidth={1.75} /></IconButton>
+          </div>
+        ))}
+        <div className="set-row"><Button small onClick={() => setSnippets([...snippets, { id: `sn-${Date.now().toString(36)}`, name: '', command: '', run: false }])}><Plus size={13} strokeWidth={2} /> {$t('Snippet hinzufügen')}</Button></div>
+      </Group>
+      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), getState().platform === 'mac' ? '⌃`' : 'Strg+`')}</span>
+    </>
   );
 }
 
@@ -270,7 +314,7 @@ function RulesSettings() {
 
 /** Colour of each settings area's symbol. */
 const TAB_COLORS: Record<SettingsTab, string> = {
-  general: '#8e8e93', watch: '#2a6de0', transfers: '#e8a600', rules: '#3fbfaa', connections: '#30b158', appearance: '#af52de', keys: '#5ac8fa', advanced: '#ff7a3d',
+  general: '#8e8e93', watch: '#2a6de0', transfers: '#e8a600', rules: '#3fbfaa', connections: '#30b158', appearance: '#af52de', terminal: '#3a3a40', keys: '#5ac8fa', advanced: '#ff7a3d',
 };
 
 /** Choices for default upload permissions: octal value with its rwx text. */
@@ -292,6 +336,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
     { id: 'rules', label: $t('Regeln'), icon: <ListChecks size={20} /> },
     { id: 'connections', label: $t('Verbindungen'), icon: <Shield size={20} strokeWidth={1.5} /> },
     { id: 'appearance', label: $t('Darstellung'), icon: <SunMoon size={20} strokeWidth={1.5} /> },
+    { id: 'terminal', label: $t('Terminal'), icon: <TerminalWindow size={20} /> },
     { id: 'keys', label: $t('Tastenkürzel'), icon: <Keyboard size={20} strokeWidth={1.5} /> },
     { id: 'advanced', label: $t('Erweitert'), icon: <SlidersHorizontal size={20} strokeWidth={1.5} /> },
   ];
@@ -488,6 +533,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
             </Group>
           </>
         )}
+        {current === 'terminal' && <TerminalSettingsPage />}
         {current === 'appearance' && (
           <Group title={$t('Darstellung')}>
             <Row label={$t('Erscheinungsbild')}><Select value={s.themeSetting} onChange={(v) => setThemeSetting(v)} label={$t('Erscheinungsbild')} options={[{ value: 'system', label: $t('Wie das System') }, { value: 'dark', label: $t('Dunkel') }, { value: 'light', label: $t('Hell') }]} /></Row>

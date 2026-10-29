@@ -459,7 +459,7 @@ export function UpdateDialog() {
 
 /* ------------------------------------------------------------- Licenses */
 
-type LicenseEntry = { name: string; version: string; license: string; kind: 'npm' | 'rust' };
+type LicenseEntry = { name: string; version: string; license: string; kind: 'npm' | 'rust' | 'other' };
 
 /** Lists the third-party packages shipped with Bitcrane and their licenses. */
 export function Licenses() {

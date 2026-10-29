@@ -2179,3 +2179,91 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .server-picture:hover { box-shadow: 0 0 0 2px var(--accent-tint); }
 .server-picture:focus-within { box-shadow: 0 0 0 2px var(--focus); }
 .segmented button { white-space: nowrap; }
+
+/* ------------------------------------------------------------- Terminal (built-in SSH) */
+
+.term-panel {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+.term-panel.is-full { flex: 1; }
+.term-handle { position: absolute; left: 0; right: 0; top: -6px; z-index: 2; }
+
+.term-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 34px;
+  padding: 0 var(--space-2);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  flex-shrink: 0;
+}
+.term-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; }
+.term-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 180px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  cursor: default;
+}
+.term-tab:hover { background: var(--bg-hover); }
+.term-tab.is-active { background: var(--bg-sidebar-sel); color: var(--text); }
+.term-tab.is-ended { text-decoration: line-through; opacity: 0.6; }
+.term-tab-close {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+}
+.term-tab:hover .term-tab-close, .term-tab.is-active .term-tab-close { opacity: 0.8; }
+.term-tab-close:hover { background: var(--bg-hover); opacity: 1; }
+.term-find {
+  width: 180px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-control);
+  background: var(--bg-field);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.term-view { flex: 1; min-height: 0; padding: 6px 4px 4px 10px; overflow: hidden; background: var(--term-bg, var(--bg-terminal)); border-radius: 0 0 var(--radius-card) var(--radius-card); }
+.term-host, .term-host .xterm { height: 100%; }
+.term-host .xterm-viewport { scrollbar-width: thin; }
+
+.term-snippets-anchor { position: relative; }
+.term-snippets {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 240px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow: auto;
+  z-index: 30;
+}
+.term-snippets-empty { display: block; padding: 6px 10px; max-width: 280px; }
+
+.snippet-row { gap: var(--space-2); }
+.snippet-name { width: 160px; flex-shrink: 0; }
+.term-font-field { width: 280px; }

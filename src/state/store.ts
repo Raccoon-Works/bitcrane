@@ -9,6 +9,7 @@
  * drops and folder watch events. In the app (`LIVE`), actions delegate to
  * `live.ts`, which calls the Rust core and receives progress through events.
  */
+import type { Snippet, TermSession, TerminalSettings } from './terminal';
 import { useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri, type CloudPlace, type ImportedServer, type Place } from '../backend/api';
@@ -70,7 +71,7 @@ export type DialogState =
   | { type: 'cloudPlaces'; found: CloudPlace[] }
   | { type: 'authPrompt'; id: string; serverId: string; host: string; name: string; instructions: string; prompts: Array<{ text: string; echo: boolean }> };
 
-export type SettingsTab = 'general' | 'watch' | 'transfers' | 'rules' | 'connections' | 'appearance' | 'keys' | 'advanced';
+export type SettingsTab = 'general' | 'watch' | 'transfers' | 'rules' | 'connections' | 'appearance' | 'terminal' | 'keys' | 'advanced';
 
 export interface PaneSelection {
   names: string[];
@@ -100,6 +101,12 @@ export interface ContextMenuState {
 }
 
 export interface Settings {
+  /** Built-in terminal: look and behaviour (state/terminal.ts). */
+  terminal?: Partial<TerminalSettings>;
+  /** Saved commands for the terminal. */
+  snippets?: Snippet[];
+  /** Height of the terminal panel in pixels. */
+  terminalHeight?: number;
   runInBackground: boolean;
   showMenuBarIcon: boolean;
   startAtLogin: boolean;
@@ -339,6 +346,8 @@ export type ToolId =
 
 export interface AppState {
   platform: Platform;
+  /** Built-in terminal sessions (state/terminal.ts). */
+  terminals: TermSession[];
   /** Windows: Explorer folder of each server shown there (mount.ts), by server id. */
   explorerFolders: Record<string, string>;
   theme: Theme;
@@ -507,9 +516,9 @@ export const allTools: Array<{ id: ToolId; label: string }> = [
  * else is in the menus, the context menu and the command palette, and can be
  * added via "Werkzeugleiste anpassen".
  */
-export const defaultToolbar: ToolId[] = ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity'];
-/** The standard toolbar up to 0.2.38 (kept by users who never changed it are moved to the new one). */
-export const oldDefaultToolbar: ToolId[] = ['nav', 'newFolder', 'refresh', 'info', 'activity'];
+export const defaultToolbar: ToolId[] = ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'terminal', 'info', 'activity'];
+/** Earlier standard toolbars (up to 0.2.38, up to 0.2.43): users who never changed theirs get the new one. */
+export const oldDefaultToolbars: ToolId[][] = [['nav', 'newFolder', 'refresh', 'info', 'activity'], ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity']];
 
 function detectPlatform(): Platform {
   const p = (navigator.platform || '') + ' ' + navigator.userAgent;
@@ -542,6 +551,7 @@ function initialState(): AppState {
   const servers = LIVE ? [] : sampleServers();
   return {
     platform: detectPlatform(),
+    terminals: [],
     explorerFolders: {},
     theme: detectTheme(),
     palette: 'auto',
