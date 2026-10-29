@@ -211,7 +211,7 @@ jobs:
 
           ## Windows note
 
-          Bitcrane is not code-signed yet. If SmartScreen shows "Windows protected your PC", choose "More info", then "Run anyway".
+          Bitcrane is not code-signed yet. On the first start, Microsoft Defender SmartScreen shows "Windows protected your PC" (German: „Der Computer wurde durch Windows geschützt“). Click "More info" („Weitere Informationen“), then "Run anyway" („Trotzdem ausführen“). Updates installed from within Bitcrane do not show this again.
           `.replace(/^          /gm, '');
           fs.writeFileSync('notes.md', body);
           JS

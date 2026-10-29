@@ -1615,4 +1615,6 @@ export const EN: Record<string, string> = {
   "Bei Dropbox anmelden …": "Sign in to Dropbox …",
   "Doppelklick: anmelden": "double-click to sign in",
   "Weitere hinzufügen": "Add more",
+  "1 Server aus anderen Programmen übernehmen": "Import 1 server from other apps",
+  "{0} Server aus anderen Programmen übernehmen": "Import {0} servers from other apps",
 };

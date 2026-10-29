@@ -1487,16 +1487,31 @@ export async function importSealed(sealed: Sealed, password: string): Promise<bo
   return true;
 }
 
+/** Same connection = same protocol, user, address and port (used to avoid duplicates on import). */
+function connectionKey(x: { host: string; port: number; user: string; protocol?: string }) {
+  return `${x.protocol ?? 'sftp'}|${x.user.toLowerCase()}@${x.host.toLowerCase()}:${x.port}`;
+}
+
 async function applyImport(data: ExportFile) {
   const merge = <T extends { id: string }>(cur: T[], add: T[]) => [...cur.filter((x) => !add.some((a) => a.id === x.id)), ...add];
+  // A server that already exists here under another id (same connection) is not added twice;
+  // watches of the imported copy are pointed at the existing server instead.
+  const existing = new Map(state.servers.filter((x) => !x.temporary).map((x) => [connectionKey(x), x.id]));
+  const remap = new Map<string, string>();
+  const servers = (data.servers ?? []).filter((x) => {
+    const have = existing.get(connectionKey(x));
+    if (have && have !== x.id) { remap.set(x.id, have); return false; }
+    return true;
+  });
+  const watches = (data.watches ?? []).map((w) => (remap.has(w.serverId) ? { ...w, serverId: remap.get(w.serverId)! } : w));
   setState((s) => ({
-    servers: merge(s.servers, (data.servers ?? []).map((x) => ({ ...x, online: false }))),
-    watches: merge(s.watches, data.watches ?? []),
+    servers: merge(s.servers, servers.map((x) => ({ ...x, online: false }))),
+    watches: merge(s.watches, watches),
     settings: data.settings ? { ...s.settings, ...data.settings } : s.settings,
     firstRun: false,
   }));
   const restored = data.secrets ? await live.restoreSecrets(data.secrets) : 0;
-  showToast($t('Importiert: {0} Server, {1} Überwachungen{2}.', data.servers?.length ?? 0, data.watches?.length ?? 0, restored ? $t(', {0} Passwörter im {1}', restored, state.platform === 'mac' ? $t('Schlüsselbund') : $t('Anmeldespeicher')) : ''), 'ok');
+  showToast($t('Importiert: {0} Server, {1} Überwachungen{2}.', servers.length, data.watches?.length ?? 0, restored ? $t(', {0} Passwörter im {1}', restored, state.platform === 'mac' ? $t('Schlüsselbund') : $t('Anmeldespeicher')) : ''), 'ok');
   if (!state.tabs.length && state.servers[0]) openServer(state.servers[0].id);
 }
 
