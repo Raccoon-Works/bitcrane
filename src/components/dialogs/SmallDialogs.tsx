@@ -138,20 +138,20 @@ export function SecretPrompt({ serverId, kind, wrong }: { serverId: string; kind
   return (
     <Dialog
       label={kind === 'passphrase' ? $t('Passphrase') : $t('Passwort')}
-      title={kind === 'passphrase' ? $t('Passphrase für den SSH-Schlüssel') : $t('Passwort für {0}@{1}', srv.user, srv.host)}
+      title={kind === 'passphrase' ? $t('Passphrase für den SSH-Schlüssel') : srv.protocol === 'vault' ? $t('Tresor „{0}“ entsperren', srv.name) : $t('Passwort für {0}@{1}', srv.user, srv.host)}
       subtitle={kind === 'passphrase'
         ? $t('Der Schlüssel {0} ist mit einer Passphrase geschützt.', srv.keyPath)
-        : $t('{0} meldet sich mit Passwort an.', srv.name)}
+        : srv.protocol === 'vault' ? $t('Cryptomator-Tresor in {0}', srv.host) : $t('{0} meldet sich mit Passwort an.', srv.name)}
       icon={<span className="icon-tile tone-accent"><KeyRound size={18} strokeWidth={1.75} /></span>}
       width={520}
       onClose={closeDialog}
-      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={submit} disabled={!value}>{$t('Verbinden')}</Button></>}
+      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={submit} disabled={!value}>{srv.protocol === 'vault' ? $t('Entsperren') : $t('Verbinden')}</Button></>}
     >
       <div className="form-stack">
         {wrong && (
           <div className="notice tone-warn-notice">
             <AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
-            <span>{kind === 'passphrase' ? $t('Die Passphrase stimmt nicht.') : $t('Der Server hat das Passwort abgelehnt.')} {$t('Bitte noch einmal eingeben.')}</span>
+            <span>{kind === 'passphrase' ? $t('Die Passphrase stimmt nicht.') : srv.protocol === 'vault' ? $t('Das Tresor-Passwort stimmt nicht.') : $t('Der Server hat das Passwort abgelehnt.')} {$t('Bitte noch einmal eingeben.')}</span>
           </div>
         )}
         <TextField type="password" value={value} onChange={setValue} autoFocus onEnter={submit} label={kind === 'passphrase' ? $t('Passphrase') : $t('Passwort')} />

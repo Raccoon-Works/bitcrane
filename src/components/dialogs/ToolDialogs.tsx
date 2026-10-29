@@ -9,7 +9,8 @@ import { cancelCloudSignIn, CLOUD_NAMES, signInToCloud } from '../../state/cloud
 import { closeDialog, finishCopyOrMove, serverById, useStore, type AfterQueue } from '../../state/store';
 import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue, uploadToServer } from '../../state/tools';
 import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
-import { Clock, Cloud, FolderPlus, Upload } from '../glyphs';
+import { AlertTriangle, Clock, Cloud, FolderPlus, Lock, Upload } from '../glyphs';
+import { createVault } from '../../state/vault';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -170,6 +171,44 @@ export function UploadToDialog({ paths }: { paths: string[] }) {
           <TextField label={$t('Ordner auf dem Server')} value={dir} onChange={setDir} mono onEnter={go} />
         </div>
       ) : <p className="small muted">{$t('Noch kein Server gespeichert. Lege zuerst einen Server an.')}</p>}
+    </Dialog>
+  );
+}
+
+/** "Neuer Cryptomator-Tresor": name and password (twice) for a new vault in the current folder. */
+export function VaultCreateDialog({ side }: { side: PaneSide }) {
+  const [name, setName] = useState($t('Tresor'));
+  const [password, setPassword] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [busy, setBusy] = useState(false);
+  const tooShort = password.length > 0 && password.length < 8;
+  const mismatch = repeat.length > 0 && repeat !== password;
+  const ok = !!name.trim() && password.length >= 8 && repeat === password && !busy;
+  const go = async () => {
+    if (!ok) return;
+    setBusy(true);
+    if (!(await createVault(side, name, password))) setBusy(false);
+  };
+  return (
+    <Dialog
+      label={$t('Neuer Tresor')}
+      title={$t('Neuer Cryptomator-Tresor')}
+      subtitle={$t('Ein verschlüsselter Ordner, den auch Cryptomator auf anderen Geräten öffnet.')}
+      icon={<span className="icon-tile tone-accent"><Lock size={18} /></span>}
+      width={520}
+      onClose={closeDialog}
+      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!ok} onClick={() => void go()}>{busy ? $t('Wird angelegt …') : $t('Anlegen')}</Button></>}
+    >
+      <div className="form-stack">
+        <TextField label={$t('Name')} value={name} onChange={setName} autoFocus />
+        <TextField type="password" label={$t('Passwort')} value={password} onChange={setPassword} placeholder={$t('Passwort (mindestens 8 Zeichen)')} invalid={tooShort} />
+        <TextField type="password" label={$t('Passwort wiederholen')} value={repeat} onChange={setRepeat} placeholder={$t('Passwort wiederholen')} invalid={mismatch} onEnter={() => void go()} />
+        {mismatch && <span className="small tone-warn">{$t('Die beiden Passwörter sind nicht gleich.')}</span>}
+        <div className="notice tone-warn-notice">
+          <AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
+          <span>{$t('Das Passwort lässt sich nicht zurücksetzen. Ohne Passwort sind die Dateien im Tresor verloren.')}</span>
+        </div>
+      </div>
     </Dialog>
   );
 }

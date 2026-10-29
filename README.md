@@ -16,6 +16,7 @@
 - Folder watching: changed files are uploaded automatically, with excludes, a post-upload command and a warning when the server copy is newer
 - Upload from the Explorer or Finder context menu ("Upload with Bitcrane")
 - Windows: servers as folders in the Explorer, like OneDrive (files download when opened)
+- Cryptomator vaults (format 8) on this computer or any server: unlock, browse, transfer, create new ones
 - Command line for scripts: `bitcrane upload`, `download`, `ls` with saved servers (see [docs/cli.md](docs/cli.md))
 - Transfer queue that survives a restart and resumes partial files
 - Host keys and self-signed certificates are confirmed once and remembered

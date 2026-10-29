@@ -213,6 +213,10 @@ export interface Backend {
   connectFtp(serverId: string, params: FtpConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectDav(serverId: string, params: DavConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectSmb(serverId: string, params: SmbConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** Unlocks a Cryptomator vault in `location` (on the server `storageId`, or this computer) under `serverId`. */
+  vaultOpen(serverId: string, location: string, storageId: string | undefined, password: string): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** Creates an empty Cryptomator vault in the new folder `location`. */
+  vaultCreate(location: string, storageId: string | undefined, password: string): Promise<void>;
   /** Dropbox with the refresh token from the sign-in (kept in the keychain). */
   connectDropbox(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Which cloud services this build has app keys for. */

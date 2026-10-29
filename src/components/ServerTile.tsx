@@ -2,7 +2,7 @@
  * Small symbols in front of servers and of this computer (Phosphor icons,
  * duotone, after the filled symbols of Transmit).
  */
-import { Database, GlobeHemisphereWest } from '@phosphor-icons/react';
+import { Database, GlobeHemisphereWest, LockSimple } from '@phosphor-icons/react';
 import { BrandLogo } from './BrandLogo';
 import type { Server, ServerColor, Theme } from '../backend/types';
 
@@ -45,7 +45,8 @@ export function ServerTile({ server, size = 20, color, protocol, image }: { serv
   }
   // One globe for every protocol (Transmit): the drive stack for FTP looked restless in the list.
   // The protocol stays visible in the tooltip and the server dialog.
-  const Icon = GlobeHemisphereWest;
+  // An unlocked Cryptomator vault is no server: it shows a lock.
+  const Icon = proto === 'vault' ? LockSimple : GlobeHemisphereWest;
   const c = color ?? server?.color;
   const dot = Math.max(7, Math.round(size * 0.36));
   return (
