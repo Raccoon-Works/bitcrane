@@ -190,6 +190,12 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
         std::fs::rename(dir.path().join("bot.py"), dir.path().join("main.py")).unwrap();
         let batch = rx.recv_timeout(Duration::from_secs(5)).expect("no batch");
+        if batch.renamed.is_empty() && cfg!(target_os = "macos") {
+            // FSEvents may report a rename as "gone" plus "new"; the upload is still right.
+            assert!(batch.changed.iter().any(|p| p.ends_with("/main.py")), "{batch:?}");
+            w.stop("r");
+            return;
+        }
         assert_eq!(batch.renamed.len(), 1, "{batch:?}");
         assert!(batch.renamed[0].0.ends_with("/bot.py") && batch.renamed[0].1.ends_with("/main.py"));
         assert!(batch.removed.is_empty() && batch.changed.is_empty(), "{batch:?}");

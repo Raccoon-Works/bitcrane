@@ -6,6 +6,7 @@
 //! - `transfer-progress` `{ id, done, total }`
 //! - `watch-batch` `{ watchId, changed, removed }`
 
+pub mod cli;
 mod config;
 mod error;
 mod dav;
@@ -343,6 +344,12 @@ fn mount_folder(state: State<'_, AppState>, server_id: String) -> Option<String>
         let _ = (state, server_id);
         None
     }
+}
+
+/// The program file, for calls from the command line (cli.rs).
+#[tauri::command]
+fn cli_path() -> String {
+    std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1491,6 +1498,7 @@ pub fn run() {
             local_zip,
             archive_extract_temp,
             take_pending_uploads,
+            cli_path,
             mount_start,
             mount_stop,
             mount_folder,
