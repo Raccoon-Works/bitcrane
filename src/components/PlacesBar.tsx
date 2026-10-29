@@ -8,7 +8,7 @@
  * - Places can be reordered by dragging; dragging one out of the bar and letting
  *   go removes it (also in the context menu, which is the way on Windows).
  */
-import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, House } from '@phosphor-icons/react';
+import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, DropboxLogo, FileText, FolderSimple, GoogleDriveLogo, House } from '@phosphor-icons/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PaneSide, Place } from '../backend/types';
 import { activeTab, movePlace, navigate, placesFor, removePlace, setState, useStore } from '../state/store';
@@ -18,12 +18,31 @@ import { $t } from '../i18n';
 function PlaceIcon({ place }: { place: Place }) {
   const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
   const props = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
+  if (place.cloud === 'dropbox') return <DropboxLogo {...props} />;
+  if (place.cloud === 'gdrive') return <GoogleDriveLogo {...props} />;
   if (place.cloud) return <Cloud {...props} />;
   if (place.path === '~') return <House {...props} />;
   if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...props} />;
   if (last === 'downloads') return <DownloadSimple {...props} />;
   if (last === 'documents' || last === 'dokumente') return <FileText {...props} />;
   return <FolderSimple {...props} />;
+}
+
+/**
+ * Name shown for a place. Cloud folders found by older versions were named
+ * with their account ("Google Drive (name@example.com)"), which filled the bar;
+ * the account is shown in the tooltip instead.
+ */
+export function placeLabel(place: Place): string {
+  if (!place.cloud) return place.name;
+  return place.name.replace(/\s*\([^)]*@[^)]*\)\s*$/, '');
+}
+
+/** Tooltip of a place: the folder, and for cloud folders the account it belongs to. */
+function placeTitle(place: Place): string {
+  const folder = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+  const account = place.cloud && folder.includes('-') ? folder.slice(folder.indexOf('-') + 1) : '';
+  return [placeLabel(place) + (account ? ` – ${account}` : ''), place.path, $t('Klicken zum Öffnen, ziehen zum Verschieben')].join('\n');
 }
 
 export function PlacesBar({ side }: { side: PaneSide }) {
@@ -108,7 +127,7 @@ export function PlacesBar({ side }: { side: PaneSide }) {
     <div ref={barRef} className={`places-bar${hint?.addPlace ? ' is-drop' : ''}`} data-places-bar role="toolbar" aria-label={$t('Orte')}>
       {places.map((p, i) => {
         const on = p.path === path;
-        if (i >= fit) return <button key={p.path} type="button" data-place-path={p.path} className="place is-overflow" tabIndex={-1} aria-hidden="true"><PlaceIcon place={p} /><span>{p.name}</span></button>;
+        if (i >= fit) return <button key={p.path} type="button" data-place-path={p.path} className="place is-overflow" tabIndex={-1} aria-hidden="true"><PlaceIcon place={p} /><span>{placeLabel(p)}</span></button>;
         const isDrop = hint?.place === p.path;
         const isDragged = drag?.path === p.path;
         return (
@@ -117,14 +136,14 @@ export function PlacesBar({ side }: { side: PaneSide }) {
             type="button"
             data-place-path={p.path}
             className={`place${on ? ' is-on' : ''}${isDrop ? ' is-drop' : ''}${isDragged ? (drag.out ? ' is-leaving' : ' is-dragged') : ''}${drag && !isDragged && drag.before === p.path ? ' drop-before' : ''}`}
-            title={`${p.path}\n${$t('Klicken zum Öffnen, ziehen zum Verschieben')}`}
+            title={placeTitle(p)}
             aria-current={on ? 'location' : undefined}
             onPointerDown={(e) => begin(e, p)}
             onClick={() => { if (moved.current) { moved.current = false; return; } navigate(side, p.path); }}
             onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'place', place: p.path } }); }}
           >
             <PlaceIcon place={p} />
-            <span className="ellipsis">{p.name}</span>
+            <span className="ellipsis">{placeLabel(p)}</span>
           </button>
         );
       })}

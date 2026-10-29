@@ -2,6 +2,7 @@
  * Right-click menu for files. Shows only what fits the clicked entries
  * (design rule: no greyed-out items from later stages).
  */
+import { placeLabel } from './PlacesBar';
 import { Check } from './glyphs';
 import { useEffect, useRef } from 'react';
 import { keyLabel } from '../state/keys';
@@ -87,7 +88,7 @@ export function ContextMenu() {
   } else if (menu.kind === 'placesMore') {
     // Places that do not fit into the places bar ("»" at its end); place = number shown.
     const shown = Number(menu.place ?? 0);
-    groups.push(placesFor(menu.side).slice(shown).map((p) => ({ label: p.name, run: () => navigate(menu.side, p.path) })));
+    groups.push(placesFor(menu.side).slice(shown).map((p) => ({ label: placeLabel(p), run: () => navigate(menu.side, p.path) })));
   } else if (menu.kind === 'place' && menu.place) {
     const path = menu.place;
     groups.push([

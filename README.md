@@ -24,12 +24,14 @@ Get the newest version from the [releases page](https://github.com/Raccoon-Works
 `Bitcrane_<version>_x64-setup.exe` for Windows, `Bitcrane_<version>_universal.dmg` for macOS (Apple Silicon and Intel).
 Installed copies update themselves.
 
-Bitcrane is not code-signed yet:
+Bitcrane is not code-signed yet, so the first start needs one extra step. Updates installed from within Bitcrane do not.
 
 - **macOS:** after moving Bitcrane to Applications, run once in Terminal
   `xattr -dr com.apple.quarantine /Applications/Bitcrane.app`
   (otherwise macOS reports the app as damaged).
-- **Windows:** if SmartScreen shows "Windows protected your PC", choose "More info", then "Run anyway".
+- **Windows:** Microsoft Defender SmartScreen shows "Windows protected your PC"
+  (German: „Der Computer wurde durch Windows geschützt“). Click "More info" („Weitere Informationen“),
+  then "Run anyway" („Trotzdem ausführen“).
 
 ## Development
 
@@ -81,18 +83,7 @@ variables are set: `BITCRANE_TEST_SSH`, `BITCRANE_TEST_FTP` (`host:plain,explici
 Bitcrane is free software under the GNU General Public License, version 3 or (at your option) any later version.
 See [LICENSE](LICENSE). Third-party components and their licenses are listed in `src/licenses.json`.
 
-## Code signing policy
-
-Windows releases are signed through SignPath: free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
-Until the first signed release, installers are unsigned (see Download above).
-
-- Only builds made by the public GitHub Actions workflow (`.github/workflows/build.yml`) from this repository are signed.
-- Every signing request is approved by hand.
-- Committers and reviewers: members of the [Raccoon-Works](https://github.com/Raccoon-Works) organization.
-- Approvers: owners of the Raccoon-Works organization.
-- All team members use multi-factor authentication for GitHub and SignPath.
-
-### Privacy
+## Privacy
 
 Bitcrane connects only to the servers and services you set up yourself, and, for updates, to GitHub
 (`github.com/Raccoon-Works/bitcrane/releases`; this can be turned off in Settings › General › Updates).

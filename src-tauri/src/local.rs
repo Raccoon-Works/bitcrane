@@ -445,7 +445,10 @@ fn cloud_kind(folder: &str) -> Option<(&'static str, &'static str)> {
 pub fn cloud_places() -> Vec<CloudPlace> {
     let mut found: Vec<(String, std::path::PathBuf)> = vec![];
     let mut add = |service: &str, p: std::path::PathBuf| {
-        if p.is_dir() && !found.iter().any(|(_, q)| q == &p) {
+        // The same folder can be reachable twice (e.g. "~/Google Drive" is a link to
+        // "~/Library/CloudStorage/GoogleDrive-…"); compare the resolved paths.
+        let real = fs::canonicalize(&p).unwrap_or_else(|_| p.clone());
+        if p.is_dir() && !found.iter().any(|(_, q)| fs::canonicalize(q).unwrap_or_else(|_| q.clone()) == real) {
             found.push((service.to_string(), p));
         }
     };
@@ -521,14 +524,14 @@ pub fn cloud_places() -> Vec<CloudPlace> {
             CloudPlace { name, path: to_ui(&p), service }
         })
         .collect();
-    // Two accounts of one service: tell them apart by the account part of the folder name.
-    let names: Vec<String> = out.iter().map(|c| c.name.clone()).collect();
+    // Two accounts of one service: numbered ("Google Drive 2"), not named after the
+    // account, so the places bar stays short. The account is shown in the tooltip.
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for c in out.iter_mut() {
-        if names.iter().filter(|n| **n == c.name).count() > 1 {
-            let folder = c.path.rsplit('/').next().unwrap_or("").to_string();
-            if let Some((_, account)) = folder.split_once('-') {
-                c.name = format!("{} ({})", c.name, account);
-            }
+        let n = seen.entry(c.name.clone()).or_insert(0);
+        *n += 1;
+        if *n > 1 {
+            c.name = format!("{} {}", c.name, n);
         }
     }
     out

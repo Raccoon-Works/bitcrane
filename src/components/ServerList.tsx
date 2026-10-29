@@ -4,14 +4,14 @@
  * second tab "Schnell verbinden" with a small form. A double click (or Enter)
  * connects the server right in this half.
  */
-import { ArrowLeft, Info, Plus, SquareTerminal, X, Zap } from './glyphs';
+import { ArrowLeft, Plus, SquareTerminal, X, Zap } from './glyphs';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowsClockwise, ClockCounterClockwise, FolderSimple, GlobeHemisphereWest, FolderSimplePlus, DownloadSimple, Globe, Lightning, Plus as PlusP, Stack } from '@phosphor-icons/react';
 import { isCloudProtocol, type PaneSide, type Protocol, type Server } from '../backend/types';
 import { showCloudNotSetUp } from '../state/cloud';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import {
-  activeTab, addServerGroup, getState, importConfig, importSshConfig, LIVE, moveServer, renameServerGroup, serverGroupNames, openDialog, openServerIn, openSyncFavorite, quickConnect, setLeftServer,
+  activeTab, addServerGroup, getState, importSshConfig, LIVE, moveServer, renameServerGroup, serverGroupNames, openDialog, openServerIn, openSyncFavorite, quickConnect, setLeftServer,
   setPaneServerList, setRightLocal, setState, updateSettings, useStore,
 } from '../state/store';
 import { formatAgo } from '../util/format';
@@ -338,15 +338,10 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
       <div className="server-welcome-actions">
         <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}><Plus size={14} strokeWidth={2} aria-hidden="true" />{$t('Server hinzufügen')}</Button>
         <Button onClick={onQuick}><Zap size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Schnell verbinden')}</Button>
-        <Button onClick={importSshConfig}><SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Aus anderen Programmen')}</Button>
+        <Button onClick={importSshConfig}><SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />
+          {found === 1 ? $t('1 Server aus anderen Programmen übernehmen') : found > 1 ? $t('{0} Server aus anderen Programmen übernehmen', found) : $t('Aus anderen Programmen')}
+        </Button>
       </div>
-      {found > 0 && (
-        <p className="notice small">
-          <Info size={14} strokeWidth={1.75} className="tone-accent" aria-hidden="true" />
-          {found === 1 ? $t('Auf diesem Rechner ist 1 Server in anderen Programmen gespeichert. Bitcrane kann ihn übernehmen.') : $t('Auf diesem Rechner sind {0} Server in anderen Programmen gespeichert. Bitcrane kann sie übernehmen.', found)}
-        </p>
-      )}
-      {LIVE && <button type="button" className="link small" onClick={() => void importConfig()}>{$t('Exportdatei von einem anderen Rechner importieren …')}</button>}
     </div>
   );
 }
