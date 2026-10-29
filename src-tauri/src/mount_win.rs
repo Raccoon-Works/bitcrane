@@ -93,6 +93,10 @@ impl Mounts {
         let root = folder_for(&name);
         std::fs::create_dir_all(&root).map_err(|e| fail("Der Ordner für den Server konnte nicht angelegt werden.", e))?;
         let id = sync_root_id(&server_id)?;
+        // A renamed server gets a new folder: the old registration goes first.
+        if id.is_registered().unwrap_or(false) && id.info().map(|i| i.path() != root).unwrap_or(true) {
+            let _ = id.unregister();
+        }
         if !id.is_registered().unwrap_or(false) {
             let exe = std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
             let info = SyncRootInfo::default()

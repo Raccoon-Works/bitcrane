@@ -14,6 +14,7 @@ import {
 import { $t } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
 import { addressOf } from './ServerList';
+import { openExplorerFolder, setExplorerFolder } from '../state/mount';
 import { runCustomCommand } from '../state/tools';
 
 interface Item { label: string; key?: string; run: () => void; danger?: boolean; checked?: boolean }
@@ -75,6 +76,15 @@ export function ContextMenu() {
       { label: $t('Duplizieren'), run: () => duplicateServer(id) },
       { label: $t('Adresse kopieren'), run: () => { if (srv) void navigator.clipboard?.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`); } },
     ]);
+    // Windows: the server as a folder in the Explorer (like OneDrive).
+    if (srv && !srv.temporary && getState().platform === 'win' && !isCloudProtocol(srv.protocol)) {
+      groups.push(srv.mountExplorer
+        ? [
+            ...(getState().explorerFolders[id] ? [{ label: $t('Ordner im Explorer öffnen'), run: () => openExplorerFolder(id) }] : []),
+            { label: $t('Nicht mehr im Explorer zeigen'), run: () => setExplorerFolder(id, false) },
+          ]
+        : [{ label: $t('Im Explorer als Ordner zeigen'), run: () => setExplorerFolder(id, true) }]);
+    }
     if (srv && !srv.temporary) groups.push([{ label: $t('Entfernen …'), danger: true, run: () => askRemoveServer(id) }]);
   } else if (menu.kind === 'serverGroup' && menu.group) {
     const g = menu.group;

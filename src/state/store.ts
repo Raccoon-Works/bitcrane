@@ -338,6 +338,8 @@ export type ToolId =
 
 export interface AppState {
   platform: Platform;
+  /** Windows: Explorer folder of each server shown there (mount.ts), by server id. */
+  explorerFolders: Record<string, string>;
   theme: Theme;
   /** Dark colour palette (draft): 'auto' = Explorer on Windows, Transmit on the Mac. */
   palette: 'auto' | 'explorer' | 'transmit' | 'old';
@@ -539,6 +541,7 @@ function initialState(): AppState {
   const servers = LIVE ? [] : sampleServers();
   return {
     platform: detectPlatform(),
+    explorerFolders: {},
     theme: detectTheme(),
     palette: 'auto',
     firstRun: false,

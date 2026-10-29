@@ -242,6 +242,21 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
   return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, jump, proxy });
 }
 
+/**
+ * Opens a second, silent connection to a saved server under its own id (used
+ * by the Explorer folder, mount.ts). Only works with stored login data and an
+ * already trusted host key; resolves to the start folder.
+ */
+export async function connectAs(connectionId: string, srv: Server): Promise<string> {
+  const { auth, password } = await buildAuth(srv);
+  if (srv.auth === 'password' && srv.user && password === undefined) {
+    throw { kind: 'passwordRequired', message: $t('Für {0} ist kein Passwort gespeichert. Einmal normal verbinden und das Passwort sichern.', srv.name) };
+  }
+  const jump = isSftp(srv) ? await jumpParams(srv) : undefined;
+  const { home } = await openConnection(connectionId, srv, auth, password, undefined, jump, await proxyParams(srv));
+  return home;
+}
+
 /** Proxy of a server with the password from the keychain. */
 async function proxyParams(srv: Server): Promise<ConnectParams['proxy']> {
   const p = srv.proxy;
