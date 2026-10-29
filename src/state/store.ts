@@ -32,7 +32,7 @@ export const LIVE = isTauri;
 
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
-  | { type: 'serverEdit'; serverId?: string }
+  | { type: 'serverEdit'; serverId?: string; cloud?: Protocol }
   | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
@@ -154,6 +154,8 @@ export interface Settings {
   /** Look for a new Bitcrane version at start and every few hours. */
   /** Updates (after Transmit): install automatically when quitting, only tell, or never look. */
   updateMode: 'auto' | 'notify' | 'off';
+  /** Client id of the user's own Google app (Google Drive); its secret is in the keychain. */
+  googleClientId?: string;
   /** Version that ran last time; a different one at start means an update was installed. */
   lastVersion?: string;
   /** Names / patterns never transferred by hand (".DS_Store", "*.tmp"). */
@@ -1927,6 +1929,16 @@ export function openExternal(url: string) {
 export const folderSizeKey = (side: PaneSide, serverId: string, path: string) => `${side}|${side === 'local' ? '' : serverId}|${path}`;
 
 /** "Größe berechnen": adds up all files in a folder (with subfolders). */
+/** "Link kopieren": sharing link of a file or folder on a cloud service. */
+export function copyShareLink(side: PaneSide, name: string) {
+  const t = activeTab();
+  if (!t) return;
+  setState({ contextMenu: null });
+  const [, serverId] = paneLoc(side, t);
+  if (!LIVE) { void navigator.clipboard?.writeText('https://www.dropbox.com/scl/fi/beispiel'); showToast($t('Link kopiert.'), 'ok'); return; }
+  void live.copyShareLink(serverId, paths.join(panePath(side), name));
+}
+
 /** "Komprimieren" (this computer only): the chosen entries go into one zip next to them. */
 export function compressEntries(side: PaneSide, names: string[]) {
   setState({ contextMenu: null });

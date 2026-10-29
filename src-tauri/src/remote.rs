@@ -1,5 +1,5 @@
 //! One interface for all server protocols: SFTP, FTP/FTPS, WebDAV and the
-//! cloud services (Dropbox).
+//! cloud services (Dropbox, Google Drive).
 //!
 //! The commands in `lib.rs` and the transfers in `transfer.rs` only talk to
 //! `Remote`; what a protocol cannot do (commands on the server over FTP,
@@ -7,6 +7,7 @@
 
 use crate::dav::DavConn;
 use crate::dropbox::DropboxConn;
+use crate::gdrive::GDriveConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::model::{FileEntry, WalkItem};
@@ -22,6 +23,7 @@ pub enum Remote {
     Ftp(Arc<FtpConn>),
     Dav(DavConn),
     Dropbox(Arc<DropboxConn>),
+    GDrive(Arc<GDriveConn>),
 }
 
 /// Size, modification time (seconds) and permission bits of a server file.
@@ -42,6 +44,7 @@ impl Remote {
             Remote::Ftp(c) => &c.home,
             Remote::Dav(c) => &c.home,
             Remote::Dropbox(c) => &c.home,
+            Remote::GDrive(c) => &c.home,
         }
     }
 
@@ -51,6 +54,7 @@ impl Remote {
             Remote::Ftp(_) => "FTP",
             Remote::Dav(_) => "WebDAV",
             Remote::Dropbox(_) => "Dropbox",
+            Remote::GDrive(_) => "Google Drive",
         }
     }
 
@@ -66,7 +70,7 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.close().await,
             Remote::Ftp(c) => c.close().await,
-            Remote::Dav(_) | Remote::Dropbox(_) => {}
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) => {}
         }
     }
 
@@ -76,6 +80,7 @@ impl Remote {
             Remote::Ftp(c) => c.list(path).await,
             Remote::Dav(c) => c.list(path).await,
             Remote::Dropbox(c) => c.list(path).await,
+            Remote::GDrive(c) => c.list(path).await,
         }?;
         list.retain(|e| safe_name(&e.name));
         Ok(list)
@@ -87,6 +92,7 @@ impl Remote {
             Remote::Ftp(c) => c.stat(path).await,
             Remote::Dav(c) => c.stat(path).await,
             Remote::Dropbox(c) => c.stat(path).await,
+            Remote::GDrive(c) => c.stat(path).await,
         }
     }
 
@@ -96,6 +102,7 @@ impl Remote {
             Remote::Ftp(c) => c.exists(path).await,
             Remote::Dav(c) => c.exists(path).await,
             Remote::Dropbox(c) => c.exists(path).await,
+            Remote::GDrive(c) => c.exists(path).await,
         }
     }
 
@@ -105,6 +112,7 @@ impl Remote {
             Remote::Ftp(c) => c.mkdir(path).await,
             Remote::Dav(c) => c.mkdir(path).await,
             Remote::Dropbox(c) => c.mkdir(path).await,
+            Remote::GDrive(c) => c.mkdir(path).await,
         }
     }
 
@@ -124,6 +132,7 @@ impl Remote {
             }
             Remote::Dav(c) => c.mkdir_all(path).await,
             Remote::Dropbox(c) => c.mkdir_all(path).await,
+            Remote::GDrive(c) => c.mkdir_all(path).await,
         }
     }
 
@@ -133,6 +142,7 @@ impl Remote {
             Remote::Ftp(c) => c.rename(from, to).await,
             Remote::Dav(c) => c.rename(from, to).await,
             Remote::Dropbox(c) => c.rename(from, to).await,
+            Remote::GDrive(c) => c.rename(from, to).await,
         }
     }
 
@@ -144,6 +154,9 @@ impl Remote {
             return c.replace(from, to).await;
         }
         if let Remote::Dropbox(c) = self {
+            return c.replace(from, to).await;
+        }
+        if let Remote::GDrive(c) = self {
             return c.replace(from, to).await;
         }
         if !self.exists(to).await {
@@ -168,6 +181,7 @@ impl Remote {
             Remote::Ftp(c) => c.remove(path).await,
             Remote::Dav(c) => c.remove(path).await,
             Remote::Dropbox(c) => c.remove(path).await,
+            Remote::GDrive(c) => c.remove(path).await,
         }
     }
 
@@ -177,6 +191,7 @@ impl Remote {
             Remote::Ftp(c) => c.remove_file(path).await,
             Remote::Dav(c) => c.remove(path).await,
             Remote::Dropbox(c) => c.remove(path).await,
+            Remote::GDrive(c) => c.remove(path).await,
         }
     }
 
@@ -186,6 +201,18 @@ impl Remote {
             Remote::Ftp(c) => c.chmod(path, mode, recursive).await,
             Remote::Dav(_) => Err(unsupported("Rechte setzen", "WebDAV")),
             Remote::Dropbox(_) => Err(unsupported("Rechte setzen", "Dropbox")),
+            Remote::GDrive(_) => Err(unsupported("Rechte setzen", "Google Drive")),
+        }
+    }
+
+    /// Link to share a file or folder; only cloud services have one.
+    pub async fn share_link(&self, path: &str) -> AppResult<String> {
+        match self {
+            Remote::Dropbox(c) => c.share_link(path).await,
+            Remote::GDrive(c) => c.share_link(path).await,
+            Remote::Sftp(_) => Err(unsupported("Ein Link zum Teilen", "SFTP")),
+            Remote::Ftp(_) => Err(unsupported("Ein Link zum Teilen", "FTP")),
+            Remote::Dav(_) => Err(unsupported("Ein Link zum Teilen", "WebDAV")),
         }
     }
 
@@ -195,6 +222,7 @@ impl Remote {
             Remote::Ftp(c) => c.walk(path).await,
             Remote::Dav(c) => c.walk(path).await,
             Remote::Dropbox(c) => c.walk(path).await,
+            Remote::GDrive(c) => c.walk(path).await,
         }?;
         items.retain(|i| i.relative.split('/').all(safe_name));
         Ok(items)
@@ -263,6 +291,7 @@ impl Remote {
             Remote::Sftp(c) => c.copy_within(paths, dest_dir).await,
             Remote::Dav(c) => c.copy_within(paths, dest_dir).await,
             Remote::Dropbox(c) => c.copy_within(paths, dest_dir).await,
+            Remote::GDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::Ftp(_) => {
                 let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
                 let mut out = Vec::new();
@@ -335,7 +364,7 @@ impl Remote {
         match self {
             Remote::Sftp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
-            Remote::Dav(_) | Remote::Dropbox(_) => false,
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) => false,
         }
     }
 
@@ -363,6 +392,7 @@ impl Remote {
             }
             Remote::Dav(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Dropbox(c) => RemoteReader::Plain(c.reader(path, offset).await?),
+            Remote::GDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
         })
     }
 
@@ -393,6 +423,10 @@ impl Remote {
                 let (w, task) = c.writer(path, mtime);
                 RemoteWriter::Dav(Some(w), Some(task))
             }
+            Remote::GDrive(c) => {
+                let (w, task) = c.writer(path, mtime);
+                RemoteWriter::Dav(Some(w), Some(task))
+            }
         })
     }
 
@@ -405,7 +439,7 @@ impl Remote {
             }
             Remote::Ftp(c) => c.set_attrs(path, mtime, perms).await,
             // Set with the upload itself where the server supports it.
-            Remote::Dav(_) | Remote::Dropbox(_) => {}
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) => {}
         }
     }
 }

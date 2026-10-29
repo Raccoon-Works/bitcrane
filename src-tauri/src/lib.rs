@@ -11,6 +11,7 @@ mod error;
 mod dav;
 mod archive;
 mod dropbox;
+mod gdrive;
 mod oauth;
 mod ftp;
 mod import;
@@ -192,10 +193,12 @@ fn cloud_services() -> oauth::CloudServices {
 /// Signs in to a cloud service in the browser; returns the refresh token (the
 /// interface keeps it in the keychain) and the account name.
 #[tauri::command]
-async fn cloud_sign_in(service: String) -> AppResult<oauth::SignedIn> {
+async fn cloud_sign_in(service: String, client_id: Option<String>, client_secret: Option<String>) -> AppResult<oauth::SignedIn> {
     let open = |url: &str| open_url(url.to_string());
     match service.as_str() {
         "dropbox" => dropbox::sign_in(open).await,
+        // Google Drive: with the user's own app key (see docs/google-drive.md).
+        "gdrive" => gdrive::sign_in(client_id.as_deref().unwrap_or(""), client_secret.as_deref().unwrap_or(""), open).await,
         _ => Err(AppError::other("Diesen Cloud-Dienst kennt Bitcrane noch nicht.")),
     }
 }
@@ -210,6 +213,15 @@ fn cloud_sign_in_cancel() {
 async fn dropbox_connect(state: State<'_, AppState>, server_id: String, params: dropbox::DropboxParams) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::Dropbox(Arc::new(dropbox::DropboxConn::connect(params).await?));
+    let home = conn.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    Ok(ConnectResult { home, clock_offset_ms: None })
+}
+
+#[tauri::command]
+async fn gdrive_connect(state: State<'_, AppState>, server_id: String, params: gdrive::GDriveParams) -> AppResult<ConnectResult> {
+    state.connections.lock().await.remove(&server_id);
+    let conn = remote::Remote::GDrive(Arc::new(gdrive::GDriveConn::connect(params).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
     Ok(ConnectResult { home, clock_offset_ms: None })
@@ -656,6 +668,12 @@ async fn remote_remove(state: State<'_, AppState>, server_id: String, paths: Vec
 async fn remote_chmod(state: State<'_, AppState>, server_id: String, path: String, perms: String, recursive: bool) -> AppResult<()> {
     let mode = u32::from_str_radix(&perms, 8).map_err(|_| AppError::other("Rechte müssen drei Ziffern von 0 bis 7 sein."))?;
     remote!(state, server_id, |c| c.chmod(&path, mode, recursive))
+}
+
+/// Link to share a file or folder on a cloud service.
+#[tauri::command]
+async fn remote_share_link(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
+    remote!(state, server_id, |c| c.share_link(&path))
 }
 
 #[tauri::command]
@@ -1236,6 +1254,7 @@ pub fn run() {
             cloud_sign_in,
             cloud_sign_in_cancel,
             dropbox_connect,
+            gdrive_connect,
             system_power,
             local_checksum,
             open_url,
@@ -1243,6 +1262,7 @@ pub fn run() {
             local_drives,
             local_cloud_places,
             local_zip,
+            remote_share_link,
             local_unzip,
             local_open,
             local_reveal,

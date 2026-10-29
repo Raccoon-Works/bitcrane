@@ -9,9 +9,10 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { crumbs, join } from '../util/paths';
 import {
-  activeTab, LIVE, paneLoc, compareFiles, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t } from '../i18n';
+import { isCloudProtocol } from '../backend/types';
 import { addressOf } from './ServerList';
 import { runCustomCommand } from '../state/tools';
 
@@ -163,6 +164,8 @@ export function ContextMenu() {
       second.push({ label: $t('Web-Adresse kopieren'), run: () => copyWebUrl(sid, join(panePath(menu.side), one)) });
       second.push({ label: $t('Im Browser öffnen'), run: () => openWebUrl(sid, join(panePath(menu.side), one)) });
     }
+    // Cloud services: a sharing link (Transmit "Copy Link").
+    if (one && paneServer && isCloudProtocol(paneServer.protocol)) second.push({ label: $t('Link zum Teilen kopieren'), run: () => copyShareLink(menu.side, one) });
     if (one) second.push({ label: $t('Umbenennen'), key: k('↩', 'F2'), run: () => startRename(menu.side, one) });
     else second.push({ label: $t('{0} Objekte umbenennen …', menu.names.length), run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }) });
     if (one && !isDir) second.push({ label: $t('Prüfsumme (SHA-256) …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });

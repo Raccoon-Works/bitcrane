@@ -8,10 +8,10 @@ import { AlertTriangle, Check, ChevronRight, FolderPlus, KeyRound, Plus, Search,
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyInfo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { isCloudProtocol, type AuthMethod, type Server, type ServerColor } from '../../backend/types';
+import { isCloudProtocol, type AuthMethod, type Protocol, type Server, type ServerColor } from '../../backend/types';
 import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/live';
-import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplate, openDialog, saveServer, showToast, updateSettings, useStore } from '../../state/store';
-import { showCloudNotSetUp } from '../../state/cloud';
+import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplate, openDialog, openExternal, saveServer, showToast, updateSettings, useStore } from '../../state/store';
+import { CLOUD_NAMES, GDRIVE_GUIDE_URL, googleKey, saveGoogleKey, showCloudNotSetUp } from '../../state/cloud';
 import { KeyPanel } from '../KeyPanel';
 import { ServerTile, swatch } from '../ServerTile';
 import { Button, Segmented, Select, TextField } from '../ui';
@@ -48,12 +48,22 @@ const colors: ServerColor[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'ora
 /** Time zones for FTP servers that list local times (UTC-12 to UTC+14). */
 const TIMEZONES = Array.from({ length: 27 }, (_, i) => i - 12).map((h) => ({ value: String(h * 60), label: h === 0 ? $t('UTC (Standard)') : `UTC${h > 0 ? '+' : '−'}${Math.abs(h)}${h === 1 ? $t(' (Winterzeit Deutschland)') : h === 2 ? $t(' (Sommerzeit Deutschland)') : ''}` }));
 
-export function ServerEdit({ serverId }: { serverId?: string }) {
+/** Fixed fields of a cloud service entry (no address, port or password of its own). */
+function cloudDefaults(service: Protocol): Partial<Server> {
+  return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
+}
+
+export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string; cloud?: Protocol }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules ?? []);
   const platform = useStore((s) => s.platform);
   const [currentId, setCurrentId] = useState<string | undefined>(serverId);
-  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? newServerTemplate());
+  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : newServerTemplate()));
+  // The user's own Google app key (Google Drive only): the id from the settings, the secret only typed here.
+  const [googleId, setGoogleId] = useState(() => getState().settings.googleClientId ?? '');
+  const [googleSecret, setGoogleSecret] = useState('');
+  const [googleStored, setGoogleStored] = useState(false);
+  useEffect(() => { void googleKey().then((k) => setGoogleStored(!!k?.clientSecret)); }, []);
   const [query, setQuery] = useState('');
   const [test, setTest] = useState<'idle' | 'running' | 'ok' | 'fail'>('idle');
   const [testText, setTestText] = useState('');
@@ -88,6 +98,14 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
     if (typeof picked === 'string') set('keyPath', await invoke<string>('path_to_ui', { path: picked }));
   };
   const isNew = !servers.some((x) => x.id === draft.id);
+  /** Signs in to the chosen cloud service (Google Drive: keeps the entered app key first). */
+  const signIn = async () => {
+    const service = draft.protocol;
+    if (!service) return;
+    if (service === 'gdrive') await saveGoogleKey(googleId, googleSecret);
+    if (service === 'dropbox' && LIVE && !getState().cloudAvailable.dropbox) { showCloudNotSetUp(service); return; }
+    openDialog({ type: 'cloudSignIn', service });
+  };
   const cloud = isCloudProtocol(draft.protocol);
   const family: 'sftp' | 'ftp' | 'webdav' | 'cloud' = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
@@ -96,7 +114,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
     setTest('idle');
     setDraft((d) => {
       // Cloud services (Transmit lists them with the protocols): signed in through the browser, no address or password.
-      if (f === 'cloud') return { ...d, protocol: 'dropbox', host: 'dropbox.com', port: 443, auth: 'agent' };
+      if (f === 'cloud') return { ...d, ...cloudDefaults('dropbox') };
       const port = (p: number) => (STANDARD_PORTS.includes(d.port) ? p : d.port);
       if (f === 'sftp') return { ...d, protocol: 'sftp', host: isCloudProtocol(d.protocol) ? '' : d.host, port: isCloudProtocol(d.protocol) ? 22 : port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
       if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
@@ -173,7 +191,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
       <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
       {cloud && isNew
         // A new cloud service is created by signing in (the browser gives Bitcrane the account).
-        ? <Button variant="primary" onClick={() => draft.protocol && (getState().cloudAvailable.dropbox || !LIVE ? openDialog({ type: 'cloudSignIn', service: draft.protocol }) : showCloudNotSetUp(draft.protocol))}>{$t('Bei Dropbox anmelden …')}</Button>
+        ? <Button variant="primary" disabled={draft.protocol === 'gdrive' && (!googleId.trim() || (!googleSecret.trim() && !googleStored))} onClick={() => void signIn()}>{$t('Bei {0} anmelden …', CLOUD_NAMES[draft.protocol ?? ''] ?? '')}</Button>
         : <>
           <Button onClick={() => finish(false)}>{$t('Sichern')}</Button>
           <Button variant="primary" onClick={() => finish(true)}>{$t('Verbinden')}</Button>
@@ -251,9 +269,23 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
-                  <Select<'dropbox'> label={$t('Dienst')} value="dropbox" onChange={() => undefined} options={[{ value: 'dropbox', label: 'Dropbox' }]} />
-                  <span className="small muted">{$t('OneDrive und Google Drive folgen mit den nächsten Updates.')}</span>
+                  <Select<'dropbox' | 'gdrive'> label={$t('Dienst')} value={draft.protocol === 'gdrive' ? 'gdrive' : 'dropbox'} onChange={(v) => isNew && setDraft((d) => ({ ...d, ...cloudDefaults(v) }))} options={isNew ? [{ value: 'dropbox', label: 'Dropbox' }, { value: 'gdrive', label: 'Google Drive' }] : [{ value: draft.protocol === 'gdrive' ? 'gdrive' : 'dropbox', label: CLOUD_NAMES[draft.protocol ?? ''] ?? '' }]} />
+                  {isNew && <span className="small muted">{$t('OneDrive folgt mit einem der nächsten Updates.')}</span>}
                 </div>
+                {draft.protocol === 'gdrive' && (
+                  <>
+                    <span>{$t('Client-ID')}</span>
+                    <div className="col-text">
+                      <TextField mono value={googleId} onChange={setGoogleId} placeholder="123456789-abc….apps.googleusercontent.com" label={$t('Client-ID')} />
+                    </div>
+                    <span>{$t('Client-Schlüssel')}</span>
+                    <div className="col-text">
+                      <TextField mono type="password" value={googleSecret} onChange={setGoogleSecret} placeholder={googleStored ? $t('gespeichert {0}', store) : 'GOCSPX-…'} label={$t('Client-Schlüssel')} />
+                      <span className="small muted">{$t('Google Drive braucht einen eigenen, kostenlosen App-Schlüssel aus deinem Google-Konto. Einmal einrichten, etwa 10 Minuten.')}{' '}
+                        <button type="button" className="link small" onClick={() => openExternal(GDRIVE_GUIDE_URL)}>{$t('Zur Anleitung')}</button></span>
+                    </div>
+                  </>
+                )}
                 <span>{$t('Konto')}</span>
                 <span className="small muted">{draft.user || '–'}</span>
                 <span>{$t('Anmeldung')}</span>
