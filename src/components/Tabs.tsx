@@ -7,7 +7,7 @@
  * empty one. Middle click closes a tab, a double click on the free space next
  * to the tabs opens a new one.
  */
-import { Plus, X } from './glyphs';
+import { Plus, Settings as Gear, X } from './glyphs';
 import { addressOf } from './ServerList';
 import { LocalTile, ServerTile } from './ServerTile';
 import { IconButton, Tooltip } from './ui';
@@ -18,6 +18,7 @@ import { $t } from '../i18n';
 
 /** Tooltip of a tab: what both halves show. */
 function tabTip(t: Tab): string {
+  if (t.settings) return $t('Einstellungen');
   const right = t.serverId ? serverById(t.serverId) : undefined;
   const left = t.leftServerId ? serverById(t.leftServerId) : undefined;
   const r = right ? `${right.name} (${addressOf(right)}): ${t.remotePath || '/'}` : $t('kein Server');
@@ -62,7 +63,7 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
                 }
               }}
             >
-              {srv ? <ServerTile server={srv} size={18} /> : <LocalTile size={18} />}
+              {t.settings ? <span className="tab-gear" aria-hidden="true"><Gear size={16} strokeWidth={1.75} /></span> : srv ? <ServerTile server={srv} size={18} /> : <LocalTile size={18} />}
               <span className="tab-name">{title}</span>
               {state && <span className={`dot${state}`} aria-hidden="true" />}
               <button type="button" className="tab-close" tabIndex={-1} aria-label={$t('Tab „{0}“ schließen', title)} onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}>

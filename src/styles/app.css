@@ -1240,19 +1240,30 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 .detail-note { padding-left: 144px; }
 
 /* Settings. */
-.set-tabs { display: flex; justify-content: center; gap: 2px; padding: 0 var(--space-3) var(--space-2); }
-/* Nine areas have to fit: the buttons share the width, long names may break into two lines. */
-.set-tab { flex: 0 1 92px; min-width: 0; height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 var(--space-1); text-align: center; line-height: 1.15; border-radius: var(--radius-control); color: var(--icon); font-size: var(--text-small); }
+/* The settings fill a tab: areas listed on the left (Windows 11 settings, VS Code, Tabby), the page on the right. */
+.settings-page { flex: 1; min-width: 0; min-height: 0; display: flex; background: var(--bg-card); }
+.set-nav { width: 224px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--space-4) var(--space-3); border-right: 1px solid var(--line); background: var(--bg-window); overflow: auto; }
+.set-nav-title { padding: 0 var(--space-3) var(--space-3); font-size: var(--text-title); font-weight: 600; }
+.set-tab { height: 36px; display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-3); border-radius: var(--radius-control); color: var(--text-2); font-size: var(--text-body); text-align: left; }
 .set-tab:hover { background: var(--bg-hover); }
-.set-tab.is-sel { background: var(--bg-control-on); color: var(--accent-text); }
-.set-body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-6) var(--space-6); overflow: auto; }
+.set-tab.is-sel { background: var(--accent); color: var(--on-accent); }
+.set-tab.is-sel .set-tab-icon { color: inherit !important; }
+.set-scroll { flex: 1; min-width: 0; overflow: auto; }
+.set-heading { margin: 0; font-size: var(--text-display); line-height: var(--lh-display); font-weight: 600; }
+.set-about { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; padding-bottom: var(--space-4); border-bottom: 1px solid var(--line); }
+.set-about-app { display: flex; align-items: center; gap: var(--space-4); }
+.set-about-name { font-size: var(--text-hero); line-height: var(--lh-hero); font-weight: 600; letter-spacing: -0.01em; }
+.set-about-links { display: grid; grid-template-columns: repeat(2, minmax(160px, auto)); gap: var(--space-1) var(--space-4); }
+.set-about-link { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-2); border-radius: var(--radius-control); text-align: left; }
+.set-about-link:hover { background: var(--bg-hover); }
+.set-about-link-icon { color: var(--accent-text); display: grid; place-items: center; }
+.set-body { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6) var(--space-8) var(--space-8); }
 .set-group { display: flex; flex-direction: column; gap: var(--space-2); }
 .set-card { border-radius: var(--radius-card); background: var(--bg-section); overflow: hidden; }
 [data-platform='win'] .set-card { border: 1px solid var(--line); }
 .set-row { min-height: 48px; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--line); }
 .set-row:first-child { border-top: 0; }
 .set-row.is-column { flex-direction: column; align-items: stretch; gap: var(--space-2); }
-.settings-dialog .dialog-body { display: flex; flex-direction: column; }
 
 /* Transfers window. */
 .tr-top { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
@@ -2272,3 +2283,4 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .term-font-field { width: 280px; }
 /* xterm.js paints unused space black; the area takes the scheme's background instead. */
 .term-host .xterm, .term-host .xterm-viewport, .term-host .xterm-scrollable-element { background-color: var(--term-bg, var(--bg-terminal)) !important; }
+.tab-gear { display: grid; place-items: center; width: 18px; color: var(--accent-text); }
