@@ -9,6 +9,8 @@
 mod config;
 mod error;
 mod dav;
+mod dropbox;
+mod oauth;
 mod ftp;
 mod import;
 mod keys;
@@ -168,6 +170,40 @@ fn open_url(url: String) -> AppResult<()> {
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = std::process::Command::new("xdg-open");
     cmd.arg(&url).spawn().map(|_| ()).map_err(AppError::from)
+}
+
+/* ----------------------------------------------------------- Cloud services */
+
+/// Which cloud services this build has app keys for (Google Drive needs the user's own).
+#[tauri::command]
+fn cloud_services() -> oauth::CloudServices {
+    oauth::services()
+}
+
+/// Signs in to a cloud service in the browser; returns the refresh token (the
+/// interface keeps it in the keychain) and the account name.
+#[tauri::command]
+async fn cloud_sign_in(service: String) -> AppResult<oauth::SignedIn> {
+    let open = |url: &str| open_url(url.to_string());
+    match service.as_str() {
+        "dropbox" => dropbox::sign_in(open).await,
+        _ => Err(AppError::other("Diesen Cloud-Dienst kennt Bitcrane noch nicht.")),
+    }
+}
+
+/// Stops a sign-in that is waiting for the browser.
+#[tauri::command]
+fn cloud_sign_in_cancel() {
+    oauth::cancel();
+}
+
+#[tauri::command]
+async fn dropbox_connect(state: State<'_, AppState>, server_id: String, params: dropbox::DropboxParams) -> AppResult<ConnectResult> {
+    state.connections.lock().await.remove(&server_id);
+    let conn = remote::Remote::Dropbox(Arc::new(dropbox::DropboxConn::connect(params).await?));
+    let home = conn.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    Ok(ConnectResult { home, clock_offset_ms: None })
 }
 
 /// How Bitcrane was started: `autostart` is true for a start at login.
@@ -1171,6 +1207,10 @@ pub fn run() {
             local_move,
             local_copy_files,
             open_full_disk_access,
+            cloud_services,
+            cloud_sign_in,
+            cloud_sign_in_cancel,
+            dropbox_connect,
             system_power,
             local_checksum,
             open_url,

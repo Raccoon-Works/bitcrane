@@ -87,6 +87,20 @@ pub fn client_config(known: Arc<KnownHosts>, host_id: String, trust: Option<Stri
     (Arc::new(config), seen)
 }
 
+/// Client configuration for well-known public services (cloud APIs): the usual
+/// check against the public certificate authorities, nothing to confirm.
+pub fn public_client_config() -> Arc<rustls::ClientConfig> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
+        .expect("protocol versions")
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Arc::new(config)
+}
+
 /// Server name for the TLS handshake (host name or IP address).
 pub fn server_name(host: &str) -> Result<ServerName<'static>, rustls::pki_types::InvalidDnsNameError> {
     ServerName::try_from(host.to_string())

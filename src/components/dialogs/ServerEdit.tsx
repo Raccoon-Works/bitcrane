@@ -8,7 +8,7 @@ import { AlertTriangle, Check, ChevronRight, FolderPlus, KeyRound, Plus, Search,
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyInfo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import type { AuthMethod, Server, ServerColor } from '../../backend/types';
+import { isCloudProtocol, type AuthMethod, type Server, type ServerColor } from '../../backend/types';
 import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/live';
 import { askRemoveServer, LIVE, monoFor, newServerTemplate, openDialog, saveServer, showToast, updateSettings, useStore } from '../../state/store';
 import { KeyPanel } from '../KeyPanel';
@@ -87,6 +87,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
     if (typeof picked === 'string') set('keyPath', await invoke<string>('path_to_ui', { path: picked }));
   };
   const isNew = !servers.some((x) => x.id === draft.id);
+  const cloud = isCloudProtocol(draft.protocol);
   const family: 'sftp' | 'ftp' | 'webdav' = draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
   const STANDARD_PORTS = [22, 21, 990, 443, 80];
@@ -159,7 +160,9 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
 
   const footer = (
     <>
-      <Button onClick={runTest} disabled={test === 'running'}>{test === 'running' ? $t('Teste …') : $t('Verbindung testen')}</Button>
+      {cloud
+        ? <Button onClick={() => draft.protocol && openDialog({ type: 'cloudSignIn', service: draft.protocol, serverId: draft.id })}>{$t('Neu anmelden …')}</Button>
+        : <Button onClick={runTest} disabled={test === 'running'}>{test === 'running' ? $t('Teste …') : $t('Verbindung testen')}</Button>}
       {test === 'ok' && <span className="small tone-ok row-inline test-result"><Check size={13} strokeWidth={2.2} aria-hidden="true" />{testText}</span>}
       {test === 'fail' && <span className="small tone-danger test-result">{testText}</span>}
       <span className="flex-1" />
@@ -231,6 +234,17 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
           </div>
 
           <div className="form-grid">
+            {cloud ? (
+              <>
+                <span>{$t('Dienst')}</span>
+                <span className="small muted">{draft.protocol === 'dropbox' ? 'Dropbox' : draft.protocol}</span>
+                <span>{$t('Konto')}</span>
+                <span className="small muted">{draft.user || '–'}</span>
+                <span>{$t('Anmeldung')}</span>
+                <span className="small muted">{$t('Über den Browser; gespeichert {0}. „Neu anmelden …“ unten, falls der Zugriff entzogen wurde.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
+              </>
+            ) : (
+            <>
             <span>{$t('Protokoll#protocol')}</span>
             <div className="row-inline">
               <Segmented<'sftp' | 'ftp' | 'webdav'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }]} />
@@ -319,6 +333,9 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
                 <span>{$t('Agent')}</span>
                 <span className="small muted">{$t('Nutzt die Schlüssel, die im SSH-Agent geladen sind (z. B. aus 1Password, Bitwarden oder ssh-agent).')}</span>
               </>
+            )}
+
+            </>
             )}
 
             <span>{$t('Startordner')}</span>

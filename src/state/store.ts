@@ -15,8 +15,9 @@ import { isTauri, type CloudPlace, type ImportedServer, type Place } from '../ba
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type {
-  Conflict, ConflictChoice, FileEntry, HostKey, PaneSide, Platform, Server, Tab, Theme, Transfer, Watch, WatchOptions,
+  Conflict, ConflictChoice, FileEntry, HostKey, PaneSide, Platform, Protocol, Server, Tab, Theme, Transfer, Watch, WatchOptions,
 } from '../backend/types';
+import { isCloudProtocol } from '../backend/types';
 import { describeFile, formatSize, matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
@@ -59,6 +60,7 @@ export type DialogState =
   | { type: 'selectMask'; side: PaneSide }
   | { type: 'afterQueue'; action: AfterQueue }
   | { type: 'workspaces' }
+  | { type: 'cloudSignIn'; service: Protocol; serverId?: string }
   | { type: 'mergeFolders'; fromDir: string; names: string[]; toDir: string; move: boolean; clashes: string[] }
   | { type: 'compare'; favoriteId?: string }
   | { type: 'import' }
@@ -382,6 +384,8 @@ export interface AppState {
   afterQueue: AfterQueue;
   /** Rule for transfers by hand in this session: '' = the server's rule, 'none' = no rule, else a rule id. */
   transferRule: string;
+  /** Cloud services this build has app keys for (desktop app; the prototype shows all). */
+  cloudAvailable: { dropbox: boolean; onedrive: boolean };
   /** Update in progress or waiting (null: none known). */
   update: import('./updates').UpdateState | null;
   /** Where dragged files would land: a side and a folder name ('' = folder shown). */
@@ -528,6 +532,7 @@ function initialState(): AppState {
     compareDirs: false,
     afterQueue: 'none',
     transferRule: '',
+    cloudAvailable: { dropbox: !LIVE, onedrive: !LIVE },
     popoverOpen: false,
     menuBarWindowOpen: false,
     appMenu: null,
@@ -2414,7 +2419,8 @@ export function saveServer(server: Server, connect: boolean) {
     if (exists) void live.disconnectServer(server.id).then(() => openServer(server.id));
     else openServer(server.id);
   } else if (connect) {
-    if (!exists) {
+    // Cloud services have no fingerprint to confirm (the prototype connects them at once).
+    if (!exists && !isCloudProtocol(server.protocol)) {
       openDialog({ type: 'fingerprint', mode: 'new', serverId: server.id, key: { host: server.host, algorithm: 'ED25519', fingerprint: fakeFingerprint(server.host) } });
     } else openServer(server.id);
   } else showToast($t('„{0}“ gespeichert.', server.name), 'ok');
