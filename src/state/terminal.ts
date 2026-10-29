@@ -19,7 +19,7 @@ import type { Tab } from '../backend/types';
 import { $t } from '../i18n';
 import { isSftp } from './live';
 import { Suggester } from './termSuggest';
-import { activeTab, getState, LIVE, openExternal, serverById, setState, showToast, subscribeStore, uid } from './store';
+import { activeTab, getState, LIVE, openDialog, openExternal, serverById, setState, showToast, subscribeStore, uid } from './store';
 
 export interface TermSession {
   id: string;
@@ -52,6 +52,16 @@ export interface TerminalSettings {
   startInFolder: boolean;
   /** Dimmed suggestions from the history while typing (termSuggest.ts). */
   suggestions: boolean;
+  /** Lines kept for scrolling back. */
+  scrollback: number;
+  /** Right click: copy the selection, or paste when nothing is selected (PuTTY, Windows Terminal). */
+  rightClick: 'smart' | 'off';
+  /** Ask before pasting text with several lines (each line would run at once). */
+  pasteWarn: boolean;
+  /** Shell of the terminal on this computer (term_shells); '' = the default. */
+  localShell: string;
+  /** Open the terminals of the tabs again at the next start (with "Tabs vom letzten Mal"). */
+  restore: boolean;
 }
 
 /** Tab state of the terminal: panel shown, session in front, whole tab. */
@@ -74,7 +84,7 @@ const SOLARIZED = base16(['#073642', '#dc322f', '#859900', '#b58900', '#268bd2',
 
 /** The schemes on offer: two that match Bitcrane plus well-known classics. */
 export const SCHEMES: Array<{ id: string; name: string; theme: ITheme }> = [
-  { id: 'bitcrane-dark', name: 'Bitcrane dunkel', theme: { background: '#141416', foreground: '#ededef', cursor: '#ededef', cursorAccent: '#141416', selectionBackground: '#3d5a80', ...DARK } },
+  { id: 'bitcrane-dark', name: 'Bitcrane dunkel', theme: { background: '#111111', foreground: '#ededef', cursor: '#5fb0ff', cursorAccent: '#111111', selectionBackground: '#28466b', ...DARK } },
   { id: 'bitcrane-light', name: 'Bitcrane hell', theme: { background: '#ffffff', foreground: '#1d1d1f', cursor: '#1d1d1f', cursorAccent: '#ffffff', selectionBackground: '#b8d4fb', ...LIGHT } },
   { id: 'solarized-dark', name: 'Solarized Dark', theme: { background: '#002b36', foreground: '#839496', cursor: '#93a1a1', cursorAccent: '#002b36', selectionBackground: '#073642', ...SOLARIZED } },
   { id: 'solarized-light', name: 'Solarized Light', theme: { background: '#fdf6e3', foreground: '#657b83', cursor: '#586e75', cursorAccent: '#fdf6e3', selectionBackground: '#eee8d5', ...SOLARIZED } },
@@ -83,6 +93,23 @@ export const SCHEMES: Array<{ id: string; name: string; theme: ITheme }> = [
   { id: 'gruvbox-dark', name: 'Gruvbox Dark', theme: { background: '#282828', foreground: '#ebdbb2', cursor: '#ebdbb2', cursorAccent: '#282828', selectionBackground: '#504945', ...base16(['#282828', '#cc241d', '#98971a', '#d79921', '#458588', '#b16286', '#689d6a', '#a89984', '#928374', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#ebdbb2']) } },
   { id: 'one-dark', name: 'One Dark', theme: { background: '#282c34', foreground: '#abb2bf', cursor: '#528bff', cursorAccent: '#282c34', selectionBackground: '#3e4451', ...base16(['#282c34', '#e06c75', '#98c379', '#e5c07b', '#61afef', '#c678dd', '#56b6c2', '#abb2bf', '#5c6370', '#e06c75', '#98c379', '#e5c07b', '#61afef', '#c678dd', '#56b6c2', '#ffffff']) } },
   { id: 'tomorrow-night', name: 'Tomorrow Night', theme: { background: '#1d1f21', foreground: '#c5c8c6', cursor: '#c5c8c6', cursorAccent: '#1d1f21', selectionBackground: '#373b41', ...base16(['#1d1f21', '#cc6666', '#b5bd68', '#f0c674', '#81a2be', '#b294bb', '#8abeb7', '#c5c8c6', '#969896', '#cc6666', '#b5bd68', '#f0c674', '#81a2be', '#b294bb', '#8abeb7', '#ffffff']) } },
+  { id: 'campbell', name: 'Campbell (Windows Terminal)', theme: { background: '#0c0c0c', foreground: '#cccccc', cursor: '#cccccc', cursorAccent: '#0c0c0c', selectionBackground: '#264f78', ...base16(['#0c0c0c', '#c50f1f', '#13a10e', '#c19c00', '#0037da', '#881798', '#3a96dd', '#cccccc', '#767676', '#e74856', '#16c60c', '#f9f1a5', '#3b78ff', '#b4009e', '#61d6d6', '#f2f2f2']) } },
+  { id: 'ubuntu', name: 'Ubuntu', theme: { background: '#300a24', foreground: '#eeeeec', cursor: '#eeeeec', cursorAccent: '#300a24', selectionBackground: '#5e2750', ...base16(['#2e3436', '#cc0000', '#4e9a06', '#c4a000', '#3465a4', '#75507b', '#06989a', '#d3d7cf', '#555753', '#ef2929', '#8ae234', '#fce94f', '#729fcf', '#ad7fa8', '#34e2e2', '#eeeeec']) } },
+  { id: 'monokai', name: 'Monokai', theme: { background: '#272822', foreground: '#f8f8f2', cursor: '#f8f8f0', cursorAccent: '#272822', selectionBackground: '#49483e', ...base16(['#272822', '#f92672', '#a6e22e', '#f4bf75', '#66d9ef', '#ae81ff', '#a1efe4', '#f8f8f2', '#75715e', '#f92672', '#a6e22e', '#f4bf75', '#66d9ef', '#ae81ff', '#a1efe4', '#f9f8f5']) } },
+  { id: 'tokyo-night', name: 'Tokyo Night', theme: { background: '#1a1b26', foreground: '#c0caf5', cursor: '#c0caf5', cursorAccent: '#1a1b26', selectionBackground: '#33467c', ...base16(['#15161e', '#f7768e', '#9ece6a', '#e0af68', '#7aa2f7', '#bb9af7', '#7dcfff', '#a9b1d6', '#414868', '#f7768e', '#9ece6a', '#e0af68', '#7aa2f7', '#bb9af7', '#7dcfff', '#c0caf5']) } },
+  { id: 'catppuccin-mocha', name: 'Catppuccin Mocha', theme: { background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc', cursorAccent: '#1e1e2e', selectionBackground: '#45475a', ...base16(['#45475a', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#bac2de', '#585b70', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#a6adc8']) } },
+  { id: 'catppuccin-latte', name: 'Catppuccin Latte', theme: { background: '#eff1f5', foreground: '#4c4f69', cursor: '#dc8a78', cursorAccent: '#eff1f5', selectionBackground: '#ccd0da', ...base16(['#5c5f77', '#d20f39', '#40a02b', '#df8e1d', '#1e66f5', '#ea76cb', '#179299', '#acb0be', '#6c6f85', '#d20f39', '#40a02b', '#df8e1d', '#1e66f5', '#ea76cb', '#179299', '#bcc0cc']) } },
+  { id: 'github-dark', name: 'GitHub Dark', theme: { background: '#0d1117', foreground: '#c9d1d9', cursor: '#c9d1d9', cursorAccent: '#0d1117', selectionBackground: '#264f78', ...base16(['#484f58', '#ff7b72', '#3fb950', '#d29922', '#58a6ff', '#bc8cff', '#39c5cf', '#b1bac4', '#6e7681', '#ffa198', '#56d364', '#e3b341', '#79c0ff', '#d2a8ff', '#56d4dd', '#f0f6fc']) } },
+  { id: 'github-light', name: 'GitHub Light', theme: { background: '#ffffff', foreground: '#24292f', cursor: '#24292f', cursorAccent: '#ffffff', selectionBackground: '#b6e3ff', ...base16(['#24292f', '#cf222e', '#116329', '#4d2d00', '#0969da', '#8250df', '#1b7c83', '#6e7781', '#57606a', '#a40e26', '#1a7f37', '#633c01', '#218bff', '#a475f9', '#3192aa', '#8c959f']) } },
+  { id: 'ayu-dark', name: 'Ayu Dark', theme: { background: '#0b0e14', foreground: '#bfbdb6', cursor: '#e6b450', cursorAccent: '#0b0e14', selectionBackground: '#273747', ...base16(['#01060e', '#ea6c73', '#7fd962', '#f9af4f', '#53bdfa', '#cda1fa', '#90e1c6', '#c7c7c7', '#686868', '#f07178', '#aad94c', '#ffb454', '#59c2ff', '#d2a6ff', '#95e6cb', '#ffffff']) } },
+  { id: 'night-owl', name: 'Night Owl', theme: { background: '#011627', foreground: '#d6deeb', cursor: '#80a4c2', cursorAccent: '#011627', selectionBackground: '#1d3b53', ...base16(['#011627', '#ef5350', '#22da6e', '#addb67', '#82aaff', '#c792ea', '#21c7a8', '#ffffff', '#575656', '#ef5350', '#22da6e', '#ffeb95', '#82aaff', '#c792ea', '#7fdbca', '#ffffff']) } },
+  { id: 'rose-pine', name: 'Rosé Pine', theme: { background: '#191724', foreground: '#e0def4', cursor: '#524f67', cursorAccent: '#e0def4', selectionBackground: '#403d52', ...base16(['#26233a', '#eb6f92', '#31748f', '#f6c177', '#9ccfd8', '#c4a7e7', '#ebbcba', '#e0def4', '#6e6a86', '#eb6f92', '#31748f', '#f6c177', '#9ccfd8', '#c4a7e7', '#ebbcba', '#e0def4']) } },
+  { id: 'kanagawa', name: 'Kanagawa', theme: { background: '#1f1f28', foreground: '#dcd7ba', cursor: '#c8c093', cursorAccent: '#1f1f28', selectionBackground: '#2d4f67', ...base16(['#16161d', '#c34043', '#76946a', '#c0a36e', '#7e9cd8', '#957fb8', '#6a9589', '#c8c093', '#727169', '#e82424', '#98bb6c', '#e6c384', '#7fb4ca', '#938aa9', '#7aa89f', '#dcd7ba']) } },
+  { id: 'everforest', name: 'Everforest', theme: { background: '#2d353b', foreground: '#d3c6aa', cursor: '#d3c6aa', cursorAccent: '#2d353b', selectionBackground: '#543a48', ...base16(['#475258', '#e67e80', '#a7c080', '#dbbc7f', '#7fbbb3', '#d699b6', '#83c092', '#d3c6aa', '#475258', '#e67e80', '#a7c080', '#dbbc7f', '#7fbbb3', '#d699b6', '#83c092', '#d3c6aa']) } },
+  { id: 'snazzy', name: 'Snazzy', theme: { background: '#282a36', foreground: '#eff0eb', cursor: '#97979b', cursorAccent: '#282a36', selectionBackground: '#3e404a', ...base16(['#282a36', '#ff5c57', '#5af78e', '#f3f99d', '#57c7ff', '#ff6ac1', '#9aedfe', '#f1f1f0', '#686868', '#ff5c57', '#5af78e', '#f3f99d', '#57c7ff', '#ff6ac1', '#9aedfe', '#eff0eb']) } },
+  { id: 'cobalt2', name: 'Cobalt2', theme: { background: '#193549', foreground: '#ffffff', cursor: '#f0cc09', cursorAccent: '#193549', selectionBackground: '#18354f', ...base16(['#000000', '#ff0000', '#38de21', '#ffe50a', '#1460d2', '#ff005d', '#00bbbb', '#bbbbbb', '#555555', '#f40e17', '#3bd01d', '#edc809', '#5555ff', '#ff55ff', '#6ae3fa', '#ffffff']) } },
+  { id: 'gruvbox-light', name: 'Gruvbox Light', theme: { background: '#fbf1c7', foreground: '#3c3836', cursor: '#3c3836', cursorAccent: '#fbf1c7', selectionBackground: '#d5c4a1', ...base16(['#fbf1c7', '#cc241d', '#98971a', '#d79921', '#458588', '#b16286', '#689d6a', '#7c6f64', '#928374', '#9d0006', '#79740e', '#b57614', '#076678', '#8f3f71', '#427b58', '#3c3836']) } },
+  { id: 'tomorrow', name: 'Tomorrow', theme: { background: '#ffffff', foreground: '#4d4d4c', cursor: '#4d4d4c', cursorAccent: '#ffffff', selectionBackground: '#d6d6d6', ...base16(['#000000', '#c82829', '#718c00', '#eab700', '#4271ae', '#8959a8', '#3e999f', '#d6d6d6', '#8e908c', '#c82829', '#718c00', '#eab700', '#4271ae', '#8959a8', '#3e999f', '#4d4d4c']) } },
   // For production servers: unmistakably red, so nobody types into the wrong one.
   { id: 'production', name: 'Produktivserver (rot)', theme: { background: '#2b1517', foreground: '#f3dede', cursor: '#ff8a80', cursorAccent: '#2b1517', selectionBackground: '#5c2a2e', ...DARK } },
 ];
@@ -95,6 +122,11 @@ export const defaultTerminalSettings = (): TerminalSettings => ({
   copyOnSelect: false,
   startInFolder: true,
   suggestions: false,
+  scrollback: 10000,
+  rightClick: getState().platform === 'mac' ? 'off' : 'smart',
+  pasteWarn: true,
+  localShell: '',
+  restore: false,
 });
 
 export const terminalSettings = (): TerminalSettings => ({ ...defaultTerminalSettings(), ...(getState().settings.terminal ?? {}) });
@@ -143,7 +175,7 @@ function makeTerminal(session: TermSession): Live {
     fontSize: st.fontSize,
     cursorStyle: st.cursor,
     cursorBlink: true,
-    scrollback: 5000,
+    scrollback: st.scrollback,
     allowProposedApi: true,
     macOptionIsMeta: true,
     theme: themeFor(session.serverId),
@@ -155,6 +187,23 @@ function makeTerminal(session: TermSession): Live {
   term.loadAddon(new WebLinksAddon((_e, url) => openExternal(url)));
   const host = document.createElement('div');
   host.className = 'term-host';
+  // Every paste goes through pasteInto (warning for several lines), also the browser's own.
+  host.addEventListener('paste', (e) => {
+    const text = e.clipboardData?.getData('text/plain');
+    e.preventDefault();
+    e.stopPropagation();
+    if (text) pasteInto(term, text);
+  }, true);
+  // Right click: copy the selection, or paste when nothing is selected.
+  host.addEventListener('contextmenu', (e) => {
+    if (terminalSettings().rightClick !== 'smart') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (term.hasSelection()) {
+      void navigator.clipboard?.writeText(term.getSelection());
+      term.clearSelection();
+    } else void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
+  });
   const suggest = new Suggester(term, host, session.serverId, () => terminalSettings().suggestions, () => getState().settings.snippets ?? []);
   term.onData((input) => {
     const d = suggest.input(input);
@@ -178,7 +227,7 @@ function makeTerminal(session: TermSession): Live {
       return false;
     }
     if (paste) {
-      void navigator.clipboard?.readText().then((t) => t && term.paste(t));
+      void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
       return false;
     }
     // ⌘ shortcuts on the Mac belong to Bitcrane, not to the shell.
@@ -188,6 +237,24 @@ function makeTerminal(session: TermSession): Live {
   return { term, fit, search, host, opened: false, suggest };
 }
 
+/** Pastes text; with several lines it asks first, since each line would run at once. */
+function pasteInto(term: Terminal, text: string) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n');
+  if (lines.length < 2 || !terminalSettings().pasteWarn) {
+    term.paste(text);
+    return;
+  }
+  const preview = lines.slice(0, 6).join('\n') + (lines.length > 6 ? '\n…' : '');
+  openDialog({
+    type: 'confirm',
+    title: $t('{0} Zeilen einfügen?', String(lines.length)),
+    text: $t('Jede Zeile wird sofort ausgeführt, als hättest du Enter gedrückt.'),
+    detail: preview,
+    confirm: $t('Einfügen'),
+    run: () => { term.paste(text); term.focus(); },
+  });
+}
+
 /** Without the backend (prototype): a minimal echo, so typing and suggestions can be tried. */
 function previewEcho(term: Terminal, d: string) {
   if (d === '\r') term.write('\r\n$ ');
@@ -195,7 +262,21 @@ function previewEcho(term: Terminal, d: string) {
   else if (!d.startsWith('\x1b')) term.write(d);
 }
 
-/** Starts a terminal for the active tab's server (in the folder it shows). */
+/** Recreates the terminals of a restored tab; they start when the tab shows them. */
+export function reopenTerminals(tabId: string, serverIds: string[], open: boolean) {
+  const sessions: TermSession[] = [];
+  for (const serverId of serverIds) {
+    if (serverId && !serverById(serverId)) continue;
+    const number = [...getState().terminals, ...sessions].filter((x) => x.serverId === serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
+    const session: TermSession = { id: uid('term'), serverId, tabId, number, alive: true };
+    live.set(session.id, makeTerminal(session));
+    sessions.push(session);
+  }
+  if (!sessions.length) return;
+  setState((s) => ({ terminals: [...s.terminals, ...sessions] }));
+  patchTab(tabId, { open, active: sessions[0].id });
+}
+
 /**
  * Starts a terminal: on the tab's SSH server when it is connected (and the
  * server half has the focus), otherwise on this computer like Tabby or the
@@ -235,10 +316,15 @@ export function attachTerminal(id: string, container: HTMLElement) {
     const folder = session.serverId ? t?.remotePath : t?.localPath;
     const cwd = terminalSettings().startInFolder && folder ? folder : undefined;
     if (LIVE) {
-      void invoke('term_open', { id, serverId: session.serverId, cols: l.term.cols, rows: l.term.rows, cwd, startup: srv?.termStart || null }).catch((e) => {
+      const start = () => void invoke('term_open', { id, serverId: session.serverId, cols: l.term.cols, rows: l.term.rows, cwd, startup: srv?.termStart || null, shell: session.serverId ? null : terminalSettings().localShell || null }).catch((e) => {
         l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
         markEnded(id);
       });
+      // A terminal reopened at the start waits until its server is connected.
+      if (session.serverId && !srv?.online) {
+        l.term.writeln(`\x1b[2m${$t('Warte auf die Verbindung zu {0} …', srv?.name ?? '')}\x1b[0m`);
+        const stop = subscribeStore(() => { if (serverById(session.serverId)?.online) { stop(); start(); } });
+      } else start();
     } else {
       l.term.writeln('Bitcrane – Terminal (Vorschau)');
       l.term.write('$ ');
@@ -428,6 +514,7 @@ function applySettings() {
     l.term.options.fontSize = st.fontSize;
     l.term.options.cursorStyle = st.cursor;
     l.term.options.theme = themeFor(session.serverId);
+    l.term.options.scrollback = st.scrollback;
     if (l.opened) fitTerminal(id);
     l.suggest.update();
   }

@@ -60,7 +60,7 @@ function Dialogs() {
     case 'uploadTo': return <UploadToDialog paths={dialog.paths} />;
     case 'vaultCreate': return <VaultCreateDialog side={dialog.side} />;
     case 'compareFiles': return <CompareFilesDialog a={dialog.a} b={dialog.b} />;
-    case 'confirm': return <ConfirmDialog title={dialog.title} text={dialog.text} confirm={dialog.confirm} danger={dialog.danger} run={dialog.run} />;
+    case 'confirm': return <ConfirmDialog title={dialog.title} text={dialog.text} confirm={dialog.confirm} danger={dialog.danger} run={dialog.run} detail={dialog.detail} />;
     case 'diff': return <DiffDialog transferId={dialog.transferId} />;
     case 'log': return <LogDialog />;
     case 'preview': return <PreviewDialog side={dialog.side} />;

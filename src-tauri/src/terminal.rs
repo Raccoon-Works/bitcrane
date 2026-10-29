@@ -93,13 +93,13 @@ impl Terminals {
 
     /// A shell on this computer (zsh/bash on the Mac, PowerShell on Windows)
     /// in a pseudo terminal, starting in `cwd`.
-    pub fn open_local(&self, app: AppHandle, id: String, cols: u32, rows: u32, cwd: Option<String>) -> AppResult<()> {
-        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+    pub fn open_local(&self, app: AppHandle, id: String, cols: u32, rows: u32, cwd: Option<String>, shell: Option<String>) -> AppResult<()> {
+        use portable_pty::{native_pty_system, PtySize};
         use std::io::{Read, Write};
         let fail = |e: &dyn std::fmt::Display| AppError::other("Das Terminal konnte nicht gestartet werden.").with_detail(e.to_string());
         let size = PtySize { rows: rows.max(2) as u16, cols: cols.max(10) as u16, pixel_width: 0, pixel_height: 0 };
         let pair = native_pty_system().openpty(size).map_err(|e| fail(&e))?;
-        let mut cmd = local_shell();
+        let mut cmd = shell.as_deref().and_then(shell_command).unwrap_or_else(local_shell);
         if let Some(dir) = cwd.map(|c| crate::paths::to_native(&c)).filter(|d| d.is_dir()) {
             cmd.cwd(dir);
         } else {
@@ -170,6 +170,66 @@ impl Terminals {
             let _ = tx.send(Command::Close);
         }
     }
+}
+
+/// A shell on this computer the user can choose for the local terminal.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LocalShell {
+    pub id: String,
+    pub name: String,
+}
+
+/// Program and arguments of a known shell, if it is installed here.
+fn shell_program(id: &str) -> Option<(std::path::PathBuf, Vec<&'static str>)> {
+    use std::path::PathBuf;
+    let in_path = |exe: &str| -> Option<PathBuf> {
+        std::env::var_os("PATH").and_then(|p| std::env::split_paths(&p).map(|d| d.join(exe)).find(|f| f.is_file()))
+    };
+    let first = |list: &[&str]| list.iter().map(PathBuf::from).find(|p| p.is_file());
+    #[cfg(windows)]
+    {
+        let pf = std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into());
+        let pf86 = std::env::var("ProgramFiles(x86)").unwrap_or_else(|_| r"C:\Program Files (x86)".into());
+        let sys = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        match id {
+            "pwsh" => in_path("pwsh.exe").or_else(|| first(&[&format!(r"{pf}\PowerShell\7\pwsh.exe")])).map(|p| (p, vec!["-NoLogo"])),
+            "powershell" => first(&[&format!(r"{sys}\System32\WindowsPowerShell\v1.0\powershell.exe")]).or_else(|| in_path("powershell.exe")).map(|p| (p, vec!["-NoLogo"])),
+            "cmd" => first(&[&format!(r"{sys}\System32\cmd.exe")]).or_else(|| in_path("cmd.exe")).map(|p| (p, vec![])),
+            "gitbash" => first(&[&format!(r"{pf}\Git\bin\bash.exe"), &format!(r"{pf86}\Git\bin\bash.exe")]).map(|p| (p, vec!["--login", "-i"])),
+            "wsl" => first(&[&format!(r"{sys}\System32\wsl.exe")]).map(|p| (p, vec![])),
+            _ => None,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        match id {
+            "zsh" => first(&["/bin/zsh", "/usr/bin/zsh", "/opt/homebrew/bin/zsh"]).map(|p| (p, vec!["-l"])),
+            "bash" => first(&["/opt/homebrew/bin/bash", "/usr/local/bin/bash", "/bin/bash", "/usr/bin/bash"]).map(|p| (p, vec!["-l"])),
+            "fish" => first(&["/opt/homebrew/bin/fish", "/usr/local/bin/fish", "/usr/bin/fish"]).or_else(|| in_path("fish")).map(|p| (p, vec!["-l"])),
+            _ => None,
+        }
+    }
+}
+
+const SHELLS: &[(&str, &str)] = if cfg!(windows) {
+    &[("pwsh", "PowerShell 7"), ("powershell", "Windows PowerShell"), ("cmd", "Eingabeaufforderung (cmd)"), ("gitbash", "Git Bash"), ("wsl", "WSL (Linux)")]
+} else {
+    &[("zsh", "zsh"), ("bash", "bash"), ("fish", "fish")]
+};
+
+/// The shells installed here (for the choice in Settings › Terminal).
+pub fn local_shells() -> Vec<LocalShell> {
+    SHELLS.iter().filter(|(id, _)| shell_program(id).is_some()).map(|(id, name)| LocalShell { id: id.to_string(), name: name.to_string() }).collect()
+}
+
+/// Command for a chosen shell; None (unknown or not installed) means the default.
+fn shell_command(id: &str) -> Option<portable_pty::CommandBuilder> {
+    let (program, args) = shell_program(id)?;
+    let mut cmd = portable_pty::CommandBuilder::new(program);
+    for a in args {
+        cmd.arg(a);
+    }
+    Some(cmd)
 }
 
 /// The user's shell: on Windows PowerShell 7 if installed, else Windows

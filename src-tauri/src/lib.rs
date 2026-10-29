@@ -740,13 +740,19 @@ async fn vault_create(state: State<'_, AppState>, location: String, storage_id: 
 /// Built-in terminal: a shell on the server's SSH session, optionally in `cwd`.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>, id: String, server_id: String, cols: u32, rows: u32, cwd: Option<String>, startup: Option<String>) -> AppResult<()> {
+async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>, id: String, server_id: String, cols: u32, rows: u32, cwd: Option<String>, startup: Option<String>, shell: Option<String>) -> AppResult<()> {
     // An empty server id is a terminal on this computer.
     if server_id.is_empty() {
-        return state.terminals.open_local(app, id, cols, rows, cwd);
+        return state.terminals.open_local(app, id, cols, rows, cwd, shell);
     }
     let conn = state.conn(&server_id).await?;
     state.terminals.open(app, conn, id, cols, rows, cwd, startup).await
+}
+
+/// Shells installed on this computer for the local terminal.
+#[tauri::command]
+fn term_shells() -> Vec<terminal::LocalShell> {
+    terminal::local_shells()
 }
 
 #[tauri::command]
@@ -1579,6 +1585,7 @@ pub fn run() {
             smb_connect,
             term_open,
             term_write,
+            term_shells,
             term_resize,
             term_close,
             vault_open,
