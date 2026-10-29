@@ -2279,6 +2279,21 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .term-snippets-empty { display: block; padding: 6px 10px; max-width: 280px; }
 
 .snippet-row { gap: var(--space-2); }
+.snippet-row.is-hidden > :not(.icon-btn) { opacity: 0.5; }
+.snippet-grip { cursor: grab; color: var(--icon-off); display: grid; place-items: center; padding: 4px 0; }
+.snippet-grip:active, body.is-dragging-snippet, body.is-dragging-snippet * { cursor: grabbing !important; user-select: none; }
+.snippet-row.is-dragging { opacity: 0.4; }
+.set-row.is-drop { box-shadow: inset 0 2px 0 var(--accent); }
+.snippet-group-head { background: var(--bg-hover); min-height: 40px; }
+.snippet-group-head.is-hidden .snippet-group-name { opacity: 0.5; }
+.snippet-group-name { font-weight: 600; padding: 2px 4px; border-radius: 4px; }
+.snippet-group-name:hover { background: var(--bg-hover); }
+.snippet-group-edit { width: 220px; }
+.snippet-group .snippet-row { padding-left: var(--space-6); }
+.snippet-add-in { min-height: 36px; padding-left: var(--space-6); }
+.snippet-drop { min-height: 36px; border: 1px dashed var(--line-strong); }
+.term-snippet-item { min-height: 40px; }
+.menu-head { padding: 6px 12px 2px; font-size: var(--text-caption); font-weight: 600; color: var(--text-muted); }
 .snippet-name { width: 160px; flex-shrink: 0; }
 .term-font-field { width: 280px; }
 /* xterm.js paints unused space black; the area takes the scheme's background instead. */

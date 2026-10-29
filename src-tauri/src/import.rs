@@ -87,6 +87,26 @@ pub fn find_all() -> ImportResult {
     ImportResult { servers, sources }
 }
 
+/* ---------------------------------------------------------------------- Tabby */
+
+/// Where Tabby keeps its config.yaml (the Quick Commands plugin stores its
+/// commands there under `qc`).
+fn tabby_config_paths() -> Vec<PathBuf> {
+    let mut v = Vec::new();
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        v.push(Path::new(&appdata).join("tabby").join("config.yaml"));
+    }
+    v.push(home().join("Library").join("Application Support").join("tabby").join("config.yaml"));
+    v.push(home().join(".config").join("tabby").join("config.yaml"));
+    v
+}
+
+/// Text of Tabby's config.yaml, if Tabby is installed. The frontend parses it
+/// and takes over only the quick commands.
+pub fn tabby_config() -> Option<String> {
+    tabby_config_paths().into_iter().find_map(|p| std::fs::read_to_string(p).ok())
+}
+
 /* ------------------------------------------------------------------ FileZilla */
 
 fn filezilla_paths() -> Vec<PathBuf> {

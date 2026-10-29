@@ -13,7 +13,7 @@ import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state
 import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { Bug, GithubLogo, ListChecks, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
-import { SCHEMES, terminalSettings, type Snippet, type TerminalSettings } from '../../state/terminal';
+import { SCHEMES, terminalSettings, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
 import { clearHistory, historyCount } from '../../state/termSuggest';
@@ -21,12 +21,12 @@ import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../..
 import { WatchIcon } from '../icons';
 import { Button, IconButton, Select, Switch, TextField } from '../ui';
 import { $t } from '../../i18n';
+import { SnippetSettings } from './SnippetSettings';
 
 /** Stable empty list for the store selector (a new [] would redraw endlessly). */
 const NO_RULES: TransferRule[] = [];
 
 /** Stable empty list: a new [] on every render would redraw the store endlessly. */
-const NO_SNIPPETS: Snippet[] = [];
 const NO_COMMANDS: CustomCommand[] = [];
 
 const CLI_GUIDE_URL = 'https://github.com/Raccoon-Works/bitcrane/blob/main/docs/cli.md';
@@ -50,11 +50,8 @@ function CliRow() {
 /** Settings › Terminal: look of the built-in terminal and the snippets. */
 function TerminalSettingsPage() {
   useStore((s) => s.settings.terminal);
-  const snippets = useStore((s) => s.settings.snippets) ?? NO_SNIPPETS;
   const t = terminalSettings();
   const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
-  const setSnippets = (list: Snippet[]) => updateSettings({ snippets: list });
-  const edit = (id: string, patch: Partial<Snippet>) => setSnippets(snippets.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const [historyN, setHistoryN] = useState(historyCount);
   return (
     <>
@@ -83,16 +80,7 @@ function TerminalSettingsPage() {
         </Row>
       </Group>
       <Group title={$t('Snippets')}>
-        {snippets.length === 0 && <div className="set-row"><span className="small muted">{$t('Snippets sind gespeicherte Befehle, die du im Terminal mit einem Klick einfügst, z. B. „sudo systemctl restart nginx“.')}</span></div>}
-        {snippets.map((sn) => (
-          <div key={sn.id} className="set-row snippet-row">
-            <TextField value={sn.name} onChange={(v) => edit(sn.id, { name: v })} placeholder={$t('Name')} className="snippet-name" />
-            <TextField value={sn.command} onChange={(v) => edit(sn.id, { command: v })} placeholder={$t('Befehl')} mono className="flex-1" />
-            <span className="row-inline small" title={$t('Nach dem Einfügen gleich ausführen')}><Switch checked={sn.run} onChange={(v) => edit(sn.id, { run: v })} label={$t('Gleich ausführen')} />{$t('ausführen')}</span>
-            <IconButton label={$t('Entfernen')} onClick={() => setSnippets(snippets.filter((x) => x.id !== sn.id))}><X size={14} strokeWidth={1.75} /></IconButton>
-          </div>
-        ))}
-        <div className="set-row"><Button small onClick={() => setSnippets([...snippets, { id: `sn-${Date.now().toString(36)}`, name: '', command: '', run: false }])}><Plus size={13} strokeWidth={2} /> {$t('Snippet hinzufügen')}</Button></div>
+        <SnippetSettings />
       </Group>
       <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), getState().platform === 'mac' ? '⌃`' : 'Strg+`')}</span>
     </>

@@ -7,7 +7,7 @@
 import {
   ArrowDown as PArrowDown, ArrowElbowDownLeft, ArrowElbowDownRight, ArrowElbowLeftUp, ArrowLeft as PArrowLeft, ArrowRight as PArrowRight,
   ArrowsDownUp, ArrowsLeftRight, ArrowUp as PArrowUp, Broadcast, CaretDown, CaretRight, CaretUp, Check as PCheck, CheckCircle, CircleHalf,
-  CircleNotch, Clock as PClock, Cloud as PCloud, Copy as PCopy, Dot as PDot, DotsSixVertical, DotsThree, DownloadSimple, Eye as PEye, Flask,
+  CircleNotch, Clock as PClock, Cloud as PCloud, Copy as PCopy, Dot as PDot, DotsSixVertical, DotsThree, DownloadSimple, Eye as PEye, EyeSlash, Flask,
   FolderPlus as PFolderPlus, Gear, Info as PInfo, Key, Keyboard as PKeyboard, Lightning, LinkSimple, Lock as PLock, MagnifyingGlass, Pause as PPause,
   Play as PPlay, Plug, Plus as PPlus, Shield as PShield, ShieldCheck as PShieldCheck, ShieldWarning, SlidersHorizontal as PSliders, Star as PStar,
   TerminalWindow, Trash, UploadSimple, Warning, WifiSlash, X as PX, XCircle as PXCircle, type Icon,
@@ -51,6 +51,7 @@ export const CornerLeftUp = wrap(ArrowElbowLeftUp);
 export const Dot = wrap(PDot);
 export const Download = wrap(DownloadSimple);
 export const Eye = wrap(PEye);
+export const EyeOff = wrap(EyeSlash);
 export const FlaskConical = wrap(Flask);
 export const FolderPlus = wrap(PFolderPlus);
 export const GripVertical = wrap(DotsSixVertical);
