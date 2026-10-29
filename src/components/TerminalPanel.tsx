@@ -76,7 +76,7 @@ export function TerminalPanel() {
   const full = !!t.full;
   const label = (n: number, serverId: string) => `${serverId ? serverById(serverId)?.name ?? '' : $t('Lokal')}${n > 1 ? ` ${n}` : ''}`;
   return (
-    <section className={`term-panel${full ? ' is-full' : ''}`} style={{ ...(full ? {} : { height }), '--term-bg': themeFor(active.serverId).background } as CSSProperties} aria-label={$t('Terminal')}>
+    <section className={`term-panel${full ? ' is-full' : ''}`} style={{ ...(full ? {} : { height }), '--term-bg': themeFor(active.serverId).background, '--term-fg': themeFor(active.serverId).foreground } as CSSProperties} aria-label={$t('Terminal')}>
       {!full && (
         <ResizeHandle orientation="horizontal" label={$t('Höhe des Terminals (ziehen, Doppelklick: zurücksetzen)')} value={height} min={120} max={900} step={20}
           toValue={(start, d) => start - d} onChange={(v) => updateSettings({ terminalHeight: Math.round(v) })} onReset={() => updateSettings({ terminalHeight: 260 })} className="term-handle" />

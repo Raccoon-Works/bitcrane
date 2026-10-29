@@ -2249,6 +2249,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 
 .term-view { flex: 1; min-height: 0; padding: 6px 4px 4px 10px; overflow: hidden; background: var(--term-bg, var(--bg-terminal)); border-radius: 0 0 var(--radius-card) var(--radius-card); }
 .term-host, .term-host .xterm { height: 100%; }
+.term-host { position: relative; }
+/* Suggestion from the history, dimmed behind the cursor (termSuggest.ts). */
+.term-ghost { position: absolute; display: none; pointer-events: none; white-space: pre; overflow: hidden; opacity: 0.45; color: var(--term-fg, currentColor); z-index: 5; }
 .term-host .xterm-viewport { scrollbar-width: thin; }
 
 .term-snippets-anchor { position: relative; }
