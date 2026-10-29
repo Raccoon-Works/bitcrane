@@ -92,14 +92,18 @@ export class Suggester {
   private suffix = '';
   private ghost: HTMLSpanElement;
   private frame = 0;
+  private term: Terminal;
+  private host: HTMLElement;
+  private serverId: string;
+  private enabled: () => boolean;
+  private snippets: () => Snippet[];
 
-  constructor(
-    private term: Terminal,
-    private host: HTMLElement,
-    private serverId: string,
-    private enabled: () => boolean,
-    private snippets: () => Snippet[],
-  ) {
+  constructor(term: Terminal, host: HTMLElement, serverId: string, enabled: () => boolean, snippets: () => Snippet[]) {
+    this.term = term;
+    this.host = host;
+    this.serverId = serverId;
+    this.enabled = enabled;
+    this.snippets = snippets;
     this.ghost = document.createElement('span');
     this.ghost.className = 'term-ghost';
     this.ghost.setAttribute('aria-hidden', 'true');
