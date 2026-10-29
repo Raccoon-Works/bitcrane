@@ -1,0 +1,42 @@
+# Compiles and tests the Rust side on Windows and macOS without building
+# installers: a quick check for code that only exists on one platform (e.g.
+# mount_win.rs). Started by hand, like the build.
+name: Check
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The Rust side embeds the built interface, so it has to exist.
+      - name: Build interface
+        run: |
+          npm ci
+          npm run build
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --lib --locked

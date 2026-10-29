@@ -21,6 +21,8 @@ mod import;
 mod keys;
 mod local;
 mod model;
+#[cfg(windows)]
+mod mount_win;
 mod paths;
 mod proxy;
 mod remote;
@@ -46,7 +48,10 @@ use tauri::{Emitter, Manager, State};
 
 /// Shared state of the running app.
 pub struct AppState {
-    connections: tokio::sync::Mutex<HashMap<String, Arc<remote::Remote>>>,
+    connections: Arc<tokio::sync::Mutex<HashMap<String, Arc<remote::Remote>>>>,
+    /// Servers shown as folders in the Windows Explorer.
+    #[cfg(windows)]
+    mounts: mount_win::Mounts,
     known_hosts: Arc<KnownHosts>,
     watches: watcher::Watches,
     cancels: Mutex<HashMap<String, Arc<AtomicU8>>>,
@@ -61,6 +66,8 @@ impl AppState {
             connections: Default::default(),
             known_hosts: Arc::new(KnownHosts::load(config_dir.join("known_hosts.json"))),
             watches: Default::default(),
+            #[cfg(windows)]
+            mounts: Default::default(),
             cancels: Default::default(),
             prompts: Default::default(),
             config_dir,
@@ -293,6 +300,50 @@ async fn local_unzip(path: String) -> AppResult<String> {
 
 /// Paths Bitcrane was started with from the Explorer menu ("--upload"), taken once by the window.
 static UPLOADS_TAKEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Shows a server as a folder in the Windows Explorer (Cloud Files API). The
+/// interface has connected it under `connection_id` before. Returns the folder.
+#[tauri::command]
+async fn mount_start(app: tauri::AppHandle, state: State<'_, AppState>, connection_id: String, server_id: String, name: String, remote_root: String) -> AppResult<String> {
+    #[cfg(windows)]
+    {
+        state.mounts.start(app, state.connections.clone(), connection_id, server_id, name, remote_root)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, state, connection_id, server_id, name, remote_root);
+        Err(AppError::other("Server als Ordner im Explorer gibt es bisher nur unter Windows."))
+    }
+}
+
+/// Takes a server out of the Explorer; with `remove_folder` the local folder
+/// goes too. Returns the folder when it had to stay.
+#[tauri::command]
+async fn mount_stop(state: State<'_, AppState>, server_id: String, remove_folder: bool) -> AppResult<Option<String>> {
+    #[cfg(windows)]
+    {
+        state.mounts.stop(&server_id, remove_folder)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (state, server_id, remove_folder);
+        Ok(None)
+    }
+}
+
+/// Folder of a mounted server, if it is shown in the Explorer right now.
+#[tauri::command]
+fn mount_folder(state: State<'_, AppState>, server_id: String) -> Option<String> {
+    #[cfg(windows)]
+    {
+        state.mounts.folder(&server_id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (state, server_id);
+        None
+    }
+}
 
 #[tauri::command]
 fn take_pending_uploads() -> Vec<String> {
@@ -1440,6 +1491,9 @@ pub fn run() {
             local_zip,
             archive_extract_temp,
             take_pending_uploads,
+            mount_start,
+            mount_stop,
+            mount_folder,
             shell_integration_set,
             remote_share_link,
             local_unzip,

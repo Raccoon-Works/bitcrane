@@ -87,3 +87,39 @@ mod tests {
         assert_eq!(to_ui(&home()), "~");
     }
 }
+
+/// Windows Explorer folder of a mounted server (`mount_win.rs`): path below
+/// `root` as a server path below `remote_root`; `None` outside the folder.
+pub fn sync_root_to_remote(root: &Path, remote_root: &str, local: &Path) -> Option<String> {
+    let root_s = root.to_string_lossy().trim_end_matches('\\').to_lowercase();
+    let local_s = local.to_string_lossy().to_string();
+    // Windows may report the path with a "\\?\" prefix or different letter case.
+    let plain = local_s.strip_prefix(r"\\?\").unwrap_or(&local_s);
+    if !plain.to_lowercase().starts_with(&root_s) {
+        return None;
+    }
+    let rest = &plain[root_s.len()..];
+    if !(rest.is_empty() || rest.starts_with('\\')) {
+        return None;
+    }
+    let mut out = remote_root.to_string();
+    for seg in rest.split('\\').filter(|s| !s.is_empty()) {
+        out = remote_join(&out, seg);
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+mod sync_root_tests {
+    use super::sync_root_to_remote as to_remote;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn maps_explorer_paths_to_the_server() {
+        let root = PathBuf::from(r"C:\Users\c\Bitcrane\Web");
+        assert_eq!(to_remote(&root, "/var/www", Path::new(r"C:\Users\c\Bitcrane\Web\a\b.txt")).as_deref(), Some("/var/www/a/b.txt"));
+        assert_eq!(to_remote(&root, "/var/www", Path::new(r"\\?\c:\users\c\bitcrane\web")).as_deref(), Some("/var/www"));
+        assert_eq!(to_remote(&root, "/", Path::new(r"C:\Users\c\Bitcrane\Webseite\x")), None);
+        assert_eq!(to_remote(&root, "/", Path::new(r"C:\Users\c\Bitcrane\Web\x")).as_deref(), Some("/x"));
+    }
+}
