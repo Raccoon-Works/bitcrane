@@ -17,7 +17,6 @@ import { AfterQueueDialog, CloudSignInDialog, MergeFoldersDialog, SelectMaskDial
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { ImportDialog } from './components/dialogs/ImportDialog';
 import { ServerEdit } from './components/dialogs/ServerEdit';
-import { SettingsDialog } from './components/dialogs/Settings';
 import { ToolbarCustomize } from './components/dialogs/ToolbarCustomize';
 import { TransfersDialog } from './components/dialogs/Transfers';
 import { WatchSetup } from './components/dialogs/WatchSetup';
@@ -45,7 +44,6 @@ function Dialogs() {
     case 'fingerprint': return <Fingerprint mode={dialog.mode} keyInfo={dialog.key} serverId={dialog.serverId} />;
     case 'conflict': return <ConflictDialog />;
     case 'perms': return <PermsDialog key={dialog.path} side={dialog.side} path={dialog.path} />;
-    case 'settings': return <SettingsDialog tab={dialog.tab} />;
     case 'about': return <About />;
     case 'licenses': return <Licenses />;
     case 'update': return <UpdateDialog />;

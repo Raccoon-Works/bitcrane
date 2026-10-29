@@ -15,6 +15,7 @@ import { Inspector } from './Inspector';
 import { Pane } from './Pane';
 import { ConnectionTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
+import { SettingsPage } from './dialogs/Settings';
 import { TrafficLights } from './TrafficLights';
 import { $t } from '../i18n';
 import { CheckCircle, DownloadSimple, Info, WarningCircle } from '@phosphor-icons/react';
@@ -46,6 +47,7 @@ export function MainWindow() {
   const swap = useStore((s) => s.settings.swapSides);
   const split = useStore((s) => s.settings.splitRatio ?? 0.5);
   const panesRef = useRef<HTMLDivElement>(null);
+  const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
 
   return (
@@ -59,7 +61,7 @@ export function MainWindow() {
         </div>
       )}
       <div className="window-body">
-          <div className="main-col">
+          {settingsTab ? <SettingsPage section={settingsTab} /> : <div className="main-col">
             <Toolbar />
             <div className="content">
               <div className="content-main">
@@ -77,7 +79,7 @@ export function MainWindow() {
               </div>
               {inspector && <Inspector />}
             </div>
-          </div>
+          </div>}
       </div>
       {/* Neutral card in the normal text colour; only the small symbol shows the kind of message. */}
       {toast && (

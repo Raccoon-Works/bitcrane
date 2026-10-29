@@ -170,6 +170,8 @@ export interface Tab {
   rightLocal?: boolean;
   /** Built-in terminal of this tab (state/terminal.ts): panel shown, session in front, filling the tab. */
   terminal?: { open: boolean; active?: string; full?: boolean };
+  /** The settings shown in a tab of their own (like a browser or VS Code); the area in front. */
+  settings?: import('../state/store').SettingsTab;
 }
 
 /** Options of a folder watch. Mirrors the "Überwachung einrichten" dialog. */

@@ -716,6 +716,7 @@ export function setPaneServerList(side: PaneSide, on: boolean) {
 
 /** Name of a tab: its server, or "Neuer Tab" while none is chosen. */
 export function tabTitle(t: Tab, s: AppState = state): string {
+  if (t.settings) return $t('Einstellungen');
   const right = t.serverId ? serverById(t.serverId, s)?.name : undefined;
   const left = t.leftServerId ? serverById(t.leftServerId, s)?.name : undefined;
   if (right && left) return `${left} ↔ ${right}`;
@@ -1675,7 +1676,31 @@ export function setSidebarWidth(width: number) {
     // Not critical: the width simply is not remembered.
   }
 }
-export const openDialog = (dialog: DialogState) => setState({ dialog, popoverOpen: false, contextMenu: null, appMenu: null, menuBarWindowOpen: false });
+export const openDialog = (dialog: DialogState) => {
+  // The settings are a tab of their own, not a dialog.
+  if (dialog?.type === 'settings') return openSettingsTab(dialog.tab);
+  setState({ dialog, popoverOpen: false, contextMenu: null, appMenu: null, menuBarWindowOpen: false });
+};
+
+/** Opens the settings tab (or brings it to the front) on the given area. */
+export function openSettingsTab(section: SettingsTab = 'general') {
+  const s = state;
+  const close = { dialog: null, popoverOpen: false, contextMenu: null, appMenu: null, menuBarWindowOpen: false };
+  const existing = s.tabs.find((t) => t.settings);
+  if (existing) {
+    setState({ ...close, activeTabId: existing.id, tabs: s.tabs.map((t) => (t.id === existing.id ? { ...t, settings: section } : t)) });
+    return;
+  }
+  const from = activeTab(s);
+  const tab: Tab = { ...emptyTab(from && !from.leftServerId ? from.localPath : '~'), settings: section };
+  const at = Math.max(0, s.tabs.findIndex((t) => t.id === s.activeTabId)) + 1;
+  setState({ ...close, tabs: [...s.tabs.slice(0, at), tab, ...s.tabs.slice(at)], activeTabId: tab.id, selection: clearSelection() });
+}
+
+/** Switches the area shown in the settings tab. */
+export function setSettingsSection(section: SettingsTab) {
+  setState((s) => ({ tabs: s.tabs.map((t) => (t.settings ? { ...t, settings: section } : t)) }));
+}
 export const closeDialog = () => setState({ dialog: null });
 /** What the search field searches: this computer, a server's files, or the server list. */
 export function searchTarget(s: AppState = state): { side: PaneSide; kind: 'local' | 'server' | 'servers'; name: string } {

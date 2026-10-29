@@ -10,8 +10,9 @@ import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
-import { closeDialog, getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
-import { ListChecks, TerminalWindow } from '@phosphor-icons/react';
+import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { Bug, GithubLogo, ListChecks, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
+import { BMark } from '../icons';
 import { SCHEMES, terminalSettings, type Snippet, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
@@ -19,7 +20,6 @@ import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
 import { Button, IconButton, Select, Switch, TextField } from '../ui';
-import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
 /** Stable empty list for the store selector (a new [] would redraw endlessly). */
@@ -352,22 +352,61 @@ function permOptions(values: string[], dir = false): Array<{ value: string; labe
   return [{ value: '', label: $t('Wie vom Server vorgegeben') }, ...values.map((v) => ({ value: v, label: `${v} (${dir ? 'd' : '-'}${rwx(v)})` }))];
 }
 
-export function SettingsDialog({ tab }: { tab: SettingsTab }) {
-  const [current, setCurrent] = useState<SettingsTab>(tab);
+const GITHUB_URL = 'https://github.com/Raccoon-Works/bitcrane';
+
+/** Top of "Allgemein": the app symbol with name and version, update check and links. */
+function AboutHeader() {
+  const [version, setVersion] = useState(LIVE ? '' : '0.2.50');
+  const update = useStore((st) => st.update);
+  useEffect(() => {
+    if (LIVE) invoke<{ version: string }>('app_info').then((i) => setVersion(i.version)).catch(() => undefined);
+  }, []);
+  const links: Array<{ label: string; note: string; icon: ReactNode; run: () => void }> = [
+    { label: $t('Was ist neu?'), note: $t('Änderungen der Versionen'), icon: <Sparkle size={18} />, run: () => openExternal(`${GITHUB_URL}/releases`) },
+    { label: $t('Problem melden'), note: $t('Auf GitHub'), icon: <Bug size={18} />, run: () => openExternal(`${GITHUB_URL}/issues/new`) },
+    { label: $t('Quellcode'), note: 'GitHub', icon: <GithubLogo size={18} />, run: () => openExternal(GITHUB_URL) },
+    { label: $t('Lizenzen'), note: $t('Verwendete Bausteine'), icon: <Scroll size={18} />, run: () => openDialog({ type: 'licenses' }) },
+  ];
+  return (
+    <div className="set-about">
+      <div className="set-about-app">
+        <BMark variant="macApp" size={84} />
+        <div className="col-text">
+          <span className="set-about-name">Bitcrane</span>
+          <span className="small muted">{version ? $t('Version {0}', version) : ' '}{update?.status === 'ready' ? ` · ${$t('Update {0} bereit', update.version ?? '')}` : ''}</span>
+          <span className="small muted">{$t('von')} RaccoonWorks</span>
+        </div>
+      </div>
+      <div className="set-about-links">
+        {links.map((l) => (
+          <button key={l.label} type="button" className="set-about-link" onClick={l.run}>
+            <span className="set-about-link-icon" aria-hidden="true">{l.icon}</span>
+            <span className="col-text"><span>{l.label}</span><span className="small muted">{l.note}</span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The settings, shown in a tab of their own with the areas listed on the left. */
+export function SettingsPage({ section }: { section: SettingsTab }) {
+  const current = section;
+  const setCurrent = setSettingsSection;
   const s = useStore((st) => st.settings);
   const platform = useStore((st) => st.platform);
   const [pattern, setPattern] = useState<string | null>(null);
   const mac = platform === 'mac';
   const tabs: Array<{ id: SettingsTab; label: string; icon: ReactNode }> = [
-    { id: 'general', label: $t('Allgemein'), icon: <Gear size={20} strokeWidth={1.5} /> },
-    { id: 'watch', label: $t('Überwachung'), icon: <WatchIcon size={20} waves={2} /> },
-    { id: 'transfers', label: $t('Übertragungen'), icon: <ArrowUpDown size={20} strokeWidth={1.5} /> },
-    { id: 'rules', label: $t('Regeln'), icon: <ListChecks size={20} /> },
-    { id: 'connections', label: $t('Verbindungen'), icon: <Shield size={20} strokeWidth={1.5} /> },
-    { id: 'appearance', label: $t('Darstellung'), icon: <SunMoon size={20} strokeWidth={1.5} /> },
-    { id: 'terminal', label: $t('Terminal'), icon: <TerminalWindow size={20} /> },
-    { id: 'keys', label: $t('Tastenkürzel'), icon: <Keyboard size={20} strokeWidth={1.5} /> },
-    { id: 'advanced', label: $t('Erweitert'), icon: <SlidersHorizontal size={20} strokeWidth={1.5} /> },
+    { id: 'general', label: $t('Allgemein'), icon: <Gear size={18} strokeWidth={1.6} /> },
+    { id: 'watch', label: $t('Überwachung'), icon: <WatchIcon size={18} waves={2} /> },
+    { id: 'transfers', label: $t('Übertragungen'), icon: <ArrowUpDown size={18} strokeWidth={1.6} /> },
+    { id: 'rules', label: $t('Regeln'), icon: <ListChecks size={18} /> },
+    { id: 'connections', label: $t('Verbindungen'), icon: <Shield size={18} strokeWidth={1.6} /> },
+    { id: 'appearance', label: $t('Darstellung'), icon: <SunMoon size={18} strokeWidth={1.6} /> },
+    { id: 'terminal', label: $t('Terminal'), icon: <TerminalWindow size={18} /> },
+    { id: 'keys', label: $t('Tastenkürzel'), icon: <Keyboard size={18} strokeWidth={1.6} /> },
+    { id: 'advanced', label: $t('Erweitert'), icon: <SlidersHorizontal size={18} strokeWidth={1.6} /> },
   ];
   const title = tabs.find((t) => t.id === current)?.label ?? $t('Einstellungen');
 
@@ -400,16 +439,20 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
   };
 
   return (
-    <Dialog label={$t('Einstellungen')} windowLike windowTitle={mac ? title : $t('Einstellungen')} width={860} maxHeight={760} onClose={closeDialog} className="settings-dialog">
-      <div role="tablist" aria-label={$t('Bereiche')} className="set-tabs">
+    <div className="settings-page">
+      <nav role="tablist" aria-orientation="vertical" aria-label={$t('Bereiche')} className="set-nav">
+        <span className="set-nav-title">{$t('Einstellungen')}</span>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === current} className={`set-tab${t.id === current ? ' is-sel' : ''}`} onClick={() => setCurrent(t.id)}>
             {/* Each area has its own colour, as in Transmit's and the Windows settings. */}
             <span className="set-tab-icon" style={{ color: TAB_COLORS[t.id] }}>{t.icon}</span><span>{t.label}</span>
           </button>
         ))}
-      </div>
+      </nav>
+      <div className="set-scroll">
       <div className="set-body" role="tabpanel" aria-label={title}>
+        {current === 'general' && <AboutHeader />}
+        <h1 className="set-heading">{title}</h1>
         {current === 'rules' && <RulesSettings />}
         {current === 'watch' && (
           <>
@@ -610,7 +653,8 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
           </>
         )}
       </div>
-    </Dialog>
+      </div>
+    </div>
   );
 }
 

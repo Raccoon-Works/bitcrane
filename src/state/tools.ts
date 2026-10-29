@@ -183,7 +183,7 @@ export function savedTabs(tabs: Tab[] = getState().tabs): SavedTab[] {
   const servers = getState().servers;
   const keep = (id?: string) => !!id && !servers.find((x) => x.id === id)?.temporary;
   return tabs
-    .filter((t) => !t.serverId || keep(t.serverId))
+    .filter((t) => !t.settings && (!t.serverId || keep(t.serverId)))
     .map((t) => ({
       serverId: t.serverId,
       localPath: t.leftServerId && !keep(t.leftServerId) ? '~' : t.localPath,
