@@ -4,7 +4,8 @@
  * and "Arbeitsbereiche".
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { PaneSide } from '../../backend/types';
+import type { PaneSide, Protocol } from '../../backend/types';
+import { cancelCloudSignIn, CLOUD_NAMES, signInToCloud } from '../../state/cloud';
 import { closeDialog, finishCopyOrMove, serverById, useStore, type AfterQueue } from '../../state/store';
 import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue } from '../../state/tools';
 import { Button, Checkbox, Segmented, TextField } from '../ui';
@@ -114,6 +115,30 @@ export function MergeFoldersDialog({ fromDir, names, toDir, move, clashes }: { f
         <Button onClick={() => finishCopyOrMove(fromDir, names, toDir, move, false)}>{$t('Beide behalten')}</Button>
         <Button variant="primary" onClick={() => finishCopyOrMove(fromDir, names, toDir, move, true)}>{$t('Zusammenführen')}</Button></>}>
       <p className="small muted">{$t('Zusammenführen legt den Inhalt in den vorhandenen Ordner. Gleichnamige Dateien werden nicht überschrieben, sondern bleiben beide erhalten („… Kopie“). Beide behalten legt einen zweiten Ordner „… Kopie“ an.')}</p>
+    </Dialog>
+  );
+}
+
+/**
+ * Sign-in to a cloud service: Bitcrane opens the service's page in the
+ * browser and waits for the answer. Nothing is typed in Bitcrane itself.
+ */
+export function CloudSignInDialog({ service, serverId }: { service: Protocol; serverId?: string }) {
+  const name = CLOUD_NAMES[service] ?? service;
+  const [error, setError] = useState<string | null>(null);
+  const [run, setRun] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    void signInToCloud(service, serverId).then((e) => { if (alive && e) setError(e); });
+    return () => { alive = false; };
+  }, [service, serverId, run]);
+  return (
+    <Dialog label={$t('Bei {0} anmelden', name)} title={$t('Bei {0} anmelden', name)} width={480} onClose={cancelCloudSignIn}
+      footer={<><span className="flex-1" />{error && <Button onClick={() => setRun((n) => n + 1)}>{$t('Noch einmal')}</Button>}<Button onClick={cancelCloudSignIn}>{$t('Abbrechen')}</Button></>}>
+      {error
+        ? <p className="small tone-danger">{error}</p>
+        : <p className="small muted">{$t('Im Browser hat sich die Anmeldeseite von {0} geöffnet. Melde dich dort an und erlaube den Zugriff für Bitcrane. Danach geht es hier von selbst weiter. Bitcrane bekommt dein Passwort nie zu sehen.', name)}</p>}
     </Dialog>
   );
 }

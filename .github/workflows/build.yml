@@ -100,6 +100,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # App keys of the cloud services (Settings -> Secrets and variables -> Actions -> Variables).
+          # Public by design for desktop apps; without them the services show as "not set up yet".
+          BITCRANE_DROPBOX_KEY: ${{ vars.DROPBOX_APP_KEY }}
+          BITCRANE_ONEDRIVE_KEY: ${{ vars.ONEDRIVE_CLIENT_ID }}
         with:
           args: ${{ matrix.args }}
 

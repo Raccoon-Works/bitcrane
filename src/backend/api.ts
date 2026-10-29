@@ -179,6 +179,13 @@ export interface Backend {
   disconnect(serverId: string): Promise<void>;
   connectFtp(serverId: string, params: FtpConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectDav(serverId: string, params: DavConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** Dropbox with the refresh token from the sign-in (kept in the keychain). */
+  connectDropbox(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** Which cloud services this build has app keys for. */
+  cloudServices(): Promise<{ dropbox: boolean; onedrive: boolean }>;
+  /** Sign-in in the browser; resolves with the refresh token and the account name. */
+  cloudSignIn(service: string): Promise<{ refreshToken: string; account: string }>;
+  cloudSignInCancel(): Promise<void>;
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;
   remoteMkdir(serverId: string, path: string): Promise<void>;

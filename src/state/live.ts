@@ -15,7 +15,7 @@ import { toBackendError } from '../backend/api';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { tauriBackend as backend } from '../backend/tauriBackend';
-import type { FileEntry, PaneSide, Server, Tab, Transfer, Watch } from '../backend/types';
+import { isCloudProtocol, type FileEntry, type PaneSide, type Server, type Tab, type Transfer, type Watch } from '../backend/types';
 import { basename, join, parent } from '../util/paths';
 import { addLog } from './log';
 import { savedTabs, tabsFromSaved } from './tools';
@@ -148,6 +148,11 @@ export const isConnecting = (serverId: string) => connecting.has(serverId);
 function passphraseAccount(srv: Server) {
   return `passphrase:${srv.keyPath}`;
 }
+/** Keychain entry of a cloud service's sign-in (refresh token). */
+export function cloudAccount(srv: Pick<Server, 'id'>) {
+  return `cloud:${srv.id}`;
+}
+
 function passwordAccount(srv: Server) {
   return `password:${srv.user}@${srv.host}:${srv.port}`;
 }
@@ -157,7 +162,7 @@ export function proxyAccount(p: { user?: string; host: string; port: number }) {
 
 /** Removes the stored secrets of a deleted server, unless a remaining server uses the same account. */
 export async function forgetSecrets(removed: Server, remaining: Server[]) {
-  const accounts = (x: Server) => [passwordAccount(x), passphraseAccount(x), ...(x.proxy?.user ? [proxyAccount(x.proxy)] : [])];
+  const accounts = (x: Server) => [passwordAccount(x), passphraseAccount(x), ...(x.proxy?.user ? [proxyAccount(x.proxy)] : []), ...(isCloudProtocol(x.protocol) ? [cloudAccount(x)] : [])];
   const inUse = new Set(remaining.flatMap(accounts));
   for (const a of accounts(removed)) if (!inUse.has(a)) await backend.secretDelete(a).catch(() => undefined);
 }
@@ -209,6 +214,12 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
   }
   if (srv.protocol === 'webdav') {
     return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only });
+  }
+  if (srv.protocol === 'dropbox') {
+    // The sign-in from the browser, kept in the keychain (see addCloudService).
+    const refreshToken = await keychain(cloudAccount(srv));
+    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    return backend.connectDropbox(id, { refreshToken });
   }
   return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, jump, proxy });
 }
@@ -265,8 +276,8 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV' };
-const authLabel = (srv: Server) => (!isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox' };
+const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
 /** Home folder of each connected server: a half that opens an already connected server starts there. */
@@ -385,7 +396,9 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
         openDialog({ type: 'secret', serverId, kind: 'password' });
         break;
       case 'authFailed':
-        if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined)) openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
+        // A cloud service's sign-in was revoked or is missing: sign in again in the browser.
+        if (isCloudProtocol(srv.protocol)) openDialog({ type: 'cloudSignIn', service: srv.protocol!, serverId });
+        else if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined)) openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
         else showToast(`${err.message}${err.detail ? ' ' + err.detail : ''}`, 'error');
         break;
       case 'cancelled':
@@ -1595,6 +1608,8 @@ async function loadConfig() {
   }
   // Saved comparisons with a schedule run by themselves from now on.
   void import('./scheduler').then((m) => m.startScheduler());
+  // Which cloud services this build can add (app keys are put in at build time).
+  void import('./cloud').then((m) => m.loadCloudServices());
   try {
     const [places, home] = await Promise.all([backend.localPlaces(), backend.localStat('~')]);
     setState({ homeName: home.name, ...(places.length ? { places } : {}) });

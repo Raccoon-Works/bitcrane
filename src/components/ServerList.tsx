@@ -7,7 +7,8 @@
 import { ArrowLeft, Info, Plus, SquareTerminal, X, Zap } from './glyphs';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowsClockwise, ClockCounterClockwise, FolderSimple, GlobeHemisphereWest, FolderSimplePlus, DownloadSimple, Globe, Lightning, Plus as PlusP, Stack } from '@phosphor-icons/react';
-import type { PaneSide, Server } from '../backend/types';
+import { isCloudProtocol, type PaneSide, type Protocol, type Server } from '../backend/types';
+import { showCloudNotSetUp } from '../state/cloud';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import {
   activeTab, addServerGroup, getState, importConfig, importSshConfig, LIVE, moveServer, renameServerGroup, serverGroupNames, openDialog, openServerIn, openSyncFavorite, quickConnect, setLeftServer,
@@ -23,6 +24,8 @@ import { $t } from '../i18n';
 
 /** Address shown next to a server name ("user@host" plus a port other than the default). */
 export function addressOf(x: Server): string {
+  // Cloud services: the signed-in account.
+  if (isCloudProtocol(x.protocol)) return x.user || x.host;
   const defaults: Record<string, number> = { sftp: 22, ftp: 21, ftps: x.implicitTls ? 990 : 21, webdav: x.davHttps === false ? 80 : 443 };
   const port = x.port !== defaults[x.protocol ?? 'sftp'] ? `:${x.port}` : '';
   return `${x.user ? `${x.user}@` : ''}${x.host}${port}`;
@@ -30,6 +33,7 @@ export function addressOf(x: Server): string {
 
 /** Short address for the list: the host (and a port other than the default); the user is in the tooltip. */
 export function hostOf(x: Server): string {
+  if (isCloudProtocol(x.protocol)) return x.user || x.host;
   const full = addressOf(x);
   return full.includes('@') ? full.slice(full.lastIndexOf('@') + 1) : full;
 }
@@ -123,15 +127,11 @@ export function ServerList({ side }: { side: PaneSide }) {
 /** What the right column of the server list shows (left column of Transmit's connection panel). */
 type Source = 'all' | 'recent' | 'syncs' | 'cloud' | `g:${string}`;
 
-/**
- * Prototype only: how cloud services will look among the servers (planned
- * feature "Cloud-Dienste als Server"). The rows can not be opened yet.
- */
-const CLOUD_PREVIEW: Array<{ id: CloudService; name: string; sub: string }> = [
-  { id: 'dropbox', name: 'Dropbox', sub: 'alex@example.com' },
-  { id: 'gdrive', name: 'Google Drive', sub: 'alex@example.com' },
-  { id: 'onedrive', name: 'OneDrive', sub: 'alex@example.com' },
-  { id: 's3', name: 'Amazon S3 · backup', sub: 'eu-central-1' },
+/** Cloud services that can be added (Dropbox now; OneDrive and Google Drive follow in the next versions). */
+const CLOUD_SERVICES: Array<{ id: CloudService; protocol?: Protocol; name: string }> = [
+  { id: 'dropbox', protocol: 'dropbox', name: 'Dropbox' },
+  { id: 'onedrive', name: 'OneDrive' },
+  { id: 'gdrive', name: 'Google Drive' },
 ];
 
 function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
@@ -156,7 +156,8 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   const recent = useMemo(() => servers.filter((x) => x.temporary || x.lastUsed).sort((a, b) => (b.lastUsed ?? 0) - (a.lastUsed ?? 0)).slice(0, 12), [servers]);
   // A search always looks through all servers.
   const view: Source = q ? 'all' : source.startsWith('g:') && !groupList.includes(source.slice(2)) ? 'all' : source;
-  const cloudPreview = !LIVE && !q;
+  const cloudAvailable = useStore((s) => s.cloudAvailable);
+  const cloudServers = saved.filter((x) => isCloudProtocol(x.protocol));
   const shown = view === 'cloud' ? [] : view === 'recent' ? recent
     : view.startsWith('g:') ? saved.filter((x) => x.group.trim() === view.slice(2))
     : q ? saved.filter((x) => `${x.name} ${x.host} ${x.user} ${x.group}`.toLowerCase().includes(q)) : saved;
@@ -222,14 +223,20 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
     );
   };
 
-  const cloudRow = (c: (typeof CLOUD_PREVIEW)[number]) => (
-    <div key={c.id} role="option" aria-selected={false} aria-disabled="true" tabIndex={-1} className="server-row is-preview"
-      title={`${c.name}\n${$t('Vorschau: Cloud-Dienste kommen mit einer späteren Version.')}`}>
-      <CloudTile service={c.id} size={20} />
-      <span className="server-row-name ellipsis">{c.name}</span>
-      <span className="server-row-sub ellipsis">{c.sub}</span>
-    </div>
-  );
+  // "Hinzufügen" rows of the cloud services: sign in through the browser.
+  const cloudAddRow = (c: (typeof CLOUD_SERVICES)[number]) => {
+    const ready = !!c.protocol && (c.protocol === 'dropbox' ? cloudAvailable.dropbox : false);
+    const add = () => (ready && c.protocol ? openDialog({ type: 'cloudSignIn', service: c.protocol }) : c.protocol ? showCloudNotSetUp(c.protocol) : undefined);
+    return (
+      <div key={`add-${c.id}`} role="option" aria-selected={false} aria-disabled={!ready} tabIndex={ready ? 0 : -1} className={`server-row${ready ? '' : ' is-preview'}`}
+        title={ready ? $t('Doppelklick: bei {0} anmelden', c.name) : $t('Kommt mit einem der nächsten Updates.')}
+        onDoubleClick={add} onKeyDown={(e) => { if (e.key === 'Enter') add(); }}>
+        <CloudTile service={c.id} size={20} />
+        <span className="server-row-name ellipsis">{$t('{0} hinzufügen …', c.name)}</span>
+        <span className="server-row-sub ellipsis">{ready ? $t('Anmeldung im Browser') : $t('bald')}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="server-split">
@@ -238,7 +245,7 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
         {groupList.map((g) => sourceItem(`g:${g}`, g, <FolderSimple size={22} weight="fill" />, saved.filter((x) => x.group.trim() === g).length, g))}
         <span className="source-sep" />
         {sourceItem('recent', $t('Verlauf'), <ClockCounterClockwise size={22} weight="bold" />, 0)}
-        {cloudPreview && sourceItem('cloud', $t('Cloud-Dienste'), <CloudServicesIcon size={22} />, CLOUD_PREVIEW.length)}
+        {!q && sourceItem('cloud', $t('Cloud-Dienste'), <CloudServicesIcon size={22} />, cloudServers.length)}
         {syncFavorites.length > 0 && sourceItem('syncs', $t('Abgleiche'), <ArrowsClockwise size={22} weight="duotone" />, syncFavorites.length)}
       </div>
       <ResizeHandle orientation="vertical" label={$t('Breite der Gruppenspalte (ziehen, Doppelklick: zurücksetzen)')} value={sourcesWidth} min={140} max={360} step={10}
@@ -279,8 +286,9 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
             );
           })
           : shown.map(row)}
-        {cloudPreview && view === 'all' && <div className="server-subhead" role="presentation">{$t('Cloud-Dienste')}<span className="tag">{$t('Vorschau')}</span></div>}
-        {cloudPreview && (view === 'all' || view === 'cloud') && CLOUD_PREVIEW.map(cloudRow)}
+        {view === 'cloud' && cloudServers.map(row)}
+        {view === 'cloud' && <div className="server-subhead" role="presentation">{$t('Hinzufügen')}</div>}
+        {view === 'cloud' && CLOUD_SERVICES.map(cloudAddRow)}
         {!shown.length && view !== 'syncs' && view !== 'cloud' && (
           <p className="server-empty">{q ? $t('Kein Server passt zu „{0}“.', filter) : view.startsWith('g:') ? $t('Diese Gruppe ist leer. Server aus „Alle Server“ hierher ziehen.') : $t('Noch nichts verbunden.')}</p>
         )}
@@ -329,6 +337,7 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
         <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}><Plus size={14} strokeWidth={2} aria-hidden="true" />{$t('Server hinzufügen')}</Button>
         <Button onClick={onQuick}><Zap size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Schnell verbinden')}</Button>
         <Button onClick={importSshConfig}><SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Aus anderen Programmen')}</Button>
+        <Button onClick={() => (getState().cloudAvailable.dropbox ? openDialog({ type: 'cloudSignIn', service: 'dropbox' }) : showCloudNotSetUp('dropbox'))}><CloudServicesIcon size={14} />{$t('Dropbox verbinden')}</Button>
       </div>
       {found > 0 && (
         <p className="notice small">

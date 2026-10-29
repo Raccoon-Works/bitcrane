@@ -29,6 +29,8 @@ export const swatch: Record<ServerColor, string> = {
 export function ServerTile({ server, size = 20, color, protocol, image }: { server?: Server; size?: number; mono?: string; color?: ServerColor; protocol?: Server['protocol']; image?: string }) {
   const proto = protocol ?? server?.protocol ?? 'sftp';
   const picture = image ?? server?.image;
+  // Cloud services show their own symbol (unless the user chose a picture).
+  if (!picture && proto === 'dropbox') return <CloudTile service="dropbox" size={size} />;
   // An own picture replaces the globe (the colour dot stays, so groups remain recognisable).
   if (picture) {
     const c = color ?? server?.color;
