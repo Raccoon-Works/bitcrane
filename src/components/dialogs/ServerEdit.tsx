@@ -10,7 +10,8 @@ import type { KeyInfo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { isCloudProtocol, type AuthMethod, type Server, type ServerColor } from '../../backend/types';
 import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/live';
-import { askRemoveServer, LIVE, monoFor, newServerTemplate, openDialog, saveServer, showToast, updateSettings, useStore } from '../../state/store';
+import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplate, openDialog, saveServer, showToast, updateSettings, useStore } from '../../state/store';
+import { showCloudNotSetUp } from '../../state/cloud';
 import { KeyPanel } from '../KeyPanel';
 import { ServerTile, swatch } from '../ServerTile';
 import { Button, Segmented, Select, TextField } from '../ui';
@@ -88,14 +89,16 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
   };
   const isNew = !servers.some((x) => x.id === draft.id);
   const cloud = isCloudProtocol(draft.protocol);
-  const family: 'sftp' | 'ftp' | 'webdav' = draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : 'sftp';
+  const family: 'sftp' | 'ftp' | 'webdav' | 'cloud' = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
   const STANDARD_PORTS = [22, 21, 990, 443, 80];
-  const setFamily = (f: 'sftp' | 'ftp' | 'webdav') => {
+  const setFamily = (f: 'sftp' | 'ftp' | 'webdav' | 'cloud') => {
     setTest('idle');
     setDraft((d) => {
+      // Cloud services (Transmit lists them with the protocols): signed in through the browser, no address or password.
+      if (f === 'cloud') return { ...d, protocol: 'dropbox', host: 'dropbox.com', port: 443, auth: 'agent' };
       const port = (p: number) => (STANDARD_PORTS.includes(d.port) ? p : d.port);
-      if (f === 'sftp') return { ...d, protocol: 'sftp', port: port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
+      if (f === 'sftp') return { ...d, protocol: 'sftp', host: isCloudProtocol(d.protocol) ? '' : d.host, port: isCloudProtocol(d.protocol) ? 22 : port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
       if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
       return { ...d, protocol: 'webdav', davHttps: d.davHttps ?? true, port: port(d.davHttps === false ? 80 : 443), auth: 'password' };
     });
@@ -161,14 +164,20 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
   const footer = (
     <>
       {cloud
-        ? <Button onClick={() => draft.protocol && openDialog({ type: 'cloudSignIn', service: draft.protocol, serverId: draft.id })}>{$t('Neu anmelden …')}</Button>
+        ? (!isNew && <Button onClick={() => draft.protocol && openDialog({ type: 'cloudSignIn', service: draft.protocol, serverId: draft.id })}>{$t('Neu anmelden …')}</Button>)
         : <Button onClick={runTest} disabled={test === 'running'}>{test === 'running' ? $t('Teste …') : $t('Verbindung testen')}</Button>}
       {test === 'ok' && <span className="small tone-ok row-inline test-result"><Check size={13} strokeWidth={2.2} aria-hidden="true" />{testText}</span>}
       {test === 'fail' && <span className="small tone-danger test-result">{testText}</span>}
       <span className="flex-1" />
       {!isNew && <Button variant="ghost" className="tone-danger-text" onClick={() => askRemoveServer(draft.id)}><Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />{$t('Entfernen')}</Button>}
-      <Button onClick={() => finish(false)}>{$t('Sichern')}</Button>
-      <Button variant="primary" onClick={() => finish(true)}>{$t('Verbinden')}</Button>
+      <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
+      {cloud && isNew
+        // A new cloud service is created by signing in (the browser gives Bitcrane the account).
+        ? <Button variant="primary" onClick={() => draft.protocol && (getState().cloudAvailable.dropbox || !LIVE ? openDialog({ type: 'cloudSignIn', service: draft.protocol }) : showCloudNotSetUp(draft.protocol))}>{$t('Bei Dropbox anmelden …')}</Button>
+        : <>
+          <Button onClick={() => finish(false)}>{$t('Sichern')}</Button>
+          <Button variant="primary" onClick={() => finish(true)}>{$t('Verbinden')}</Button>
+        </>}
     </>
   );
 
@@ -197,7 +206,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
             {isNew && (
               <div className="split-group">
                 <span className="side-title">{$t('Neu')}</span>
-                <div className="split-item is-sel"><ServerTile mono={draft.mono || '?'} color={draft.color} size={24} /><span className="split-text"><span className="strong-500">{draft.name || $t('Neuer Server')}</span><span className="small sub">{draft.host || $t('noch nicht gespeichert')}</span></span></div>
+                <div className="split-item is-sel"><ServerTile mono={draft.mono || '?'} color={draft.color} image={draft.image} protocol={draft.protocol} size={24} /><span className="split-text"><span className="strong-500">{draft.name || $t('Neuer Server')}</span><span className="small sub">{draft.host || $t('noch nicht gespeichert')}</span></span></div>
               </div>
             )}
           </div>
@@ -213,7 +222,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
           <div className="detail-head">
             {/* Own picture (Transmit): click the symbol to choose one; it is shrunk to 64 px and kept in the settings. */}
             <label className="server-picture" title={$t('Eigenes Bild wählen')}>
-              <ServerTile mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()} color={draft.color} image={draft.image} size={48} />
+              <ServerTile mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()} color={draft.color} image={draft.image} protocol={draft.protocol} size={48} />
               <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" className="vh" aria-label={$t('Eigenes Bild wählen')}
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pictureFromFile(f).then((url) => set('image', url)).catch(() => showToast($t('Das Bild ließ sich nicht lesen.'), 'error')); }} />
             </label>
@@ -236,8 +245,15 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
           <div className="form-grid">
             {cloud ? (
               <>
+                <span>{$t('Protokoll#protocol')}</span>
+                <div className="row-inline">
+                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
+                </div>
                 <span>{$t('Dienst')}</span>
-                <span className="small muted">{draft.protocol === 'dropbox' ? 'Dropbox' : draft.protocol}</span>
+                <div className="col-text">
+                  <Select<'dropbox'> label={$t('Dienst')} value="dropbox" onChange={() => undefined} options={[{ value: 'dropbox', label: 'Dropbox' }]} />
+                  <span className="small muted">{$t('OneDrive und Google Drive folgen mit den nächsten Updates.')}</span>
+                </div>
                 <span>{$t('Konto')}</span>
                 <span className="small muted">{draft.user || '–'}</span>
                 <span>{$t('Anmeldung')}</span>
@@ -247,7 +263,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
             <>
             <span>{$t('Protokoll#protocol')}</span>
             <div className="row-inline">
-              <Segmented<'sftp' | 'ftp' | 'webdav'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }]} />
+              <Segmented<'sftp' | 'ftp' | 'webdav' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
             </div>
 
             {family === 'ftp' && (
@@ -343,7 +359,7 @@ export function ServerEdit({ serverId }: { serverId?: string }) {
               <span className="small muted">{$t('Lokal')}</span>
               <TextField mono value={draft.localStart} onChange={(v) => set('localStart', v)} />
               <span className="small muted">{$t('Server')}</span>
-              <TextField mono value={draft.remoteStart} onChange={(v) => set('remoteStart', v)} placeholder={`/home/${draft.user || 'benutzer'}`} />
+              <TextField mono value={draft.remoteStart} onChange={(v) => set('remoteStart', v)} placeholder={cloud ? '/' : `/home/${draft.user || 'benutzer'}`} />
             </div>
 
             {family === 'sftp' && <label htmlFor="s-jump">{$t('Sprungserver')}</label>}

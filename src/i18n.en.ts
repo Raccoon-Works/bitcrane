@@ -1610,4 +1610,9 @@ export const EN: Record<string, string> = {
   "Unerwartete Antwort des Anmeldedienstes.": "Unexpected answer from the sign-in service.",
   "Die Verbindung konnte nicht vorbereitet werden.": "The connection could not be prepared.",
   "Diesen Cloud-Dienst kennt Bitcrane noch nicht.": "Bitcrane does not know this cloud service yet.",
+  "Cloud-Dienst": "Cloud service",
+  "OneDrive und Google Drive folgen mit den nächsten Updates.": "OneDrive and Google Drive follow with the next updates.",
+  "Bei Dropbox anmelden …": "Sign in to Dropbox …",
+  "Doppelklick: anmelden": "double-click to sign in",
+  "Weitere hinzufügen": "Add more",
 };

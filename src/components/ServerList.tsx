@@ -171,7 +171,8 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
     setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'server', serverId: id } });
   };
 
-  if (!saved.length && !recent.length) return <Welcome onQuick={onQuick} />;
+  // Nothing saved yet: the welcome text sits where the list would be; the column on the left stays (Verlauf, Cloud-Dienste).
+  const welcome = !saved.length && !recent.length && !q && view === 'all';
 
   const sourceItem = (id: Source, label: ReactNode, icon: ReactNode, count: number, group?: string) => (
     <div
@@ -232,8 +233,8 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
         title={ready ? $t('Doppelklick: bei {0} anmelden', c.name) : $t('Kommt mit einem der nächsten Updates.')}
         onDoubleClick={add} onKeyDown={(e) => { if (e.key === 'Enter') add(); }}>
         <CloudTile service={c.id} size={20} />
-        <span className="server-row-name ellipsis">{$t('{0} hinzufügen …', c.name)}</span>
-        <span className="server-row-sub ellipsis">{ready ? $t('Anmeldung im Browser') : $t('bald')}</span>
+        <span className="server-row-name ellipsis">{c.name}</span>
+        <span className="server-row-sub ellipsis">{ready ? $t('Doppelklick: anmelden') : $t('bald')}</span>
       </div>
     );
   };
@@ -260,7 +261,8 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
             <span className="server-row-name">{platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC')}</span>
           </div>
         )}
-        {rightCanBeLocal && view === 'all' && !q && (
+        {welcome && <Welcome onQuick={onQuick} />}
+        {rightCanBeLocal && view === 'all' && !q && !welcome && (
           <div role="option" aria-selected={false} tabIndex={0} className="server-row" title={$t('Doppelklick: rechts Ordner dieses Computers zeigen (zwei lokale Hälften)')}
             onDoubleClick={() => setRightLocal()} onKeyDown={(e) => { if (e.key === 'Enter') setRightLocal(); }}>
             <LocalTile size={20} />
@@ -287,9 +289,9 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
           })
           : shown.map(row)}
         {view === 'cloud' && cloudServers.map(row)}
-        {view === 'cloud' && <div className="server-subhead" role="presentation">{$t('Hinzufügen')}</div>}
+        {view === 'cloud' && cloudServers.length > 0 && <div className="server-subhead" role="presentation">{$t('Weitere hinzufügen')}</div>}
         {view === 'cloud' && CLOUD_SERVICES.map(cloudAddRow)}
-        {!shown.length && view !== 'syncs' && view !== 'cloud' && (
+        {!shown.length && !welcome && view !== 'syncs' && view !== 'cloud' && (
           <p className="server-empty">{q ? $t('Kein Server passt zu „{0}“.', filter) : view.startsWith('g:') ? $t('Diese Gruppe ist leer. Server aus „Alle Server“ hierher ziehen.') : $t('Noch nichts verbunden.')}</p>
         )}
       </div>
@@ -337,7 +339,6 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
         <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}><Plus size={14} strokeWidth={2} aria-hidden="true" />{$t('Server hinzufügen')}</Button>
         <Button onClick={onQuick}><Zap size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Schnell verbinden')}</Button>
         <Button onClick={importSshConfig}><SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />{$t('Aus anderen Programmen')}</Button>
-        <Button onClick={() => (getState().cloudAvailable.dropbox ? openDialog({ type: 'cloudSignIn', service: 'dropbox' }) : showCloudNotSetUp('dropbox'))}><CloudServicesIcon size={14} />{$t('Dropbox verbinden')}</Button>
       </div>
       {found > 0 && (
         <p className="notice small">
