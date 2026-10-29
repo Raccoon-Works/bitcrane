@@ -110,3 +110,8 @@
   --sel-row: #5fb0ff; --sel-fg: #0d0d0d; --sel-sub: #1a2a3a; --accent-text: #5fb0ff; --focus: #5fb0ff; --accent-tint: rgba(95, 176, 255, 0.12);
   --paper: #262626;
 }
+/* Mac title bar with the tabs: as dark as the Windows title bar; the tab in front joins the toolbar below. */
+.page[data-palette='midnight'][data-theme='dark'] .mac-titlebar { background: var(--bg-titlebar); box-shadow: inset 0 -1px 0 var(--line); }
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab { border-right-color: var(--line); }
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab.is-sel { background: var(--bg-window); box-shadow: -1px 0 0 var(--line-strong), 1px 0 0 var(--line-strong); }
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tabs { border-left-color: var(--line); }
