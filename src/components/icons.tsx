@@ -12,11 +12,13 @@ import {
   FilePdf, FilePpt, FilePy, FileRs, FileSql, FileTs, FileTsx, FileTxt, FileVideo, FileVue, FileXls, FileZip, type Icon,
 } from '@phosphor-icons/react';
 
-type BVariant = 'macApp' | 'winApp' | 'mono';
+type BVariant = 'macApp' | 'winApp' | 'mono' | 'brand';
 
 const bColors: Record<Exclude<BVariant, 'mono'>, { arrowA: string; arrowB: string; bowlA: string; bowlB: string }> = {
   macApp: { arrowA: '#2A6DE0', arrowB: '#9AD8FF', bowlA: '#FFFFFF', bowlB: '#DCE6F5' },
   winApp: { arrowA: '#4C9BFF', arrowB: '#9FDCFF', bowlA: '#2A6DE0', bowlB: '#1B4FB8' },
+  // Interim free-standing mark in light blue with a slight edge (variant "D"), until the reworked logo arrives.
+  brand: { arrowA: '#9FD6FF', arrowB: '#DDF2FF', bowlA: '#6FB8FF', bowlB: '#4A9EF2' },
 };
 
 /**
@@ -48,6 +50,13 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
         </>
       )}
       <g transform={tf}>
+        {variant === 'brand' && [5, 4, 3, 2, 1].map((i) => (
+          <g key={i} transform={`translate(${i * 0.7} ${i * 0.9})`}>
+            <path d="M34 33 H54 A11 11 0 0 1 54 55 H34 M34 55 H56.5 A12 12 0 0 1 56.5 79 H34" fill="none" stroke="#1F5FA8" strokeWidth="10.5" strokeLinejoin="round" strokeLinecap="round" />
+            <path d="M34 79 V25" stroke="#4E8FCB" strokeWidth="11" strokeLinecap="round" fill="none" />
+            <path d="M34 11 L47.5 27 H20.5 Z" fill="#4E8FCB" stroke="#4E8FCB" strokeWidth="3.5" strokeLinejoin="round" />
+          </g>
+        ))}
         <path d="M34 33 H54 A11 11 0 0 1 54 55 H34 M34 55 H56.5 A12 12 0 0 1 56.5 79 H34" fill="none" stroke={`url(#${id}b)`} strokeWidth="10.5" strokeLinejoin="round" strokeLinecap="round" />
         <path d="M34 79 V25" stroke={`url(#${id}a)`} strokeWidth="11" strokeLinecap="round" fill="none" />
         <path d="M34 11 L47.5 27 H20.5 Z" fill={`url(#${id}a)`} stroke={`url(#${id}a)`} strokeWidth="3.5" strokeLinejoin="round" />

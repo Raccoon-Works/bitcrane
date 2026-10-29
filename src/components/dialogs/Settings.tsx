@@ -377,7 +377,7 @@ function AboutHeader() {
   return (
     <div className="set-about">
       <div className="set-about-app">
-        <BMark variant="macApp" size={84} />
+        <BMark variant="brand" size={80} />
         <div className="col-text">
           <span className="set-about-name">Bitcrane</span>
           <span className="small muted">{version ? $t('Version {0}', version) : ' '}{update?.status === 'ready' ? ` · ${$t('Update {0} bereit', update.version ?? '')}` : ''}</span>
