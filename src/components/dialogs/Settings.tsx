@@ -15,6 +15,7 @@ import { ListChecks, TerminalWindow } from '@phosphor-icons/react';
 import { SCHEMES, terminalSettings, type Snippet, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
+import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
 import { Button, IconButton, Select, Switch, TextField } from '../ui';
@@ -54,6 +55,7 @@ function TerminalSettingsPage() {
   const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const setSnippets = (list: Snippet[]) => updateSettings({ snippets: list });
   const edit = (id: string, patch: Partial<Snippet>) => setSnippets(snippets.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const [historyN, setHistoryN] = useState(historyCount);
   return (
     <>
       <Group title={$t('Darstellung')}>
@@ -71,6 +73,14 @@ function TerminalSettingsPage() {
         </Row>
         <Row label={$t('Beim Markieren kopieren')} note={$t('Markierter Text landet sofort in der Zwischenablage, wie in PuTTY.')}><Switch checked={t.copyOnSelect} onChange={(v) => set({ copyOnSelect: v })} label={$t('Beim Markieren kopieren')} /></Row>
         <Row label={$t('Im angezeigten Ordner starten')} note={$t('Das Terminal beginnt im Ordner, den die Serverhälfte gerade zeigt.')}><Switch checked={t.startInFolder} onChange={(v) => set({ startInFolder: v })} label={$t('Im angezeigten Ordner starten')} /></Row>
+      </Group>
+      <Group title={$t('Vorschläge')}>
+        <Row label={$t('Vorschläge aus dem Verlauf')} note={$t('Beim Tippen erscheint ausgegraut ein früherer Befehl dieses Servers oder ein Snippet; die Pfeiltaste nach rechts übernimmt ihn. Tab vervollständigt weiter wie gewohnt über die Shell.')}>
+          <Switch checked={t.suggestions} onChange={(v) => set({ suggestions: v })} label={$t('Vorschläge aus dem Verlauf')} />
+        </Row>
+        <Row label={$t('Gemerkte Befehle')} note={$t('Nur auf diesem Computer, höchstens 300 je Server. Befehle mit einem Leerzeichen am Anfang merkt sich Bitcrane nicht, z. B. für Passwörter in der Befehlszeile.')}>
+          <Button small disabled={!historyN} onClick={() => { clearHistory(); setHistoryN(0); }}>{historyN ? $t('{0} Befehle löschen', String(historyN)) : $t('Keine')}</Button>
+        </Row>
       </Group>
       <Group title={$t('Snippets')}>
         {snippets.length === 0 && <div className="set-row"><span className="small muted">{$t('Snippets sind gespeicherte Befehle, die du im Terminal mit einem Klick einfügst, z. B. „sudo systemctl restart nginx“.')}</span></div>}

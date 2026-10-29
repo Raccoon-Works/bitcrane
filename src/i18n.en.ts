@@ -1881,4 +1881,11 @@ export const EN: Record<string, string> = {
   "alle Pfade": "all paths",
   "nur der Name": "just the name",
   "der Ordner": "the folder",
+  "Vorschläge": "Suggestions",
+  "Vorschläge aus dem Verlauf": "Suggestions from history",
+  "Beim Tippen erscheint ausgegraut ein früherer Befehl dieses Servers oder ein Snippet; die Pfeiltaste nach rechts übernimmt ihn. Tab vervollständigt weiter wie gewohnt über die Shell.": "While you type, an earlier command of this server or a snippet appears dimmed; the right arrow key accepts it. Tab still completes through the shell as usual.",
+  "Gemerkte Befehle": "Remembered commands",
+  "Nur auf diesem Computer, höchstens 300 je Server. Befehle mit einem Leerzeichen am Anfang merkt sich Bitcrane nicht, z. B. für Passwörter in der Befehlszeile.": "Only on this computer, at most 300 per server. Commands that start with a space are not remembered, e.g. for passwords on the command line.",
+  "{0} Befehle löschen": "Delete {0} commands",
+  "Keine": "None",
 };

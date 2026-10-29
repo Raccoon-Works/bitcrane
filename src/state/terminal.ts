@@ -18,6 +18,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import type { Tab } from '../backend/types';
 import { $t } from '../i18n';
 import { isSftp } from './live';
+import { Suggester } from './termSuggest';
 import { activeTab, getState, LIVE, openExternal, serverById, setState, showToast, subscribeStore, uid } from './store';
 
 export interface TermSession {
@@ -45,6 +46,8 @@ export interface TerminalSettings {
   copyOnSelect: boolean;
   /** Start in the folder the server half shows. */
   startInFolder: boolean;
+  /** Dimmed suggestions from the history while typing (termSuggest.ts). */
+  suggestions: boolean;
 }
 
 /** Tab state of the terminal: panel shown, session in front, whole tab. */
@@ -87,6 +90,7 @@ export const defaultTerminalSettings = (): TerminalSettings => ({
   cursor: 'block',
   copyOnSelect: false,
   startInFolder: true,
+  suggestions: false,
 });
 
 export const terminalSettings = (): TerminalSettings => ({ ...defaultTerminalSettings(), ...(getState().settings.terminal ?? {}) });
@@ -106,6 +110,7 @@ interface Live {
   search: SearchAddon;
   host: HTMLDivElement;
   opened: boolean;
+  suggest: Suggester;
 }
 
 const live = new Map<string, Live>();
@@ -144,8 +149,13 @@ function makeTerminal(session: TermSession): Live {
   term.loadAddon(fit);
   term.loadAddon(search);
   term.loadAddon(new WebLinksAddon((_e, url) => openExternal(url)));
-  term.onData((d) => {
+  const host = document.createElement('div');
+  host.className = 'term-host';
+  const suggest = new Suggester(term, host, session.serverId, () => terminalSettings().suggestions, () => getState().settings.snippets ?? []);
+  term.onData((input) => {
+    const d = suggest.input(input);
     if (LIVE) void invoke('term_write', { id: session.id, data: d }).catch(() => undefined);
+    else previewEcho(term, d);
   });
   term.onResize(({ cols, rows }) => {
     if (LIVE) void invoke('term_resize', { id: session.id, cols, rows }).catch(() => undefined);
@@ -171,9 +181,14 @@ function makeTerminal(session: TermSession): Live {
     if (mac && e.metaKey) return false;
     return true;
   });
-  const host = document.createElement('div');
-  host.className = 'term-host';
-  return { term, fit, search, host, opened: false };
+  return { term, fit, search, host, opened: false, suggest };
+}
+
+/** Without the backend (prototype): a minimal echo, so typing and suggestions can be tried. */
+function previewEcho(term: Terminal, d: string) {
+  if (d === '\r') term.write('\r\n$ ');
+  else if (d === '\x7f') term.write('\b \b');
+  else if (!d.startsWith('\x1b')) term.write(d);
 }
 
 /** Starts a terminal for the active tab's server (in the folder it shows). */
@@ -254,6 +269,7 @@ function markEnded(id: string) {
 export function closeTerminal(id: string) {
   const session = getState().terminals.find((x) => x.id === id);
   if (LIVE) void invoke('term_close', { id }).catch(() => undefined);
+  live.get(id)?.suggest.dispose();
   live.get(id)?.term.dispose();
   live.delete(id);
   setState((s) => ({ terminals: s.terminals.filter((x) => x.id !== id) }));
@@ -331,6 +347,7 @@ function applySettings() {
     l.term.options.cursorStyle = st.cursor;
     l.term.options.theme = themeFor(session.serverId);
     if (l.opened) fitTerminal(id);
+    l.suggest.update();
   }
 }
 
