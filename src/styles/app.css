@@ -2303,7 +2303,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .confirm-detail { margin: 0; max-height: 160px; overflow: auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: var(--bg-field); white-space: pre-wrap; word-break: break-all; }
 
 /* Colour schemes of the terminal as previews (Settings › Terminal). */
-.scheme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: var(--space-2); max-height: 420px; overflow: auto; padding: 2px; }
+.scheme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: var(--space-2); padding: 2px; }
+.scheme-more { align-self: flex-start; color: var(--accent-text); font-size: var(--text-small); padding: 2px 0; }
+.scheme-more:hover { text-decoration: underline; }
 .scheme-card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-control); border: 1px solid var(--line); text-align: left; background: var(--bg-card); }
 .scheme-card:hover { border-color: var(--line-strong); background: var(--bg-hover); }
 .scheme-card.is-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

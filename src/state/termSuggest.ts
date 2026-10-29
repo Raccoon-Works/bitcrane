@@ -345,6 +345,9 @@ export class Suggester {
       this.hide();
       return data;
     }
+    // Escape sequences are keys like the arrows, or the terminal's own answers to the
+    // shell (cursor position reports at start-up); neither begins a typed line.
+    if (data.startsWith('\x1b')) return data;
     if (!this.anchor && this.term.buffer.active.type === 'normal') this.anchor = this.cursor();
     return data;
   }

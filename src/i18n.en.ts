@@ -1953,4 +1953,9 @@ export const EN: Record<string, string> = {
   "Mit Liste": "With list",
   "Nur ausgegraut": "Dimmed only",
   "Snippet": "Snippet",
+  "Noch keine Regel": "No rule yet",
+  "Zum Beispiel „Bot“: .git, __pycache__ und *.log nie hochladen, Rechte 644/755. Danach unter Server bearbeiten › Regel auswählen.": "For example “Bot”: never upload .git, __pycache__ and *.log, permissions 644/755. Then choose it under Edit server › Rule.",
+  "Erste Regel anlegen": "Create first rule",
+  "Weniger zeigen": "Show fewer",
+  "Alle {0} Farbschemata zeigen": "Show all {0} color schemes",
 };
