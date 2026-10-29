@@ -1875,4 +1875,10 @@ export const EN: Record<string, string> = {
   "Ein SSH-Terminal gibt es für SSH-Server (SFTP).": "An SSH terminal is available for SSH servers (SFTP).",
   "Im System-Terminal öffnen": "Open in system terminal",
   "Das Terminal konnte nicht gestartet werden.": "The terminal could not be started.",
+  "Erscheinen im Rechtsklick-Menü von Dateien auf SFTP-Servern und laufen dort im Ordner der Datei. Die Ausgabe steht im Protokoll.": "Appear in the context menu of files on SFTP servers and run there in the file's folder. The output goes to the log.",
+  "Platzhalter:": "Placeholders:",
+  "Pfad der Datei (bei mehreren einmal je Datei)": "path of the file (with several files, once per file)",
+  "alle Pfade": "all paths",
+  "nur der Name": "just the name",
+  "der Ordner": "the folder",
 };

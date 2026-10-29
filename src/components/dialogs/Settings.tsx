@@ -26,6 +26,7 @@ const NO_RULES: TransferRule[] = [];
 
 /** Stable empty list: a new [] on every render would redraw the store endlessly. */
 const NO_SNIPPETS: Snippet[] = [];
+const NO_COMMANDS: CustomCommand[] = [];
 
 const CLI_GUIDE_URL = 'https://github.com/Raccoon-Works/bitcrane/blob/main/docs/cli.md';
 
@@ -224,31 +225,43 @@ function KnownHostsList() {
 }
 
 /**
- * "Regeln": named transfer rules (like WinSCP's transfer presets). A server
- * uses one for its manual transfers and watches; a watch can choose another.
- * Empty fields keep the general settings of "Übertragungen".
+ * "Eigene Befehle" (WinSCP "Custom commands"): own commands in the context
+ * menu of server files. Laid out like the terminal snippets: an explanation
+ * row, one row per command, and the add button in its own row.
  */
-/** "Eigene Befehle" (WinSCP "Custom commands"): own commands in the context menu of server files. */
 function CustomCommands() {
-  const list = useStore((st) => st.settings.customCommands) ?? [];
+  const list = useStore((st) => st.settings.customCommands) ?? NO_COMMANDS;
   const save = (next: CustomCommand[]) => updateSettings({ customCommands: next });
   const set = (id: string, patch: Partial<CustomCommand>) => save(list.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   return (
     <>
-      <p className="small muted">{$t('Erscheinen im Rechtsklick-Menü von Dateien auf SFTP-Servern und laufen dort im Ordner der Datei. Platzhalter: {file} Pfad der Datei (bei mehreren Dateien einmal je Datei), {files} alle Pfade, {name} nur der Name, {dir} der Ordner. Die Ausgabe steht im Protokoll.')}</p>
+      <div className="set-row">
+        <div className="col-text flex-1">
+          <span className="small muted">{$t('Erscheinen im Rechtsklick-Menü von Dateien auf SFTP-Servern und laufen dort im Ordner der Datei. Die Ausgabe steht im Protokoll.')}</span>
+          <span className="small muted">
+            {$t('Platzhalter:')} <code>{'{file}'}</code> {$t('Pfad der Datei (bei mehreren einmal je Datei)')}, <code>{'{files}'}</code> {$t('alle Pfade')}, <code>{'{name}'}</code> {$t('nur der Name')}, <code>{'{dir}'}</code> {$t('der Ordner')}
+          </span>
+        </div>
+      </div>
       {list.map((c) => (
-        <div key={c.id} className="cmd-row">
-          <TextField label={$t('Name im Menü')} value={c.name} onChange={(v) => set(c.id, { name: v })} placeholder={$t('Name im Menü')} className="cmd-name" />
+        <div key={c.id} className="set-row snippet-row">
+          <TextField label={$t('Name im Menü')} value={c.name} onChange={(v) => set(c.id, { name: v })} placeholder={$t('Name im Menü')} className="snippet-name" />
           <TextField label={$t('Befehl')} value={c.command} onChange={(v) => set(c.id, { command: v })} placeholder="unzip -o {file}" mono className="flex-1" />
-          <Button small variant="ghost" onClick={() => save(list.filter((x) => x.id !== c.id))}>{$t('Entfernen')}</Button>
+          <IconButton label={$t('Entfernen')} onClick={() => save(list.filter((x) => x.id !== c.id))}><X size={14} strokeWidth={1.75} /></IconButton>
         </div>
       ))}
-      <span className="row-inline">
-        <Button small onClick={() => save([...list, { id: newCommandId(), name: $t('Entpacken'), command: 'unzip -o {file}' }])}>{$t('Befehl hinzufügen')}</Button>
-      </span>
+      <div className="set-row">
+        <Button small onClick={() => save([...list, { id: newCommandId(), name: '', command: '' }])}><Plus size={13} strokeWidth={2} /> {$t('Befehl hinzufügen')}</Button>
+      </div>
     </>
   );
 }
+
+/**
+ * "Regeln": named transfer rules (like WinSCP's transfer presets). A server
+ * uses one for its manual transfers and watches; a watch can choose another.
+ * Empty fields keep the general settings of "Übertragungen".
+ */
 
 function RulesSettings() {
   const rules = useStore((st) => st.settings.rules) ?? NO_RULES;
