@@ -1792,7 +1792,8 @@ button.disclosure:hover { color: var(--text); }
 .server-foot { margin-top: auto; display: flex; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--line); }
 body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important; }
 
-.server-welcome { flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-6); text-align: center; }
+.server-welcome { flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: var(--space-3); padding: var(--space-6); text-align: center; }
+.server-welcome > * { flex-shrink: 0; }
 .server-welcome p { max-width: 360px; margin: 0; }
 .server-welcome-actions { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: 280px; }
 .server-welcome-actions .btn { justify-content: center; }
