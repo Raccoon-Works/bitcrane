@@ -37,6 +37,7 @@ export const tauriBackend: Backend = {
   localMove: (paths, destDir, merge) => invoke('local_move', { paths, destDir, merge: !!merge }),
   localCopyFiles: (pairs) => invoke('local_copy_files', { pairs }),
   localZip: (paths) => invoke('local_zip', { paths }),
+  takePendingUploads: () => invoke('take_pending_uploads'),
   archiveExtractTemp: (paths) => invoke('archive_extract_temp', { paths }),
   syncRead: (dir) => invoke('sync_read', { dir }),
   syncWrite: (dir, text) => invoke('sync_write', { dir, text }),

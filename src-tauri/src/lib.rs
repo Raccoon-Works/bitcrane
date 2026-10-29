@@ -11,6 +11,7 @@ mod error;
 mod dav;
 mod archive;
 mod archive_vfs;
+mod shell_integration;
 mod dropbox;
 mod gdrive;
 mod onedrive;
@@ -287,6 +288,23 @@ async fn local_unzip(path: String) -> AppResult<String> {
     tauri::async_runtime::spawn_blocking(move || archive::extract(&path))
         .await
         .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
+}
+
+/// Paths Bitcrane was started with from the Explorer menu ("--upload"), taken once by the window.
+static UPLOADS_TAKEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn take_pending_uploads() -> Vec<String> {
+    if UPLOADS_TAKEN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return Vec::new();
+    }
+    shell_integration::upload_args(&std::env::args().collect::<Vec<_>>())
+}
+
+/// "Mit Bitcrane hochladen" in the Explorer / Finder context menu on or off.
+#[tauri::command]
+fn shell_integration_set(enable: bool, label: String) -> AppResult<()> {
+    shell_integration::set(enable, &label)
 }
 
 /// Extracts entries of archives into a temporary folder (to upload them); returns the folder and the names.
@@ -1295,8 +1313,15 @@ pub fn run() {
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
-        // A second start only brings the running Bitcrane to the front.
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_main_window(app)));
+        // A second start only brings the running Bitcrane to the front; started from the
+        // Explorer menu ("--upload <path>") it passes the paths on to the window.
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            tray::show_main_window(app);
+            let paths = shell_integration::upload_args(&args);
+            if !paths.is_empty() {
+                let _ = app.emit("upload-files", paths);
+            }
+        }));
     }
     builder
         // sftp:// links (opt-in in the settings; on the Mac the scheme is declared in Info.plist).
@@ -1401,6 +1426,8 @@ pub fn run() {
             local_cloud_places,
             local_zip,
             archive_extract_temp,
+            take_pending_uploads,
+            shell_integration_set,
             remote_share_link,
             local_unzip,
             local_open,

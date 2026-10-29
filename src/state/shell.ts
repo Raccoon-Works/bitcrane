@@ -21,6 +21,7 @@ import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';
 import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, updateSettings, type AppState } from './store';
 import { checkForUpdates } from './updates';
+import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
 import { $t } from '../i18n';
 
 /* ------------------------------------------------------------------------ */
@@ -325,7 +326,13 @@ export async function startShell() {
   // sftp:// links: the first one may have started the app.
   const deepLink = await import('@tauri-apps/plugin-deep-link').catch(() => null);
   if (deepLink) {
-    const open = (urls: string[] | null) => { for (const u of urls ?? []) if (u.startsWith('sftp:')) openSftpLink(u); };
+    const open = (urls: string[] | null) => {
+      for (const u of urls ?? []) {
+        if (u.startsWith('sftp:')) openSftpLink(u);
+        // Finder Quick Action "Mit Bitcrane hochladen".
+        else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u));
+      }
+    };
     const waitConfig = () => (isConfigLoaded() ? Promise.resolve() : new Promise<void>((r) => { const t = window.setInterval(() => { if (isConfigLoaded()) { window.clearInterval(t); r(); } }, 100); }));
     void waitConfig().then(() => deepLink.getCurrent().then(open).catch(() => undefined));
     await deepLink.onOpenUrl((urls) => { void waitConfig().then(() => open(urls)); }).catch(() => undefined);
@@ -344,6 +351,24 @@ export async function startShell() {
   }
 
   await listen<string>('tray-action', (e) => onTrayAction(e.payload));
+
+  // "Mit Bitcrane hochladen" from the Explorer: paths of a second start, and the ones Bitcrane was started with.
+  await listen<string[]>('upload-files', (e) => receiveUploadPaths(e.payload));
+  const whenLoaded = () => (isConfigLoaded() ? Promise.resolve() : new Promise<void>((r) => { const t = window.setInterval(() => { if (isConfigLoaded()) { window.clearInterval(t); r(); } }, 100); }));
+  void whenLoaded().then(async () => {
+    const first = await backend.takePendingUploads().catch(() => [] as string[]);
+    if (first.length) receiveUploadPaths(first);
+    // The context-menu entry follows the setting.
+    let shellOn: boolean | undefined;
+    const syncShell = () => {
+      const on = getState().settings.shellIntegration !== false;
+      if (on === shellOn) return;
+      shellOn = on;
+      void applyShellIntegration();
+    };
+    subscribeStore(syncShell);
+    syncShell();
+  });
 
   // Start at login follows the setting.
   let autostart = await autostartEnabled().catch(() => false);

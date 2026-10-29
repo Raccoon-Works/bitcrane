@@ -167,6 +167,8 @@ export interface Backend {
   localCopyFiles(pairs: Array<[string, string]>): Promise<void>;
   /** Packs files and folders into a zip next to them; returns the archive's name. */
   localZip(paths: string[]): Promise<string>;
+  /** Paths Bitcrane was started with from the Explorer menu (only once). */
+  takePendingUploads(): Promise<string[]>;
   /** Extracts entries of archives into a new temporary folder; returns [folder, names]. */
   archiveExtractTemp(paths: string[]): Promise<[string, string[]]>;
   /** Shared settings file in a sync folder (null when there is none yet). */

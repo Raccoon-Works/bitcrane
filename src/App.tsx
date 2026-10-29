@@ -13,7 +13,7 @@ import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportD
 import { LogDialog } from './components/dialogs/LogDialog';
 import { PreviewDialog } from './components/dialogs/PreviewDialog';
 import { BatchRename } from './components/dialogs/BatchRename';
-import { AfterQueueDialog, CloudSignInDialog, MergeFoldersDialog, SelectMaskDialog, WorkspacesDialog } from './components/dialogs/ToolDialogs';
+import { AfterQueueDialog, CloudSignInDialog, MergeFoldersDialog, SelectMaskDialog, UploadToDialog, WorkspacesDialog } from './components/dialogs/ToolDialogs';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { ImportDialog } from './components/dialogs/ImportDialog';
 import { ServerEdit } from './components/dialogs/ServerEdit';
@@ -59,6 +59,7 @@ function Dialogs() {
     case 'edits': return <EditsDialog />;
     case 'exportConfig': return <ExportDialog />;
     case 'importPassword': return <ImportPasswordDialog sealed={dialog.sealed} />;
+    case 'uploadTo': return <UploadToDialog paths={dialog.paths} />;
     case 'compareFiles': return <CompareFilesDialog a={dialog.a} b={dialog.b} />;
     case 'confirm': return <ConfirmDialog title={dialog.title} text={dialog.text} confirm={dialog.confirm} danger={dialog.danger} run={dialog.run} />;
     case 'diff': return <DiffDialog transferId={dialog.transferId} />;
