@@ -9,6 +9,7 @@ use crate::dav::DavConn;
 use crate::dropbox::DropboxConn;
 use crate::gdrive::GDriveConn;
 use crate::onedrive::OneDriveConn;
+use crate::smb::SmbConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::model::{FileEntry, WalkItem};
@@ -26,6 +27,7 @@ pub enum Remote {
     Dropbox(Arc<DropboxConn>),
     GDrive(Arc<GDriveConn>),
     OneDrive(Arc<OneDriveConn>),
+    Smb(Arc<SmbConn>),
 }
 
 /// Size, modification time (seconds) and permission bits of a server file.
@@ -48,6 +50,7 @@ impl Remote {
             Remote::Dropbox(c) => &c.home,
             Remote::GDrive(c) => &c.home,
             Remote::OneDrive(c) => &c.home,
+            Remote::Smb(c) => &c.home,
         }
     }
 
@@ -59,6 +62,7 @@ impl Remote {
             Remote::Dropbox(_) => "Dropbox",
             Remote::GDrive(_) => "Google Drive",
             Remote::OneDrive(_) => "OneDrive",
+            Remote::Smb(_) => "SMB",
         }
     }
 
@@ -74,6 +78,7 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.close().await,
             Remote::Ftp(c) => c.close().await,
+            Remote::Smb(c) => c.close().await,
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }
     }
@@ -86,6 +91,7 @@ impl Remote {
             Remote::Dropbox(c) => c.list(path).await,
             Remote::GDrive(c) => c.list(path).await,
             Remote::OneDrive(c) => c.list(path).await,
+            Remote::Smb(c) => c.list(path).await,
         }?;
         list.retain(|e| safe_name(&e.name));
         Ok(list)
@@ -99,6 +105,7 @@ impl Remote {
             Remote::Dropbox(c) => c.stat(path).await,
             Remote::GDrive(c) => c.stat(path).await,
             Remote::OneDrive(c) => c.stat(path).await,
+            Remote::Smb(c) => c.stat(path).await,
         }
     }
 
@@ -110,6 +117,7 @@ impl Remote {
             Remote::Dropbox(c) => c.exists(path).await,
             Remote::GDrive(c) => c.exists(path).await,
             Remote::OneDrive(c) => c.exists(path).await,
+            Remote::Smb(c) => c.exists(path).await,
         }
     }
 
@@ -121,6 +129,7 @@ impl Remote {
             Remote::Dropbox(c) => c.mkdir(path).await,
             Remote::GDrive(c) => c.mkdir(path).await,
             Remote::OneDrive(c) => c.mkdir(path).await,
+            Remote::Smb(c) => c.mkdir(path).await,
         }
     }
 
@@ -142,6 +151,7 @@ impl Remote {
             Remote::Dropbox(c) => c.mkdir_all(path).await,
             Remote::GDrive(c) => c.mkdir_all(path).await,
             Remote::OneDrive(c) => c.mkdir_all(path).await,
+            Remote::Smb(c) => c.mkdir_all(path).await,
         }
     }
 
@@ -153,6 +163,7 @@ impl Remote {
             Remote::Dropbox(c) => c.rename(from, to).await,
             Remote::GDrive(c) => c.rename(from, to).await,
             Remote::OneDrive(c) => c.rename(from, to).await,
+            Remote::Smb(c) => c.rename(from, to).await,
         }
     }
 
@@ -170,6 +181,9 @@ impl Remote {
             return c.replace(from, to).await;
         }
         if let Remote::OneDrive(c) = self {
+            return c.replace(from, to).await;
+        }
+        if let Remote::Smb(c) = self {
             return c.replace(from, to).await;
         }
         if !self.exists(to).await {
@@ -196,6 +210,7 @@ impl Remote {
             Remote::Dropbox(c) => c.remove(path).await,
             Remote::GDrive(c) => c.remove(path).await,
             Remote::OneDrive(c) => c.remove(path).await,
+            Remote::Smb(c) => c.remove(path).await,
         }
     }
 
@@ -207,6 +222,7 @@ impl Remote {
             Remote::Dropbox(c) => c.remove(path).await,
             Remote::GDrive(c) => c.remove(path).await,
             Remote::OneDrive(c) => c.remove(path).await,
+            Remote::Smb(c) => c.remove(path).await,
         }
     }
 
@@ -218,6 +234,7 @@ impl Remote {
             Remote::Dropbox(_) => Err(unsupported("Rechte setzen", "Dropbox")),
             Remote::GDrive(_) => Err(unsupported("Rechte setzen", "Google Drive")),
             Remote::OneDrive(_) => Err(unsupported("Rechte setzen", "OneDrive")),
+            Remote::Smb(_) => Err(unsupported("Rechte setzen", "SMB")),
         }
     }
 
@@ -230,6 +247,7 @@ impl Remote {
             Remote::Sftp(_) => Err(unsupported("Ein Link zum Teilen", "SFTP")),
             Remote::Ftp(_) => Err(unsupported("Ein Link zum Teilen", "FTP")),
             Remote::Dav(_) => Err(unsupported("Ein Link zum Teilen", "WebDAV")),
+            Remote::Smb(_) => Err(unsupported("Ein Link zum Teilen", "SMB")),
         }
     }
 
@@ -241,6 +259,7 @@ impl Remote {
             Remote::Dropbox(c) => c.walk(path).await,
             Remote::GDrive(c) => c.walk(path).await,
             Remote::OneDrive(c) => c.walk(path).await,
+            Remote::Smb(c) => c.walk(path).await,
         }?;
         // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
         items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
@@ -312,6 +331,7 @@ impl Remote {
             Remote::Dropbox(c) => c.copy_within(paths, dest_dir).await,
             Remote::GDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::OneDrive(c) => c.copy_within(paths, dest_dir).await,
+            Remote::Smb(c) => c.copy_within(paths, dest_dir).await,
             Remote::Ftp(_) => {
                 let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
                 let mut out = Vec::new();
@@ -374,7 +394,7 @@ impl Remote {
     /// show minutes, so a just-written file can look up to a minute older.
     pub fn mtime_slack(&self) -> u32 {
         match self {
-            Remote::Sftp(_) => 0,
+            Remote::Sftp(_) | Remote::Smb(_) => 0,
             _ => 60,
         }
     }
@@ -382,7 +402,7 @@ impl Remote {
     /// Whether a partial upload can be continued (append) for this file.
     pub fn can_append(&self, path: &str) -> bool {
         match self {
-            Remote::Sftp(_) => true,
+            Remote::Sftp(_) | Remote::Smb(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => false,
         }
@@ -414,6 +434,7 @@ impl Remote {
             Remote::Dropbox(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::GDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::OneDrive(c) => RemoteReader::Plain(c.reader(path, offset).await?),
+            Remote::Smb(c) => RemoteReader::Plain(c.reader(path, offset).await?),
         })
     }
 
@@ -452,6 +473,10 @@ impl Remote {
                 let (w, task) = c.writer(path, size.map(|s| s - offset), mtime);
                 RemoteWriter::Dav(Some(w), Some(task))
             }
+            Remote::Smb(c) => {
+                let (w, task) = c.writer(path, offset, mtime).await?;
+                RemoteWriter::Dav(Some(w), Some(task))
+            }
         })
     }
 
@@ -463,6 +488,11 @@ impl Remote {
                 let _ = c.sftp.set_metadata(path, attrs).await;
             }
             Remote::Ftp(c) => c.set_attrs(path, mtime, perms).await,
+            Remote::Smb(c) => {
+                if let Some(m) = mtime {
+                    c.set_mtime(path, m).await;
+                }
+            }
             // Set with the upload itself where the server supports it.
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }
@@ -649,6 +679,11 @@ mod integration {
                 let home = c.home.clone();
                 check(Remote::Ftp(Arc::new(c)), home).await;
             }
+        }
+        if let Some(p) = crate::smb::test_params() {
+            let c = crate::smb::SmbConn::connect(p).await.unwrap();
+            let home = c.home.clone();
+            check(Remote::Smb(Arc::new(c)), home).await;
         }
         if let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") {
             for url in urls.split(',') {

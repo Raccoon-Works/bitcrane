@@ -9,11 +9,12 @@
   <a href="https://github.com/Raccoon-Works/bitcrane/releases/latest"><strong>Download the latest version</strong></a>
 </p>
 
-- Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS)
+- Protocols: SFTP (SSH), FTP, FTPS (explicit and implicit TLS), WebDAV (HTTP and HTTPS), SMB 2/3 (Windows shares, NAS)
 - Cloud services: Dropbox, OneDrive, Google Drive (with your own free app key, see [docs/google-drive.md](docs/google-drive.md))
 - Servers and shared settings stay in step between your computers through a folder your own cloud already syncs (passwords optionally, encrypted)
 - Two halves: this computer and a server, or two servers (server to server)
 - Folder watching: changed files are uploaded automatically, with excludes, a post-upload command and a warning when the server copy is newer
+- Upload from the Explorer or Finder context menu ("Upload with Bitcrane")
 - Transfer queue that survives a restart and resumes partial files
 - Host keys and self-signed certificates are confirmed once and remembered
 - Passwords and passphrases live in the macOS Keychain or the Windows Credential Manager, never in Bitcrane's files
@@ -67,7 +68,7 @@ in a plain browser it uses an in-memory file system (`src/backend/mockFs.ts`) so
 | `src/i18n.ts`, `src/i18n.en.ts` | Translation helper; German is the source language, English the translation |
 | `src/components/` | Main window, panes, sidebar, toolbar, activity, dialogs |
 | `src/styles/` | Design tokens and component styles |
-| `src-tauri/src/remote.rs` | One interface over SFTP (`ssh.rs`), FTP/FTPS (`ftp.rs`) and WebDAV (`dav.rs`) |
+| `src-tauri/src/remote.rs` | One interface over SFTP (`ssh.rs`), FTP/FTPS (`ftp.rs`), WebDAV (`dav.rs`), SMB (`smb.rs`) and the cloud services |
 | `src-tauri/src/transfer.rs` | Uploads, downloads and server-to-server copies with resume, temp names and versions |
 | `src-tauri/src/tls.rs` | Certificate checks (public CAs, otherwise a confirmed fingerprint) |
 | `src-tauri/src/watcher.rs` | File system events for folder watches |

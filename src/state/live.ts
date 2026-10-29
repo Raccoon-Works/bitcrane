@@ -215,6 +215,9 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
   if (srv.protocol === 'webdav') {
     return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only });
   }
+  if (srv.protocol === 'smb') {
+    return backend.connectSmb(id, { host: srv.host, port: srv.port || 445, user: srv.user, password, share: srv.smbShare ?? '', encrypt: !!srv.smbEncrypt });
+  }
   if (srv.protocol === 'dropbox') {
     // The sign-in from the browser, kept in the keychain (see addCloudService).
     const refreshToken = await keychain(cloudAccount(srv));
@@ -291,8 +294,8 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
-const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
+const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : srv.protocol === 'smb' ? $t(', Gast') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
 /** Home folder of each connected server: a half that opens an already connected server starts there. */
@@ -327,8 +330,8 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
   const srv = serverById(serverId);
   if (!srv) return false;
   const { auth, passphrase, password } = await buildAuth(srv, { secret: opts.secret, kind: opts.secretKind });
-  // FTP without a user name logs in anonymously; everything else needs the password.
-  const needsPassword = srv.auth === 'password' && !(srv.protocol === 'ftp' || srv.protocol === 'ftps') ? true : srv.auth === 'password' && !!srv.user;
+  // FTP without a user name logs in anonymously, SMB as guest; everything else needs the password.
+  const needsPassword = srv.auth === 'password' && !(srv.protocol === 'ftp' || srv.protocol === 'ftps' || srv.protocol === 'smb') ? true : srv.auth === 'password' && !!srv.user;
   if (needsPassword && password === undefined) {
     if (opts.trust) pendingLogin.set(serverId, { trust: opts.trust });
     if (!opts.silent) openDialog({ type: 'secret', serverId, kind: 'password' });
@@ -1706,9 +1709,9 @@ export async function cloudPlaces() {
  * ~/.ssh/config (aliases) are resolved when that setting is on.
  */
 export async function quickConnect(address: string, save: boolean, auth: 'auto' | 'key' | 'password'): Promise<Server | null> {
-  // Optional scheme: sftp:// (default), ftp://, ftps://, ftpes:// (explicit TLS), webdav:// / davs://.
+  // Optional scheme: sftp:// (default), ftp://, ftps://, ftpes:// (explicit TLS), webdav:// / davs://, smb://.
   const scheme = address.trim().match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase() ?? 'sftp';
-  const protocol: Server['protocol'] = scheme === 'ftp' ? 'ftp' : scheme === 'ftps' || scheme === 'ftpes' ? 'ftps' : scheme === 'webdav' || scheme === 'davs' || scheme === 'dav' ? 'webdav' : 'sftp';
+  const protocol: Server['protocol'] = scheme === 'ftp' ? 'ftp' : scheme === 'ftps' || scheme === 'ftpes' ? 'ftps' : scheme === 'webdav' || scheme === 'davs' || scheme === 'dav' ? 'webdav' : scheme === 'smb' ? 'smb' : 'sftp';
   const m = address.trim().replace(/^[a-z]+:\/\//i, '').match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
   if (!m) {
     showToast($t('Adresse nicht erkannt. Beispiele: ubuntu@server.example:22, ftp://web@host.example'), 'error');
@@ -1717,7 +1720,7 @@ export async function quickConnect(address: string, save: boolean, auth: 'auto' 
   const [, userPart, hostPart, portPart, path] = m;
   let host = hostPart;
   let user = userPart ?? '';
-  const defaultPort = protocol === 'ftp' ? 21 : protocol === 'ftps' ? (scheme === 'ftps' ? 990 : 21) : protocol === 'webdav' ? (scheme === 'dav' ? 80 : 443) : 22;
+  const defaultPort = protocol === 'ftp' ? 21 : protocol === 'ftps' ? (scheme === 'ftps' ? 990 : 21) : protocol === 'webdav' ? (scheme === 'dav' ? 80 : 443) : protocol === 'smb' ? 445 : 22;
   let port = portPart ? Number(portPart) : defaultPort;
   let keyPath = '~/.ssh/id_ed25519';
   let method: Server['auth'] = auth === 'password' ? 'password' : auth === 'key' ? 'key' : 'auto';
@@ -1726,6 +1729,7 @@ export async function quickConnect(address: string, save: boolean, auth: 'auto' 
       id: uid('srv'), name: hostPart, mono: hostPart.slice(0, 2).toUpperCase(), color: 'gray', host, port, user, auth: 'password', keyPath,
       group: '', localStart: '~', remoteStart: protocol === 'webdav' ? '' : path || '', online: false, temporary: !save,
       protocol, implicitTls: scheme === 'ftps' || undefined, davPath: protocol === 'webdav' ? path || '/' : undefined, davHttps: protocol === 'webdav' ? scheme !== 'dav' : undefined,
+      smbShare: protocol === 'smb' ? path?.split('/').filter(Boolean)[0] : undefined,
     };
   }
   if (getState().settings.readSshConfig) {

@@ -96,6 +96,10 @@ export interface Server {
   davPath?: string;
   /** WebDAV: https (default) or plain http. */
   davHttps?: boolean;
+  /** SMB: share to start in (empty: the list of shares). */
+  smbShare?: string;
+  /** SMB: insist on SMB 3 encryption. */
+  smbEncrypt?: boolean;
 }
 
 export interface ServerProxy {
@@ -106,7 +110,7 @@ export interface ServerProxy {
   user?: string;
 }
 
-export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'dropbox' | 'gdrive' | 'onedrive';
+export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 'dropbox' | 'gdrive' | 'onedrive';
 
 /** Cloud services that Bitcrane treats like a server (signed in through the browser). */
 export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];

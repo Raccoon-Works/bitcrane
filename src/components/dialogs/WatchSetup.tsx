@@ -269,7 +269,7 @@ export function WatchSetup({ editId }: { editId?: string }) {
                 <Checkbox checked={opts.keepOldVersion} onChange={(v) => set('keepOldVersion', v)} label={$t('Ältere Version auf dem Server behalten')} note={$t('Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.')} />
               </div>
 
-              {!sshServer && <div className="sub-card"><span className="small muted">{$t('Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt')}{' '}{servers.find((x) => x.id === serverId)?.protocol === 'webdav' ? 'WebDAV' : 'FTP'}.</span></div>}
+              {!sshServer && <div className="sub-card"><span className="small muted">{$t('Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt')}{' '}{({ webdav: 'WebDAV', smb: 'SMB' } as Record<string, string>)[servers.find((x) => x.id === serverId)?.protocol ?? ''] ?? 'FTP'}.</span></div>}
               {sshServer && <div className="sub-card">
                 <div className="row-between">
                   <label htmlFor="w-cmd" className="strong-500">{$t('Nach dem Hochladen einen Befehl auf dem Server ausführen')}</label>
