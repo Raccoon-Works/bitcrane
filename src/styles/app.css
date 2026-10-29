@@ -1405,7 +1405,7 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 /* Text the user may want to copy stays selectable. */
 .page.is-app :is(input, textarea, pre, .selectable, .log-text, .tr-output, .diff) { user-select: text; -webkit-user-select: text; }
 /* macOS draws its own traffic lights over the sidebar (overlay title bar). */
-.page.is-app .traffic .tl { visibility: hidden; }
+.page.is-app .mac-titlebar .traffic .tl, .page.is-app .toolbar .traffic .tl { visibility: hidden; }
 
 /* ------------------------------------------------------------- Difference view */
 
@@ -1777,7 +1777,8 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 .server-welcome p { max-width: 360px; margin: 0; }
 .server-welcome-actions { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: 260px; }
 .server-welcome-actions .btn { justify-content: center; }
-.server-welcome .notice { max-width: 360px; text-align: left; }
+.server-welcome .notice { max-width: 360px; display: block; text-align: center; }
+.server-welcome .notice svg { display: inline-block; vertical-align: -2px; margin-right: 4px; }
 /* The import link sits centred under the notice like the rest of the column. */
 .server-welcome > .link { align-self: center; text-align: center; width: auto; margin: 0 auto; }
 
