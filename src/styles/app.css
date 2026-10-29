@@ -1709,11 +1709,11 @@ body.is-dragging-place, body.is-dragging-place * { cursor: grabbing !important; 
 .row { grid-template-columns: calc(14px + var(--depth, 0) * 18px) 20px minmax(0, 1fr) var(--cols, 96px 64px); gap: var(--space-1) var(--space-2); }
 .row > :nth-child(2) { justify-self: end; }
 .col-head { padding-left: 62px; }
-.disclosure { width: 14px; height: 18px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 3px; background: none; color: var(--text-muted); cursor: default; }
-.disclosure svg { transition: transform 120ms ease-out; }
-.disclosure.is-open svg { transform: rotate(90deg); }
-.disclosure:hover { color: var(--text); }
-.row.is-sel .disclosure { color: var(--sel-fg); }
+button.disclosure { width: 14px; height: 18px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 3px; background: none; color: var(--text-muted); cursor: default; }
+button.disclosure svg { transition: transform 120ms ease-out; }
+button.disclosure.is-open svg { transform: rotate(90deg); }
+button.disclosure:hover { color: var(--text); }
+.row.is-sel button.disclosure { color: var(--sel-fg); }
 
 /* Icons view. */
 .list.is-icons { padding: var(--space-2); }
@@ -1945,7 +1945,7 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 .view-switch .icon-btn { width: 32px; height: 26px; }
 .pane-head > .tip-anchor .icon-btn { width: 32px; height: 32px; }
 .pane-foot { height: 44px; }
-.disclosure { width: 16px; height: 20px; }
+button.disclosure { width: 16px; height: 20px; }
 .tile-icon { width: 64px; height: 60px; }
 .server-glyph svg { display: block; }
 
@@ -2310,3 +2310,11 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .scheme-preview { display: flex; flex-direction: column; gap: 1px; padding: 8px 9px; border-radius: 5px; font-size: 11px; line-height: 15px; white-space: nowrap; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.18); }
 .scheme-cursor { display: inline-block; width: 6px; height: 12px; margin-left: 4px; vertical-align: -2px; }
 .scheme-name { font-size: var(--text-small); padding: 0 2px; }
+
+/* SSH tunnels in "Server bearbeiten". */
+.fw-list { gap: var(--space-2); }
+.fw-card { display: flex; flex-direction: column; gap: 6px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); border: 1px solid var(--line); }
+.fw-line { display: flex; align-items: center; gap: 6px; }
+.fw-line .fw-host { width: 112px; flex: 1 1 112px; min-width: 80px; }
+.fw-line .fw-port { width: 64px; flex: none; }
+.fw-arrow { padding: 0 2px; }

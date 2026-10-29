@@ -35,6 +35,7 @@ mod sshconfig;
 mod sysicons;
 mod tray;
 mod terminal;
+mod forward;
 mod transfer;
 mod vault;
 mod watcher;
@@ -54,6 +55,8 @@ use tauri::{Emitter, Manager, State};
 pub struct AppState {
     connections: Arc<tokio::sync::Mutex<HashMap<String, Arc<remote::Remote>>>>,
     terminals: terminal::Terminals,
+    /// SSH tunnels (port forwarding) of the servers.
+    forwards: forward::Forwards,
     /// Servers shown as folders in the Windows Explorer.
     #[cfg(windows)]
     mounts: mount_win::Mounts,
@@ -72,6 +75,7 @@ impl AppState {
             known_hosts: Arc::new(KnownHosts::load(config_dir.join("known_hosts.json"))),
             watches: Default::default(),
             terminals: Default::default(),
+            forwards: Default::default(),
             #[cfg(windows)]
             mounts: Default::default(),
             cancels: Default::default(),
@@ -749,6 +753,25 @@ async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>, id: String
     state.terminals.open(app, conn, id, cols, rows, cwd, startup).await
 }
 
+/// Starts an SSH tunnel (port forwarding) on a connected server.
+#[tauri::command]
+async fn forward_start(state: State<'_, AppState>, server_id: String, spec: forward::ForwardSpec) -> AppResult<()> {
+    let conn = state.conn(&server_id).await?;
+    state.forwards.start(&server_id, conn, spec).await
+}
+
+#[tauri::command]
+async fn forward_stop(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    state.forwards.stop(&id).await;
+    Ok(())
+}
+
+/// Ids of the tunnels that are running.
+#[tauri::command]
+fn forward_active(state: State<'_, AppState>) -> Vec<String> {
+    state.forwards.active()
+}
+
 /// Shells installed on this computer for the local terminal.
 #[tauri::command]
 fn term_shells() -> Vec<terminal::LocalShell> {
@@ -772,6 +795,7 @@ fn term_close(state: State<'_, AppState>, id: String) {
 
 #[tauri::command]
 async fn ssh_disconnect(state: State<'_, AppState>, server_id: String) -> AppResult<()> {
+    state.forwards.stop_server(&server_id).await;
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(c) = old {
         c.close().await;
@@ -1586,6 +1610,9 @@ pub fn run() {
             term_open,
             term_write,
             term_shells,
+            forward_start,
+            forward_stop,
+            forward_active,
             term_resize,
             term_close,
             vault_open,

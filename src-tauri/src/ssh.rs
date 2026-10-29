@@ -159,11 +159,16 @@ struct SeenKey {
     fingerprint: String,
 }
 
+/// Remote port forwards of a session: port on the server → where its
+/// connections go on this side (forward.rs).
+pub type RemoteForwards = Arc<Mutex<std::collections::HashMap<u32, (String, u16)>>>;
+
 pub(crate) struct Handler {
     host_id: String,
     known: Arc<KnownHosts>,
     trust: Option<String>,
     seen: Arc<Mutex<Option<SeenKey>>>,
+    forwards: RemoteForwards,
 }
 
 impl client::Handler for Handler {
@@ -188,6 +193,34 @@ impl client::Handler for Handler {
             _ => Ok(false),
         }
     }
+
+    /// A connection to a port the server forwards to us (remote forward):
+    /// connect to the target on this side and pass the data both ways.
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        _connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let target = self.forwards.lock().unwrap().get(&connected_port).cloned();
+        let Some((host, port)) = target else {
+            reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
+        };
+        reply.accept().await;
+        tokio::spawn(async move {
+            if let Ok(mut tcp) = tokio::net::TcpStream::connect((host.as_str(), port)).await {
+                let _ = tcp.set_nodelay(true);
+                let mut stream = channel.into_stream();
+                let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
+            }
+        });
+        Ok(())
+    }
 }
 
 /* ----------------------------------------------------------------- Connection */
@@ -199,6 +232,7 @@ pub struct Connection {
     pub home: String,
     /// Session to the jump server, kept open while this connection lives.
     jump: Option<client::Handle<Handler>>,
+    pub(crate) forwards: RemoteForwards,
 }
 
 fn agent_error(e: impl std::fmt::Display) -> AppError {
@@ -402,10 +436,10 @@ enum Transport {
 }
 
 /// Handshake (with host key check) and login for one hop.
-async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport: Transport, prompter: Option<Prompter>) -> AppResult<client::Handle<Handler>> {
+async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport: Transport, prompter: Option<Prompter>, forwards: RemoteForwards) -> AppResult<client::Handle<Handler>> {
     let host_id = format!("{}:{}", params.host, params.port);
     let seen = Arc::new(Mutex::new(None));
-    let handler = Handler { host_id: host_id.clone(), known: known.clone(), trust: params.trust.clone(), seen: seen.clone() };
+    let handler = Handler { host_id: host_id.clone(), known: known.clone(), trust: params.trust.clone(), seen: seen.clone(), forwards };
 
     let config = Arc::new(client::Config {
         inactivity_timeout: None,
@@ -470,14 +504,16 @@ pub async fn connect_with(params: &ConnectParams, known: Arc<KnownHosts>, prompt
 pub struct Session {
     pub(crate) handle: client::Handle<Handler>,
     pub(crate) jump: Option<client::Handle<Handler>>,
+    pub(crate) forwards: RemoteForwards,
 }
 
 /// Opens the session: host key check and login (through the jump server if set).
 pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Session> {
+    let forwards = RemoteForwards::default();
     let (handle, jump) = match &params.jump {
-        None => (open_session(params, known.clone(), Transport::Direct, prompter.clone()).await?, None),
+        None => (open_session(params, known.clone(), Transport::Direct, prompter.clone(), forwards.clone()).await?, None),
         Some(jump_params) => {
-            let jump = open_session(jump_params, known.clone(), Transport::Direct, prompter.clone()).await.map_err(|mut e| {
+            let jump = open_session(jump_params, known.clone(), Transport::Direct, prompter.clone(), RemoteForwards::default()).await.map_err(|mut e| {
                 e.message = format!("Sprungserver {}: {}", jump_params.host, e.message);
                 e
             })?;
@@ -485,12 +521,12 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
                 .channel_open_direct_tcpip(params.host.clone(), params.port as u32, "127.0.0.1", 0)
                 .await
                 .map_err(|e| AppError::new(ErrorKind::Unreachable, "Der Sprungserver erreicht das Ziel nicht.").with_detail(e.to_string()))?;
-            let target = open_session(params, known.clone(), Transport::Through(channel.into_stream()), prompter).await?;
+            let target = open_session(params, known.clone(), Transport::Through(channel.into_stream()), prompter, forwards.clone()).await?;
             (target, Some(jump))
         }
     };
 
-    Ok(Session { handle, jump })
+    Ok(Session { handle, jump, forwards })
 }
 
 impl Session {
@@ -511,7 +547,7 @@ impl Session {
         };
         sftp.set_timeout(30);
         let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
-        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump })
+        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump, forwards: self.forwards })
     }
 }
 
@@ -909,6 +945,11 @@ impl Connection {
         open_shell(&self.handle, cols, rows, command).await
     }
 
+    /// The SSH handle and remote forwards, for port forwarding (forward.rs).
+    pub(crate) fn tunnel(&self) -> (&client::Handle<Handler>, &RemoteForwards) {
+        (&self.handle, &self.forwards)
+    }
+
     /// Runs a command on the server and returns exit code and combined output.
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
         let mut channel = self.handle.channel_open_session().await?;
@@ -970,6 +1011,55 @@ mod integration {
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
         ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None }
+    }
+
+    /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.
+    #[tokio::test]
+    async fn port_forwarding() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let Some(e) = env() else { return };
+        let dir = tempfile::tempdir().unwrap();
+        let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
+        let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
+        let fp = connect(&params(&e, key(), None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
+        let conn = Arc::new(crate::remote::Remote::Sftp(connect(&params(&e, key(), Some(fp)), known).await.unwrap()));
+        let fw = crate::forward::Forwards::default();
+        let spec = |id: &str, kind: &str, port: u16| crate::forward::ForwardSpec { id: id.into(), kind: kind.into(), bind_host: "127.0.0.1".into(), bind_port: port, dest_host: "127.0.0.1".into(), dest_port: e.port };
+        async fn banner(mut s: tokio::net::TcpStream) -> String {
+            let mut buf = [0u8; 7];
+            s.read_exact(&mut buf).await.unwrap();
+            String::from_utf8_lossy(&buf).into_owned()
+        }
+
+        fw.start("s", conn.clone(), spec("l", "local", 47811)).await.unwrap();
+        assert_eq!(banner(tokio::net::TcpStream::connect("127.0.0.1:47811").await.unwrap()).await, "SSH-2.0");
+        // The same port again: a clear message.
+        let busy = crate::forward::Forwards::default().start("s", conn.clone(), spec("x", "local", 47811)).await.unwrap_err();
+        assert!(busy.message.contains("belegt"), "{}", busy.message);
+
+        fw.start("s", conn.clone(), spec("d", "dynamic", 47812)).await.unwrap();
+        let mut s = tokio::net::TcpStream::connect("127.0.0.1:47812").await.unwrap();
+        s.write_all(&[5, 1, 0]).await.unwrap();
+        let mut hello = [0u8; 2];
+        s.read_exact(&mut hello).await.unwrap();
+        assert_eq!(hello, [5, 0]);
+        let p = e.port.to_be_bytes();
+        s.write_all(&[5, 1, 0, 1, 127, 0, 0, 1, p[0], p[1]]).await.unwrap();
+        let mut reply = [0u8; 10];
+        s.read_exact(&mut reply).await.unwrap();
+        assert_eq!(reply[1], 0, "SOCKS connect succeeded");
+        assert_eq!(banner(s).await, "SSH-2.0");
+
+        fw.start("s", conn.clone(), spec("r", "remote", 47813)).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(banner(tokio::net::TcpStream::connect("127.0.0.1:47813").await.unwrap()).await, "SSH-2.0");
+
+        let mut active = fw.active();
+        active.sort();
+        assert_eq!(active, vec!["d", "l", "r"]);
+        fw.stop_server("s").await;
+        assert!(fw.active().is_empty());
+        assert!(tokio::net::TcpStream::connect("127.0.0.1:47811").await.is_err(), "local port closed");
     }
 
     #[tokio::test]

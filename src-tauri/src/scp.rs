@@ -19,6 +19,7 @@ pub struct ScpConn {
     handle: client::Handle<Handler>,
     jump: Option<client::Handle<Handler>>,
     pub home: String,
+    forwards: crate::ssh::RemoteForwards,
 }
 
 /// Quotes a path for the POSIX shell: 'it'\''s' for "it's".
@@ -177,7 +178,7 @@ fn ls_command(path: &str, single: bool) -> String {
 
 impl ScpConn {
     pub async fn new(session: Session) -> AppResult<ScpConn> {
-        let mut conn = ScpConn { handle: session.handle, jump: session.jump, home: "/".into() };
+        let mut conn = ScpConn { handle: session.handle, jump: session.jump, home: "/".into(), forwards: session.forwards };
         let out = conn.run("pwd").await?;
         if out.code != 0 {
             return Err(AppError::other("Der Server bietet weder SFTP noch eine Shell für Dateibefehle an.").with_detail(out.err));
@@ -286,6 +287,11 @@ impl ScpConn {
 
     pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
         crate::ssh::open_shell(&self.handle, cols, rows, command).await
+    }
+
+    /// The SSH handle and remote forwards, for port forwarding (forward.rs).
+    pub(crate) fn tunnel(&self) -> (&client::Handle<Handler>, &crate::ssh::RemoteForwards) {
+        (&self.handle, &self.forwards)
     }
 
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
