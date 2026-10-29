@@ -69,6 +69,8 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
 [target."cfg(windows)".dependencies]
 winreg = "0.56.0"
+# Servers as folders in the Explorer (mount_win.rs).
+cloud-filter = "0.0.6"
 # System file symbols (sysicons.rs).
 windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_Foundation", "Win32_UI_Controls", "Win32_System_Com"] }
 
