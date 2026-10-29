@@ -36,7 +36,7 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
   const rim = !mono && !tile && light;
   const vb = tile ? '-7.17 -7.17 114.34 114.34' : '0 0 100 100';
   // The tile version is moved so the mark sits optically in the middle of the tile.
-  const tf = tile ? 'translate(48.32 51.12) scale(0.94) translate(-44.5 -48)' : 'translate(50 50) scale(1.12) translate(-44.5 -48)';
+  const tf = tile ? 'translate(48.50 51.00) scale(0.84) translate(-44.5 -48)' : 'translate(50 50) scale(1.12) translate(-44.5 -48)';
   const fill = (k: string) => (mono ? color : `url(#${id}${k})`);
   const shape = (bowl: string, arrow: string, key?: string | number, t?: string, withRim = false) => (
     <g key={key} transform={t}>
