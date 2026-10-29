@@ -12,7 +12,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { FileEntry, PaneSide, Tab } from '../backend/types';
 import * as live from './live';
 import {
-  activeTab, disconnect, getState, LIVE, listEntries, openDialog, paneEntries, paneLoc, panePath, paneShowsServers,
+  activeTab, closeDialog, disconnect, getState, openServerInNewTab, LIVE, listEntries, openDialog, paneEntries, paneLoc, panePath, paneShowsServers,
   refresh, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings,
   type AfterQueue, type CustomCommand, type SavedTab, type Workspace,
 } from './store';
@@ -303,4 +303,64 @@ export function startAfterQueueWatch() {
     }
     wasBusy = busy;
   });
+}
+
+/* ------------------------------------------------------------------------ */
+/* "Mit Bitcrane hochladen" from the Explorer / Finder                       */
+/* ------------------------------------------------------------------------ */
+
+let incoming: string[] = [];
+let incomingTimer: number | undefined;
+
+/**
+ * Paths handed over by the Explorer menu or the Finder Quick Action. Explorer
+ * starts Bitcrane once per selected item, so they are collected for a moment
+ * and then shown in one "Hochladen nach …" window.
+ */
+export function receiveUploadPaths(paths: string[]) {
+  incoming = [...new Set([...incoming, ...paths.filter(Boolean)])];
+  window.clearTimeout(incomingTimer);
+  incomingTimer = window.setTimeout(() => {
+    const list = incoming;
+    incoming = [];
+    if (list.length) openDialog({ type: 'uploadTo', paths: list });
+  }, 700);
+}
+
+/** Decodes a "bitcrane://upload/<base64url>" link of the Finder Quick Action. */
+export function uploadPathsFromLink(url: string): string[] {
+  const data = url.replace(/^bitcrane:\/\/upload\/?/, '').replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    const bytes = Uint8Array.from(atob(data + '='.repeat((4 - (data.length % 4)) % 4)), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes).split('\n').map((p) => p.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** Uploads the handed-over paths: opens the server in a new tab if needed and waits for the connection. */
+export async function uploadToServer(paths: string[], serverId: string, dir: string) {
+  updateSettings({ uploadToLast: { serverId, dir } });
+  closeDialog();
+  if (!LIVE) {
+    showToast(paths.length === 1 ? $t('„{0}“ wird hochgeladen.', paths.length ? paths[0].split(/[\\/]/).pop() ?? '' : '') : $t('{0} Objekte werden hochgeladen.', paths.length), 'ok');
+    return;
+  }
+  if (!live.isConnected(serverId)) {
+    openServerInNewTab(serverId);
+    const t0 = Date.now();
+    while (!live.isConnected(serverId) && Date.now() - t0 < 30000) await new Promise((r) => window.setTimeout(r, 300));
+    if (!live.isConnected(serverId)) {
+      showToast($t('Keine Verbindung zu {0}.', serverById(serverId)?.name ?? ''), 'error');
+      return;
+    }
+  }
+  await live.uploadNativePaths(serverId, paths, dir);
+}
+
+/** Switches the context-menu entry on or off (called at start and when the setting changes). */
+export async function applyShellIntegration() {
+  if (!LIVE) return;
+  const on = getState().settings.shellIntegration !== false;
+  await invoke('shell_integration_set', { enable: on, label: $t('Mit Bitcrane hochladen') }).catch(() => undefined);
 }

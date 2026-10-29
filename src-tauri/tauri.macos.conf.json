@@ -23,7 +23,8 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "sftp"
+          "sftp",
+          "bitcrane"
         ]
       }
     }

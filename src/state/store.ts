@@ -55,6 +55,7 @@ export type DialogState =
   | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
   | { type: 'diff'; transferId: string }
   | { type: 'compareFiles'; a: CompareRef; b: CompareRef }
+  | { type: 'uploadTo'; paths: string[] }
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
@@ -154,6 +155,10 @@ export interface Settings {
   /** Look for a new Bitcrane version at start and every few hours. */
   /** Updates (after Transmit): install automatically when quitting, only tell, or never look. */
   updateMode: 'auto' | 'notify' | 'off';
+  /** "Mit Bitcrane hochladen" in the Explorer / Finder context menu (missing = on). */
+  shellIntegration?: boolean;
+  /** Last target of "Mit Bitcrane hochladen": server and folder. */
+  uploadToLast?: { serverId: string; dir: string };
   /** Keep the computer from falling asleep while transfers run (missing = on). */
   keepAwake?: boolean;
   /** Client id of the user's own Google app (Google Drive); its secret is in the keychain. */

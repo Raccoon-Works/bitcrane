@@ -7,9 +7,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PaneSide, Protocol } from '../../backend/types';
 import { cancelCloudSignIn, CLOUD_NAMES, signInToCloud } from '../../state/cloud';
 import { closeDialog, finishCopyOrMove, serverById, useStore, type AfterQueue } from '../../state/store';
-import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue } from '../../state/tools';
-import { Button, Checkbox, Segmented, TextField } from '../ui';
-import { Clock, Cloud, FolderPlus } from '../glyphs';
+import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue, uploadToServer } from '../../state/tools';
+import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
+import { Clock, Cloud, FolderPlus, Upload } from '../glyphs';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -142,6 +142,34 @@ export function CloudSignInDialog({ service, serverId }: { service: Protocol; se
       {error
         ? <p className="small tone-danger">{error}</p>
         : <p className="small muted">{$t('Im Browser hat sich die Anmeldeseite von {0} geöffnet. Melde dich dort an und erlaube den Zugriff für Bitcrane. Danach geht es hier von selbst weiter. Bitcrane bekommt dein Passwort nie zu sehen.', name)}</p>}
+    </Dialog>
+  );
+}
+
+/**
+ * "Mit Bitcrane hochladen" (Explorer / Finder): which server and which folder
+ * the handed-over files go to. Remembers the last choice.
+ */
+export function UploadToDialog({ paths }: { paths: string[] }) {
+  const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
+  const last = useStore((s) => s.settings.uploadToLast);
+  const first = servers.find((x) => x.id === last?.serverId) ?? servers[0];
+  const [serverId, setServerId] = useState(first?.id ?? '');
+  const startDir = (id: string) => (last?.serverId === id ? last.dir : serverById(id)?.remoteStart || '/');
+  const [dir, setDir] = useState(first ? startDir(first.id) : '/');
+  const names = paths.map((p) => p.split(/[\\/]/).filter(Boolean).pop() ?? p);
+  const title = names.length === 1 ? $t('„{0}“ hochladen', names[0]) : $t('{0} Objekte hochladen', names.length);
+  const go = () => { if (serverId && dir.trim()) void uploadToServer(paths, serverId, dir.trim()); };
+  return (
+    <Dialog label={title} title={title} subtitle={names.length > 1 ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' …' : '') : undefined} width={500}
+      icon={<span className="icon-tile tone-accent"><Upload size={20} strokeWidth={1.75} /></span>}
+      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!serverId || !dir.trim()} onClick={go}>{$t('Hochladen')}</Button></>}>
+      {servers.length ? (
+        <div className="form-stack">
+          <Select label={$t('Server')} value={serverId} onChange={(v) => { setServerId(v); setDir(startDir(v)); }} options={servers.map((x) => ({ value: x.id, label: x.name }))} />
+          <TextField label={$t('Ordner auf dem Server')} value={dir} onChange={setDir} mono onEnter={go} />
+        </div>
+      ) : <p className="small muted">{$t('Noch kein Server gespeichert. Lege zuerst einen Server an.')}</p>}
     </Dialog>
   );
 }
