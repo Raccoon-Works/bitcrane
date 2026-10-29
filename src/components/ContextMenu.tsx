@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { crumbs, join } from '../util/paths';
 import {
-  activeTab, LIVE, paneLoc, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, paneLoc, compareFiles, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t } from '../i18n';
 import { addressOf } from './ServerList';
@@ -62,7 +62,7 @@ export function ContextMenu() {
   if (menu.kind === 'server' && menu.serverId) {
     const id = menu.serverId;
     const srv = getState().servers.find((x) => x.id === id);
-    const other = menu.side === 'local' ? 'remote' : 'local';
+    const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
     groups.push([
       { label: $t('Verbinden'), run: () => openServerIn(menu.side, id) },
       { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) },
@@ -167,6 +167,21 @@ export function ContextMenu() {
     else second.push({ label: $t('{0} Objekte umbenennen …', menu.names.length), run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }) });
     if (one && !isDir) second.push({ label: $t('Prüfsumme (SHA-256) …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
     if (one && isDir) second.push({ label: $t('Größe berechnen'), run: () => void computeFolderSize(menu.side, one) });
+    // "Dateien vergleichen" (after ForkLift): two files of this half, or this file and the one picked in the other half.
+    const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
+    const otherPick = getState().selection[other].names;
+    const isFile = (side: 'local' | 'remote', name: string) => !!tab && !isDirEntry(...paneLoc(side, tab), join(panePath(side), name));
+    if (menu.names.length === 2 && menu.names.every((n) => isFile(menu.side, n))) {
+      second.push({ label: $t('Dateien vergleichen'), run: () => compareFiles({ side: menu.side, name: menu.names[0] }, { side: menu.side, name: menu.names[1] }) });
+    } else if (one && !isDir && otherPick.length === 1 && isFile(other, otherPick[0])) {
+      const [a, b] = menu.side === 'local' ? [{ side: menu.side, name: one }, { side: other, name: otherPick[0] }] : [{ side: other, name: otherPick[0] }, { side: menu.side, name: one }];
+      second.push({ label: $t('Mit „{0}“ vergleichen', otherPick[0]), run: () => compareFiles(a, b) });
+    }
+    // Zip archives on this computer (after ForkLift).
+    if (!onServer) {
+      second.push({ label: one ? $t('„{0}“ komprimieren', one) : $t('{0} Objekte komprimieren', menu.names.length), run: () => compressEntries(menu.side, menu.names) });
+      if (one && !isDir && /\.zip$/i.test(one)) second.push({ label: $t('Entpacken'), run: () => extractArchive(menu.side, one) });
+    }
     if (one && menu.side === 'remote' && sftpTab) second.push({ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: join(panePath('remote'), one) }) });
     if (one) second.push({ label: $t('Informationen und Rechte …'), key: k('⌘I', 'Strg+I'), run: () => openDialog({ type: 'perms', side: menu.side, path: join(panePath(menu.side), one) }) });
     groups.push(second);

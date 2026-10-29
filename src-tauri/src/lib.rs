@@ -9,6 +9,7 @@
 mod config;
 mod error;
 mod dav;
+mod archive;
 mod dropbox;
 mod oauth;
 mod ftp;
@@ -236,6 +237,22 @@ async fn local_copy(paths: Vec<String>, dest_dir: String, merge: Option<bool>) -
     tauri::async_runtime::spawn_blocking(move || local::copy(&paths, &dest_dir, merge.unwrap_or(false)))
         .await
         .map_err(|e| AppError::other("Kopieren wurde unterbrochen.").with_detail(e.to_string()))?
+}
+
+/// Packs files and folders of this computer into a zip next to them; returns the archive's name.
+#[tauri::command]
+async fn local_zip(paths: Vec<String>) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || archive::compress(&paths))
+        .await
+        .map_err(|e| AppError::other("Komprimieren wurde unterbrochen.").with_detail(e.to_string()))?
+}
+
+/// Unpacks a zip of this computer into a new folder next to it; returns the folder's name.
+#[tauri::command]
+async fn local_unzip(path: String) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || archive::extract(&path))
+        .await
+        .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
 }
 
 /// Copies files to exact target paths, replacing existing ones (comparing two local folders).
@@ -1217,6 +1234,8 @@ pub fn run() {
             local_places,
             local_drives,
             local_cloud_places,
+            local_zip,
+            local_unzip,
             local_open,
             local_reveal,
             edit_temp_path,

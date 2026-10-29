@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
 import { AuthPrompt, CloudPlacesDialog, ConfirmDialog, ConflictDialog, About, Licenses, UpdateDialog, ConfirmDelete, Fingerprint, PermsDialog, QuickConnect, SecretPrompt, Shortcuts } from './components/dialogs/SmallDialogs';
-import { DiffDialog } from './components/dialogs/DiffDialog';
+import { DiffDialog, CompareFilesDialog } from './components/dialogs/DiffDialog';
 import { ChecksumDialog, EditsDialog, SymlinkDialog } from './components/dialogs/FileTools';
 import { Palette } from './components/dialogs/Palette';
 import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportDialogs';
@@ -59,6 +59,7 @@ function Dialogs() {
     case 'edits': return <EditsDialog />;
     case 'exportConfig': return <ExportDialog />;
     case 'importPassword': return <ImportPasswordDialog sealed={dialog.sealed} />;
+    case 'compareFiles': return <CompareFilesDialog a={dialog.a} b={dialog.b} />;
     case 'confirm': return <ConfirmDialog title={dialog.title} text={dialog.text} confirm={dialog.confirm} danger={dialog.danger} run={dialog.run} />;
     case 'diff': return <DiffDialog transferId={dialog.transferId} />;
     case 'log': return <LogDialog />;
