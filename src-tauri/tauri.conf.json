@@ -83,8 +83,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUxMDRFRUU2MDBENEQ3RUUKUldUdTE5UUE1dTRFNGVXcGp4d1J1M0RRSjBvL3NQT1ZTb2dZMWxDeG1ndFYrVXNOaTNFTEh5ZmIK",
       "endpoints": [
-        "https://github.com/Raccoon-Works/bitcrane/releases/latest/download/latest.json",
-        "https://raw.githubusercontent.com/Raccoon-Works/bitcrane-releases/main/latest.json"
+        "https://github.com/Raccoon-Works/bitcrane/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
