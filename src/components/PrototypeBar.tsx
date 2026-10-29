@@ -54,7 +54,7 @@ export function PrototypeBar() {
       <span className="flex-1" />
       <Segmented label={$t('System')} value={platform} onChange={setPlatform} options={[{ value: 'mac', label: $t('Mac') }, { value: 'win', label: $t('Windows') }]} />
       <Segmented label={$t('Erscheinungsbild')} value={theme} onChange={setTheme} options={[{ value: 'dark', label: $t('Dunkel') }, { value: 'light', label: $t('Hell') }]} />
-      {theme === 'dark' && <Segmented label={$t('Farben')} value={palette} onChange={(v) => setState({ palette: v })} options={[{ value: 'auto', label: $t('Je System') }, { value: 'explorer', label: 'Explorer' }, { value: 'transmit', label: 'Transmit' }, { value: 'tabby', label: 'Tabby' }, { value: 'old', label: $t('Bisher') }]} />}
+      {theme === 'dark' && <Segmented label={$t('Farben')} value={palette} onChange={(v) => setState({ palette: v })} options={[{ value: 'auto', label: $t('Standard') }, { value: 'explorer', label: 'Explorer' }, { value: 'transmit', label: 'Transmit' }, { value: 'midnight', label: $t('Mitternacht') }, { value: 'old', label: $t('Bisher') }]} />}
       <div className="proto-scenes">
         <button type="button" className="proto-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
           {$t('Ausprobieren')}{' '}<ChevronUp size={12} strokeWidth={2} aria-hidden="true" />

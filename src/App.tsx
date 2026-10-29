@@ -161,7 +161,7 @@ export default function App() {
   const platform = useStore((s) => s.platform);
   const theme = useStore((s) => s.theme);
   // "Dunkle Farben" in Settings › Darstellung; the prototype bar can still try every palette.
-  const palette = useStore((s) => (s.palette !== 'auto' ? s.palette : s.settings.darkPalette === 'tabby' ? 'tabby' : s.platform === 'win' ? 'explorer' : 'transmit'));
+  const palette = useStore((s) => (s.palette !== 'auto' ? s.palette : s.settings.darkPalette !== 'system' ? 'midnight' : s.platform === 'win' ? 'explorer' : 'transmit'));
   const { w, h, scale } = useStageSize(platform);
   useShortcuts();
   // "Nach Abschluss": watches the transfer queue for the chosen action.

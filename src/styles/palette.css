@@ -60,11 +60,12 @@
 .page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] .pane { border-color: var(--line-strong); }
 
 /*
- * "tabby": the darker look of Tabby (MIT). Near-black, neutral grey without a
- * blue cast, the window frame darkest; light blue (#5da9f6) as the accent,
- * with dark text on filled accent areas. Values measured from Tabby 1.0.238.
+ * "midnight" (default for the dark mode since 0.2.50): near-black neutral
+ * greys without a blue cast, the window frame darkest, inspired by the Tabby
+ * terminal. The accent is the light blue of the arrow in the Bitcrane logo,
+ * with dark text on filled accent areas (white would not be readable on it).
  */
-.page[data-palette='tabby'][data-theme='dark'] {
+.page[data-palette='midnight'][data-theme='dark'] {
   --bg-window: #111111;
   --bg-titlebar: #0d0d0d;
   --bg-card: #171717;
@@ -84,28 +85,28 @@
   --line-strong: rgba(255, 255, 255, 0.08);
   --field-line: #333333;
   --frame: #262626;
-  --accent: #5da9f6;
-  --accent-hover: #74b6f8;
-  --accent-pressed: #4a93dd;
+  --accent: #5fb0ff;
+  --accent-hover: #78beff;
+  --accent-pressed: #4a9aec;
   --on-accent: #0d0d0d;
-  --accent-text: #5da9f6;
-  --focus: #5da9f6;
-  --accent-tint: rgba(93, 169, 246, 0.12);
-  --accent-ring: rgba(93, 169, 246, 0.3);
-  --sel-row: rgba(93, 169, 246, 0.22);
+  --accent-text: #5fb0ff;
+  --focus: #5fb0ff;
+  --accent-tint: rgba(95, 176, 255, 0.12);
+  --accent-ring: rgba(95, 176, 255, 0.3);
+  --sel-row: rgba(95, 176, 255, 0.22);
   --sel-fg: #ffffff;
-  --sel-sub: #cfe4fb;
+  --sel-sub: #d3e8ff;
   --sel-row-inactive: rgba(255, 255, 255, 0.06);
   --paper: #262626;
 }
-.page[data-palette='tabby'][data-theme='dark'] :is(.places-bar, .pane-head, .col-head, .server-panel-head) { background: var(--bg-pane-head); }
-.page[data-palette='tabby'][data-theme='dark'] .col-head { padding-top: var(--space-1); border-bottom: 1px solid var(--line); }
-.page[data-palette='tabby'][data-theme='dark'] .pane { border-color: var(--line-strong); }
+.page[data-palette='midnight'][data-theme='dark'] :is(.places-bar, .pane-head, .col-head, .server-panel-head) { background: var(--bg-pane-head); }
+.page[data-palette='midnight'][data-theme='dark'] .col-head { padding-top: var(--space-1); border-bottom: 1px solid var(--line); }
+.page[data-palette='midnight'][data-theme='dark'] .pane { border-color: var(--line-strong); }
 /* The connection panel loses its blue-grey and joins the same near-black. */
-.page[data-palette='tabby'][data-theme='dark'] .pane.is-servers {
+.page[data-palette='midnight'][data-theme='dark'] .pane.is-servers {
   --bg-card: #171717; --bg-pane-head: #141414; --bg-section: #1d1d1d;
   --bg-control: #222222; --bg-control-on: #2e2e2e; --bg-field: #1d1d1d; --field-line: #333333;
   --bg-second: #262626; --bg-second-hover: #303030; --bg-second-pressed: #1f1f1f;
-  --sel-row: #5da9f6; --sel-fg: #0d0d0d; --sel-sub: #1a2a3a; --accent-text: #5da9f6; --focus: #5da9f6; --accent-tint: rgba(93, 169, 246, 0.12);
+  --sel-row: #5fb0ff; --sel-fg: #0d0d0d; --sel-sub: #1a2a3a; --accent-text: #5fb0ff; --focus: #5fb0ff; --accent-tint: rgba(95, 176, 255, 0.12);
   --paper: #262626;
 }
