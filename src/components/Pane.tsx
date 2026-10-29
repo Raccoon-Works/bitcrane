@@ -444,7 +444,7 @@ export function Pane({ side }: { side: PaneSide }) {
           <IconButton label={$t('Symbole')} active={icons} onClick={() => setViewMode(side, 'icons')}><SquaresFour size={18} weight="duotone" /></IconButton>
         </span>
         {onServer && sshPane && (
-          <IconButton label={$t('SSH-Terminal')} active={terminalOpen} onClick={() => void import('../state/terminal').then((m) => m.toggleTerminal())}>
+          <IconButton label={$t('SSH-Terminal')} active={terminalOpen} onClick={() => void import('../state/terminal').then((m) => m.toggleTerminal('server'))}>
             <TerminalWindow size={18} weight="bold" />
           </IconButton>
         )}
