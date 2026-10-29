@@ -15,6 +15,8 @@
 - Two halves: this computer and a server, or two servers (server to server)
 - Folder watching: changed files are uploaded automatically, with excludes, a post-upload command and a warning when the server copy is newer
 - Upload from the Explorer or Finder context menu ("Upload with Bitcrane")
+- Windows: servers as folders in the Explorer, like OneDrive (files download when opened)
+- Command line for scripts: `bitcrane upload`, `download`, `ls` with saved servers (see [docs/cli.md](docs/cli.md))
 - Transfer queue that survives a restart and resumes partial files
 - Host keys and self-signed certificates are confirmed once and remembered
 - Passwords and passphrases live in the macOS Keychain or the Windows Credential Manager, never in Bitcrane's files
@@ -38,7 +40,7 @@ Bitcrane is not code-signed yet, so the first start needs one extra step. Update
 
 ## Roadmap
 
-- **Servers as drives** in Finder and Explorer (like Mountain Duck): planned for Windows through the built-in Cloud Files interface. On macOS, the File Provider interface requires an app extension signed by Apple; it will follow together with notarized macOS releases.
+- **Servers as folders in Finder** (Windows already has them in the Explorer): the macOS File Provider interface requires an app extension signed by Apple; it will follow together with notarized macOS releases.
 - **Notarized macOS builds and signed Windows builds**: planned. Until then, see the notes under Download.
 - **Built-in SSH terminal** with snippets, next to the file view.
 - Distribution through the **Microsoft Store**.

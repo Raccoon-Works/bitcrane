@@ -10,7 +10,7 @@ import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
-import { closeDialog, getState, LIVE, newRuleId, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { closeDialog, getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { ListChecks } from '@phosphor-icons/react';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
 import { newCommandId } from '../../state/tools';
@@ -19,6 +19,24 @@ import { WatchIcon } from '../icons';
 import { Button, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
+
+const CLI_GUIDE_URL = 'https://github.com/Raccoon-Works/bitcrane/blob/main/docs/cli.md';
+
+/** Where the program lives, for `bitcrane upload …` in scripts (cli.rs). */
+function CliRow() {
+  const [exe, setExe] = useState('');
+  useEffect(() => {
+    if (LIVE) void invoke<string>('cli_path').then(setExe).catch(() => undefined);
+  }, []);
+  return (
+    <Row label={$t('Kommandozeile')} note={<>{$t('Für Skripte: Übertragungen mit gespeicherten Servern, ohne Fenster.')} {exe && <span className="mono">{exe}</span>}</>}>
+      <span className="row-inline">
+        {exe && <Button small onClick={() => void navigator.clipboard?.writeText(exe)}>{$t('Pfad kopieren')}</Button>}
+        <Button small onClick={() => openExternal(CLI_GUIDE_URL)}>{$t('Anleitung')}</Button>
+      </span>
+    </Row>
+  );
+}
 
 function Row({ label, note, children, column }: { label: string; note?: ReactNode; children?: ReactNode; column?: boolean }) {
   return (
@@ -365,6 +383,7 @@ export function SettingsDialog({ tab }: { tab: SettingsTab }) {
             <Row label={$t('Sprache')} note={$t('Gilt ab dem nächsten Start.')}><Select value={s.language} onChange={(v) => updateSettings({ language: v })} label={$t('Sprache')} options={[{ value: 'de', label: $t('Deutsch') }, { value: 'en', label: $t('English') }]} /></Row>
             <Row label={mac ? $t('Symbol in der Menüleiste zeigen') : $t('Symbol im Infobereich zeigen')} note={$t('Zeigt den Zustand und ein Menü mit Servern, Überwachungen und Einstellungen, auch ohne geöffnetes Fenster. Aus: Bitcrane ist dann nur über das Programmsymbol erreichbar.')}><Switch checked={s.showMenuBarIcon} onChange={(v) => updateSettings({ showMenuBarIcon: v })} label={$t('Symbol zeigen')} /></Row>
             <Row label={mac ? $t('Schnellaktion im Finder') : $t('Eintrag im Explorer-Kontextmenü')} note={mac ? $t('Rechtsklick auf Dateien › Schnellaktionen › „Mit Bitcrane hochladen“.') : $t('Rechtsklick auf Dateien › „Mit Bitcrane hochladen“ (unter Windows 11 in „Weitere Optionen anzeigen“).')}><Switch checked={s.shellIntegration !== false} onChange={(v) => updateSettings({ shellIntegration: v })} label={$t('Mit Bitcrane hochladen')} /></Row>
+            <CliRow />
             <Row label={$t('Updates')} note={s.updateMode === 'auto' ? $t('Neue Versionen werden im Hintergrund geladen und beim Beenden installiert.') : s.updateMode === 'notify' ? $t('Beim Start und alle paar Stunden. Installiert wird erst, wenn du zustimmst.') : $t('Nur wenn du „Jetzt suchen“ klickst.')}>
               <span className="row-inline">
                 <Button small onClick={() => void checkForUpdates(true)}>{$t('Jetzt suchen')}</Button>

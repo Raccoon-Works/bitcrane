@@ -1785,4 +1785,7 @@ export const EN: Record<string, string> = {
   "Das Windows-Konto konnte nicht ermittelt werden.": "The Windows account could not be determined.",
   "Der Ordner kann nicht überwacht werden.": "The folder cannot be watched.",
   "Server als Ordner im Explorer gibt es bisher nur unter Windows.": "Servers as folders in Explorer are only available on Windows so far.",
+  "Kommandozeile": "Command line",
+  "Für Skripte: Übertragungen mit gespeicherten Servern, ohne Fenster.": "For scripts: transfers with saved servers, without a window.",
+  "Anleitung": "Guide",
 };
