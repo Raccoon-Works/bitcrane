@@ -1391,6 +1391,12 @@ fn file_read(path: String) -> AppResult<String> {
     Ok(std::fs::read_to_string(p)?)
 }
 
+/// Tabby's config.yaml (for taking over its quick commands as snippets).
+#[tauri::command]
+fn tabby_config() -> Option<String> {
+    import::tabby_config()
+}
+
 /// Servers saved in FileZilla, WinSCP and the SSH configuration.
 #[tauri::command]
 fn import_find() -> import::ImportResult {
@@ -1605,6 +1611,7 @@ pub fn run() {
             secret_delete,
             ssh_config_hosts,
             import_find,
+            tabby_config,
             file_write,
             sync_read,
             keep_awake,

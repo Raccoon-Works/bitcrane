@@ -105,6 +105,8 @@ export interface Settings {
   terminal?: Partial<TerminalSettings>;
   /** Saved commands for the terminal. */
   snippets?: Snippet[];
+  /** Order of the snippet groups (a group may be empty for a while). */
+  snippetGroups?: string[];
   /** Height of the terminal panel in pixels. */
   terminalHeight?: number;
   /** The terminal button was added to a changed toolbar once (0.2.45). */

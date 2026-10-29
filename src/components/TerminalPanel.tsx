@@ -35,6 +35,12 @@ function TerminalView({ id }: { id: string }) {
 
 function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
   const snippets = useStore((s) => s.settings.snippets) ?? NO_SNIPPETS;
+  const order = useStore((s) => s.settings.snippetGroups);
+  // Hidden ones stay out; snippets without a group first, then the groups in their order.
+  const shown = snippets.filter((x) => !x.hidden && x.command.trim());
+  const groupNames = [...(order ?? [])];
+  for (const x of shown) if (x.group && !groupNames.includes(x.group)) groupNames.push(x.group);
+  const sections: Array<[string, Snippet[]]> = [['', shown.filter((x) => !x.group)] as [string, Snippet[]], ...groupNames.map((g) => [g, shown.filter((x) => x.group === g)] as [string, Snippet[]])].filter(([, l]) => l.length);
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('.term-snippets')) onClose();
@@ -44,12 +50,20 @@ function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
   }, [onClose]);
   return (
     <div className="term-snippets menu" role="menu">
-      {snippets.length === 0 && <span className="small muted term-snippets-empty">{$t('Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.')}</span>}
-      {snippets.map((sn) => (
-        <button key={sn.id} type="button" role="menuitem" className="menu-item" title={sn.command} onClick={() => { sendSnippet(id, sn); onClose(); }}>
-          <span className="ellipsis">{sn.name || sn.command}</span>
-          {sn.run && <span className="menu-key">↵</span>}
-        </button>
+      {shown.length === 0 && <span className="small muted term-snippets-empty">{$t('Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.')}</span>}
+      {sections.map(([group, list]) => (
+        <div key={group || '-'} role="group" aria-label={group || undefined}>
+          {group && <div className="menu-head">{group}</div>}
+          {list.map((sn) => (
+            <button key={sn.id} type="button" role="menuitem" className="menu-item term-snippet-item" title={sn.command} onClick={() => { void sendSnippet(id, sn); onClose(); }}>
+              <span className="col-text min-w-0">
+                <span className="ellipsis">{sn.name || sn.command}</span>
+                {sn.name && <span className="small muted mono ellipsis">{sn.command}</span>}
+              </span>
+              {sn.run && <span className="menu-key">↵</span>}
+            </button>
+          ))}
+        </div>
       ))}
       <div className="menu-sep" />
       <button type="button" role="menuitem" className="menu-item" onClick={() => { onClose(); openDialog({ type: 'settings', tab: 'terminal' }); }}>
