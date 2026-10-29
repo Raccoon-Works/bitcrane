@@ -9,6 +9,7 @@ import { cancelCloudSignIn, CLOUD_NAMES, signInToCloud } from '../../state/cloud
 import { closeDialog, finishCopyOrMove, serverById, useStore, type AfterQueue } from '../../state/store';
 import { afterQueueLabel, matchingNames, openWorkspace, removeWorkspace, runAfterQueue, saveWorkspace, selectByMask, setAfterQueue } from '../../state/tools';
 import { Button, Checkbox, Segmented, TextField } from '../ui';
+import { Clock, Cloud, FolderPlus } from '../glyphs';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -65,6 +66,7 @@ export function AfterQueueDialog({ action }: { action: AfterQueue }) {
       label={$t('Alle Übertragungen fertig')}
       title={$t('Alle Übertragungen fertig')}
       subtitle={$t('„{0}“ in {1} Sekunden.', afterQueueLabel(action), Math.max(0, left))}
+      icon={<span className="icon-tile tone-accent"><Clock size={20} strokeWidth={1.75} /></span>}
       width={440}
       onClose={cancel}
       footer={<><span className="flex-1" /><Button onClick={cancel}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={() => void runAfterQueue(action)}>{$t('Jetzt')}</Button></>}
@@ -110,7 +112,7 @@ export function WorkspacesDialog() {
 export function MergeFoldersDialog({ fromDir, names, toDir, move, clashes }: { fromDir: string; names: string[]; toDir: string; move: boolean; clashes: string[] }) {
   const title = clashes.length === 1 ? $t('Ordner „{0}“ gibt es dort schon', clashes[0]) : $t('{0} Ordner gibt es dort schon', clashes.length);
   return (
-    <Dialog label={title} title={title} width={500}
+    <Dialog label={title} title={title} width={500} icon={<span className="icon-tile tone-accent"><FolderPlus size={20} strokeWidth={1.75} /></span>}
       footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
         <Button onClick={() => finishCopyOrMove(fromDir, names, toDir, move, false)}>{$t('Beide behalten')}</Button>
         <Button variant="primary" onClick={() => finishCopyOrMove(fromDir, names, toDir, move, true)}>{$t('Zusammenführen')}</Button></>}>
@@ -135,6 +137,7 @@ export function CloudSignInDialog({ service, serverId }: { service: Protocol; se
   }, [service, serverId, run]);
   return (
     <Dialog label={$t('Bei {0} anmelden', name)} title={$t('Bei {0} anmelden', name)} width={480} onClose={cancelCloudSignIn}
+      icon={<span className="icon-tile tone-accent"><Cloud size={20} strokeWidth={1.75} /></span>}
       footer={<><span className="flex-1" />{error && <Button onClick={() => setRun((n) => n + 1)}>{$t('Noch einmal')}</Button>}<Button onClick={cancelCloudSignIn}>{$t('Abbrechen')}</Button></>}>
       {error
         ? <p className="small tone-danger">{error}</p>

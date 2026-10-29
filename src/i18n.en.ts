@@ -1617,4 +1617,5 @@ export const EN: Record<string, string> = {
   "Weitere hinzufügen": "Add more",
   "1 Server aus anderen Programmen übernehmen": "Import 1 server from other apps",
   "{0} Server aus anderen Programmen übernehmen": "Import {0} servers from other apps",
+  "Bitcrane wurde auf {0} aktualisiert.": "Bitcrane was updated to {0}.",
 };

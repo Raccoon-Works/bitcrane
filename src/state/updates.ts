@@ -85,7 +85,7 @@ async function downloadInBackground() {
     downloaded = true;
     setState({ update: { status: 'ready', version, notes: update.body ?? '' } });
     addLog('ok', $t('Update {0} geladen, es wird beim Beenden installiert.', version));
-    showToast($t('Bitcrane {0} ist geladen und wird beim Beenden installiert.', version), 'ok');
+    showToast($t('Bitcrane {0} ist geladen und wird beim Beenden installiert.', version), 'update');
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // Fall back to asking: the update window offers the normal download (and shows its error).

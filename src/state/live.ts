@@ -21,7 +21,7 @@ import { addLog } from './log';
 import { savedTabs, tabsFromSaved } from './tools';
 import { LANG, rememberLanguage } from '../i18n';
 import {
-  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, watchExcludes, type AppState, type SavedTab,
+  activeTab, editorFor, emptyTab, getState, offerCloudPlaces, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
 } from './store';
 import { $t } from '../i18n';
 
@@ -1515,6 +1515,20 @@ async function loadDrives() {
 }
 
 /** Writes pending changes at once (before quitting). */
+/** After an update (installed on quit or with a restart) a short message names the new version once. */
+async function announceUpdate() {
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    const now = await getVersion();
+    const before = getState().settings.lastVersion;
+    if (before === now) return;
+    updateSettings({ lastVersion: now });
+    if (before) showToast($t('Bitcrane wurde auf {0} aktualisiert.', now), 'update');
+  } catch {
+    // Unknown version: no message.
+  }
+}
+
 export async function saveNow() {
   if (!loaded) return;
   window.clearTimeout(saveTimer);
@@ -1720,6 +1734,7 @@ export function startLive() {
   }, 1000);
   void loadConfig().then(() => {
     reconcileWatches(getState());
+    void announceUpdate();
     startUpdateChecks();
   });
 }

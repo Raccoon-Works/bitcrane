@@ -16,7 +16,7 @@ import { ConnectionTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
 import { TrafficLights } from './TrafficLights';
 import { $t } from '../i18n';
-import { CheckCircle, Info, WarningCircle } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, Info, WarningCircle } from '@phosphor-icons/react';
 
 function WinTitleBar() {
   return (
@@ -75,12 +75,13 @@ export function MainWindow() {
             </div>
           </div>
       </div>
-      {/* Neutral card; only a small symbol shows the kind of message (no coloured frame). */}
+      {/* Neutral card in the normal text colour; only the small symbol shows the kind of message. */}
       {toast && (
-        <div className={`toast tone-${toast.tone}`} role="status">
-          {toast.tone === 'ok' ? <CheckCircle size={18} weight="fill" className="toast-icon" aria-hidden="true" />
-            : toast.tone === 'error' ? <WarningCircle size={18} weight="fill" className="toast-icon" aria-hidden="true" />
-              : <Info size={18} weight="fill" className="toast-icon" aria-hidden="true" />}
+        <div className={`toast toast-${toast.tone}`} role="status">
+          {toast.tone === 'ok' ? <CheckCircle size={18} className="toast-icon" aria-hidden="true" />
+            : toast.tone === 'error' ? <WarningCircle size={18} className="toast-icon" aria-hidden="true" />
+              : toast.tone === 'update' ? <DownloadSimple size={18} className="toast-icon" aria-hidden="true" />
+                : <Info size={18} className="toast-icon" aria-hidden="true" />}
           <span>{toast.text}</span>
         </div>
       )}

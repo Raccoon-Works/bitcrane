@@ -2,7 +2,7 @@
  * Smaller dialogs: quick connect, host key (fingerprint) checks, conflict,
  * permissions, delete confirmation, about and the shortcut overview.
  */
-import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Zap } from '../glyphs';
+import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 import type { CloudPlace, ConflictChoice, HostKey, PaneSide, Server } from '../../backend/types';
@@ -105,7 +105,6 @@ export function Fingerprint({ mode, keyInfo, serverId }: { mode: 'new' | 'change
       subtitle={$t('Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.')}
       icon={<span className="icon-tile tone-danger"><ShieldAlert size={20} strokeWidth={1.75} /></span>}
       width={620}
-      className="is-danger"
       footer={<><Button variant="ghost" aria-expanded={details} onClick={() => setDetails(!details)}>{details ? $t('Weniger') : $t('Details')}</Button><span className="flex-1" /><Button onClick={() => trustHostKey(serverId)}>{$t('Neuen übernehmen')}</Button><Button variant="primary" onClick={() => rejectHostKey(serverId)}>{$t('Nicht verbinden')}</Button></>}
     >
       <dl className="kv-card">
@@ -374,9 +373,9 @@ export function ConfirmDelete({ side, names }: { side: PaneSide; names: string[]
       label={$t('Löschen bestätigen')}
       title={remote ? $t('{0} vom Server löschen?', what) : $t('{0} in den Papierkorb legen?', what)}
       subtitle={remote ? $t('Auf {0} gibt es keinen Papierkorb. Gelöschte Dateien sind dort endgültig weg.', srv?.name ?? $t('dem Server')) : $t('Du kannst sie aus dem Papierkorb wiederherstellen.')}
-      icon={<span className={`icon-tile ${remote ? 'tone-danger' : 'tone-accent'}`}><AlertTriangle size={18} strokeWidth={1.75} /></span>}
+      icon={<span className="icon-tile tone-danger"><Trash2 size={20} strokeWidth={1.75} /></span>}
       width={480}
-      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{remote ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
+      footer={<><span className="flex-1" /><Button autoFocus onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{remote ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
     >
       {names.length > 1 && <ul className="delete-list small">{names.slice(0, 6).map((n) => <li key={n}>{n}</li>)}{names.length > 6 && <li>{$t('… und')}{' '}{names.length - 6} {$t('weitere')}</li>}</ul>}
     </Dialog>
@@ -534,8 +533,9 @@ export function CloudPlacesDialog({ found }: { found: CloudPlace[] }) {
 
 export function ConfirmDialog({ title, text, confirm, danger, run }: { title: string; text: string; confirm: string; danger?: boolean; run: () => void }) {
   return (
-    <Dialog label={title} title={title} subtitle={text} width={480} className={danger ? 'is-danger' : undefined}
-      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant={danger ? 'danger' : 'primary'} autoFocus onClick={() => { closeDialog(); run(); }}>{confirm}</Button></>}>
+    <Dialog label={title} title={title} subtitle={text} width={480}
+      icon={danger ? <span className="icon-tile tone-danger"><Trash2 size={20} strokeWidth={1.75} /></span> : <span className="icon-tile tone-accent"><Info size={20} strokeWidth={1.75} /></span>}
+      footer={<><span className="flex-1" /><Button autoFocus={danger} onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant={danger ? 'danger' : 'primary'} autoFocus={!danger} onClick={() => { closeDialog(); run(); }}>{confirm}</Button></>}>
       {null}
     </Dialog>
   );
