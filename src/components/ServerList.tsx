@@ -326,14 +326,13 @@ function ServerFoot() {
 
 /** No servers yet: the first steps (the old welcome screen, now inside the half). */
 function Welcome({ onQuick }: { onQuick: () => void }) {
-  const platform = useStore((s) => s.platform);
   const [found, setFound] = useState(LIVE ? 0 : 3);
   useEffect(() => {
     if (LIVE) backend.importFind().then((r) => setFound(r.servers.length)).catch(() => undefined);
   }, []);
   return (
     <div className="server-welcome">
-      {platform === 'mac' ? <BMark variant="macApp" size={72} /> : <BMark variant="winApp" size={56} />}
+      <BMark variant="brand" size={72} />
       <h2 className="headline">{$t('Willkommen bei Bitcrane')}</h2>
       <p className="muted center">{$t('Verbinde dich mit einem Server. Danach kannst du einen Ordner überwachen lassen.')}</p>
       <div className="server-welcome-actions">
