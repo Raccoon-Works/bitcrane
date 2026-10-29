@@ -67,6 +67,16 @@ export interface DavConnectParams {
   proxy?: ProxyParams;
 }
 
+/** SMB connection (see `smb.rs`). */
+export interface SmbConnectParams {
+  host: string;
+  port: number;
+  user: string;
+  password?: string;
+  share: string;
+  encrypt: boolean;
+}
+
 /** Options of one transfer (see `transfer.rs`). */
 export interface TransferOptions {
   tempName?: boolean;
@@ -194,6 +204,7 @@ export interface Backend {
   disconnect(serverId: string): Promise<void>;
   connectFtp(serverId: string, params: FtpConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectDav(serverId: string, params: DavConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  connectSmb(serverId: string, params: SmbConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Dropbox with the refresh token from the sign-in (kept in the keychain). */
   connectDropbox(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Which cloud services this build has app keys for. */

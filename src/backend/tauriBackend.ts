@@ -55,6 +55,7 @@ export const tauriBackend: Backend = {
   disconnect: (serverId) => invoke('ssh_disconnect', { serverId }),
   connectFtp: (serverId, params) => invoke('ftp_connect', { serverId, params }),
   connectDav: (serverId, params) => invoke('dav_connect', { serverId, params }),
+  connectSmb: (serverId, params) => invoke('smb_connect', { serverId, params }),
   connectDropbox: (serverId, params) => invoke('dropbox_connect', { serverId, params }),
   cloudServices: () => invoke('cloud_services'),
   cloudSignIn: (service, clientId, clientSecret) => invoke('cloud_sign_in', { service, clientId: clientId ?? null, clientSecret: clientSecret ?? null }),

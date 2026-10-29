@@ -349,8 +349,8 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
   );
 }
 
-type QuickProtocol = 'sftp' | 'ftp' | 'ftpes' | 'ftps' | 'davs' | 'dav';
-const DEFAULT_PORT: Record<QuickProtocol, number> = { sftp: 22, ftp: 21, ftpes: 21, ftps: 990, davs: 443, dav: 80 };
+type QuickProtocol = 'sftp' | 'ftp' | 'ftpes' | 'ftps' | 'davs' | 'dav' | 'smb';
+const DEFAULT_PORT: Record<QuickProtocol, number> = { sftp: 22, ftp: 21, ftpes: 21, ftps: 990, davs: 443, dav: 80, smb: 445 };
 
 /**
  * "Schnell verbinden" (Transmit's Quick Connect): protocol, address, user,
@@ -405,7 +405,7 @@ function QuickForm({ side }: { side: PaneSide }) {
         <label htmlFor="q-pass">{$t('Passwort')}</label>
         <TextField id="q-pass" type="password" value={password} onChange={setPassword} placeholder={protocol === 'sftp' ? $t('Leer: SSH-Schlüssel oder Agent') : ''} />
         <label htmlFor="q-path">{$t('Startordner')}</label>
-        <TextField id="q-path" value={path} onChange={setPath} placeholder="/var/www" mono />
+        <TextField id="q-path" value={path} onChange={setPath} placeholder={protocol === 'smb' ? '/daten/ordner' : '/var/www'} mono />
       </div>
       <p className="small muted quick-note">{platform === 'mac'
         ? $t('Das Passwort gilt nur für diese Verbindung. Mit „Zu Servern hinzufügen“ wird es im Schlüsselbund gesichert.')
@@ -427,5 +427,5 @@ function QuickForm({ side }: { side: PaneSide }) {
 }
 
 function protocolLabel(p: QuickProtocol): string {
-  return { sftp: 'SFTP', ftp: 'FTP', ftpes: $t('FTPS (explizit)'), ftps: $t('FTPS (implizit)'), davs: 'WebDAV (HTTPS)', dav: 'WebDAV (HTTP)' }[p];
+  return { sftp: 'SFTP', ftp: 'FTP', ftpes: $t('FTPS (explizit)'), ftps: $t('FTPS (implizit)'), davs: 'WebDAV (HTTPS)', dav: 'WebDAV (HTTP)', smb: $t('SMB (Windows-Freigabe, NAS)') }[p];
 }

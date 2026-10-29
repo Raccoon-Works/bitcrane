@@ -26,6 +26,7 @@ mod proxy;
 mod remote;
 mod tls;
 mod ssh;
+mod smb;
 mod sshconfig;
 mod sysicons;
 mod tray;
@@ -632,6 +633,18 @@ async fn ftp_connect(state: State<'_, AppState>, server_id: String, params: ftp:
 async fn dav_connect(state: State<'_, AppState>, server_id: String, params: dav::DavParams) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::Dav(dav::DavConn::connect(params, state.known_hosts.clone()).await?);
+    let home = conn.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+}
+
+#[tauri::command]
+async fn smb_connect(state: State<'_, AppState>, server_id: String, params: smb::SmbParams) -> AppResult<ConnectResult> {
+    let old = state.connections.lock().await.remove(&server_id);
+    if let Some(old) = old {
+        old.close().await;
+    }
+    let conn = remote::Remote::Smb(Arc::new(smb::SmbConn::connect(params).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
     Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
@@ -1439,6 +1452,7 @@ pub fn run() {
             ssh_disconnect,
             ftp_connect,
             dav_connect,
+            smb_connect,
             auth_prompt_answer,
             ssh_is_connected,
             remote_list,

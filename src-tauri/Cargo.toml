@@ -51,6 +51,7 @@ webpki-roots = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots-no-provider", "stream", "http2", "socks"] }
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
+smb = { version = "0.12.1", default-features = false, features = ["async", "sign", "encrypt", "compress"] }
 bytes = "1"
 percent-encoding = "2"
 png = "0.18"
@@ -77,3 +78,11 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSDictionary", "NSGeometry"] }
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics"] }
 objc2-core-graphics = { version = "0.3", features = ["CGImage"] }
+
+# Two small fixes to the SMB client (details in vendor/BITCRANE.md):
+# smb 0.12.1 pins sspi 0.21.3, whose release-candidate crypto pins clash with
+# the final versions russh uses, so vendor/smb moves to sspi 0.23.1;
+# vendor/smb-transport turns on TCP_NODELAY.
+[patch.crates-io]
+smb = { path = "vendor/smb" }
+smb-transport = { path = "vendor/smb-transport" }

@@ -107,10 +107,10 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
     openDialog({ type: 'cloudSignIn', service });
   };
   const cloud = isCloudProtocol(draft.protocol);
-  const family: 'sftp' | 'ftp' | 'webdav' | 'cloud' = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : 'sftp';
+  const family: 'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud' = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : draft.protocol === 'smb' ? 'smb' : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
-  const STANDARD_PORTS = [22, 21, 990, 443, 80];
-  const setFamily = (f: 'sftp' | 'ftp' | 'webdav' | 'cloud') => {
+  const STANDARD_PORTS = [22, 21, 990, 443, 80, 445];
+  const setFamily = (f: 'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud') => {
     setTest('idle');
     setDraft((d) => {
       // Cloud services (Transmit lists them with the protocols): signed in through the browser, no address or password.
@@ -118,6 +118,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
       const port = (p: number) => (STANDARD_PORTS.includes(d.port) ? p : d.port);
       if (f === 'sftp') return { ...d, protocol: 'sftp', host: isCloudProtocol(d.protocol) ? '' : d.host, port: isCloudProtocol(d.protocol) ? 22 : port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
       if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
+      if (f === 'smb') return { ...d, protocol: 'smb', port: port(445), auth: 'password', proxy: undefined };
       return { ...d, protocol: 'webdav', davHttps: d.davHttps ?? true, port: port(d.davHttps === false ? 80 : 443), auth: 'password' };
     });
   };
@@ -265,7 +266,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
               <>
                 <span>{$t('Protokoll#protocol')}</span>
                 <div className="row-inline">
-                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
+                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
@@ -294,7 +295,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
             <>
             <span>{$t('Protokoll#protocol')}</span>
             <div className="row-inline">
-              <Segmented<'sftp' | 'ftp' | 'webdav' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
+              <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
             </div>
 
             {family === 'ftp' && (
@@ -310,7 +311,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
 
             <label htmlFor="s-host">{$t('Server')}</label>
             <div className="field-row">
-              <TextField id="s-host" value={draft.host} onChange={(v) => set('host', v)} placeholder={$t('server.example oder 203.0.113.10')} className="flex-1" invalid={!draft.host && test === 'fail'} />
+              <TextField id="s-host" value={draft.host} onChange={(v) => set('host', v)} placeholder={family === 'smb' ? $t('nas.local oder 192.168.1.20') : $t('server.example oder 203.0.113.10')} className="flex-1" invalid={!draft.host && test === 'fail'} />
               <TextField value={String(draft.port)} onChange={(v) => set('port', Number(v.replace(/\D/g, '')) || 22)} className="port-field" />
             </div>
 
@@ -328,13 +329,23 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
               </>
             )}
 
+            {family === 'smb' && (
+              <>
+                <label htmlFor="s-share">{$t('Freigabe')}</label>
+                <div className="col-text">
+                  <TextField id="s-share" value={draft.smbShare ?? ''} onChange={(v) => set('smbShare', v.trim().replace(/^[\\/]+|[\\/]+$/g, '') || undefined)} placeholder={$t('z. B. daten')} />
+                  <span className="small muted">{$t('Leer lassen, um mit der Liste aller Freigaben zu beginnen.')}</span>
+                </div>
+              </>
+            )}
+
             <label htmlFor="s-user">{$t('Benutzer')}</label>
-            <TextField id="s-user" value={draft.user} onChange={(v) => set('user', v)} placeholder={family === 'ftp' ? $t('leer lassen für anonym') : 'ubuntu'} />
+            <TextField id="s-user" value={draft.user} onChange={(v) => set('user', v)} placeholder={family === 'ftp' ? $t('leer lassen für anonym') : family === 'smb' ? $t('leer lassen für Gast') : 'ubuntu'} />
 
             {family !== 'sftp' && (
               <>
                 <span>{$t('Anmeldung')}</span>
-                <span className="small muted">{family === 'ftp' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.') : $t('Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
+                <span className="small muted">{family === 'ftp' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.') : family === 'smb' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane als Gast an. Für Domänenkonten DOMÄNE\\name eintragen.') : $t('Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
               </>
             )}
             {family === 'sftp' && <span>{$t('Anmeldung')}</span>}
@@ -420,8 +431,8 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
             </button>
             {more && (
               <div className="disclosure-body form-grid">
-                <label htmlFor="s-proxy">{$t('Proxy')}</label>
-                <div className="col-text">
+                {family !== 'smb' && <label htmlFor="s-proxy">{$t('Proxy')}</label>}
+                {family !== 'smb' && <div className="col-text">
                   <div className="field-row">
                     <Select id="s-proxy" label={$t('Proxy')} value={draft.proxy?.kind ?? 'none'} onChange={(v) => set('proxy', v === 'none' ? undefined : { host: '', port: v === 'http' ? 8080 : 1080, ...draft.proxy, kind: v as 'socks5' | 'http' })}
                       options={[{ value: 'none', label: $t('Kein Proxy') }, { value: 'socks5', label: 'SOCKS5' }, { value: 'http', label: 'HTTP (CONNECT)' }]} />
@@ -439,7 +450,18 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                     </div>
                   )}
                   {draft.jumpServerId && draft.proxy && <span className="small muted">{$t('Mit Sprungserver gilt dessen Proxy-Einstellung.')}</span>}
-                </div>
+                </div>}
+
+                {family === 'smb' && (
+                  <>
+                    <label htmlFor="s-smbenc">{$t('Verschlüsselung')}</label>
+                    <div className="col-text">
+                      <Select<'auto' | 'required'> id="s-smbenc" label={$t('Verschlüsselung')} value={draft.smbEncrypt ? 'required' : 'auto'} onChange={(v) => set('smbEncrypt', v === 'required' || undefined)}
+                        options={[{ value: 'auto', label: $t('Wie der Server es verlangt (Standard)') }, { value: 'required', label: $t('Immer verschlüsseln (SMB 3)') }]} />
+                      <span className="small muted">{$t('Älteren NAS-Geräten fehlt SMB 3; dann kommt keine Verbindung zustande.')}</span>
+                    </div>
+                  </>
+                )}
 
                 {(draft.protocol === 'ftps' || (draft.protocol === 'webdav' && draft.davHttps !== false)) && (
                   <>

@@ -37,7 +37,7 @@ export function QuickConnect() {
     <Dialog
       label={$t('Schnell verbinden')}
       title={$t('Schnell verbinden')}
-      subtitle={$t('Ohne den Server zu speichern. Adresse wie im Terminal eingeben; für FTP oder WebDAV mit ftp://, ftps:// oder davs:// davor.')}
+      subtitle={$t('Ohne den Server zu speichern. Adresse wie im Terminal eingeben; für FTP, WebDAV oder SMB mit ftp://, ftps://, davs:// oder smb:// davor.')}
       icon={<span className="icon-tile tone-accent"><Zap size={18} strokeWidth={1.75} /></span>}
       width={560}
       footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={() => quickConnect(address, save, auth as 'auto' | 'key' | 'password')}>{$t('Verbinden')}</Button></>}
