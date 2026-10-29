@@ -199,6 +199,12 @@ export interface Backend {
   localOpen(path: string, app?: string): Promise<void>;
   editTempPath(serverId: string, remotePath: string): Promise<string>;
   localReveal(path: string): Promise<void>;
+  /** Windows: shows a server (connected under `connectionId`) as a folder in the Explorer; resolves to the folder. */
+  mountStart(connectionId: string, serverId: string, name: string, remoteRoot: string): Promise<string>;
+  /** Takes it out again; resolves to the folder when it had to stay (outstanding uploads). */
+  mountStop(serverId: string, removeFolder: boolean): Promise<string | null>;
+  /** Folder of a server shown in the Explorer right now. */
+  mountFolder(serverId: string): Promise<string | null>;
 
   connect(serverId: string, params: ConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   disconnect(serverId: string): Promise<void>;

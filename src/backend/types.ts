@@ -100,6 +100,8 @@ export interface Server {
   smbShare?: string;
   /** SMB: insist on SMB 3 encryption. */
   smbEncrypt?: boolean;
+  /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
+  mountExplorer?: boolean;
 }
 
 export interface ServerProxy {

@@ -22,6 +22,7 @@ import { isConfigLoaded } from './live';
 import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, updateSettings, type AppState } from './store';
 import { checkForUpdates } from './updates';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
+import { initMounts } from './mount';
 import { $t } from '../i18n';
 
 /* ------------------------------------------------------------------------ */
@@ -368,6 +369,8 @@ export async function startShell() {
     };
     subscribeStore(syncShell);
     syncShell();
+    // Servers shown as folders in the Windows Explorer.
+    void initMounts();
   });
 
   // Start at login follows the setting.

@@ -14,7 +14,7 @@ import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplat
 import { CLOUD_NAMES, GDRIVE_GUIDE_URL, googleKey, saveGoogleKey, showCloudNotSetUp } from '../../state/cloud';
 import { KeyPanel } from '../KeyPanel';
 import { ServerTile, swatch } from '../ServerTile';
-import { Button, Segmented, Select, TextField } from '../ui';
+import { Button, Segmented, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -485,6 +485,22 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
                     <div className="col-text">
                       <Select<'binary' | 'ascii' | 'auto'> id="s-mode" label={$t('Übertragungsart')} value={draft.ftpMode ?? 'binary'} onChange={(v) => set('ftpMode', v === 'binary' ? undefined : v)} options={[{ value: 'binary', label: $t('Binär (Standard, Dateien bleiben unverändert)') }, { value: 'auto', label: $t('Automatisch (Textdateien als Text)') }, { value: 'ascii', label: $t('Text (Zeilenenden anpassen)') }]} />
                       <span className="small muted">{$t('Text passt Zeilenenden zwischen Windows und Linux an. Abgebrochene Textübertragungen beginnen neu.')}</span>
+                    </div>
+                  </>
+                )}
+
+                {family !== 'cloud' && (
+                  <>
+                    <span>{platform === 'win' ? $t('Im Explorer zeigen') : $t('Im Finder zeigen')}</span>
+                    <div className="col-text">
+                      {platform === 'win' ? (
+                        <>
+                          <Switch checked={!!draft.mountExplorer} onChange={(v) => set('mountExplorer', v || undefined)} label={$t('Im Explorer als Ordner zeigen')} />
+                          <span className="small muted">{$t('Wie OneDrive: Der Server erscheint links im Explorer, Dateien werden erst beim Öffnen geladen, Änderungen gehen von selbst zurück auf den Server. Braucht ein gespeichertes Passwort.')}</span>
+                        </>
+                      ) : (
+                        <span className="small muted">{$t('Server als Ordner im Finder kommen mit einer von Apple signierten Version von Bitcrane. Unter Windows gibt es das schon.')}</span>
+                      )}
                     </div>
                   </>
                 )}
