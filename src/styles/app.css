@@ -2040,6 +2040,13 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 }
 .pane.is-servers .server-panel-head, .pane.is-servers .server-sources, .pane.is-servers .server-foot { background: var(--bg-pane-head); }
 .pane.is-servers { --bg-second: #343946; --bg-second-hover: #3d4352; --bg-second-pressed: #2c303b; }
+/* Light theme: the card stays dark, but in a softer grey-blue, so it does not weigh on the light file views. */
+.page[data-theme='light'] .pane.is-servers {
+  --bg-card: #2a3240; --bg-pane-head: #2f3846; --bg-section: #343e4d;
+  --bg-control: #3a4554; --bg-control-on: #414c5d; --bg-field: #323b49; --field-line: #475163;
+  --bg-second: #3d4859; --bg-second-hover: #465264; --bg-second-pressed: #36404f;
+  background: var(--bg-card);
+}
 
 /* Calm toolbar: every symbol in the normal icon colour; colour only shows a state
    (watches running or waiting, a panel or view that is switched on). */
