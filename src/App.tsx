@@ -27,7 +27,7 @@ import { MainWindow } from './components/MainWindow';
 import { MenuBarWindow } from './components/MenuBarWindow';
 import { PrototypeBar } from './components/PrototypeBar';
 import { STAGE_ID } from './components/stage';
-import { activeTab, copySelection, getState, LIVE, pasteClipboard, setState, startSimulation, useStore } from './state/store';
+import { activeTab, copySelection, getState, LIVE, pasteClipboard, setState, startSimulation, useStore, currentZoom } from './state/store';
 import { actionFor } from './state/keys';
 import { startAfterQueueWatch } from './state/tools';
 
@@ -42,7 +42,7 @@ function Dialogs() {
   if (!dialog) return null;
   switch (dialog.type) {
     case 'watchSetup': return <WatchSetup key={dialog.editId ?? 'new'} editId={dialog.editId} />;
-    case 'serverEdit': return <ServerEdit key={dialog.serverId ?? `new-${dialog.cloud ?? ''}`} serverId={dialog.serverId} cloud={dialog.cloud} terminal={dialog.terminal} />;
+    case 'serverEdit': return <ServerEdit key={dialog.serverId ?? `new-${dialog.cloud ?? ''}`} serverId={dialog.serverId} cloud={dialog.cloud} terminal={dialog.terminal} preset={dialog.preset} />;
     case 'quickConnect': return <QuickConnect terminal={dialog.terminal} />;
     case 'fingerprint': return <Fingerprint mode={dialog.mode} keyInfo={dialog.key} serverId={dialog.serverId} />;
     case 'conflict': return <ConflictDialog />;
@@ -179,7 +179,7 @@ export default function App() {
   }, []);
   // Window zoom (Strg + Plus/Minus, Einstellungen > Darstellung): the app zooms its web view
   // like a browser, so everything grows evenly. The browser prototype only shows the step.
-  const zoom = useStore((s) => s.settings.zoom ?? 1);
+  const zoom = useStore((s) => currentZoom(s));
   useEffect(() => {
     if (LIVE) void import('@tauri-apps/api/webview').then((m) => m.getCurrentWebview().setZoom(zoom)).catch(() => undefined);
     // The Mac's own window buttons do not zoom: the bar around them keeps its real size (CSS divides by --zoom).

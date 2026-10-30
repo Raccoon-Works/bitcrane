@@ -10,7 +10,7 @@ import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
-import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, currentZoom, defaultZoom, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { Bug, GithubLogo, ListChecks, MagnifyingGlass, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
 import { terminalSettings, type TerminalSettings } from '../../state/terminal';
@@ -501,21 +501,21 @@ function filterSettings(root: HTMLElement, query: string): boolean {
 }
 
 /** Zoom steps as a row of points (Spotify): smaller on the left, larger on the right. */
-function ZoomPicker({ value }: { value: number }) {
+function ZoomPicker({ value, standard }: { value: number; standard: number }) {
   const near = ZOOM_STEPS.reduce((b, z) => (Math.abs(z - value) < Math.abs(b - value) ? z : b), ZOOM_STEPS[0]);
   return (
     <div className="zoom-picker" role="radiogroup" aria-label={$t('Zoom')}>
       <div className="zoom-ends"><span>{$t('Kleiner')}</span><span>{$t('Größer')}</span></div>
       <div className="zoom-track">
         {ZOOM_STEPS.map((z) => (
-          <button key={z} type="button" role="radio" aria-checked={z === near} className={`zoom-step${z === near ? ' is-on' : ''}${z === 1 ? ' is-default' : ''}`}
-            title={z === 1 ? $t('Standard') : undefined} onClick={() => updateSettings({ zoom: z })}>
+          <button key={z} type="button" role="radio" aria-checked={z === near} className={`zoom-step${z === near ? ' is-on' : ''}${z === standard ? ' is-default' : ''}`}
+            title={z === standard ? $t('Standard') : undefined} onClick={() => updateSettings({ zoom: z })}>
             <span className="zoom-dot" />
             <span className="zoom-label">{Math.round(z * 100)} %</span>
           </button>
         ))}
       </div>
-      {near !== 1 && <div className="zoom-reset"><Button small onClick={() => updateSettings({ zoom: 1 })}>{$t('Zurücksetzen')}</Button></div>}
+      {near !== standard && <div className="zoom-reset"><Button small onClick={() => updateSettings({ zoom: standard })}>{$t('Zurücksetzen')}</Button></div>}
     </div>
   );
 }
@@ -755,7 +755,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Zoom')} note={mac ? $t('Alles im Fenster größer oder kleiner, auch mit ⌘ + Plus/Minus, ⌘ + 0 setzt zurück.') : $t('Alles im Fenster größer oder kleiner, auch mit Strg + Plus/Minus, Strg + 0 setzt zurück.')}>
               <span />
             </Row>
-            <ZoomPicker value={s.zoom ?? 1} />
+            <ZoomPicker value={currentZoom()} standard={defaultZoom()} />
             <Row label={$t('Dateisymbole des Systems')} note={mac ? $t('Statt der farbigen Bitcrane-Symbole die Symbole von macOS zeigen.') : $t('Statt der farbigen Bitcrane-Symbole die Symbole von Windows zeigen.')}><Switch checked={!!s.systemIcons} onChange={(v) => updateSettings({ systemIcons: v })} label={$t('Dateisymbole des Systems')} /></Row>
             <Row label={$t('Versteckte Dateien zeigen')}><Switch checked={s.showHidden} onChange={(v) => updateSettings({ showHidden: v })} label={$t('Versteckte Dateien zeigen')} /></Row>
             {/* Windows only: protected system items (hidden + system attribute); the Mac has no such files in the home folder. */}

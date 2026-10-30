@@ -2092,5 +2092,10 @@
   "Gruppen ausblenden": "Masquer les groupes",
   "Kleiner": "Plus petit",
   "Größer": "Plus grand",
-  "Paketinhalt zeigen": "Afficher le contenu du paquet"
+  "Paketinhalt zeigen": "Afficher le contenu du paquet",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Cliquer : replier ou déplier, glisser : déplacer",
+  "{0} frei": "{0} libres",
+  "{0} über SMB verbinden …": "Se connecter à {0} via SMB …",
+  "Alle Bereiche aufklappen": "Tout déplier",
+  "Reihenfolge zurücksetzen": "Rétablir l’ordre"
 }

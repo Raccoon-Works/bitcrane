@@ -166,6 +166,8 @@ export interface Place {
   cloud?: string;
   /** Drives only: a network share (shown under "Freigaben"). */
   network?: boolean;
+  /** Drives only: free space in bytes. */
+  free?: number;
 }
 
 /** A cloud storage folder found on this computer (first start, like Transmit). */

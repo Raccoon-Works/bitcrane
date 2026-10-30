@@ -2092,5 +2092,10 @@
   "Gruppen ausblenden": "Nascondi gruppi",
   "Kleiner": "Più piccolo",
   "Größer": "Più grande",
-  "Paketinhalt zeigen": "Mostra contenuto pacchetto"
+  "Paketinhalt zeigen": "Mostra contenuto pacchetto",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Clic: comprimi o espandi, trascina: sposta",
+  "{0} frei": "{0} liberi",
+  "{0} über SMB verbinden …": "Connetti a {0} tramite SMB …",
+  "Alle Bereiche aufklappen": "Espandi tutte le sezioni",
+  "Reihenfolge zurücksetzen": "Ripristina ordine"
 }

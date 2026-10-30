@@ -15,7 +15,7 @@ import { isVaultListing, unlockVault } from '../state/vault';
 import { ArrowElbowLeftUp, GitBranch, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, Columns, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage } from '../state/store';
+import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage, LIVE } from '../state/store';
 import { PlacesBar } from './PlacesBar';
 import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
@@ -26,7 +26,8 @@ import { Thumb } from './Thumb';
 import * as paths from '../util/paths';
 import { LocalTile, ServerTile } from './ServerTile';
 import { Button, IconButton } from './ui';
-import { $t } from '../i18n';
+import { $t, LOCALE } from '../i18n';
+import { invoke } from '@tauri-apps/api/core';
 import { compareMarks, selectDifferences, toggleCompareDirs, type CompareMark } from '../state/tools';
 import { GIT_LABEL, gitMark, useGit } from '../state/git';
 import { tagCss, useTags } from '../state/tags';
@@ -89,6 +90,30 @@ function PathInput({ side, path }: { side: PaneSide; path: string }) {
       onBlur={() => setState({ pathEdit: null })}
     />
   );
+}
+
+/** Free space of the disk that holds a folder of this computer, refreshed when files change. */
+function useFreeSpace(path: string, enabled: boolean, rev: number): number | null {
+  const [free, setFree] = useState<number | null>(null);
+  useEffect(() => {
+    if (!enabled) { setFree(null); return; }
+    if (!LIVE) { setFree(86.2e9); return; }
+    let live = true;
+    const t = window.setTimeout(() => {
+      void invoke<number | null>('local_free_space', { path }).then((v) => { if (live) setFree(v ?? null); }).catch(() => { if (live) setFree(null); });
+    }, 300);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [path, enabled, rev]);
+  return free;
+}
+
+/** "86 GB", "1,2 TB", "512 MB". */
+function formatFree(bytes: number): string {
+  const gb = bytes / 1e9;
+  if (gb >= 1000) return `${(gb / 1000).toLocaleString(LOCALE, { maximumFractionDigits: 1 })} TB`;
+  if (gb >= 10) return `${Math.round(gb).toLocaleString(LOCALE)} GB`;
+  if (gb >= 1) return `${gb.toLocaleString(LOCALE, { maximumFractionDigits: 1 })} GB`;
+  return `${Math.round(bytes / 1e6).toLocaleString(LOCALE)} MB`;
 }
 
 export function Pane({ side }: { side: PaneSide }) {
@@ -214,6 +239,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
 
   const sidebarOn = useStore((s) => s.settings.sidebar !== false);
+  const freeSpace = useFreeSpace(path, !onServer && !!path, fsRev);
   // All hooks stay above the early returns below, so their order never changes.
   // Column view (Finder, ForkLift): the folder above, the folder shown, and what the chosen folder holds.
   const colView = viewMode === 'columns' && !deep;
@@ -281,14 +307,16 @@ export function Pane({ side }: { side: PaneSide }) {
     if (status.loading && !entries.length) return $t('Wird gelesen …');
     const n = entries.length;
     // Hidden entries are counted, so nobody wonders where a file went (WinSCP: "2 versteckt").
+    // Free space of the disk shown (this computer only), as in the Finder's status bar.
+    const freeText = freeSpace !== null ? `, ${$t('{0} frei', formatFree(freeSpace))}` : '';
     const base = `${n} ${n === 1 ? $t('Objekt') : $t('Objekte')}${hidden ? `, ${$t('{0} versteckt', hidden)}` : ''}`;
-    if (selectedCount) return $t('{0}, {1} ausgewählt', base, selectedCount);
+    if (selectedCount) return $t('{0}, {1} ausgewählt', base, selectedCount) + freeText;
     if (marks) return marks.size ? $t('{0}, {1} anders als drüben', base, marks.size) : $t('{0}, gleich wie drüben', base);
     if (side === 'remote' && otherNames) {
       const only = entries.filter((e) => !otherNames.has(e.name)).length;
       if (only) return $t('{0}, {1} nur auf dem Server', base, only);
     }
-    return base;
+    return base + freeText;
   })();
 
   const isMod = (e: { metaKey: boolean; ctrlKey: boolean }) => e.metaKey || e.ctrlKey;

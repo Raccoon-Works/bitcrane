@@ -33,7 +33,7 @@ export const LIVE = isTauri;
 
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
-  | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean }
+  | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }
   | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
@@ -95,7 +95,7 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
+  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
   /** Group right-clicked in the server list ("serverGroup"). */
   group?: string;
   serverId?: string;
@@ -140,6 +140,10 @@ export interface Settings {
   sidebarWidth?: number;
   /** Folders of this computer opened last (sidebar). */
   recentDirs?: string[];
+  /** Sidebar sections in the user's order, folded ones, and hidden ones. */
+  sidebarOrder?: SidebarSection[];
+  sidebarCollapsed?: SidebarSection[];
+  sidebarHidden?: SidebarSection[];
   /** Git state in local file lists (on unless switched off). */
   gitStatus?: boolean;
   /** "Kopieren nach …": the folders used last. */
@@ -864,6 +868,37 @@ export function paneStatus(side: PaneSide, s: AppState = state): { loading: bool
  */
 export type ViewMode = 'list' | 'icons' | 'columns';
 
+/** Sections of the sidebar. */
+export type SidebarSection = 'favorites' | 'recent' | 'devices' | 'shares' | 'tags';
+export const SIDEBAR_SECTIONS: SidebarSection[] = ['favorites', 'recent', 'devices', 'shares', 'tags'];
+
+/** Sidebar sections in the user's order (new sections are added at their default place). */
+export function sidebarOrder(s: AppState = state): SidebarSection[] {
+  const saved = (s.settings.sidebarOrder ?? []).filter((x) => SIDEBAR_SECTIONS.includes(x));
+  const missing = SIDEBAR_SECTIONS.filter((x) => !saved.includes(x));
+  return [...saved, ...missing];
+}
+
+/** Moves a sidebar section before another one (null: to the end). */
+export function moveSidebarSection(id: SidebarSection, before: SidebarSection | null) {
+  const rest = sidebarOrder().filter((x) => x !== id);
+  const i = before === null ? rest.length : Math.max(0, rest.indexOf(before));
+  updateSettings({ sidebarOrder: [...rest.slice(0, i), id, ...rest.slice(i)] });
+}
+
+/** Folds or unfolds a sidebar section. */
+export function toggleSidebarCollapsed(id: SidebarSection) {
+  const cur = state.settings.sidebarCollapsed ?? [];
+  updateSettings({ sidebarCollapsed: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+}
+
+/** Shows or hides a sidebar section. */
+export function toggleSidebarHidden(id: SidebarSection) {
+  const cur = state.settings.sidebarHidden ?? [];
+  updateSettings({ sidebarHidden: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+  setState({ contextMenu: null });
+}
+
 /**
  * Entries of any folder of a half, filtered and sorted like the half itself
  * (column view: the folder above and the folder chosen). Undefined until read.
@@ -961,12 +996,22 @@ export function setSort(side: PaneSide, key: SortKey) {
 /** Zoom steps of the window, like a browser. */
 export const ZOOM_STEPS = [0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2];
 
-/** Strg + Plus / Minus / 0: one zoom step larger, smaller, or back to 100 %. */
+/** Standard zoom: Mac programs are more compact than Windows ones, so the Mac starts at 90 %. */
+export function defaultZoom(s: AppState = state): number {
+  return s.platform === 'mac' ? 0.9 : 1;
+}
+
+/** The zoom in use: the user's choice, or the standard of the system. */
+export function currentZoom(s: AppState = state): number {
+  return s.settings.zoom ?? defaultZoom(s);
+}
+
+/** Strg + Plus / Minus / 0: one zoom step larger, smaller, or back to the standard. */
 export function stepZoom(dir: 1 | -1 | 0) {
-  const cur = state.settings.zoom ?? 1;
+  const cur = currentZoom();
   // Nearest step to the current zoom, then one step in the wanted direction.
   const at = ZOOM_STEPS.reduce((best, z, i) => (Math.abs(z - cur) < Math.abs(ZOOM_STEPS[best] - cur) ? i : best), 0);
-  const next = dir === 0 ? 1 : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, at + dir))];
+  const next = dir === 0 ? defaultZoom() : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, at + dir))];
   setState((s) => ({ settings: { ...s.settings, zoom: next } }));
   showToast($t('Zoom: {0} %', Math.round(next * 100)));
 }
