@@ -173,11 +173,12 @@ pub async fn upload(conn: &Remote, local_path: &str, remote_path: &str, opts: &T
         None => conn.meta(remote_path).await.and_then(|m| m.perms),
     };
 
-    let target = if opts.temp_name { temp_name(remote_path) } else { remote_path.to_string() };
+    let use_temp = opts.temp_name && !conn.atomic_upload();
+    let target = if use_temp { temp_name(remote_path) } else { remote_path.to_string() };
     // Continue a partial upload when its size fits, the protocol can append and
     // the local file has not changed since the partial was written (else the
     // new file's tail would land on the old file's head).
-    let offset = if opts.temp_name && opts.resume && conn.can_append(remote_path) {
+    let offset = if use_temp && opts.resume && conn.can_append(remote_path) {
         conn.meta(&target)
             .await
             .filter(|m| m.size <= total && matches!((m.mtime, mtime), (Some(part), Some(src)) if part + conn.mtime_slack() >= src))
@@ -228,14 +229,14 @@ pub async fn upload(conn: &Remote, local_path: &str, remote_path: &str, opts: &T
     if let Err(e) = result {
         // Keep the partial file for resuming unless the user threw the transfer away.
         // Without a temp name the target is the real file: it is never deleted.
-        if opts.temp_name && (flag.load(Ordering::Relaxed) == DISCARD || !conn.can_append(remote_path)) {
+        if use_temp && (flag.load(Ordering::Relaxed) == DISCARD || !conn.can_append(remote_path)) {
             let _ = conn.remove_file(&target).await;
         }
         return Err(e);
     }
 
     conn.set_attrs(&target, keep_mtime, perms).await;
-    if opts.temp_name {
+    if use_temp {
         if opts.keep_versions > 0 {
             keep_old_version(conn, remote_path, opts.keep_versions).await?;
         }
@@ -339,7 +340,8 @@ pub async fn cross(src: &Remote, src_path: &str, dst: &Remote, dst_path: &str, o
         Some(p) => Some(p),
         None => dst.meta(dst_path).await.and_then(|m| m.perms),
     };
-    let target = if opts.temp_name { temp_name(dst_path) } else { dst_path.to_string() };
+    let use_temp = opts.temp_name && !dst.atomic_upload();
+    let target = if use_temp { temp_name(dst_path) } else { dst_path.to_string() };
     let mut reader = src.reader(src_path, 0).await?;
     let mut writer = match dst.writer(&target, 0, Some(total), keep_mtime).await {
         Ok(w) => w,
@@ -388,13 +390,13 @@ pub async fn cross(src: &Remote, src_path: &str, dst: &Remote, dst_path: &str, o
         }
     };
     if let Err(e) = result {
-        if opts.temp_name {
+        if use_temp {
             let _ = dst.remove_file(&target).await;
         }
         return Err(e);
     }
     dst.set_attrs(&target, keep_mtime, perms).await;
-    if opts.temp_name {
+    if use_temp {
         if opts.keep_versions > 0 {
             keep_old_version(dst, dst_path, opts.keep_versions).await?;
         }

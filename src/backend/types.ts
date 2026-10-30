@@ -106,6 +106,12 @@ export interface Server {
   vaultStorageId?: string;
   /** Built-in terminal: colour scheme for this server (e.g. red for production), else the setting. */
   termScheme?: string;
+  /** S3: provider preset (only for the form), signing region, fixed bucket (empty = bucket list), plain http, bucket in the path. */
+  s3Provider?: string;
+  s3Region?: string;
+  s3Bucket?: string;
+  s3Http?: boolean;
+  s3PathStyle?: boolean;
   /** SFTP / SSH servers: what opening the server shows, the files (default) or only a terminal. */
   openAs?: 'files' | 'terminal';
   /** Built-in terminal: command typed in after connecting. */
@@ -137,7 +143,7 @@ export interface ServerProxy {
   user?: string;
 }
 
-export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 'vault' | 'dropbox' | 'gdrive' | 'onedrive';
+export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 's3' | 'vault' | 'dropbox' | 'gdrive' | 'onedrive';
 
 /** Cloud services that Bitcrane treats like a server (signed in through the browser). */
 export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];

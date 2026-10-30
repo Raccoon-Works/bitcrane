@@ -27,6 +27,7 @@ mod mount_win;
 mod paths;
 mod proxy;
 mod remote;
+mod s3;
 mod tls;
 mod ssh;
 mod smb;
@@ -700,6 +701,15 @@ async fn ftp_connect(state: State<'_, AppState>, server_id: String, params: ftp:
 async fn dav_connect(state: State<'_, AppState>, server_id: String, params: dav::DavParams) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::Dav(dav::DavConn::connect(params, state.known_hosts.clone()).await?);
+    let home = conn.home().to_string();
+    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+}
+
+#[tauri::command]
+async fn s3_connect(state: State<'_, AppState>, server_id: String, params: s3::S3Params) -> AppResult<ConnectResult> {
+    state.connections.lock().await.remove(&server_id);
+    let conn = remote::Remote::S3(Arc::new(s3::S3Conn::connect(params, state.known_hosts.clone()).await?));
     let home = conn.home().to_string();
     state.connections.lock().await.insert(server_id, Arc::new(conn));
     Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
@@ -1606,6 +1616,7 @@ pub fn run() {
             ssh_disconnect,
             ftp_connect,
             dav_connect,
+            s3_connect,
             smb_connect,
             term_open,
             term_write,

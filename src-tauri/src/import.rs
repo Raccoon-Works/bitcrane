@@ -210,6 +210,7 @@ fn read_putty() -> Option<Vec<ImportedServer>> {
 }
 
 /// One PuTTY session; the registry key name is percent-encoded ("My%20Server").
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn putty_session(raw_name: &str, protocol: &str, host: &str, port: u32, user: &str, key_file: &str) -> Option<ImportedServer> {
     let name = percent_decode(raw_name);
     if name == "Default Settings" || !protocol.eq_ignore_ascii_case("ssh") {
@@ -241,6 +242,7 @@ pub fn putty_session(raw_name: &str, protocol: &str, host: &str, port: u32, user
     })
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn percent_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());

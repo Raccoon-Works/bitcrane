@@ -229,6 +229,13 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
   if (srv.protocol === 'webdav') {
     return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only });
   }
+  if (srv.protocol === 's3') {
+    const port = srv.port && srv.port !== (srv.s3Http ? 80 : 443) ? `:${srv.port}` : '';
+    return backend.connectS3(id, {
+      endpoint: `${srv.s3Http ? 'http' : 'https'}://${srv.host}${port}`, region: srv.s3Region ?? '', bucket: srv.s3Bucket ?? '',
+      accessKey: srv.user, secret: password, pathStyle: !!srv.s3PathStyle, tls13Only: !!srv.tls13Only, trust, proxy,
+    });
+  }
   if (srv.protocol === 'vault') {
     // The vault's files lie on another server, which has to be connected first.
     const storage = srv.vaultStorageId ? serverById(srv.vaultStorageId) : undefined;
@@ -331,7 +338,7 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', vault: 'Cryptomator', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
+const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', s3: 'S3', vault: 'Cryptomator', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
 const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : srv.protocol === 'smb' ? $t(', Gast') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */

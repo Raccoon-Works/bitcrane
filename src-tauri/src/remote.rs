@@ -34,6 +34,8 @@ pub enum Remote {
     Scp(Arc<ScpConn>),
     /// An unlocked Cryptomator vault (vault.rs).
     Vault(Arc<VaultConn>),
+    /// Amazon S3 and compatible object storage (s3.rs).
+    S3(Arc<crate::s3::S3Conn>),
 }
 
 /// Size, modification time (seconds) and permission bits of a server file.
@@ -59,6 +61,7 @@ impl Remote {
             Remote::Smb(c) => &c.home,
             Remote::Scp(c) => &c.home,
             Remote::Vault(c) => &c.home,
+            Remote::S3(c) => &c.home,
         }
     }
 
@@ -73,6 +76,7 @@ impl Remote {
             Remote::Smb(_) => "SMB",
             Remote::Scp(_) => "SCP",
             Remote::Vault(_) => "Cryptomator",
+            Remote::S3(_) => "S3",
         }
     }
 
@@ -91,7 +95,7 @@ impl Remote {
             Remote::Ftp(c) => c.close().await,
             Remote::Smb(c) => c.close().await,
             Remote::Scp(c) => c.close().await,
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) => {}
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) | Remote::S3(_) => {}
         }
     }
 
@@ -106,6 +110,7 @@ impl Remote {
             Remote::Smb(c) => c.list(path).await,
             Remote::Scp(c) => c.list(path).await,
             Remote::Vault(c) => c.list(path).await,
+            Remote::S3(c) => c.list(path).await,
         }?;
         list.retain(|e| safe_name(&e.name));
         Ok(list)
@@ -122,6 +127,7 @@ impl Remote {
             Remote::Smb(c) => c.stat(path).await,
             Remote::Scp(c) => c.stat(path).await,
             Remote::Vault(c) => c.stat(path).await,
+            Remote::S3(c) => c.stat(path).await,
         }
     }
 
@@ -136,6 +142,7 @@ impl Remote {
             Remote::Smb(c) => c.exists(path).await,
             Remote::Scp(c) => c.exists(path).await,
             Remote::Vault(c) => c.exists(path).await,
+            Remote::S3(c) => c.exists(path).await,
         }
     }
 
@@ -150,6 +157,7 @@ impl Remote {
             Remote::Smb(c) => c.mkdir(path).await,
             Remote::Scp(c) => c.mkdir(path).await,
             Remote::Vault(c) => c.mkdir(path).await,
+            Remote::S3(c) => c.mkdir(path).await,
         }
     }
 
@@ -174,6 +182,7 @@ impl Remote {
             Remote::Smb(c) => c.mkdir_all(path).await,
             Remote::Scp(c) => c.mkdir_all(path).await,
             Remote::Vault(c) => c.mkdir_all(path).await,
+            Remote::S3(c) => c.mkdir_all(path).await,
         }
     }
 
@@ -188,6 +197,7 @@ impl Remote {
             Remote::Smb(c) => c.rename(from, to).await,
             Remote::Scp(c) => c.rename(from, to).await,
             Remote::Vault(c) => c.rename(from, to).await,
+            Remote::S3(c) => c.rename(from, to).await,
         }
     }
 
@@ -214,6 +224,9 @@ impl Remote {
             return c.replace(from, to).await;
         }
         if let Remote::Vault(c) = self {
+            return c.replace(from, to).await;
+        }
+        if let Remote::S3(c) = self {
             return c.replace(from, to).await;
         }
         if !self.exists(to).await {
@@ -243,6 +256,7 @@ impl Remote {
             Remote::Smb(c) => c.remove(path).await,
             Remote::Scp(c) => c.remove(path).await,
             Remote::Vault(c) => c.remove(path).await,
+            Remote::S3(c) => c.remove(path).await,
         }
     }
 
@@ -257,6 +271,7 @@ impl Remote {
             Remote::Smb(c) => c.remove(path).await,
             Remote::Scp(c) => c.remove(path).await,
             Remote::Vault(c) => c.remove(path).await,
+            Remote::S3(c) => c.remove(path).await,
         }
     }
 
@@ -271,6 +286,7 @@ impl Remote {
             Remote::Smb(_) => Err(unsupported("Rechte setzen", "SMB")),
             Remote::Scp(c) => c.chmod(path, mode, recursive).await,
             Remote::Vault(_) => Err(unsupported("Rechte setzen", "Cryptomator")),
+            Remote::S3(_) => Err(unsupported("Rechte setzen", "S3")),
         }
     }
 
@@ -286,6 +302,7 @@ impl Remote {
             Remote::Smb(_) => Err(unsupported("Ein Link zum Teilen", "SMB")),
             Remote::Scp(_) => Err(unsupported("Ein Link zum Teilen", "SCP")),
             Remote::Vault(_) => Err(unsupported("Ein Link zum Teilen", "Cryptomator")),
+            Remote::S3(_) => Err(unsupported("Ein Link zum Teilen", "S3")),
         }
     }
 
@@ -300,6 +317,7 @@ impl Remote {
             Remote::Smb(c) => c.walk(path).await,
             Remote::Scp(c) => c.walk(path).await,
             Remote::Vault(c) => c.walk(path).await,
+            Remote::S3(c) => c.walk(path).await,
         }?;
         // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
         items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
@@ -388,6 +406,7 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.copy_within(paths, dest_dir).await,
             Remote::Dav(c) => c.copy_within(paths, dest_dir).await,
+            Remote::S3(c) => c.copy_within(paths, dest_dir).await,
             Remote::Dropbox(c) => c.copy_within(paths, dest_dir).await,
             Remote::GDrive(c) => c.copy_within(paths, dest_dir).await,
             Remote::OneDrive(c) => c.copy_within(paths, dest_dir).await,
@@ -460,12 +479,18 @@ impl Remote {
         }
     }
 
+    /// Whether a new file only becomes visible once complete (object storage):
+    /// then uploads go straight to the target instead of a temporary name.
+    pub fn atomic_upload(&self) -> bool {
+        matches!(self, Remote::S3(_))
+    }
+
     /// Whether a partial upload can be continued (append) for this file.
     pub fn can_append(&self, path: &str) -> bool {
         match self {
             Remote::Sftp(_) | Remote::Smb(_) | Remote::Scp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) => false,
+            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) | Remote::S3(_) => false,
         }
     }
 
@@ -498,6 +523,7 @@ impl Remote {
             Remote::Smb(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Scp(c) => RemoteReader::Plain(c.reader(path, offset).await?),
             Remote::Vault(c) => RemoteReader::Plain(c.reader(path, offset).await?),
+            Remote::S3(c) => RemoteReader::Plain(c.reader(path, offset).await?),
         })
     }
 
@@ -548,6 +574,10 @@ impl Remote {
                 let (w, task) = c.writer(path, size.map(|s| s - offset)).await?;
                 RemoteWriter::Dav(Some(w), Some(task))
             }
+            Remote::S3(c) => {
+                let (w, task) = c.writer(path, size.map(|s| s - offset), mtime);
+                RemoteWriter::Dav(Some(w), Some(task))
+            }
         })
     }
 
@@ -566,6 +596,8 @@ impl Remote {
             }
             Remote::Scp(c) => c.set_attrs(path, mtime, perms).await,
             Remote::Vault(_) => {}
+            // The mtime travels with the upload as metadata.
+            Remote::S3(_) => {}
             // Set with the upload itself where the server supports it.
             Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) => {}
         }
@@ -643,10 +675,12 @@ impl RemoteWriter {
                 }
             }
             RemoteWriter::Dav(w, task) => {
-                w.take();
+                // Stop the upload task before the stream ends: an object store
+                // would otherwise take the early end as the complete file.
                 if let Some(t) = task.take() {
                     t.abort();
                 }
+                w.take();
             }
         }
     }
@@ -753,6 +787,14 @@ pub(crate) mod integration {
                 let home = c.home.clone();
                 check(Remote::Ftp(Arc::new(c)), home).await;
             }
+        }
+        if let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") {
+            // A fresh bucket on the test server, then the same checks as everywhere.
+            let params = |bucket: &str| crate::s3::S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+            let bucket = format!("bitcrane-tr-{}", uuid::Uuid::new_v4().simple());
+            crate::s3::S3Conn::connect(params(""), known.clone()).await.unwrap().mkdir(&format!("/{bucket}")).await.unwrap();
+            let c = crate::s3::S3Conn::connect(params(&bucket), known.clone()).await.unwrap();
+            check(Remote::S3(Arc::new(c)), "/".into()).await;
         }
         if let Some(p) = crate::smb::test_params() {
             let c = crate::smb::SmbConn::connect(p).await.unwrap();

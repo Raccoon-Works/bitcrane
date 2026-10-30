@@ -266,6 +266,22 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             let params = crate::dav::DavParams { url, user: user.clone(), password: password(), tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false), trust: None, proxy: proxy(s) };
             Remote::Dav(crate::dav::DavConn::connect(params, ctx.known.clone()).await?)
         }
+        "s3" => {
+            let http = s.get("s3Http").and_then(Value::as_bool).unwrap_or(false);
+            let port_part = if port == 0 || port == if http { 80 } else { 443 } { String::new() } else { format!(":{port}") };
+            let params = crate::s3::S3Params {
+                endpoint: format!("{}://{host}{port_part}", if http { "http" } else { "https" }),
+                region: str_of(s, "s3Region").to_string(),
+                bucket: str_of(s, "s3Bucket").to_string(),
+                access_key: user.clone(),
+                secret: password(),
+                path_style: s.get("s3PathStyle").and_then(Value::as_bool).unwrap_or(false),
+                tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
+                trust: None,
+                proxy: proxy(s),
+            };
+            Remote::S3(Arc::new(crate::s3::S3Conn::connect(params, ctx.known.clone()).await?))
+        }
         "smb" => {
             let params = crate::smb::SmbParams {
                 host: host.clone(),
