@@ -90,6 +90,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Versteckte Dateien ein/aus'), ...sc('hidden'), run: toggleHidden },
         { label: $t('Spalte „Rechte“ ein/aus'), run: togglePermsColumn },
         { label: $t('Seiten tauschen'), run: toggleSwapSides },
+        { label: $t('Seitenleiste ein/aus'), ...sc('sidebar'), run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
         { label: $t('Hälften untereinander ein/aus'), run: () => updateSettings({ stackHalves: !getState().settings.stackHalves }) },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
         { label: $t('Verzeichnisse vergleichen'), ...sc('compareDirs'), run: toggleCompareDirs },
