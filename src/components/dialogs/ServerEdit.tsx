@@ -48,6 +48,23 @@ function pictureFromFile(file: File): Promise<string> {
   });
 }
 
+/** Protocol families of the form (FTP covers FTP and FTPS). */
+type Fam = 'sftp' | 'ftp' | 'webdav' | 'smb' | 's3' | 'cloud';
+
+/**
+ * S3 providers: the address follows from the region, so picking the provider
+ * and the region fills it in. "other" is any S3-compatible service (MinIO,
+ * Ceph, a NAS ...); R2 needs the account id in the address.
+ */
+const S3_PROVIDERS: Record<string, { label: string; region: string; host: (region: string) => string; regions?: string[] }> = {
+  aws: { label: 'Amazon S3', region: 'eu-central-1', host: (r) => `s3.${r}.amazonaws.com`, regions: ['eu-central-1', 'eu-central-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-north-1', 'eu-south-1', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'ca-central-1', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1', 'sa-east-1'] },
+  b2: { label: 'Backblaze B2', region: 'eu-central-003', host: (r) => `s3.${r}.backblazeb2.com`, regions: ['eu-central-003', 'us-west-000', 'us-west-001', 'us-west-002', 'us-west-004', 'us-east-005'] },
+  r2: { label: 'Cloudflare R2', region: 'auto', host: () => '' },
+  wasabi: { label: 'Wasabi', region: 'eu-central-1', host: (r) => `s3.${r}.wasabisys.com`, regions: ['eu-central-1', 'eu-central-2', 'eu-west-1', 'eu-west-2', 'us-east-1', 'us-east-2', 'us-west-1', 'ap-northeast-1'] },
+  hetzner: { label: 'Hetzner Object Storage', region: 'fsn1', host: (r) => `${r}.your-objectstorage.com`, regions: ['fsn1', 'nbg1', 'hel1'] },
+  other: { label: 'Anderer Dienst (MinIO, Ceph …)', region: '', host: () => '' },
+};
+
 const colors: ServerColor[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'orange', 'red'];
 
 /** Time zones for FTP servers that list local times (UTC-12 to UTC+14). */
@@ -112,10 +129,10 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
     openDialog({ type: 'cloudSignIn', service });
   };
   const cloud = isCloudProtocol(draft.protocol);
-  const family: 'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud' = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : draft.protocol === 'smb' ? 'smb' : 'sftp';
+  const family: Fam = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : draft.protocol === 'smb' ? 'smb' : draft.protocol === 's3' ? 's3' : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
   const STANDARD_PORTS = [22, 21, 990, 443, 80, 445];
-  const setFamily = (f: 'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud') => {
+  const setFamily = (f: Fam) => {
     setTest('idle');
     setDraft((d) => {
       // Cloud services (Transmit lists them with the protocols): signed in through the browser, no address or password.
@@ -124,8 +141,19 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
       if (f === 'sftp') return { ...d, protocol: 'sftp', host: isCloudProtocol(d.protocol) ? '' : d.host, port: isCloudProtocol(d.protocol) ? 22 : port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
       if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
       if (f === 'smb') return { ...d, protocol: 'smb', port: port(445), auth: 'password', proxy: undefined };
+      if (f === 's3') {
+        const provider = d.s3Provider ?? 'aws';
+        const region = d.s3Region ?? S3_PROVIDERS[provider].region;
+        return { ...d, protocol: 's3', port: port(443), auth: 'password', s3Provider: provider, s3Region: region, host: S3_PROVIDERS[provider].host(region) || d.host };
+      }
       return { ...d, protocol: 'webdav', davHttps: d.davHttps ?? true, port: port(d.davHttps === false ? 80 : 443), auth: 'password' };
     });
+  };
+  /** S3: a provider or region change fills in the address of known providers. */
+  const setS3 = (provider: string, region: string) => {
+    setTest('idle');
+    const p = S3_PROVIDERS[provider] ?? S3_PROVIDERS.other;
+    setDraft((d) => ({ ...d, s3Provider: provider, s3Region: region, host: p.host(region) || (S3_PROVIDERS[d.s3Provider ?? '']?.host(d.s3Region ?? '') === d.host ? '' : d.host), s3PathStyle: provider === 'other' ? d.s3PathStyle ?? true : undefined }));
   };
   const setFtpTls = (v: 'explicit' | 'implicit' | 'none') => {
     setTest('idle');
@@ -271,7 +299,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
               <>
                 <span>{$t('Protokoll#protocol')}</span>
                 <div className="row-inline">
-                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
+                  <Segmented<Fam> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 's3', label: 'S3' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
@@ -300,7 +328,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
             <>
             <span>{$t('Protokoll#protocol')}</span>
             <div className="row-inline">
-              <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
+              <Segmented<Fam> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 's3', label: 'S3' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
             </div>
 
             {family === 'ftp' && (
@@ -314,11 +342,41 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
               </>
             )}
 
-            <label htmlFor="s-host">{$t('Server')}</label>
+            {family === 's3' && (
+              <>
+                <label htmlFor="s-s3p">{$t('Anbieter')}</label>
+                <div className="field-row">
+                  <Select id="s-s3p" label={$t('Anbieter')} value={draft.s3Provider ?? 'aws'} onChange={(v) => setS3(v, S3_PROVIDERS[v]?.region ?? '')}
+                    options={Object.entries(S3_PROVIDERS).map(([value, p]) => ({ value, label: value === 'other' ? $t('Anderer Dienst (MinIO, Ceph …)') : p.label }))} />
+                  {S3_PROVIDERS[draft.s3Provider ?? 'aws']?.regions
+                    ? <Select label={$t('Region')} value={draft.s3Region ?? ''} onChange={(v) => setS3(draft.s3Provider ?? 'aws', v)} options={(S3_PROVIDERS[draft.s3Provider ?? 'aws'].regions ?? []).map((r) => ({ value: r, label: r }))} />
+                    : <TextField label={$t('Region')} value={draft.s3Region ?? ''} onChange={(v) => set('s3Region', v.trim() || undefined)} placeholder={draft.s3Provider === 'r2' ? 'auto' : 'us-east-1'} mono className="flex-1" />}
+                </div>
+              </>
+            )}
+
+            <label htmlFor="s-host">{family === 's3' ? $t('Endpunkt') : $t('Server')}</label>
             <div className="field-row">
-              <TextField id="s-host" value={draft.host} onChange={(v) => set('host', v)} placeholder={family === 'smb' ? $t('nas.local oder 192.168.1.20') : $t('server.example oder 203.0.113.10')} className="flex-1" invalid={!draft.host && test === 'fail'} />
+              <TextField id="s-host" value={draft.host} onChange={(v) => set('host', v)} placeholder={family === 'smb' ? $t('nas.local oder 192.168.1.20') : family === 's3' ? (draft.s3Provider === 'r2' ? $t('KONTO-ID.r2.cloudflarestorage.com') : 'minio.example') : $t('server.example oder 203.0.113.10')} className="flex-1" invalid={!draft.host && test === 'fail'} mono={family === 's3'} />
               <TextField value={String(draft.port)} onChange={(v) => set('port', Number(v.replace(/\D/g, '')) || 22)} className="port-field" />
             </div>
+
+            {family === 's3' && (
+              <>
+                <label htmlFor="s-bucket">{$t('Bucket')}</label>
+                <div className="col-text">
+                  <TextField id="s-bucket" value={draft.s3Bucket ?? ''} onChange={(v) => set('s3Bucket', v.trim() || undefined)} placeholder={$t('leer lassen für die Liste aller Buckets')} mono />
+                  {draft.s3Provider === 'other' && (
+                    <span className="row-inline wrap-row">
+                      <Switch checked={draft.s3PathStyle ?? true} onChange={(v) => set('s3PathStyle', v)} label={$t('Bucket im Pfad (für MinIO und IP-Adressen)')} />
+                      <span className="small">{$t('Bucket im Pfad (für MinIO und IP-Adressen)')}</span>
+                      <Switch checked={!!draft.s3Http} onChange={(v) => setDraft((d) => ({ ...d, s3Http: v || undefined, port: d.port === (v ? 443 : 80) ? (v ? 80 : 443) : d.port }))} label={$t('Unverschlüsselt (http)')} />
+                      <span className="small">{$t('Unverschlüsselt (http)')}</span>
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
 
             {family === 'webdav' && (
               <>
@@ -344,13 +402,13 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
               </>
             )}
 
-            <label htmlFor="s-user">{$t('Benutzer')}</label>
-            <TextField id="s-user" value={draft.user} onChange={(v) => set('user', v)} placeholder={family === 'ftp' ? $t('leer lassen für anonym') : family === 'smb' ? $t('leer lassen für Gast') : 'ubuntu'} />
+            <label htmlFor="s-user">{family === 's3' ? $t('Zugriffsschlüssel') : $t('Benutzer')}</label>
+            <TextField id="s-user" value={draft.user} onChange={(v) => set('user', v)} placeholder={family === 'ftp' ? $t('leer lassen für anonym') : family === 'smb' ? $t('leer lassen für Gast') : family === 's3' ? 'Access Key ID' : 'ubuntu'} mono={family === 's3'} />
 
             {family !== 'sftp' && (
               <>
                 <span>{$t('Anmeldung')}</span>
-                <span className="small muted">{family === 'ftp' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.') : family === 'smb' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane als Gast an. Für Domänenkonten DOMÄNE\\name eintragen.') : $t('Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
+                <span className="small muted">{family === 'ftp' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.') : family === 'smb' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane als Gast an. Für Domänenkonten DOMÄNE\\name eintragen.') : family === 's3' ? $t('Mit dem geheimen Schlüssel (Secret Access Key). Bitcrane fragt beim ersten Verbinden und speichert ihn {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung')) : $t('Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
               </>
             )}
             {family === 'sftp' && <span>{$t('Anmeldung')}</span>}
@@ -409,7 +467,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
               <span className="small muted">{$t('Lokal')}</span>
               <TextField mono value={draft.localStart} onChange={(v) => set('localStart', v)} />
               <span className="small muted">{$t('Server')}</span>
-              <TextField mono value={draft.remoteStart} onChange={(v) => set('remoteStart', v)} placeholder={cloud ? '/' : `/home/${draft.user || 'benutzer'}`} />
+              <TextField mono value={draft.remoteStart} onChange={(v) => set('remoteStart', v)} placeholder={cloud || family === 's3' ? '/' : `/home/${draft.user || 'benutzer'}`} />
             </div>
 
             {family === 'sftp' && <label htmlFor="s-jump">{$t('Sprungserver')}</label>}
@@ -511,7 +569,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
                   </>
                 )}
 
-                {(draft.protocol === 'ftps' || (draft.protocol === 'webdav' && draft.davHttps !== false)) && (
+                {(draft.protocol === 'ftps' || (draft.protocol === 'webdav' && draft.davHttps !== false) || (draft.protocol === 's3' && !draft.s3Http)) && (
                   <>
                     <label htmlFor="s-tlsver">TLS-Version</label>
                     <Select<'any' | '13'> id="s-tlsver" label="TLS-Version" value={draft.tls13Only ? '13' : 'any'} onChange={(v) => set('tls13Only', v === '13' || undefined)} options={[{ value: 'any', label: $t('TLS 1.2 und 1.3') }, { value: '13', label: $t('Nur TLS 1.3') }]} />

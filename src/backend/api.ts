@@ -60,6 +60,19 @@ export interface FtpConnectParams {
 }
 
 /** WebDAV connection (see `dav.rs`). */
+/** Amazon S3 or a compatible service (s3.rs). */
+export interface S3ConnectParams {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKey: string;
+  secret?: string;
+  pathStyle: boolean;
+  tls13Only?: boolean;
+  trust?: string;
+  proxy?: ProxyParams;
+}
+
 export interface DavConnectParams {
   url: string;
   user: string;
@@ -212,6 +225,7 @@ export interface Backend {
   disconnect(serverId: string): Promise<void>;
   connectFtp(serverId: string, params: FtpConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectDav(serverId: string, params: DavConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  connectS3(serverId: string, params: S3ConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectSmb(serverId: string, params: SmbConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Unlocks a Cryptomator vault in `location` (on the server `storageId`, or this computer) under `serverId`. */
   vaultOpen(serverId: string, location: string, storageId: string | undefined, password: string): Promise<{ home: string; clockOffsetMs?: number | null }>;

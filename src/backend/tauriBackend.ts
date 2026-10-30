@@ -58,6 +58,7 @@ export const tauriBackend: Backend = {
   disconnect: (serverId) => invoke('ssh_disconnect', { serverId }),
   connectFtp: (serverId, params) => invoke('ftp_connect', { serverId, params }),
   connectDav: (serverId, params) => invoke('dav_connect', { serverId, params }),
+  connectS3: (serverId, params) => invoke('s3_connect', { serverId, params }),
   connectSmb: (serverId, params) => invoke('smb_connect', { serverId, params }),
   vaultOpen: (serverId, location, storageId, password) => invoke('vault_open', { serverId, location, storageId: storageId ?? null, password }),
   vaultCreate: (location, storageId, password) => invoke('vault_create', { location, storageId: storageId ?? null, password }),
