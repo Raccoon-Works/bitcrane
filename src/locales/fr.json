@@ -2085,5 +2085,9 @@
   "{0} Objekte mit diesem Tag": "{0} éléments avec ce tag",
   "Keine Dateien mit diesem Tag gefunden.": "Aucun fichier avec ce tag.",
   "Die Suche nach Tags geht im echten Programm.": "La recherche par tag fonctionne dans l’application réelle.",
-  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favoris, dossiers récents, appareils, partages et tags à gauche de la fenêtre. Désactivé : les barres d’emplacements au-dessus des moitiés."
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favoris, dossiers récents, appareils, partages et tags à gauche de la fenêtre. Désactivé : les barres d’emplacements au-dessus des moitiés.",
+  "Seitenleiste ausblenden": "Masquer la barre latérale",
+  "Seitenleiste einblenden": "Afficher la barre latérale",
+  "Gruppen einblenden": "Afficher les groupes",
+  "Gruppen ausblenden": "Masquer les groupes"
 }

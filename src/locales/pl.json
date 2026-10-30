@@ -2085,5 +2085,9 @@
   "{0} Objekte mit diesem Tag": "Obiekty z tym tagiem: {0}",
   "Keine Dateien mit diesem Tag gefunden.": "Nie znaleziono plików z tym tagiem.",
   "Die Suche nach Tags geht im echten Programm.": "Wyszukiwanie po tagach działa w prawdziwej aplikacji.",
-  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Ulubione, ostatnie foldery, urządzenia, udziały i tagi po lewej stronie okna. Wyłączone: paski miejsc nad połówkami."
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Ulubione, ostatnie foldery, urządzenia, udziały i tagi po lewej stronie okna. Wyłączone: paski miejsc nad połówkami.",
+  "Seitenleiste ausblenden": "Ukryj pasek boczny",
+  "Seitenleiste einblenden": "Pokaż pasek boczny",
+  "Gruppen einblenden": "Pokaż grupy",
+  "Gruppen ausblenden": "Ukryj grupy"
 }

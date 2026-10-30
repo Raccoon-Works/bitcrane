@@ -5,7 +5,7 @@
  */
 import { toggleTerminal } from '../state/terminal';
 import {
-  ArrowClockwise, ArrowsClockwise, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
+  ArrowClockwise, ArrowsClockwise, SidebarSimple, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
 } from '@phosphor-icons/react';
 import { useState, type ReactNode } from 'react';
 import { TermNewMenu } from './TermNewMenu';
@@ -13,7 +13,7 @@ import {
   activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
   refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
   upload, useStore, type ToolId,
-  getState, openInEditor, searchTarget, setDeepSearch, toggleSyncBrowse,
+  getState, openInEditor, searchTarget, setDeepSearch, toggleSyncBrowse, updateSettings,
 } from '../state/store';
 import { formatAgo } from '../util/format';
 import { useKeyLabel } from '../state/keys';
@@ -127,6 +127,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
 }
 
 export function Toolbar() {
+  const sidebarOn = useStore((s) => s.settings.sidebar !== false);
   const platform = useStore((s) => s.platform);
   const toolbar = useStore((s) => s.toolbar);
   const labels = useStore((s) => s.toolbarLabels);
@@ -154,6 +155,11 @@ export function Toolbar() {
       else openDialog({ type: 'toolbar' });
     }}>
       {termMenu && <TermNewMenu x={termMenu.x} y={termMenu.y} onClose={() => setTermMenu(null)} />}
+      {/* Sidebar on or off (Finder: the button left of the back arrow). */}
+      <div className="tool-group">
+        <IconButton label={sidebarOn ? $t('Seitenleiste ausblenden') : $t('Seitenleiste einblenden')} shortcut={sk('sidebar')} active={sidebarOn} className="sidebar-btn"
+          onClick={() => updateSettings({ sidebar: !sidebarOn })}><SidebarSimple size={19} /></IconButton>
+      </div>
       {toolbar.includes('nav') && (
         <div className="tool-group">
           <IconButton label={$t('Zurück')} shortcut={defs.nav.key} disabled={!tab?.back.length} onClick={goBack}><CaretLeft size={19} /></IconButton>

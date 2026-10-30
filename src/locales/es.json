@@ -2085,5 +2085,9 @@
   "{0} Objekte mit diesem Tag": "{0} elementos con esta etiqueta",
   "Keine Dateien mit diesem Tag gefunden.": "No se encontraron archivos con esta etiqueta.",
   "Die Suche nach Tags geht im echten Programm.": "La búsqueda por etiquetas funciona en la app real.",
-  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favoritos, carpetas recientes, dispositivos, recursos compartidos y etiquetas a la izquierda de la ventana. Desactivado: las barras de lugares sobre las mitades."
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favoritos, carpetas recientes, dispositivos, recursos compartidos y etiquetas a la izquierda de la ventana. Desactivado: las barras de lugares sobre las mitades.",
+  "Seitenleiste ausblenden": "Ocultar barra lateral",
+  "Seitenleiste einblenden": "Mostrar barra lateral",
+  "Gruppen einblenden": "Mostrar grupos",
+  "Gruppen ausblenden": "Ocultar grupos"
 }

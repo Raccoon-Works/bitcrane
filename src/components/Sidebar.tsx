@@ -20,11 +20,11 @@ import { BrandLogo, isBrandService } from './BrandLogo';
 import { placeLabel } from './PlacesBar';
 import * as paths from '../util/paths';
 
-const ICON = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
+const ICON = { size: 16, weight: 'regular', 'aria-hidden': true } as const;
 
 function PlaceIcon({ place }: { place: Place }) {
   const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
-  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={15} />;
+  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={14} />;
   if (place.cloud) return <Cloud {...ICON} />;
   if (place.path === '~') return <House {...ICON} />;
   if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...ICON} />;

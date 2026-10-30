@@ -6,7 +6,7 @@
  */
 import { ArrowLeft, Plus, SquareTerminal, X, Zap } from './glyphs';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowsClockwise, ClockCounterClockwise, FolderSimple, GlobeHemisphereWest, FolderSimplePlus, DownloadSimple, Globe, Lightning, Plus as PlusP, Stack } from '@phosphor-icons/react';
+import { ArrowsClockwise, ClockCounterClockwise, FolderSimple, GlobeHemisphereWest, SidebarSimple, FolderSimplePlus, DownloadSimple, Globe, Lightning, Plus as PlusP, Stack } from '@phosphor-icons/react';
 import { isCloudProtocol, type PaneSide, type Protocol, type Server } from '../backend/types';
 import { addCloudService } from '../state/cloud';
 import { tauriBackend as backend } from '../backend/tauriBackend';
@@ -90,6 +90,7 @@ function useServerDrag() {
 
 export function ServerList({ side }: { side: PaneSide }) {
   const [tab, setTab] = useState<'servers' | 'quick'>('servers');
+  const sourcesHidden = useStore((s) => !!s.settings.serverSourcesHidden);
   const t = useStore((s) => activeTab(s));
   // Back to the files: possible unless the right half has no server yet.
   const canGoBack = !!t && (side === 'local' || !!t.serverId || !!t.rightLocal);
@@ -99,6 +100,11 @@ export function ServerList({ side }: { side: PaneSide }) {
         <span className="server-panel-side">
           {/* A small globe in the corner marks the connection card (Transmit). */}
           <span className="server-panel-mark" aria-hidden="true"><GlobeHemisphereWest size={18} weight="fill" /></span>
+          {tab === 'servers' && (
+            <IconButton label={sourcesHidden ? $t('Gruppen einblenden') : $t('Gruppen ausblenden')} active={!sourcesHidden} onClick={() => updateSettings({ serverSourcesHidden: !sourcesHidden })}>
+              <SidebarSimple size={17} />
+            </IconButton>
+          )}
           {canGoBack && (
             <IconButton label={$t('Zurück zu den Dateien')} onClick={() => setPaneServerList(side, false)}><ArrowLeft size={15} strokeWidth={1.75} /></IconButton>
           )}
@@ -149,6 +155,7 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   const renamingGroup = useStore((s) => s.renamingGroup);
   const [source, setSource] = useState<Source>('all');
   const sourcesWidth = useStore((s) => s.settings.serverSourcesWidth ?? 200);
+  const sourcesHidden = useStore((s) => !!s.settings.serverSourcesHidden);
   const [selected, setSelected] = useState<string | null>(null);
   const { drag, begin, wasDrag } = useServerDrag();
   const saved = servers.filter((x) => !x.temporary);
@@ -248,7 +255,7 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   };
 
   return (
-    <div className="server-split">
+    <div className={`server-split${sourcesHidden ? ' no-sources' : ''}`}>
       <div className="server-sources" role="listbox" aria-label={$t('Gruppen')} style={{ width: sourcesWidth }}>
         {sourceItem('all', $t('Alle Server'), <Stack size={22} weight="fill" />, saved.length, '')}
         {groupList.map((g) => sourceItem(`g:${g}`, g, <FolderSimple size={22} weight="fill" />, saved.filter((x) => x.group.trim() === g).length, g))}

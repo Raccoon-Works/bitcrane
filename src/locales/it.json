@@ -2085,5 +2085,9 @@
   "{0} Objekte mit diesem Tag": "{0} elementi con questo tag",
   "Keine Dateien mit diesem Tag gefunden.": "Nessun file con questo tag.",
   "Die Suche nach Tags geht im echten Programm.": "La ricerca per tag funziona nell’app reale.",
-  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Preferiti, cartelle recenti, dispositivi, condivisioni e tag a sinistra della finestra. Disattivato: le barre dei luoghi sopra le metà."
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Preferiti, cartelle recenti, dispositivi, condivisioni e tag a sinistra della finestra. Disattivato: le barre dei luoghi sopra le metà.",
+  "Seitenleiste ausblenden": "Nascondi barra laterale",
+  "Seitenleiste einblenden": "Mostra barra laterale",
+  "Gruppen einblenden": "Mostra gruppi",
+  "Gruppen ausblenden": "Nascondi gruppi"
 }

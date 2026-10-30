@@ -2087,4 +2087,8 @@ export const EN: Record<string, string> = {
   "Keine Dateien mit diesem Tag gefunden.": "No files with this tag found.",
   "Die Suche nach Tags geht im echten Programm.": "Searching by tag works in the real app.",
   "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favorites, recent folders, devices, shared drives and tags on the left of the window. Off: the places bars above the halves.",
+  "Seitenleiste ausblenden": "Hide sidebar",
+  "Seitenleiste einblenden": "Show sidebar",
+  "Gruppen einblenden": "Show groups",
+  "Gruppen ausblenden": "Hide groups",
 };

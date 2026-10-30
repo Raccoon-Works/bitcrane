@@ -2085,5 +2085,9 @@
   "{0} Objekte mit diesem Tag": "{0} onderdelen met deze tag",
   "Keine Dateien mit diesem Tag gefunden.": "Geen bestanden met deze tag gevonden.",
   "Die Suche nach Tags geht im echten Programm.": "Zoeken op tag werkt in de echte app.",
-  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favorieten, recente mappen, apparaten, gedeelde mappen en tags links in het venster. Uit: de locatiebalken boven de helften."
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favorieten, recente mappen, apparaten, gedeelde mappen en tags links in het venster. Uit: de locatiebalken boven de helften.",
+  "Seitenleiste ausblenden": "Verberg navigatiekolom",
+  "Seitenleiste einblenden": "Toon navigatiekolom",
+  "Gruppen einblenden": "Toon groepen",
+  "Gruppen ausblenden": "Verberg groepen"
 }

@@ -164,6 +164,8 @@ export interface Settings {
   splitRatio: number;
   /** Width of the group column in the server list, in pixels. */
   serverSourcesWidth: number;
+  /** Server list: the group column is hidden. */
+  serverSourcesHidden?: boolean;
   /** Height of the opened activity area, in pixels. */
   activityHeight: number;
   uploadDirPerms: string;
