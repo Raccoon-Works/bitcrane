@@ -1425,7 +1425,7 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 /* Text the user may want to copy stays selectable. */
 .page.is-app :is(input, textarea, pre, .selectable, .log-text, .tr-output, .diff) { user-select: text; -webkit-user-select: text; }
 /* macOS draws its own traffic lights over the sidebar (overlay title bar). */
-.page.is-app .mac-titlebar .traffic .tl, .page.is-app .toolbar .traffic .tl { visibility: hidden; }
+.page.is-app .mac-titlebar .traffic .tl, .page.is-app .toolbar .traffic .tl, .page.is-app .side-top .traffic .tl { visibility: hidden; }
 
 /* ------------------------------------------------------------- Difference view */
 
