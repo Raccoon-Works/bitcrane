@@ -690,12 +690,13 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Dunkle Farben')} note={$t('„Mitternacht“ ist fast schwarz mit hellblauen Akzenten; die andere Wahl folgt den Farben des Systems.')}>
               <Select<'midnight' | 'system'> value={s.darkPalette === 'system' ? 'system' : 'midnight'} onChange={(v) => updateSettings({ darkPalette: v })} label={$t('Dunkle Farben')} options={[{ value: 'midnight', label: $t('Mitternacht') }, { value: 'system', label: getState().platform === 'mac' ? $t('Wie macOS') : $t('Wie Windows') }]} />
             </Row>
-            <Row label={$t('Zoom')} note={$t('Alles im Fenster größer oder kleiner, auch mit Strg + Plus/Minus, Strg + 0 setzt zurück.')}>
+            <Row label={$t('Zoom')} note={mac ? $t('Alles im Fenster größer oder kleiner, auch mit ⌘ + Plus/Minus, ⌘ + 0 setzt zurück.') : $t('Alles im Fenster größer oder kleiner, auch mit Strg + Plus/Minus, Strg + 0 setzt zurück.')}>
               <Select value={String(s.zoom ?? 1)} onChange={(v) => updateSettings({ zoom: Number(v) })} label={$t('Zoom')} options={ZOOM_STEPS.map((z) => ({ value: String(z), label: `${Math.round(z * 100)} %` }))} />
             </Row>
-            <Row label={$t('Dateisymbole des Systems')} note={$t('Statt der farbigen Bitcrane-Symbole die Symbole von Windows bzw. macOS zeigen.')}><Switch checked={!!s.systemIcons} onChange={(v) => updateSettings({ systemIcons: v })} label={$t('Dateisymbole des Systems')} /></Row>
+            <Row label={$t('Dateisymbole des Systems')} note={mac ? $t('Statt der farbigen Bitcrane-Symbole die Symbole von macOS zeigen.') : $t('Statt der farbigen Bitcrane-Symbole die Symbole von Windows zeigen.')}><Switch checked={!!s.systemIcons} onChange={(v) => updateSettings({ systemIcons: v })} label={$t('Dateisymbole des Systems')} /></Row>
             <Row label={$t('Versteckte Dateien zeigen')}><Switch checked={s.showHidden} onChange={(v) => updateSettings({ showHidden: v })} label={$t('Versteckte Dateien zeigen')} /></Row>
-            <Row label={$t('Geschützte Systemdateien zeigen')} note={$t('Wie im Explorer standardmäßig aus, z. B. „Anwendungsdaten“ oder „Eigene Dateien“ im Benutzerordner.')}><Switch checked={!!s.showSystem} onChange={(v) => updateSettings({ showSystem: v })} label={$t('Geschützte Systemdateien zeigen')} /></Row>
+            {/* Windows only: protected system items (hidden + system attribute); the Mac has no such files in the home folder. */}
+            {!mac && <Row label={$t('Geschützte Systemdateien zeigen')} note={$t('Wie im Explorer standardmäßig aus, z. B. „Anwendungsdaten“ oder „Eigene Dateien“ im Benutzerordner.')}><Switch checked={!!s.showSystem} onChange={(v) => updateSettings({ showSystem: v })} label={$t('Geschützte Systemdateien zeigen')} /></Row>}
             <Row label={$t('Eintrag „..“ zum übergeordneten Ordner')} note={$t('Ganz oben in der Liste, wie in WinSCP und Total Commander. Unter Windows standardmäßig an, auf dem Mac aus.')}><Switch checked={s.parentRow ?? platform === 'win'} onChange={(v) => updateSettings({ parentRow: v })} label={$t('Eintrag „..“ zum übergeordneten Ordner')} /></Row>
             <Row label={$t('Spalte „Geändert“')} note={$t('Spalten lassen sich auch mit einem Rechtsklick auf die Spaltenköpfe ein- und ausblenden.')}><Switch checked={s.columns.mtime} onChange={(v) => updateSettings({ columns: { ...s.columns, mtime: v } })} label={$t('Spalte Geändert')} /></Row>
             <Row label={$t('Spalte „Rechte“')}><Switch checked={s.showPerms} onChange={(v) => updateSettings({ showPerms: v })} label={$t('Spalte Rechte')} /></Row>
@@ -740,7 +741,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
         <span className="set-nav-title">{$t('Einstellungen')}</span>
         <label className="set-search">
           <MagnifyingGlass size={15} aria-hidden="true" />
-          <input ref={searchRef} type="search" value={query} placeholder={$t('Einstellungen durchsuchen')} aria-label={$t('Einstellungen durchsuchen')}
+          <input ref={searchRef} type="search" value={query} placeholder={$t('Suchen')} aria-label={$t('Einstellungen durchsuchen')}
             onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); } }} />
         </label>
         {tabs.map((t) => (

@@ -39,15 +39,15 @@ export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
   ];
   return (
     <Dialog
-      label={$t('Schnell verbinden')}
-      title={$t('Schnell verbinden')}
+      label={terminal ? $t('Neue SSH-Verbindung') : $t('Schnell verbinden')}
+      title={terminal ? $t('Neue SSH-Verbindung') : $t('Schnell verbinden')}
       subtitle={$t('Ohne den Server zu speichern. Adresse wie im Terminal eingeben, auch als „ssh benutzer@server“; für FTP, WebDAV oder SMB mit ftp://, ftps://, davs:// oder smb:// davor.')}
       icon={<span className="icon-tile tone-accent"><Zap size={18} strokeWidth={1.75} /></span>}
       width={560}
       footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={go}>{$t('Verbinden')}</Button></>}
     >
       <div className="form-stack">
-        <TextField value={address} onChange={setAddress} mono autoFocus prefix={/^[a-z]+:\/\/|^ssh\s/i.test(address.trim()) ? undefined : <span className="muted">sftp://</span>} onEnter={go} className="big-field" />
+        <TextField value={address} onChange={setAddress} mono autoFocus placeholder={terminal ? 'benutzer@server' : undefined} prefix={terminal || /^[a-z]+:\/\/|^ssh\s/i.test(address.trim()) ? undefined : <span className="muted">sftp://</span>} onEnter={go} className="big-field" />
         <div className="row-inline">
           <span className="muted">{$t('Anmeldung')}</span>
           <Select value={auth} onChange={setAuth} label={$t('Anmeldung')} options={[{ value: 'auto', label: $t('Automatisch (Agent, Schlüssel, Passwort)') }, { value: 'key', label: $t('SSH-Schlüssel') }, { value: 'password', label: $t('Passwort') }]} />
