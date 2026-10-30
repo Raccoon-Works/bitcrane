@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -56,7 +56,10 @@ export function ContextMenu() {
   const sftpTab = !paneServer?.protocol || paneServer.protocol === 'sftp';
   const remoteTerminal = !onServer || sftpTab;
   const one = menu.names.length === 1 ? menu.names[0] : undefined;
-  const isDir = one && tab ? isDirEntry(ls, sid, join(panePath(menu.side), one)) : false;
+  const folder = one && tab ? isDirEntry(ls, sid, join(panePath(menu.side), one)) : false;
+  // A package (app, library) is offered like a file, with "Paketinhalt zeigen" to go in.
+  const pkg = !!one && folder && isPackage(menu.side, { name: one, kind: 'dir' });
+  const isDir = folder && !pkg;
   const leftServer = tab?.leftServerId ? getState().servers.find((x) => x.id === tab.leftServerId) : undefined;
   const otherName = (side: 'local' | 'remote') => (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
   const groups: Item[][] = [];
@@ -190,9 +193,10 @@ export function ContextMenu() {
     ]);
   } else if (menu.names.length) {
     const first: Item[] = [];
-    if (one) first.push({ label: isDir ? $t('Öffnen') : onServer ? $t('Im Editor öffnen') : $t('Öffnen'), key: k('⌘↓', 'Enter'), run: () => openEntry(menu.side, one) });
-    if (one && !isDir && !onServer) first.push({ label: $t('Im Editor öffnen'), run: () => openInEditor(menu.side, one) });
-    if (one && !isDir) first.push({ label: $t('Vorschau'), key: k($t('Leertaste'), $t('Leertaste')), run: () => { setState({ contextMenu: null }); openDialog({ type: 'preview', side: menu.side }); } });
+    if (one) first.push({ label: isDir ? $t('Öffnen') : onServer ? $t('Im Editor öffnen') : $t('Öffnen'), key: k('⌘↓', 'Enter'), run: () => (pkg ? openWithDefaultApp(menu.side, one) : openEntry(menu.side, one)) });
+    if (pkg && one) first.push({ label: $t('Paketinhalt zeigen'), run: () => showPackageContents(menu.side, one) });
+    if (one && !isDir && !pkg && !onServer) first.push({ label: $t('Im Editor öffnen'), run: () => openInEditor(menu.side, one) });
+    if (one && !isDir && !pkg) first.push({ label: $t('Vorschau'), key: k($t('Leertaste'), $t('Leertaste')), run: () => { setState({ contextMenu: null }); openDialog({ type: 'preview', side: menu.side }); } });
     if (leftServer) first.push({ label: $t('Zu „{0}“ übertragen', otherName(menu.side)), key: sk(menu.side === 'remote' ? 'download' : 'upload'), run: () => (menu.side === 'remote' ? download(menu.names) : upload(menu.names)) });
     else if (menu.side === 'remote') first.push({ label: $t('Herunterladen'), key: sk('download'), run: () => download(menu.names) });
     // Upload only when the other half shows a server (not with the server list or two local halves).
@@ -212,15 +216,15 @@ export function ContextMenu() {
     if (one && paneServer && isCloudProtocol(paneServer.protocol)) second.push({ label: $t('Link zum Teilen kopieren'), run: () => copyShareLink(menu.side, one) });
     if (one) second.push({ label: $t('Umbenennen'), key: k('↩', 'F2'), run: () => startRename(menu.side, one) });
     else second.push({ label: $t('{0} Objekte umbenennen …', menu.names.length), run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }) });
-    if (one && !isDir) second.push({ label: $t('Prüfsumme (SHA-256) …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
-    if (one && isDir) second.push({ label: $t('Größe berechnen'), run: () => void computeFolderSize(menu.side, one) });
+    if (one && !folder) second.push({ label: $t('Prüfsumme (SHA-256) …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
+    if (one && folder) second.push({ label: $t('Größe berechnen'), run: () => void computeFolderSize(menu.side, one) });
     // "Dateien vergleichen" (after ForkLift): two files of this half, or this file and the one picked in the other half.
     const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
     const otherPick = getState().selection[other].names;
     const isFile = (side: 'local' | 'remote', name: string) => !!tab && !isDirEntry(...paneLoc(side, tab), join(panePath(side), name));
     if (menu.names.length === 2 && menu.names.every((n) => isFile(menu.side, n))) {
       second.push({ label: $t('Dateien vergleichen'), run: () => compareFiles({ side: menu.side, name: menu.names[0] }, { side: menu.side, name: menu.names[1] }) });
-    } else if (one && !isDir && otherPick.length === 1 && isFile(other, otherPick[0])) {
+    } else if (one && !folder && otherPick.length === 1 && isFile(other, otherPick[0])) {
       const [a, b] = menu.side === 'local' ? [{ side: menu.side, name: one }, { side: other, name: otherPick[0] }] : [{ side: other, name: otherPick[0] }, { side: menu.side, name: one }];
       second.push({ label: $t('Mit „{0}“ vergleichen', otherPick[0]), run: () => compareFiles(a, b) });
     }
@@ -228,7 +232,7 @@ export function ContextMenu() {
     // Inside an opened archive nothing can be added, so no "komprimieren" there.
     if (!onServer && !archiveFolder(panePath(menu.side))) {
       second.push({ label: one ? $t('„{0}“ komprimieren', one) : $t('{0} Objekte komprimieren', menu.names.length), run: () => compressEntries(menu.side, menu.names) });
-      if (one && !isDir && isArchiveName(one)) {
+      if (one && !folder && isArchiveName(one)) {
         second.push({ label: $t('Entpacken'), run: () => extractArchive(menu.side, one) });
         second.push({ label: $t('Mit Standardprogramm öffnen'), run: () => openWithDefaultApp(menu.side, one) });
       }

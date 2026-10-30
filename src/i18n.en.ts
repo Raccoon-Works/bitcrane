@@ -2093,4 +2093,5 @@ export const EN: Record<string, string> = {
   "Gruppen ausblenden": "Hide groups",
   "Kleiner": "Smaller",
   "Größer": "Larger",
+  "Paketinhalt zeigen": "Show Package Contents",
 };

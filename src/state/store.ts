@@ -1305,9 +1305,31 @@ export function openEntry(side: PaneSide, name: string) {
  * Double click, Enter (Windows) or ⌘↓ on a row. Folders open; files do what
  * "Doppelklick auf eine Datei" says (Transmit: open, edit or transfer).
  */
+/** Folders the Finder shows as one item (apps, bundles, Photos libraries …). */
+const PACKAGE_EXT = /\.(app|bundle|framework|plugin|kext|prefPane|saver|appex|xpc|pkg|mpkg|photoslibrary|musiclibrary|tvlibrary|imovielibrary|fcpbundle|rtfd|pages|numbers|key|playground|xcodeproj|xcworkspace|scptd|workflow)$/i;
+
+/** True for a package folder on the Mac's own disk (shown and opened like a file, "Paketinhalt zeigen" goes in). */
+export function isPackage(side: PaneSide, entry: { name: string; kind: string }, s: AppState = state): boolean {
+  if (s.platform !== 'mac' || entry.kind !== 'dir') return false;
+  const t = activeTab(s);
+  if (!t || paneLoc(side, t)[0] !== 'local') return false;
+  return PACKAGE_EXT.test(entry.name);
+}
+
+/** "Paketinhalt zeigen": opens a package folder like a normal folder. */
+export function showPackageContents(side: PaneSide, name: string) {
+  setState({ contextMenu: null });
+  navigate(side, paths.join(panePath(side), name));
+}
+
 export function activateEntry(side: PaneSide, name: string) {
   const t = activeTab();
   if (!t) return;
+  // A package (app, Photos library …) opens like in the Finder instead of being entered.
+  if (isPackage(side, { name, kind: 'dir' }) && isDirEntry(...paneLoc(side, t), paths.join(panePath(side), name))) {
+    openWithDefaultApp(side, name);
+    return;
+  }
   const path = paths.join(panePath(side), name);
   const mode = state.settings.fileDoubleClick;
   if (isDirEntry(...paneLoc(side, t), path) || mode === 'open') {

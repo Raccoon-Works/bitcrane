@@ -15,7 +15,7 @@ import { isVaultListing, unlockVault } from '../state/vault';
 import { ArrowElbowLeftUp, GitBranch, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, Columns, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder } from '../state/store';
+import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage } from '../state/store';
 import { PlacesBar } from './PlacesBar';
 import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
@@ -219,7 +219,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const colView = viewMode === 'columns' && !deep;
   const parentDir = colView && path && paths.parent(path) !== path ? paths.parent(path) : null;
   const chosen = colView && sel.names.length === 1 ? entries.find((e) => e.name === sel.names[0]) : undefined;
-  const childDir = chosen?.kind === 'dir' ? paths.join(path, chosen.name) : null;
+  const childDir = chosen?.kind === 'dir' && !isPackage(side, chosen) ? paths.join(path, chosen.name) : null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const parentRows = useMemo(() => (parentDir ? folderRows(side, parentDir) : undefined), [side, parentDir, fsRev, showHidden, sort, tab?.serverId, tab?.leftServerId]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,12 +305,12 @@ export function Pane({ side }: { side: PaneSide }) {
       if (colView) {
         // Columns: ← goes to the folder above, → into the chosen folder (Finder).
         if (!right) goUp(side);
-        else if (cur?.kind === 'dir') { navigate(side, paths.join(path, cur.name)); clickRow(side, 0, {}); }
+        else if (cur?.kind === 'dir' && !isPackage(side, cur)) { navigate(side, paths.join(path, cur.name)); clickRow(side, 0, {}); }
         return;
       }
       if (!cur) return;
       // List: → opens a folder in place, ← closes it or jumps to the folder around it (Finder).
-      if (right && cur.kind === 'dir' && !openSet.has(cur.name)) toggleExpand(side, cur.name);
+      if (right && cur.kind === 'dir' && !isPackage(side, cur) && !openSet.has(cur.name)) toggleExpand(side, cur.name);
       else if (!right && cur.kind === 'dir' && openSet.has(cur.name)) toggleExpand(side, cur.name);
       else if (!right && cur.name.includes('/')) {
         const parentIndex = entries.findIndex((x) => x.name === cur.name.slice(0, cur.name.lastIndexOf('/')));
@@ -362,11 +362,13 @@ export function Pane({ side }: { side: PaneSide }) {
     const isBusy = depth === 0 && busy.has(entry.name);
     const label = entry.name.slice(entry.name.lastIndexOf('/') + 1);
     const isOpen = openSet.has(entry.name);
+    // Packages (apps, libraries) look and open like files, as in the Finder.
+    const dirLike = entry.kind === 'dir' && !isPackage(side, entry);
     const props = {
       role: 'option',
       'aria-selected': sel.names.includes(entry.name),
       'data-index': index,
-      'data-dir': entry.kind === 'dir',
+      'data-dir': dirLike,
       'data-name': entry.name,
       title: icons ? label : undefined,
       onPointerDown: (e: React.PointerEvent) => {
@@ -396,7 +398,7 @@ export function Pane({ side }: { side: PaneSide }) {
       return (
         <div key={entry.name} {...props} className={`${rowClass(entry, index).replace('row', 'tile')}`}>
           <span className="tile-icon">
-            {entry.kind === 'dir' ? <FolderGlyph size={ICON_PX[iconStep]} /> : <Thumb side={ls} path={paths.join(path, entry.name)} name={label} size={ICON_PX[iconStep]} />}
+            {dirLike ? <FolderGlyph size={ICON_PX[iconStep]} /> : <Thumb side={ls} path={paths.join(path, entry.name)} name={label} size={ICON_PX[iconStep]} />}
             {ext && <span className="tile-ext" aria-hidden="true">{ext}</span>}
             {link}
           </span>
@@ -408,13 +410,13 @@ export function Pane({ side }: { side: PaneSide }) {
     return (
       <div key={entry.name} {...props} className={rowClass(entry, index)} style={{ '--depth': depth } as CSSProperties}>
         <span className="row-bar" />
-        {entry.kind === 'dir' && !colView ? (
+        {dirLike && !colView ? (
           <button type="button" tabIndex={-1} className={`disclosure${isOpen ? ' is-open' : ''}`} aria-label={isOpen ? $t('„{0}“ zuklappen', label) : $t('„{0}“ aufklappen', label)} aria-expanded={isOpen}
             onClick={(e) => { e.stopPropagation(); toggleExpand(side, entry.name); }}>
             <CaretRight size={13} weight="bold" aria-hidden="true" />
           </button>
         ) : <span />}
-        {entry.kind === 'dir' ? <FolderGlyph size={20} /> : <FileGlyph size={20} name={label} />}
+        {dirLike ? <FolderGlyph size={20} /> : <FileGlyph size={20} name={label} />}
         <span className="row-name">
           {nameEl}
           {link}
@@ -424,7 +426,7 @@ export function Pane({ side }: { side: PaneSide }) {
           {(() => { const g = gitMark(git, path, entry.name, entry.kind === 'dir'); return g ? <span className={`git-mark git-${g === '?' ? 'new' : g === '•' ? 'dir' : g}`} title={`Git: ${GIT_LABEL[g] ?? g}`}>{g === '•' ? '' : g}</span> : null; })()}
           {marks && depth === 0 && marks.get(entry.name) && <span className={`tag cmp-tag is-${marks.get(entry.name)}`}>{markLabel[marks.get(entry.name)!]}</span>}
         </span>
-        {colView && (entry.kind === 'dir' ? <CaretRight size={11} weight="bold" className="miller-caret" aria-hidden="true" /> : <span />)}
+        {colView && (dirLike ? <CaretRight size={11} weight="bold" className="miller-caret" aria-hidden="true" /> : <span />)}
         {!colView && columns.mtime && <span className="row-sub nowrap">{formatDate(entry.mtime)}</span>}
         {!colView && columns.kind && <span className="row-sub ellipsis">{kindOf(entry)}</span>}
         {!colView && showPerms && <span className="row-sub mono perms-cell">{entry.perms ? permsToText(entry.perms) : ''}</span>}
