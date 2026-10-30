@@ -195,10 +195,10 @@ export function savedTabs(tabs: Tab[] = getState().tabs): SavedTab[] {
 }
 
 /** The tab's terminal sessions, kept when Settings › Terminal › "Terminals wieder öffnen" is on. */
-function terminalsToSave(t: Tab): Pick<SavedTab, 'terminals' | 'terminalOpen'> {
+function terminalsToSave(t: Tab): Pick<SavedTab, 'terminals' | 'terminalOpen' | 'terminalFull'> {
   if (!getState().settings.terminal?.restore) return {};
   const ids = getState().terminals.filter((x) => x.tabId === t.id && x.alive).map((x) => x.serverId);
-  return ids.length ? { terminals: ids, terminalOpen: !!t.terminal?.open } : {};
+  return ids.length ? { terminals: ids, terminalOpen: !!t.terminal?.open, ...(t.terminal?.full ? { terminalFull: true } : {}) } : {};
 }
 
 /** Tabs built from saved ones; servers that no longer exist are dropped from them. */

@@ -33,7 +33,7 @@ export const LIVE = isTauri;
 
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
-  | { type: 'serverEdit'; serverId?: string; cloud?: Protocol }
+  | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean }
   | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
@@ -41,7 +41,7 @@ export type DialogState =
   | { type: 'edits' }
   | { type: 'exportConfig' }
   | { type: 'importPassword'; sealed: Sealed }
-  | { type: 'quickConnect' }
+  | { type: 'quickConnect'; terminal?: boolean }
   | { type: 'fingerprint'; mode: 'new' | 'changed'; key: HostKey; serverId: string }
   | { type: 'conflict' }
   | { type: 'perms'; side: PaneSide; path: string }
@@ -316,6 +316,8 @@ export interface SavedTab {
   /** Terminals of the tab ('' = this computer), when "Terminals wieder öffnen" is on. */
   terminals?: string[];
   terminalOpen?: boolean;
+  /** The terminal filled the tab (SSH-only tabs). */
+  terminalFull?: boolean;
 }
 
 /** A named set of tabs that can be opened again later. */
@@ -997,6 +999,10 @@ export function selectTab(id: string) {
 export function openServerInNewTab(serverId: string) {
   const srv = serverById(serverId);
   if (!srv) return;
+  if (srv.openAs === 'terminal' && (!srv.protocol || srv.protocol === 'sftp')) {
+    void import('./terminal').then((m) => m.openServerTerminal(serverId));
+    return;
+  }
   const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [] };
   setState((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), firstRun: false, contextMenu: null }));
   if (LIVE && !live.isConnected(serverId)) live.connectNow(serverId);
@@ -1023,7 +1029,13 @@ export function askRemoveServer(id: string) {
   });
 }
 
-export function openServer(serverId: string) {
+export function openServer(serverId: string, files = false) {
+  // Servers set to open as a terminal (SSH only): a terminal tab instead of the files.
+  const target = serverById(serverId);
+  if (!files && target?.openAs === 'terminal' && (!target.protocol || target.protocol === 'sftp')) {
+    void import('./terminal').then((m) => m.openServerTerminal(serverId));
+    return;
+  }
   setState((st) => ({ servers: st.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)) }));
   const s = state;
   const existing = s.tabs.find((t) => t.serverId === serverId);
@@ -1571,7 +1583,7 @@ async function applyImport(data: ExportFile) {
   }));
   const restored = data.secrets ? await live.restoreSecrets(data.secrets) : 0;
   showToast($t('Importiert: {0} Server, {1} Überwachungen{2}.', servers.length, data.watches?.length ?? 0, restored ? $t(', {0} Passwörter im {1}', restored, state.platform === 'mac' ? $t('Schlüsselbund') : $t('Anmeldespeicher')) : ''), 'ok');
-  if (!state.tabs.length && state.servers[0]) openServer(state.servers[0].id);
+  if (!state.tabs.length && state.servers[0]) openServer(state.servers[0].id, true);
 }
 
 /** Opens a local place from the sidebar ("Projekte", "Downloads"). */
@@ -1604,7 +1616,7 @@ export function openWatchFolders(watchId: string) {
   const w = state.watches.find((x) => x.id === watchId);
   if (!w) return;
   const t = activeTab();
-  if (t && t.serverId !== w.serverId) openServer(w.serverId);
+  if (t && t.serverId !== w.serverId) openServer(w.serverId, true);
   updateTab({ leftServerId: undefined, localPath: w.localPath, remotePath: w.remotePath });
   setState({ selection: clearSelection(), popoverOpen: false });
 }
@@ -2693,16 +2705,41 @@ export function fakeFingerprint(host: string): string {
  * "Schnell verbinden". A password typed into the form is used for this connection;
  * it is kept in the system keychain only when the server is saved ("Zu Servern hinzufügen").
  */
-export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key' | 'password' = 'auto', side?: PaneSide, password?: string) {
+/**
+ * Accepts what people type in a terminal as well: "ssh user@host",
+ * "ssh -p 2222 user@host" and ssh:// become the usual user@host:port.
+ */
+export function normalizeSshAddress(address: string): string {
+  let a = address.trim().replace(/^ssh:\/\//i, '');
+  const cmd = a.match(/^ssh\s+(.*)$/i);
+  if (!cmd) return a;
+  let port = '';
+  const words: string[] = [];
+  const parts = cmd[1].trim().split(/\s+/);
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] === '-p' && parts[i + 1]) port = parts[++i];
+    else if (/^-p\d+$/.test(parts[i])) port = parts[i].slice(2);
+    else if (parts[i] === '-l' && parts[i + 1]) words.unshift(`${parts[++i]}@`);
+    // Options with a value (key file, jump host, -o …): skipped together with it.
+    else if (/^-[bcDEeFIiJLlmOoQRSWw]$/.test(parts[i])) i++;
+    else if (!parts[i].startsWith('-')) words.push(parts[i]);
+  }
+  a = words.join('');
+  return port && !/:\d+(\/|$)/.test(a) ? `${a}:${port}` : a;
+}
+
+export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key' | 'password' = 'auto', side?: PaneSide, password?: string, openAs?: 'terminal') {
+  address = normalizeSshAddress(address);
   const typed = address.trim().replace(/^sftp:\/\//, '');
   if (typed) setState((s) => ({ settings: { ...s.settings, recentAddresses: [typed, ...s.settings.recentAddresses.filter((a) => a !== typed)].slice(0, 8) } }));
   if (LIVE) {
     void live.quickConnect(address, save, password ? 'password' : auth).then((server) => {
       if (!server) return;
+      if (openAs && (!server.protocol || server.protocol === 'sftp')) server = { ...server, openAs };
       setState((s) => ({ servers: [...s.servers, server], dialog: null }));
       if (password) live.presetPassword(server.id, password, save);
       // From the "Schnell verbinden" tab of a half: connect right there.
-      if (side) openServerIn(side, server.id);
+      if (side && !server.openAs) openServerIn(side, server.id);
       else openServer(server.id);
     });
     return;
@@ -2717,6 +2754,7 @@ export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key
     ...newServerTemplate(),
     name: host, mono: host.slice(0, 2).toUpperCase(), host, user, port: Number(port), color: 'gray',
     remoteStart: path || (LIVE ? '' : `/home/${user}`), temporary: !save, auth: auth === 'auto' ? 'agent' : auth,
+    ...(openAs ? { openAs } : {}),
   };
   setState((s) => ({ servers: [...s.servers, server] }));
   if (side === 'local') {

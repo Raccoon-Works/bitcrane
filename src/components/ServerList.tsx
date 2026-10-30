@@ -164,7 +164,12 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   const leftOnServer = side === 'local' && !!t?.leftServerId;
   // The right half can show this computer too (two local halves, Total Commander).
   const rightCanBeLocal = side === 'remote';
-  const open = (id: string) => openServerIn(side, id);
+  // Servers set to open as a terminal (SSH only) get their terminal tab; the files stay in the context menu.
+  const open = (id: string) => {
+    const srv = getState().servers.find((x) => x.id === id);
+    if (srv?.openAs === 'terminal' && (!srv.protocol || srv.protocol === 'sftp')) void import('../state/terminal').then((m) => m.openServerTerminal(id));
+    else openServerIn(side, id);
+  };
   const menuFor = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     setSelected(id);

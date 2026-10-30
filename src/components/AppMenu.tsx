@@ -49,6 +49,7 @@ export function menuDefs(): MenuDef[] {
       id: 'file', label: $t('Ablage'), items: [
         { label: $t('Neuer Tab'), ...sc('newTab'), run: newTab },
         { label: $t('Schnell verbinden …'), ...sc('quickConnect'), run: () => openDialog({ type: 'quickConnect' }) },
+        { label: $t('Neue SSH-Verbindung …'), run: () => openDialog({ type: 'quickConnect', terminal: true }) },
         sep,
         { label: $t('Neuer Ordner'), ...sc('newFolder'), run: () => newFolder() },
         { label: $t('Hochladen'), ...sc('upload'), run: () => upload() },
@@ -269,6 +270,7 @@ export function WinMoreMenu() {
   const top: MenuItem[] = [
     { label: $t('Neuer Tab'), win: 'Strg+T', run: newTab },
     { label: $t('Schnell verbinden …'), win: 'Strg+K', run: () => openDialog({ type: 'quickConnect' }) },
+    { label: $t('Neue SSH-Verbindung …'), run: () => openDialog({ type: 'quickConnect', terminal: true }) },
     { label: $t('Neue Überwachung …'), win: 'Strg+U', run: () => openDialog({ type: 'watchSetup' }) },
     { label: $t('Übertragungen …'), win: 'Strg+Alt+T', run: () => openDialog({ type: 'transfers' }) },
   ];
