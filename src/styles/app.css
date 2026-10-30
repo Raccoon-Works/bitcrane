@@ -2446,3 +2446,12 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .window-body:has(> .sidebar) .main-col .content { padding-left: var(--space-2); }
 .window-body:has(> .sidebar) .pane { position: relative; }
 .window-body:has(> .sidebar) .pane.is-focused::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); pointer-events: none; }
+
+/* Light theme: the sidebar is a dark grey-blue card like the server list, so the
+   light file views sit between two calm dark areas (Transmit). */
+.page[data-theme='light'] .sidebar {
+  --text: #ececf1; --text-muted: #9ea4b0; --text-faint: #7d8390; --accent-text: #5fb0ff;
+  --bg-hover: rgba(255, 255, 255, 0.06); --bg-sidebar-sel: rgba(255, 255, 255, 0.10);
+  --line: rgba(255, 255, 255, 0.07); --accent-tint: rgba(95, 176, 255, 0.12);
+  background: #2a3240; color: var(--text); color-scheme: dark;
+}
