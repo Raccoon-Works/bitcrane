@@ -1976,4 +1976,7 @@ export const EN: Record<string, string> = {
   "Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnest du mit dem Terminal-Knopf oben oder {1}; ein Rechtsklick auf den Knopf zeigt die Auswahl (Shell, SSH-Server).": "Terminal shortcuts: copy and paste with {0}. Open a terminal with the Terminal button at the top or {1}; a right click on the button shows the choice (shell, SSH server).",
   "Änderungen in überwachten Ordnern": "Changes in watched folders",
   "meldet das System sofort": "reported by the system right away",
+  "Einstellungen durchsuchen": "Search settings",
+  "Suchergebnisse": "Search results",
+  "Keine Einstellung zu „{0}“ gefunden.": "No setting found for \"{0}\".",
 };
