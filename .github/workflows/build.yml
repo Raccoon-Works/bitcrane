@@ -74,6 +74,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Stops the build on type errors and on broken hook order (black window in 0.2.64).
+      - name: Check the interface code
+        run: |
+          npx tsc -b
+          npx eslint src
+
       - name: Set version and update signing
         shell: bash
         env:
