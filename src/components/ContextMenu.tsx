@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -125,6 +125,20 @@ export function ContextMenu() {
       { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
     ]);
     groups.push([{ label: $t('Aus der Ortsleiste entfernen'), danger: true, run: () => removePlace(menu.side, path) }]);
+  } else if (menu.kind === 'sidebarPlace' && menu.place) {
+    // A favourite in the sidebar.
+    const path = menu.place;
+    const list = localPlaces();
+    const i = list.findIndex((p) => p.path === path);
+    groups.push([
+      { label: $t('Öffnen'), run: () => openPlace(path) },
+      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
+    ]);
+    groups.push([
+      ...(i > 0 ? [{ label: $t('Nach oben'), run: () => editLocalPlaces(path, { before: list[i - 1].path }) }] : []),
+      ...(i >= 0 && i < list.length - 1 ? [{ label: $t('Nach unten'), run: () => editLocalPlaces(path, { before: list[i + 2]?.path ?? null }) }] : []),
+    ]);
+    groups.push([{ label: $t('Aus den Favoriten entfernen'), danger: true, run: () => editLocalPlaces(path, { remove: true }) }]);
   } else if (menu.kind === 'paneSource') {
     // The location button of a half: this computer and its drives, or which server it shows.
     const servers = getState().servers.filter((x) => !x.temporary || x.online);
@@ -260,6 +274,8 @@ export function ContextMenu() {
     if (folderCommands.length) groups.push(folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })));
     if (!onServer) groups.push([{ label: $t('Diesen Ordner überwachen …'), key: sk('newWatch'), run: () => openDialog({ type: 'watchSetup' }) }]);
   }
+  // Groups left empty by conditions are dropped, so no double separators appear.
+  for (let i = groups.length - 1; i >= 0; i--) if (!groups[i].length) groups.splice(i, 1);
 
   const anyCheck = groups.flat().some((it) => it.checked !== undefined);
   // Convert to stage coordinates and keep the menu inside the window.

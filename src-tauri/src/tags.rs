@@ -81,6 +81,37 @@ pub fn toggle(paths: &[String], name: &str, color: u8, on: bool) -> AppResult<()
     Ok(())
 }
 
+/// A file found by its tag.
+#[derive(Debug, Serialize, Clone)]
+pub struct Tagged {
+    pub path: String,
+    pub size: u64,
+    pub mtime: i64,
+    pub dir: bool,
+}
+
+/// Files and folders with a tag of this name, through Spotlight (`mdfind`), like
+/// a click on a tag in the Finder's sidebar. At most `limit` results.
+pub fn find(name: &str, limit: usize) -> Vec<Tagged> {
+    #[allow(unused_mut)]
+    let mut out = Vec::new();
+    #[cfg(target_os = "macos")]
+    {
+        // Spotlight query strings use double quotes; backslash and quote are escaped.
+        let q = format!("kMDItemUserTags == \"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""));
+        if let Ok(o) = std::process::Command::new("/usr/bin/mdfind").arg(q).output() {
+            for line in String::from_utf8_lossy(&o.stdout).lines().take(limit) {
+                let Ok(md) = std::fs::metadata(line) else { continue };
+                let mtime = md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+                out.push(Tagged { path: crate::paths::to_ui(std::path::Path::new(line)), size: if md.is_dir() { 0 } else { md.len() }, mtime, dir: md.is_dir() });
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (name, limit);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

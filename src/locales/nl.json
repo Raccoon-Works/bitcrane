@@ -2070,5 +2070,20 @@
   "Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)": "Hoogte van de helften (sleep; dubbelklik: herstel)",
   "Markierungen gehen im echten Programm.": "Tags werken in de volledige app.",
   "Als Spalten": "Als kolommen",
-  "Spalten": "Kolommen"
+  "Spalten": "Kolommen",
+  "Favoriten": "Favorieten",
+  "Tags": "Tags",
+  "Freigaben": "Gedeeld",
+  "Ordner hierher ziehen": "Sleep mappen hierheen",
+  "„{0}“ ist schon in den Favoriten.": "‘{0}’ staat al in Favorieten.",
+  "„{0}“ zu den Favoriten hinzugefügt.": "‘{0}’ toegevoegd aan Favorieten.",
+  "Nach oben": "Omhoog",
+  "Nach unten": "Omlaag",
+  "Aus den Favoriten entfernen": "Verwijder uit Favorieten",
+  "Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)": "Breedte van de navigatiekolom (slepen, dubbelklik: herstellen)",
+  "Tag": "Tag",
+  "{0} Objekte mit diesem Tag": "{0} onderdelen met deze tag",
+  "Keine Dateien mit diesem Tag gefunden.": "Geen bestanden met deze tag gevonden.",
+  "Die Suche nach Tags geht im echten Programm.": "Zoeken op tag werkt in de echte app.",
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favorieten, recente mappen, apparaten, gedeelde mappen en tags links in het venster. Uit: de locatiebalken boven de helften."
 }

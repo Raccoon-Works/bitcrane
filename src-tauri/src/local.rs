@@ -450,7 +450,7 @@ pub fn places() -> Vec<Place> {
     let mut push = |name: &str, p: Option<std::path::PathBuf>| {
         if let Some(p) = p {
             if p.is_dir() {
-                out.push(Place { name: name.into(), path: to_ui(&p) });
+                out.push(Place { name: name.into(), path: to_ui(&p), network: false });
             }
         }
     };
@@ -467,6 +467,31 @@ pub fn places() -> Vec<Place> {
 
 /// Drives and volumes of this computer: C:, D:, USB sticks and network
 /// drives on Windows, the mounted volumes on the Mac, mount points on Linux.
+/// Mapped network drive (Windows: "Z:" on a server share).
+#[cfg(windows)]
+fn is_remote_drive(letter: char) -> bool {
+    use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+    let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
+    // DRIVE_REMOTE = 4.
+    unsafe { GetDriveTypeW(root.as_ptr()) == 4 }
+}
+
+/// Mount points of network shares on the Mac (smbfs, afpfs, nfs, webdav), from `mount`.
+#[cfg(target_os = "macos")]
+fn network_mounts() -> Vec<String> {
+    let Ok(out) = std::process::Command::new("/sbin/mount").output() else { return Vec::new() };
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|line| {
+            // "//user@host/share on /Volumes/share (smbfs, nodev, …)"
+            let (_, rest) = line.split_once(" on ")?;
+            let (point, kind) = rest.rsplit_once(" (")?;
+            let fs = kind.split(',').next()?.trim();
+            matches!(fs, "smbfs" | "afpfs" | "nfs" | "webdav" | "cifs").then(|| point.to_string())
+        })
+        .collect()
+}
+
 pub fn drives() -> Vec<Place> {
     #[allow(unused_mut)]
     let mut out = vec![];
@@ -476,11 +501,12 @@ pub fn drives() -> Vec<Place> {
         // DVD drive reports "not a folder" and is left out as well.
         let l = letter as char;
         if Path::new(&format!("{l}:\\")).is_dir() {
-            out.push(Place { name: format!("{l}:"), path: format!("{l}:/") });
+            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network: is_remote_drive(l) });
         }
     }
     #[cfg(target_os = "macos")]
     if let Ok(rd) = fs::read_dir("/Volumes") {
+        let shares = network_mounts();
         for e in rd.flatten() {
             let name = e.file_name().to_string_lossy().into_owned();
             if name.starts_with('.') {
@@ -489,20 +515,21 @@ pub fn drives() -> Vec<Place> {
             // The start volume appears there as a link to "/".
             let target = fs::canonicalize(e.path()).unwrap_or_else(|_| e.path());
             if target.is_dir() {
-                out.push(Place { name, path: to_ui(&target) });
+                let network = shares.iter().any(|m| Path::new(m) == target.as_path());
+                out.push(Place { name, path: to_ui(&target), network });
             }
         }
         out.sort_by(|a, b| (a.path != "/").cmp(&(b.path != "/")).then(a.name.cmp(&b.name)));
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        out.push(Place { name: "/".into(), path: "/".into() });
+        out.push(Place { name: "/".into(), path: "/".into(), network: false });
         let user = std::env::var("USER").unwrap_or_default();
         for base in [format!("/media/{user}"), format!("/run/media/{user}"), "/mnt".to_string()] {
             if let Ok(rd) = fs::read_dir(&base) {
                 for e in rd.flatten() {
                     if e.path().is_dir() {
-                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()) });
+                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false });
                     }
                 }
             }

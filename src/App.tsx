@@ -4,6 +4,7 @@
  */
 import { CopyToDialog } from './components/dialogs/CopyToDialog';
 import { GitCommit } from './components/dialogs/GitCommit';
+import { TagFiles } from './components/dialogs/TagFiles';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
@@ -54,6 +55,7 @@ function Dialogs() {
     case 'confirmDelete': return <ConfirmDelete side={dialog.side} names={dialog.names} />;
     case 'copyTo': return <CopyToDialog side={dialog.side} names={dialog.names} />;
     case 'gitCommit': return <GitCommit root={dialog.root} />;
+    case 'tagFiles': return <TagFiles name={dialog.name} color={dialog.color} />;
     case 'shortcuts': return <Shortcuts />;
     case 'checksum': return <ChecksumDialog side={dialog.side} name={dialog.name} />;
     case 'symlink': return <SymlinkDialog target={dialog.target} />;

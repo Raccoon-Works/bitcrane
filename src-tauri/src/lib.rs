@@ -204,6 +204,12 @@ async fn local_tags(dir: String) -> std::collections::HashMap<String, Vec<tags::
     tokio::task::spawn_blocking(move || tags::list(&dir)).await.unwrap_or_default()
 }
 
+/// Files of this computer with a Finder tag (Spotlight; empty elsewhere).
+#[tauri::command]
+async fn local_tag_find(name: String) -> Vec<tags::Tagged> {
+    tokio::task::spawn_blocking(move || tags::find(&name, 500)).await.unwrap_or_default()
+}
+
 /// Turns a Finder colour tag on or off for files of this computer.
 #[tauri::command]
 fn local_tag(paths: Vec<String>, name: String, color: u8, on: bool) -> AppResult<()> {
@@ -1665,6 +1671,7 @@ pub fn run() {
             open_mac_settings,
             git_status,
             local_tags,
+            local_tag_find,
             local_tag,
             git_action,
             cloud_services,

@@ -2070,5 +2070,20 @@
   "Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)": "Wysokość połówek (przeciągnij; dwuklik: resetuj)",
   "Markierungen gehen im echten Programm.": "Tagi działają w pełnej wersji aplikacji.",
   "Als Spalten": "Jako kolumny",
-  "Spalten": "Kolumny"
+  "Spalten": "Kolumny",
+  "Favoriten": "Ulubione",
+  "Tags": "Tagi",
+  "Freigaben": "Udostępnione",
+  "Ordner hierher ziehen": "Przeciągnij tu foldery",
+  "„{0}“ ist schon in den Favoriten.": "„{0}” jest już w Ulubionych.",
+  "„{0}“ zu den Favoriten hinzugefügt.": "Dodano „{0}” do Ulubionych.",
+  "Nach oben": "Przenieś w górę",
+  "Nach unten": "Przenieś w dół",
+  "Aus den Favoriten entfernen": "Usuń z Ulubionych",
+  "Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)": "Szerokość paska bocznego (przeciągnij, dwuklik: przywróć)",
+  "Tag": "Tag",
+  "{0} Objekte mit diesem Tag": "Obiekty z tym tagiem: {0}",
+  "Keine Dateien mit diesem Tag gefunden.": "Nie znaleziono plików z tym tagiem.",
+  "Die Suche nach Tags geht im echten Programm.": "Wyszukiwanie po tagach działa w prawdziwej aplikacji.",
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Ulubione, ostatnie foldery, urządzenia, udziały i tagi po lewej stronie okna. Wyłączone: paski miejsc nad połówkami."
 }

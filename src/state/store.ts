@@ -54,6 +54,7 @@ export type DialogState =
   | { type: 'confirmDelete'; side: PaneSide; names: string[] }
   | { type: 'copyTo'; side: PaneSide; names: string[] }
   | { type: 'gitCommit'; root: string }
+  | { type: 'tagFiles'; name: string; color: number }
   | { type: 'shortcuts' }
   | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
   | { type: 'diff'; transferId: string }
@@ -94,7 +95,7 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
+  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
   /** Group right-clicked in the server list ("serverGroup"). */
   group?: string;
   serverId?: string;
@@ -133,8 +134,12 @@ export interface Settings {
   parallel: number;
   /** The two halves on top of each other instead of side by side. */
   stackHalves?: boolean;
-  /** Sidebar with favourites, drives, servers and tags (on unless switched off). */
+  /** Sidebar with favourites, recent folders, devices, shares and tags (on unless switched off). */
   sidebar?: boolean;
+  /** Width of the sidebar in pixels. */
+  sidebarWidth?: number;
+  /** Folders of this computer opened last (sidebar). */
+  recentDirs?: string[];
   /** Git state in local file lists (on unless switched off). */
   gitStatus?: boolean;
   /** "Kopieren nach …": the folders used last. */
@@ -449,7 +454,7 @@ export interface AppState {
   /** Where dragged files would land: a side and a folder name ('' = folder shown). */
   /** Drop target while dragging: a folder in a half ('' = the folder shown), a place
       in a places bar (`place` = its path), or the places bar itself (`addPlace`). */
-  dropHint: { side: PaneSide; name: string; place?: string; addPlace?: boolean } | null;
+  dropHint: { side: PaneSide; name: string; place?: string; addPlace?: boolean; sidebar?: boolean } | null;
   /** Folders opened in place (triangle in the list), as paths relative to the folder shown. */
   expanded: Record<PaneSide, string[]>;
 }
@@ -1159,11 +1164,19 @@ export function navigate(side: PaneSide, path: string, record = true) {
     showToast($t('Synchron blättern beendet: der Ordner liegt außerhalb der verbundenen Ordner.'));
   }
   updateTab(patch);
+  if (ls === 'local') rememberRecentDir(path);
   setState((s) => ({
     selection: { ...s.selection, [side]: { names: [], cursor: 0, anchor: 0 }, ...(other ? { [other]: { names: [], cursor: -1, anchor: -1 } } : {}) },
     expanded: { ...s.expanded, [side]: [], ...(other ? { [other]: [] } : {}) },
     focusSide: side, renaming: null,
   }));
+}
+
+/** Folders of this computer opened last, newest first (sidebar "Zuletzt verwendet"). */
+function rememberRecentDir(path: string) {
+  const cur = state.settings.recentDirs ?? [];
+  if (cur[0] === path) return;
+  updateSettings({ recentDirs: [path, ...cur.filter((p) => p !== path)].slice(0, 12) });
 }
 
 /** "Synchron blättern" on or off for the current tab (starts from the folders shown now). */
@@ -1378,6 +1391,37 @@ export function addPlace(side: PaneSide, path: string) {
   const name = path === '~' ? state.homeName : paths.basename(path) || path;
   setPlaces(side, [...list, { name, path }]);
   showToast($t('„{0}“ zur Ortsleiste hinzugefügt.', name), 'ok');
+}
+
+/** Favourites of this computer (sidebar), whatever the halves show. */
+export function localPlaces(s: AppState = state): Place[] {
+  return s.settings.localPlaces ?? s.places;
+}
+
+/** Adds a folder of this computer to the sidebar's favourites. */
+export function addLocalPlace(path: string) {
+  const list = localPlaces();
+  const name = path === '~' ? state.homeName : paths.basename(path) || path;
+  if (list.some((p) => p.path === path)) {
+    showToast($t('„{0}“ ist schon in den Favoriten.', name));
+    return;
+  }
+  updateSettings({ localPlaces: [...list, { name, path }] });
+  showToast($t('„{0}“ zu den Favoriten hinzugefügt.', name), 'ok');
+}
+
+/** Removes a favourite of this computer, or moves it before another one (`before` null: to the end). */
+export function editLocalPlaces(path: string, op: { remove: true } | { before: string | null }) {
+  const list = localPlaces();
+  const item = list.find((p) => p.path === path);
+  if (!item) return;
+  const rest = list.filter((p) => p.path !== path);
+  if ('remove' in op) updateSettings({ localPlaces: rest });
+  else {
+    const i = op.before === null ? rest.length : Math.max(0, rest.findIndex((p) => p.path === op.before));
+    updateSettings({ localPlaces: [...rest.slice(0, i), item, ...rest.slice(i)] });
+  }
+  setState({ contextMenu: null });
 }
 
 export function removePlace(side: PaneSide, path: string) {

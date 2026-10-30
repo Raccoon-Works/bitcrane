@@ -164,6 +164,8 @@ export interface Place {
   path: string;
   /** Cloud storage folder ("gdrive", "onedrive", "dropbox", "icloud", "box", "other"): shown with a cloud. */
   cloud?: string;
+  /** Drives only: a network share (shown under "Freigaben"). */
+  network?: boolean;
 }
 
 /** A cloud storage folder found on this computer (first start, like Transmit). */
