@@ -133,6 +133,8 @@ export interface Settings {
   parallel: number;
   /** The two halves on top of each other instead of side by side. */
   stackHalves?: boolean;
+  /** Sidebar with favourites, drives, servers and tags (on unless switched off). */
+  sidebar?: boolean;
   /** Git state in local file lists (on unless switched off). */
   gitStatus?: boolean;
   /** "Kopieren nach …": the folders used last. */

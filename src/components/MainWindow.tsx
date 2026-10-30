@@ -4,6 +4,7 @@
  * sit in each half's places bar (Transmit 5). On Windows a title bar with the
  * connection tabs sits on top.
  */
+import { Sidebar } from './Sidebar';
 import { useRef, type CSSProperties } from 'react';
 import { setState, updateSettings, useStore } from '../state/store';
 import { ResizeHandle } from './ResizeHandle';
@@ -48,6 +49,7 @@ export function MainWindow() {
   const split = useStore((s) => s.settings.splitRatio ?? 0.5);
   // "Hälften untereinander" (ForkLift): for narrow windows the halves can stack.
   const stacked = useStore((s) => !!s.settings.stackHalves);
+  const sidebar = useStore((s) => s.settings.sidebar !== false);
   const panesRef = useRef<HTMLDivElement>(null);
   const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
@@ -63,6 +65,7 @@ export function MainWindow() {
         </div>
       )}
       <div className="window-body">
+          {sidebar && !settingsTab && <Sidebar />}
           {settingsTab ? <SettingsPage section={settingsTab} /> : <div className="main-col">
             <Toolbar />
             <div className="content">

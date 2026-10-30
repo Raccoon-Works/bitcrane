@@ -2072,4 +2072,7 @@ export const EN: Record<string, string> = {
   "Markierungen gehen im echten Programm.": "Tags work in the real app.",
   "Als Spalten": "As columns",
   "Spalten": "Columns",
+  "Favoriten": "Favorites",
+  "Tags": "Tags",
+  "Dateien mit dem Tag „{0}“ suchen kommt mit dem fertigen Ausbau.": "Searching files with the tag “{0}” comes with the finished version.",
 };

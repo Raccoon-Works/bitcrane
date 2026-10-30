@@ -213,6 +213,7 @@ export function Pane({ side }: { side: PaneSide }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
 
+  const sidebarOn = useStore((s) => s.settings.sidebar !== false);
   // All hooks stay above the early returns below, so their order never changes.
   // Column view (Finder, ForkLift): the folder above, the folder shown, and what the chosen folder holds.
   const colView = viewMode === 'columns' && !deep;
@@ -440,7 +441,7 @@ export function Pane({ side }: { side: PaneSide }) {
       style={{ '--cols': [columns.mtime && '124px', columns.kind && '120px', showPerms && '84px', columns.owner && '84px', columns.size && '76px'].filter(Boolean).join(' ') || '0px' } as CSSProperties}
       aria-label={onServer ? $t('Server') : $t('Lokal')}
     >
-      <PlacesBar side={side} />
+      {!sidebarOn && <PlacesBar side={side} />}
       <div className="pane-head">
         {/* Location button: this computer and its drives, or which server the half shows. */}
         <button type="button" className="pane-source" title={onServer ? `${server?.name ?? ''} · ${$t('Ort wechseln')}` : $t('Laufwerke und Server')} aria-label={$t('Ort wechseln')} aria-haspopup="menu"

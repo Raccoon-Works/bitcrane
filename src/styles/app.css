@@ -2400,3 +2400,43 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .miller-caret { color: var(--text-faint); justify-self: end; }
 .row.is-sel .miller-caret { color: var(--sel-fg); }
 .miller-empty { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-2); }
+
+/* Sidebar (Finder, ForkLift): favourites, drives, servers, tags. Acts on the active half. */
+.sidebar {
+  width: 200px;
+  flex: none;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-2) var(--space-4);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.side-group { display: flex; flex-direction: column; gap: 1px; }
+.side-title { padding: 0 var(--space-2) var(--space-1); font-size: var(--text-small); font-weight: 600; color: var(--text-muted); }
+.side-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-row);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: default;
+}
+.side-item:hover { background: var(--bg-hover); }
+.side-item.is-active { background: var(--bg-sidebar-sel); font-weight: 600; }
+.side-icon { display: grid; place-items: center; color: var(--accent-text); }
+.side-tag { width: 10px; height: 10px; }
+.side-online { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+/* With the sidebar the active half carries an accent line, so it is clear where a click opens. */
+
+.window-body:has(> .sidebar) .main-col .content { padding-left: var(--space-2); }
+.window-body:has(> .sidebar) .pane { position: relative; }
+.window-body:has(> .sidebar) .pane.is-focused::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); pointer-events: none; }
