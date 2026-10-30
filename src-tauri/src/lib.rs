@@ -672,6 +672,16 @@ fn path_to_ui(path: String) -> String {
     paths::to_ui(&paths::to_native(path.trim()))
 }
 
+/// Real target of each folder (links resolved), in the UI form; unchanged when
+/// it cannot be resolved. Lets the sidebar show a folder reached by two paths once.
+#[tauri::command]
+fn local_real_paths(list: Vec<String>) -> Vec<String> {
+    list
+        .into_iter()
+        .map(|p| std::fs::canonicalize(paths::to_native(&p)).map(|c| paths::to_ui(&c)).unwrap_or(p))
+        .collect()
+}
+
 /// Shows a file or folder in the Finder / Explorer with the item selected.
 #[tauri::command]
 fn local_reveal(path: String) -> AppResult<()> {
@@ -1672,6 +1682,7 @@ pub fn run() {
             git_status,
             local_tags,
             local_tag_find,
+            local_real_paths,
             local_tag,
             git_action,
             cloud_services,
