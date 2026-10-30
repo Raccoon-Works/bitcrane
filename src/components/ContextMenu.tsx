@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -128,6 +128,17 @@ export function ContextMenu() {
       { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
     ]);
     groups.push([{ label: $t('Aus der Ortsleiste entfernen'), danger: true, run: () => removePlace(menu.side, path) }]);
+  } else if (menu.kind === 'sidebarSection') {
+    // Which sections the sidebar shows (Finder: Settings > Sidebar), and the default order.
+    const st = getState().settings;
+    const hiddenNow = st.sidebarHidden ?? [];
+    const names: Record<SidebarSection, string> = { favorites: $t('Favoriten'), recent: $t('Zuletzt verwendet'), devices: $t('Geräte'), shares: $t('Freigaben'), tags: $t('Tags') };
+    groups.push(SIDEBAR_SECTIONS.filter((id) => id !== 'tags' || platform === 'mac')
+      .map((id) => ({ label: names[id], checked: !hiddenNow.includes(id), run: () => toggleSidebarHidden(id) })));
+    groups.push([
+      { label: $t('Alle Bereiche aufklappen'), run: () => updateSettings({ sidebarCollapsed: [] }) },
+      { label: $t('Reihenfolge zurücksetzen'), run: () => updateSettings({ sidebarOrder: [] }) },
+    ]);
   } else if (menu.kind === 'sidebarPlace' && menu.place) {
     // A favourite in the sidebar.
     const path = menu.place;

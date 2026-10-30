@@ -2092,5 +2092,10 @@
   "Gruppen ausblenden": "Verberg groepen",
   "Kleiner": "Kleiner",
   "Größer": "Groter",
-  "Paketinhalt zeigen": "Toon pakketinhoud"
+  "Paketinhalt zeigen": "Toon pakketinhoud",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Klik: in- of uitklappen, slepen: verplaatsen",
+  "{0} frei": "{0} vrij",
+  "{0} über SMB verbinden …": "Verbind met {0} via SMB …",
+  "Alle Bereiche aufklappen": "Alle onderdelen uitklappen",
+  "Reihenfolge zurücksetzen": "Volgorde herstellen"
 }

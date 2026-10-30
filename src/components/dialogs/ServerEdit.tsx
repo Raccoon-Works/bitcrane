@@ -75,12 +75,12 @@ function cloudDefaults(service: Protocol): Partial<Server> {
   return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
 }
 
-export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverId?: string; cloud?: Protocol; terminal?: boolean }) {
+export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: { serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
   const platform = useStore((s) => s.platform);
   const [currentId, setCurrentId] = useState<string | undefined>(serverId);
-  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : { ...newServerTemplate(), ...(terminal ? { openAs: 'terminal' as const } : {}) }));
+  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : { ...newServerTemplate(), ...(terminal ? { openAs: 'terminal' as const } : {}), ...(preset ?? {}) }));
   // The user's own Google app key (Google Drive only): the id from the settings, the secret only typed here.
   const [googleId, setGoogleId] = useState(() => getState().settings.googleClientId ?? '');
   const [googleSecret, setGoogleSecret] = useState('');

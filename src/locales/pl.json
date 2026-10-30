@@ -2092,5 +2092,10 @@
   "Gruppen ausblenden": "Ukryj grupy",
   "Kleiner": "Mniejszy",
   "Größer": "Większy",
-  "Paketinhalt zeigen": "Pokaż zawartość pakietu"
+  "Paketinhalt zeigen": "Pokaż zawartość pakietu",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Kliknij: zwiń lub rozwiń, przeciągnij: przenieś",
+  "{0} frei": "Wolne: {0}",
+  "{0} über SMB verbinden …": "Połącz z {0} przez SMB …",
+  "Alle Bereiche aufklappen": "Rozwiń wszystkie sekcje",
+  "Reihenfolge zurücksetzen": "Przywróć kolejność"
 }

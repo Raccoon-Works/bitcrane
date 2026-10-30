@@ -450,7 +450,7 @@ pub fn places() -> Vec<Place> {
     let mut push = |name: &str, p: Option<std::path::PathBuf>| {
         if let Some(p) = p {
             if p.is_dir() {
-                out.push(Place { name: name.into(), path: to_ui(&p), network: false });
+                out.push(Place { name: name.into(), path: to_ui(&p), network: false, free: None });
             }
         }
     };
@@ -492,7 +492,17 @@ fn network_mounts() -> Vec<String> {
         .collect()
 }
 
+/// Drives and volumes of this computer with their free space (sidebar 'Geräte').
 pub fn drives() -> Vec<Place> {
+    let mut out = drives_list();
+    // Free space of local disks (network shares are skipped: a slow server would hold up the list).
+    for d in out.iter_mut().filter(|d| !d.network) {
+        d.free = fs4::available_space(to_native(&d.path)).ok();
+    }
+    out
+}
+
+fn drives_list() -> Vec<Place> {
     #[allow(unused_mut)]
     let mut out = vec![];
     #[cfg(windows)]
@@ -501,7 +511,7 @@ pub fn drives() -> Vec<Place> {
         // DVD drive reports "not a folder" and is left out as well.
         let l = letter as char;
         if Path::new(&format!("{l}:\\")).is_dir() {
-            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network: is_remote_drive(l) });
+            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network: is_remote_drive(l), free: None });
         }
     }
     #[cfg(target_os = "macos")]
@@ -516,20 +526,20 @@ pub fn drives() -> Vec<Place> {
             let target = fs::canonicalize(e.path()).unwrap_or_else(|_| e.path());
             if target.is_dir() {
                 let network = shares.iter().any(|m| Path::new(m) == target.as_path());
-                out.push(Place { name, path: to_ui(&target), network });
+                out.push(Place { name, path: to_ui(&target), network, free: None });
             }
         }
         out.sort_by(|a, b| (a.path != "/").cmp(&(b.path != "/")).then(a.name.cmp(&b.name)));
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        out.push(Place { name: "/".into(), path: "/".into(), network: false });
+        out.push(Place { name: "/".into(), path: "/".into(), network: false, free: None });
         let user = std::env::var("USER").unwrap_or_default();
         for base in [format!("/media/{user}"), format!("/run/media/{user}"), "/mnt".to_string()] {
             if let Ok(rd) = fs::read_dir(&base) {
                 for e in rd.flatten() {
                     if e.path().is_dir() {
-                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false });
+                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false, free: None });
                     }
                 }
             }

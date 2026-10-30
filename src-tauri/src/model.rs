@@ -50,6 +50,9 @@ pub struct Place {
     /// A network share (SMB, AFP, NFS, WebDAV mount or mapped network drive).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub network: bool,
+    /// Drives only: free space in bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free: Option<u64>,
 }
 
 /// Formats Unix mode bits as three octal digits.

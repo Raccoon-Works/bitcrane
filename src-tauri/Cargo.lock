@@ -634,12 +634,14 @@ dependencies = [
  "dirs 6.0.0",
  "filetime",
  "flate2",
+ "fs4",
  "futures-util",
  "globset",
  "hmac 0.12.1",
  "keepawake",
  "keyring",
  "log",
+ "mdns-sd",
  "notify",
  "notify-debouncer-full",
  "objc2",
@@ -2186,6 +2188,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "flume"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "spin",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2231,6 +2244,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs4"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
+dependencies = [
+ "rustix 1.1.6",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3099,6 +3122,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "image"
 version = "0.25.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3697,6 +3730,21 @@ name = "md5"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebb8d8732c6a6df3d8f032a82911cfc747e00efb95cc46e8d0acd5b5b88570c"
+
+[[package]]
+name = "mdns-sd"
+version = "0.21.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8562654710f72a9cbce4b0d5b7c366a2f94330ba1ce3740f15e932ea2d37b161"
+dependencies = [
+ "fastrand 2.5.0",
+ "flume",
+ "if-addrs",
+ "log",
+ "mio",
+ "socket-pktinfo",
+ "socket2 0.6.5",
+]
 
 [[package]]
 name = "memchr"
@@ -6488,6 +6536,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket-pktinfo"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "612942246d0cc239cfd83af1dfd39be47f649208a3524e5e9da651910128e0ac"
+dependencies = [
+ "libc",
+ "socket2 0.6.5",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "socket2"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6553,6 +6612,15 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "spin"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
+dependencies = [
+ "lock_api",
 ]
 
 [[package]]

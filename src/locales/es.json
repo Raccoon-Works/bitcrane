@@ -2092,5 +2092,10 @@
   "Gruppen ausblenden": "Ocultar grupos",
   "Kleiner": "Más pequeño",
   "Größer": "Más grande",
-  "Paketinhalt zeigen": "Mostrar contenido del paquete"
+  "Paketinhalt zeigen": "Mostrar contenido del paquete",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Clic: contraer o expandir, arrastrar: mover",
+  "{0} frei": "{0} libres",
+  "{0} über SMB verbinden …": "Conectar a {0} por SMB …",
+  "Alle Bereiche aufklappen": "Expandir todas las secciones",
+  "Reihenfolge zurücksetzen": "Restablecer orden"
 }

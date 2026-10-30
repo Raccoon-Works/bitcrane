@@ -2414,13 +2414,23 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
   gap: var(--space-3);
 }
 .side-handle { flex: none; border-left: 1px solid var(--line); }
-.side-group.is-drop { border-radius: var(--radius-row); box-shadow: inset 0 0 0 2px var(--accent-text); background: var(--accent-tint); }
+.sidebar.is-drop-favs [data-sidebar-favs] { border-radius: var(--radius-row); box-shadow: inset 0 0 0 2px var(--accent-text); background: var(--accent-tint); }
 .side-empty { padding: var(--space-1) var(--space-2); font-size: var(--text-small); color: var(--text-faint); }
 .tag-files { max-height: 420px; overflow-y: auto; }
 .tag-file { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-3); width: 100%; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
 .tag-file-name { display: flex; flex-direction: column; min-width: 0; }
 .side-group { display: flex; flex-direction: column; gap: 1px; }
-.side-title { padding: 0 var(--space-2) 2px; font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.side-title { display: flex; align-items: center; gap: 4px; width: 100%; padding: 2px var(--space-2); border: 0; border-radius: 5px; background: none; font: inherit; font-size: 11px; font-weight: 600; color: var(--text-faint); text-align: left; cursor: default; touch-action: none; }
+.side-title:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* The fold arrow only shows while the pointer is on the heading (Finder, Transmit), or when folded. */
+.side-caret { margin-left: auto; opacity: 0; transition: opacity 120ms ease, transform 160ms ease; }
+.side-title:hover .side-caret, .side-title:focus-visible .side-caret { opacity: 1; }
+.side-group.is-folded .side-caret { transform: rotate(-90deg); }
+.side-free { margin-left: auto; font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.sidebar.is-sorting .side-title { cursor: grabbing; }
+.side-group.is-dragged { opacity: 0.45; }
+.side-group.is-drop-before { box-shadow: 0 -2px 0 var(--accent-text); }
+.side-drop-end { height: 2px; margin: 0 var(--space-2); background: var(--accent-text); border-radius: 1px; }
 .side-item {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;

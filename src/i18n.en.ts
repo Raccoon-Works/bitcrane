@@ -2094,4 +2094,9 @@ export const EN: Record<string, string> = {
   "Kleiner": "Smaller",
   "Größer": "Larger",
   "Paketinhalt zeigen": "Show Package Contents",
+  "Klicken: ein- oder ausklappen, ziehen: verschieben": "Click: collapse or expand, drag: move",
+  "{0} frei": "{0} free",
+  "{0} über SMB verbinden …": "Connect to {0} via SMB …",
+  "Alle Bereiche aufklappen": "Expand all sections",
+  "Reihenfolge zurücksetzen": "Reset order",
 };

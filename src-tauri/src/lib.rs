@@ -20,6 +20,7 @@ mod oauth;
 mod ftp;
 mod git;
 mod tags;
+mod netshares;
 mod import;
 mod keys;
 mod local;
@@ -670,6 +671,18 @@ fn edit_temp_path(app: tauri::AppHandle, server_id: String, remote_path: String)
 fn path_to_ui(path: String) -> String {
     // Accepts native paths and typed UI paths ("~/x", "C:\x") alike.
     paths::to_ui(&paths::to_native(path.trim()))
+}
+
+/// Free space on the disk that holds a folder of this computer (bytes).
+#[tauri::command]
+fn local_free_space(path: String) -> Option<u64> {
+    fs4::available_space(paths::to_native(&path)).ok()
+}
+
+/// Computers in the local network that offer SMB shares (Bonjour), searched for about two seconds.
+#[tauri::command]
+async fn network_hosts() -> Vec<netshares::NetHost> {
+    tokio::task::spawn_blocking(|| netshares::discover(std::time::Duration::from_millis(2200))).await.unwrap_or_default()
 }
 
 /// Real target of each folder (links resolved), in the UI form; unchanged when
@@ -1683,6 +1696,8 @@ pub fn run() {
             local_tags,
             local_tag_find,
             local_real_paths,
+            local_free_space,
+            network_hosts,
             local_tag,
             git_action,
             cloud_services,
