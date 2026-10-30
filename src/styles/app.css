@@ -1927,7 +1927,9 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 /* A narrow half: the sources become a row above the servers. */
 @container serverpanel (max-width: 560px) {
   .server-split { flex-direction: column; }
-  .server-sources { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); }
+  /* !important: the column's own width (set by dragging, inline) does not apply to the row. */
+  .server-sources { width: auto !important; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sources-handle { display: none; }
   .source-item { flex-shrink: 0; height: 34px; }
   .source-sep { width: 1px; height: auto; margin: var(--space-1) var(--space-1); }
 }
