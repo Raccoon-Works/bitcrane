@@ -19,7 +19,7 @@ import { menuDefs } from '../components/AppMenu';
 import { playDoneSound, playErrorSound } from '../util/sounds';
 import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';
-import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, updateSettings, type AppState } from './store';
+import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, undoLast, updateSettings, type AppState } from './store';
 import { checkForUpdates } from './updates';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
 import { initMounts } from './mount';
@@ -96,7 +96,12 @@ async function installMacMenu() {
   ]);
   // "Bearbeiten" needs the standard text commands, otherwise ⌘C / ⌘V do not work in text fields.
   const editMenu = await sub('edit', $t('Bearbeiten'), [
-    await PredefinedMenuItem.new({ item: 'Undo', text: menuText($t('Widerrufen')) }),
+    // ⌘Z: in a text field the text's undo, otherwise the last file action (rename, move, new file).
+    await MenuItem.new({ text: menuText($t('Widerrufen')), accelerator: 'Cmd+Z', action: () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) document.execCommand('undo');
+      else undoLast();
+    } }),
     await PredefinedMenuItem.new({ item: 'Redo', text: menuText($t('Wiederholen')) }),
     await sep(),
     await PredefinedMenuItem.new({ item: 'Cut', text: menuText($t('Ausschneiden')) }),
@@ -105,7 +110,7 @@ async function installMacMenu() {
     await PredefinedMenuItem.new({ item: 'SelectAll', text: menuText($t('Alles auswählen')) }),
     await sep(),
     // "Alles auswählen" is the standard entry above; it also selects all files in a list.
-    ...(await custom('edit', [$t('Alles auswählen'), $t('Kopieren'), $t('Einfügen')])),
+    ...(await custom('edit', [$t('Widerrufen'), $t('Alles auswählen'), $t('Kopieren'), $t('Einfügen')])),
   ]);
   const windowMenu = await sub('window', $t('Fenster'), [
     await PredefinedMenuItem.new({ item: 'Minimize', text: menuText($t('Im Dock ablegen')) }),

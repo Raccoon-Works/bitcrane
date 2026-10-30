@@ -161,6 +161,15 @@ impl Remote {
         }
     }
 
+    /// "Neue Datei": an empty file, refused when the name is taken.
+    pub async fn new_file(&self, path: &str) -> AppResult<()> {
+        if self.exists(path).await {
+            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(path))));
+        }
+        let w = self.writer(path, 0, Some(0), None).await?;
+        w.close().await
+    }
+
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
         self.mkdir_all_with(path, None).await
     }

@@ -18,6 +18,8 @@ mod gdrive;
 mod onedrive;
 mod oauth;
 mod ftp;
+mod git;
+mod tags;
 mod import;
 mod keys;
 mod local;
@@ -28,6 +30,8 @@ mod paths;
 mod proxy;
 mod remote;
 mod s3;
+#[cfg(test)]
+mod loadtest;
 mod tls;
 mod ssh;
 mod smb;
@@ -124,6 +128,11 @@ fn local_mkdir(path: String) -> AppResult<()> {
 }
 
 #[tauri::command]
+fn local_new_file(path: String) -> AppResult<()> {
+    local::new_file(&path)
+}
+
+#[tauri::command]
 fn local_rename(path: String, new_name: String) -> AppResult<()> {
     local::rename(&path, &new_name)
 }
@@ -150,6 +159,67 @@ fn open_full_disk_access() -> AppResult<()> {
     {
         Ok(())
     }
+}
+
+/// State of the macOS permissions Bitcrane can check: "Festplattenvollzugriff"
+/// shows in whether the privacy database itself can be read (only with it).
+#[tauri::command]
+fn mac_full_disk_access() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let db = paths::home().join("Library").join("Application Support").join("com.apple.TCC").join("TCC.db");
+        std::fs::File::open(db).is_ok()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+/// Opens a page of the macOS System Settings: "fullDisk", "localNetwork",
+/// "notifications" or "loginItems".
+#[tauri::command]
+fn open_mac_settings(page: String) -> AppResult<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let url = match page.as_str() {
+            "fullDisk" => "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+            "localNetwork" => "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork",
+            "notifications" => "x-apple.systempreferences:com.apple.Notifications-Settings.extension",
+            "loginItems" => "x-apple.systempreferences:com.apple.LoginItems-Settings.extension",
+            _ => return Err(AppError::other("Unbekannte Seite der Systemeinstellungen.")),
+        };
+        std::process::Command::new("open").arg(url).spawn().map(|_| ()).map_err(AppError::from)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = page;
+        Ok(())
+    }
+}
+
+/// Finder tags of the entries of a local folder (macOS; empty elsewhere).
+#[tauri::command]
+async fn local_tags(dir: String) -> std::collections::HashMap<String, Vec<tags::Tag>> {
+    tokio::task::spawn_blocking(move || tags::list(&dir)).await.unwrap_or_default()
+}
+
+/// Turns a Finder colour tag on or off for files of this computer.
+#[tauri::command]
+fn local_tag(paths: Vec<String>, name: String, color: u8, on: bool) -> AppResult<()> {
+    tags::toggle(&paths, &name, color, on)
+}
+
+/// Git state of a folder of this computer (None outside a working copy or without git).
+#[tauri::command]
+async fn git_status(dir: String) -> Option<git::GitStatus> {
+    tokio::task::spawn_blocking(move || git::status(&dir)).await.ok().flatten()
+}
+
+/// Add, commit, pull or push in a working copy (see git.rs).
+#[tauri::command]
+async fn git_action(root: String, what: String, paths: Vec<String>, message: String, all: bool) -> AppResult<String> {
+    tokio::task::spawn_blocking(move || git::action(&root, &what, &paths, &message, all)).await.map_err(|e| AppError::other(e.to_string()))?
 }
 
 /// "Nach Abschluss" (WinSCP "Once empty"): puts the computer to sleep or shuts it down
@@ -842,6 +912,11 @@ async fn remote_stat(state: State<'_, AppState>, server_id: String, path: String
 #[tauri::command]
 async fn remote_mkdir(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<()> {
     remote!(state, server_id, |c| c.mkdir(&path))
+}
+
+#[tauri::command]
+async fn remote_new_file(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<()> {
+    remote!(state, server_id, |c| c.new_file(&path))
 }
 
 #[tauri::command]
@@ -1578,6 +1653,7 @@ pub fn run() {
             local_list,
             local_stat,
             local_mkdir,
+            local_new_file,
             local_rename,
             local_trash,
             local_walk,
@@ -1585,6 +1661,12 @@ pub fn run() {
             local_move,
             local_copy_files,
             open_full_disk_access,
+            mac_full_disk_access,
+            open_mac_settings,
+            git_status,
+            local_tags,
+            local_tag,
+            git_action,
             cloud_services,
             cloud_sign_in,
             cloud_sign_in_cancel,
@@ -1633,6 +1715,7 @@ pub fn run() {
             remote_list,
             remote_stat,
             remote_mkdir,
+            remote_new_file,
             remote_rename,
             remote_remove,
             remote_move,

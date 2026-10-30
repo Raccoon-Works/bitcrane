@@ -12,10 +12,10 @@
  */
 import { ArrowLeft, ArrowRight, ChevronDown, CornerDownRight, Download, Link2, Loader2, Lock, PlugZap, WifiOff } from './glyphs';
 import { isVaultListing, unlockVault } from '../state/vault';
-import { ArrowElbowLeftUp, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, TerminalWindow } from '@phosphor-icons/react';
+import { ArrowElbowLeftUp, GitBranch, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, Columns, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer } from '../state/store';
+import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder } from '../state/store';
 import { PlacesBar } from './PlacesBar';
 import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
@@ -28,6 +28,8 @@ import { LocalTile, ServerTile } from './ServerTile';
 import { Button, IconButton } from './ui';
 import { $t } from '../i18n';
 import { compareMarks, selectDifferences, toggleCompareDirs, type CompareMark } from '../state/tools';
+import { GIT_LABEL, gitMark, useGit } from '../state/git';
+import { tagCss, useTags } from '../state/tags';
 
 
 /** Symbol size of the icons view per size step. */
@@ -225,6 +227,32 @@ export function Pane({ side }: { side: PaneSide }) {
   const allCrumbs = path ? crumbsFor(path, homeName) : [];
   const crumbs = allCrumbs.slice(Math.min(crumbsHidden, Math.max(0, allCrumbs.length - 1)));
   const icons = viewMode === 'icons';
+  // Column view (Finder, ForkLift): the folder above, the folder shown, and what the chosen folder holds.
+  const colView = viewMode === 'columns' && !deep;
+  const parentDir = colView && path && paths.parent(path) !== path ? paths.parent(path) : null;
+  const chosen = colView && sel.names.length === 1 ? entries.find((e) => e.name === sel.names[0]) : undefined;
+  const childDir = chosen?.kind === 'dir' ? paths.join(path, chosen.name) : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const parentRows = useMemo(() => (parentDir ? folderRows(side, parentDir) : undefined), [side, parentDir, fsRev, showHidden, sort, tab?.serverId, tab?.leftServerId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const childRows = useMemo(() => (childDir ? folderRows(side, childDir) : undefined), [side, childDir, fsRev, showHidden, sort, tab?.serverId, tab?.leftServerId]);
+  useEffect(() => { if (parentDir) loadFolder(side, parentDir); }, [side, parentDir]);
+  useEffect(() => { if (childDir) loadFolder(side, childDir); }, [side, childDir]);
+  const parentColRef = useRef<HTMLDivElement>(null);
+  // The folder shown stays in view in the column above it.
+  useEffect(() => { parentColRef.current?.querySelector('.is-here')?.scrollIntoView({ block: 'nearest' }); }, [parentDir, parentRows]);
+  /** A row of the side columns: the folder above or the chosen folder's contents. */
+  const sideRow = (e: FileEntry, here: boolean, onPick: () => void, onOpen: () => void) => (
+    <div key={e.name} role="option" aria-selected={here} className={`row${here ? ' is-sel-inactive is-here' : ''}`}
+      onMouseDown={(ev) => { if (ev.button === 0) { listRef.current?.focus({ preventScroll: true }); onPick(); } }}
+      onDoubleClick={onOpen}>
+      <span className="row-bar" />
+      <span />
+      {e.kind === 'dir' ? <FolderGlyph size={18} /> : <FileGlyph size={18} name={e.name} />}
+      <span className="row-name"><span className="ellipsis">{e.name}</span></span>
+      {e.kind === 'dir' ? <CaretRight size={11} weight="bold" className="miller-caret" aria-hidden="true" /> : <span />}
+    </div>
+  );
   // Icons view: arrow keys move by row and column.
   const gridCols = () => {
     const el = listRef.current?.querySelector<HTMLElement>('.icon-grid');
@@ -232,6 +260,12 @@ export function Pane({ side }: { side: PaneSide }) {
   };
 
   const watched = !onServer && !!watchForLocal(path);
+  // Git working copies on this computer: changed files and the branch (ForkLift).
+  const gitOn = useStore((s) => s.settings.gitStatus !== false);
+  const git = useGit(path, !onServer && gitOn && !!path);
+  // Finder tags (Mac, this computer).
+  const isMac = useStore((s) => s.platform === 'mac');
+  const tags = useTags(path, !onServer && !!path && isMac);
   const stateLabel = !onServer
     ? (watched ? { text: $t('überwacht'), tone: 'accent' } : null)
     : offline ? { text: $t('getrennt'), tone: 'warn' } : status.connecting ? { text: $t('verbindet'), tone: 'muted' } : server?.online ? { text: $t('verbunden'), tone: 'ok' } : { text: $t('nicht verbunden'), tone: 'muted' };
@@ -265,6 +299,12 @@ export function Pane({ side }: { side: PaneSide }) {
       e.preventDefault();
       const right = e.key === 'ArrowRight';
       if (icons) { moveCursor(side, right ? 1 : -1, e.shiftKey); return; }
+      if (colView) {
+        // Columns: ← goes to the folder above, → into the chosen folder (Finder).
+        if (!right) goUp(side);
+        else if (cur?.kind === 'dir') { navigate(side, paths.join(path, cur.name)); clickRow(side, 0, {}); }
+        return;
+      }
       if (!cur) return;
       // List: → opens a folder in place, ← closes it or jumps to the folder around it (Finder).
       if (right && cur.kind === 'dir' && !openSet.has(cur.name)) toggleExpand(side, cur.name);
@@ -365,7 +405,7 @@ export function Pane({ side }: { side: PaneSide }) {
     return (
       <div key={entry.name} {...props} className={rowClass(entry, index)} style={{ '--depth': depth } as CSSProperties}>
         <span className="row-bar" />
-        {entry.kind === 'dir' ? (
+        {entry.kind === 'dir' && !colView ? (
           <button type="button" tabIndex={-1} className={`disclosure${isOpen ? ' is-open' : ''}`} aria-label={isOpen ? $t('„{0}“ zuklappen', label) : $t('„{0}“ aufklappen', label)} aria-expanded={isOpen}
             onClick={(e) => { e.stopPropagation(); toggleExpand(side, entry.name); }}>
             <CaretRight size={13} weight="bold" aria-hidden="true" />
@@ -377,13 +417,16 @@ export function Pane({ side }: { side: PaneSide }) {
           {link}
           {busyTag}
           {onlyHere && !marks && <span className="tag">{$t('nur Server')}</span>}
+          {tags?.[entry.name] && <span className="tag-dots" title={tags[entry.name].map((t) => t.name).join(', ')}>{tags[entry.name].map((t) => <span key={t.name} className="tag-dot" style={{ background: tagCss(t.color) }} />)}</span>}
+          {(() => { const g = gitMark(git, path, entry.name, entry.kind === 'dir'); return g ? <span className={`git-mark git-${g === '?' ? 'new' : g === '•' ? 'dir' : g}`} title={`Git: ${GIT_LABEL[g] ?? g}`}>{g === '•' ? '' : g}</span> : null; })()}
           {marks && depth === 0 && marks.get(entry.name) && <span className={`tag cmp-tag is-${marks.get(entry.name)}`}>{markLabel[marks.get(entry.name)!]}</span>}
         </span>
-        {columns.mtime && <span className="row-sub nowrap">{formatDate(entry.mtime)}</span>}
-        {columns.kind && <span className="row-sub ellipsis">{kindOf(entry)}</span>}
-        {showPerms && <span className="row-sub mono perms-cell">{entry.perms ? permsToText(entry.perms) : ''}</span>}
-        {columns.owner && <span className="row-sub ellipsis">{entry.owner || '–'}</span>}
-        {columns.size && <span className="row-sub num">{entry.kind === 'dir' ? (folderSizes[folderSizeKey(ls, sid, `${path === '/' ? '' : path}/${entry.name}`)] !== undefined ? formatSize(folderSizes[folderSizeKey(ls, sid, `${path === '/' ? '' : path}/${entry.name}`)]) : '–') : formatSize(entry.size)}</span>}
+        {colView && (entry.kind === 'dir' ? <CaretRight size={11} weight="bold" className="miller-caret" aria-hidden="true" /> : <span />)}
+        {!colView && columns.mtime && <span className="row-sub nowrap">{formatDate(entry.mtime)}</span>}
+        {!colView && columns.kind && <span className="row-sub ellipsis">{kindOf(entry)}</span>}
+        {!colView && showPerms && <span className="row-sub mono perms-cell">{entry.perms ? permsToText(entry.perms) : ''}</span>}
+        {!colView && columns.owner && <span className="row-sub ellipsis">{entry.owner || '–'}</span>}
+        {!colView && columns.size && <span className="row-sub num">{entry.kind === 'dir' ? (folderSizes[folderSizeKey(ls, sid, `${path === '/' ? '' : path}/${entry.name}`)] !== undefined ? formatSize(folderSizes[folderSizeKey(ls, sid, `${path === '/' ? '' : path}/${entry.name}`)]) : '–') : formatSize(entry.size)}</span>}
       </div>
     );
   };
@@ -427,6 +470,12 @@ export function Pane({ side }: { side: PaneSide }) {
         {/* A click into the free space of the path bar makes it editable (like Explorer). */}
         {!pathEdit ? <span className="flex-1 path-fill" title={$t('Pfad eingeben')} onClick={() => editPath(side)} /> : null}
         {tab.syncBrowse && <button type="button" className="sync-chip" title={$t('Synchron blättern: Ordnerwechsel gilt für beide Seiten. Klicken zum Beenden.')} onClick={toggleSyncBrowse}><Link2 size={12} strokeWidth={2} aria-hidden="true" />{$t('synchron')}</button>}
+        {git && (
+          <button type="button" className="git-chip" title={$t('Git: Zweig {0}. Klicken für Commit, Pull und Push.', git.branch)}
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setState({ contextMenu: { x: r.left, y: r.bottom + 4, side, names: [], kind: 'git' } }); }}>
+            <GitBranch size={13} aria-hidden="true" />{git.branch}{git.ahead > 0 && <span> ↑{git.ahead}</span>}{git.behind > 0 && <span> ↓{git.behind}</span>}{Object.keys(git.files).length > 0 && <span className="git-chip-count">{Object.keys(git.files).length}</span>}
+          </button>
+        )}
         {stateLabel && <span className={`pane-state tone-${stateLabel.tone}`} title={stateLabel.text}><span className="state-dot" /><span className="pane-state-text">{stateLabel.text}</span></span>}
         {/* More columns: the same menu as a right click on the column header (Explorer), here where it can be found. */}
         {/* Icons view: size of the symbols and preview pictures (Windows' sizes, the Finder's slider). */}
@@ -434,14 +483,15 @@ export function Pane({ side }: { side: PaneSide }) {
           <input type="range" className="icon-size" min={0} max={3} step={1} value={iconStep} aria-label={$t('Symbolgröße')}
             title={`${$t('Symbolgröße')} (${$t('Strg + Mausrad')})`} onChange={(e) => setIconSize(side, Number(e.target.value))} />
         )}
-        {!icons && (
+        {!icons && !colView && (
           <IconButton label={$t('Spalten wählen')} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setState({ contextMenu: { x: r.left, y: r.bottom + 4, side, names: [], kind: 'columns' } }); }}>
             <SlidersHorizontal size={18} weight="bold" />
           </IconButton>
         )}
         <span className="view-switch" role="group" aria-label={$t('Darstellung')}>
-          <IconButton label={$t('Liste')} active={!icons} onClick={() => setViewMode(side, 'list')}><ListBullets size={18} weight="bold" /></IconButton>
+          <IconButton label={$t('Liste')} active={viewMode === 'list'} onClick={() => setViewMode(side, 'list')}><ListBullets size={18} weight="bold" /></IconButton>
           <IconButton label={$t('Symbole')} active={icons} onClick={() => setViewMode(side, 'icons')}><SquaresFour size={18} weight="duotone" /></IconButton>
+          <IconButton label={$t('Spalten')} active={viewMode === 'columns'} onClick={() => setViewMode(side, 'columns')}><Columns size={18} weight="bold" /></IconButton>
         </span>
         {onServer && sshPane && (
           <IconButton label={$t('SSH-Terminal')} active={terminalOpen} onClick={() => void import('../state/terminal').then((m) => m.toggleTerminal('server'))}>
@@ -454,7 +504,7 @@ export function Pane({ side }: { side: PaneSide }) {
           </IconButton>
         )}
       </div>
-      {!icons && <div className="col-head" role="row" onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'columns' } }); }}>
+      {!icons && !colView && <div className="col-head" role="row" onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'columns' } }); }}>
         {([['name', $t('Name'), ''], ...(columns.mtime ? [['mtime', $t('Geändert'), '']] : []), ...(columns.kind ? [['kind', $t('Art'), '']] : []), ...(showPerms ? [['perms', $t('Rechte'), '']] : []), ...(columns.owner ? [['owner', $t('Besitzer'), '']] : []), ...(columns.size ? [['size', $t('Größe'), 'num']] : [])] as Array<[SortKey, string, string]>).map(([key, label, cls]) => (
           <button key={key} type="button" role="columnheader" className={`col-btn ${cls}${sort.key === key ? ' is-sorted' : ''}`} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'} title={$t('Klicken zum Sortieren')} onClick={() => setSort(side, key)}>
             <span className="ellipsis">{label}</span>
@@ -493,7 +543,7 @@ export function Pane({ side }: { side: PaneSide }) {
         aria-label={onServer ? $t('Dateien auf dem Server') : $t('Dateien lokal')}
         aria-multiselectable="true"
         tabIndex={0}
-        className={`list${icons ? ' is-icons' : ''}${offline ? ' is-dim' : ''}`}
+        className={`list${icons ? ' is-icons' : ''}${colView ? ' is-columns' : ''}${offline ? ' is-dim' : ''}`}
         onFocus={() => setFocusSide(side)}
         onKeyDown={onKeyDown}
         onMouseDown={(e) => { if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('icon-grid')) clearPaneSelection(side); }}
@@ -507,7 +557,7 @@ export function Pane({ side }: { side: PaneSide }) {
       >
         {/* ".." to the folder above (WinSCP, Total Commander): Windows on by default, the Mac off.
             Always the first row, also above the "Dieser Ordner ist leer" note. */}
-        {!deep && !icons && !search && !status.notConnected && !status.error && (parentRowOn ?? platformWin) && canGoUp(side) && (
+        {!deep && !icons && !colView && !search && !status.notConnected && !status.error && (parentRowOn ?? platformWin) && canGoUp(side) && (
           <div role="option" aria-selected={false} className="row parent-row" title={$t('Übergeordneter Ordner (Doppelklick)')}
             onMouseDown={(e) => { if (e.button === 0) { listRef.current?.focus({ preventScroll: true }); clearPaneSelection(side); } }}
             onDoubleClick={() => goUp(side)}>
@@ -557,7 +607,24 @@ export function Pane({ side }: { side: PaneSide }) {
             ))}
           </>
         )}
-        {!deep && (icons ? <div className="icon-grid">{entries.map((entry, index) => item(entry, index))}</div> : entries.map((entry, index) => item(entry, index)))}
+        {!deep && colView && (
+          <div className="miller">
+            {parentDir && (
+              <div className="miller-col is-parent" ref={parentColRef} aria-label={$t('Übergeordneter Ordner')}>
+                {(parentRows ?? []).map((e) => sideRow(e, e.name === paths.basename(path), () => { if (e.kind === 'dir' && e.name !== paths.basename(path)) navigate(side, paths.join(parentDir, e.name)); else if (e.kind === 'file') revealSearchResult(side, paths.join(parentDir, e.name)); }, () => activateEntry(side, e.name)))}
+              </div>
+            )}
+            <div className="miller-col is-current" onMouseDown={(e) => { if (e.target === e.currentTarget) clearPaneSelection(side); }}>
+              {entries.map((entry, index) => item(entry, index))}
+            </div>
+            <div className="miller-col is-child">
+              {childDir && childRows && childRows.length === 0 && <div className="miller-empty small muted">{$t('Leer')}</div>}
+              {childDir && (childRows ?? []).map((e) => sideRow(e, false, () => revealSearchResult(side, paths.join(childDir, e.name)), () => {}))}
+              {!childDir && chosen && <div className="miller-empty small muted">{chosen.name}<span>{formatSize(chosen.size)} · {formatDate(chosen.mtime)}</span></div>}
+            </div>
+          </div>
+        )}
+        {!deep && !colView && (icons ? <div className="icon-grid">{entries.map((entry, index) => item(entry, index))}</div> : entries.map((entry, index) => item(entry, index)))}
       </div>
 
       <div className="pane-foot">

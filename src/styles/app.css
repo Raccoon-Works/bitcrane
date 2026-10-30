@@ -2361,3 +2361,42 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .sync-row .sync-conflict { grid-column: span 1; min-width: 0; }
 .sync-list.has-conflicts .sync-row { grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) 150px minmax(0, 1fr); }
 .sync-conflict .select, .sync-conflict select { width: 100%; font-size: 12px; }
+.perm-state { white-space: nowrap; }
+
+/* Git (local working copies): a letter per changed file, the branch in the path bar. */
+.git-mark { display: inline-grid; place-items: center; min-width: 15px; height: 15px; padding: 0 3px; margin-left: 6px; border-radius: 4px; font: 600 10px/1 var(--font-mono, ui-monospace, monospace); color: #fff; flex-shrink: 0; }
+.git-M { background: #d29922; }
+.git-A { background: #2ea043; }
+.git-D { background: #da3633; }
+.git-R { background: #8957e5; }
+.git-U { background: #da3633; }
+.git-new { background: var(--text-faint); }
+.git-dir { min-width: 7px; width: 7px; height: 7px; padding: 0; border-radius: 50%; background: #d29922; }
+.git-chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: var(--text-caption); color: var(--text-2); background: var(--bg-control); white-space: nowrap; }
+.git-chip:hover { background: var(--bg-control-on); }
+.git-chip-count { margin-left: 2px; padding: 0 5px; border-radius: 8px; background: #d29922; color: #fff; font-weight: 600; font-size: 10px; line-height: 15px; }
+.git-message { width: 100%; resize: vertical; font: inherit; padding: var(--space-2); }
+.git-files { max-height: 280px; overflow-y: auto; }
+.git-files .recent-item { cursor: default; gap: var(--space-2); }
+
+/* Halves on top of each other (narrow windows, ForkLift's "Seiten untereinander"). */
+.panes.is-stacked { flex-direction: column; }
+.panes.is-stacked > .pane { min-height: 0; min-width: 0; }
+
+/* Finder tags (Mac): coloured dots after the name, overlapping like in the Finder. */
+.tag-dots { display: inline-flex; margin-left: 6px; flex-shrink: 0; }
+.tag-dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--bg-list, var(--bg-window)); display: inline-block; }
+.tag-dots .tag-dot + .tag-dot { margin-left: -3px; }
+.menu-tag-dot { margin-right: 2px; box-shadow: none; }
+
+/* Column view (Finder, ForkLift): folder above, folder shown, contents of the chosen folder. */
+.list.is-columns { padding: 0; overflow: hidden; display: flex; }
+.miller { flex: 1; min-width: 0; display: flex; }
+.miller-col { flex: 1 1 0; min-width: 140px; overflow-y: auto; padding: var(--space-1) var(--space-2); border-right: 1px solid var(--line); }
+.miller-col:last-child { border-right: 0; }
+.miller-col.is-parent { flex: 0.8 1 0; }
+.miller-col.is-child { flex: 1.1 1 0; }
+.miller-col .row { grid-template-columns: 0 18px minmax(0, 1fr) 12px; column-gap: var(--space-2); }
+.miller-caret { color: var(--text-faint); justify-self: end; }
+.row.is-sel .miller-caret { color: var(--sel-fg); }
+.miller-empty { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-2); }

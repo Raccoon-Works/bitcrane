@@ -651,6 +651,12 @@ export function makeFolder(side: PaneSide, serverId: string, dir: string, name: 
   return run(side, serverId, dir, () => (side === 'local' ? backend.localMkdir(path) : backend.remoteMkdir(serverId, path)));
 }
 
+/** "Neue Datei": an empty file in the folder. */
+export function makeFile(side: PaneSide, serverId: string, dir: string, name: string) {
+  const path = join(dir, name);
+  return run(side, serverId, dir, () => (side === 'local' ? backend.localNewFile(path) : backend.remoteNewFile(serverId, path)));
+}
+
 export function removeEntries(side: PaneSide, serverId: string, dir: string, names: string[]) {
   const paths = names.map((n) => join(dir, n));
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
@@ -678,6 +684,8 @@ export async function moveLocal(fromDir: string, names: string[], toDir: string,
   invalidate('local', '', fromDir);
   bump();
   if (ok) showToast(made.length === 1 ? $t('„{0}“ verschoben.', made[0]) : $t('{0} Objekte verschoben.', made.length), 'ok');
+  // The names they got in the target (for undo), or null when it failed.
+  return ok ? made : null;
 }
 
 export async function copyLocal(fromDir: string, names: string[], toDir: string, merge = false) {
