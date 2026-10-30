@@ -959,7 +959,7 @@ export function setSort(side: PaneSide, key: SortKey) {
 }
 
 /** Zoom steps of the window, like a browser. */
-export const ZOOM_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+export const ZOOM_STEPS = [0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2];
 
 /** Strg + Plus / Minus / 0: one zoom step larger, smaller, or back to 100 %. */
 export function stepZoom(dir: 1 | -1 | 0) {
