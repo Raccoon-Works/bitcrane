@@ -1702,7 +1702,7 @@ async function loadConfig() {
   if (restored.length) {
     setState({ tabs: restored });
     // Terminals of the last session come back with their tabs (they start when shown).
-    restored.forEach((t, i) => { const saved = cfg?.tabs?.[i]; if (saved?.terminals?.length) reopenTerminals(t.id, saved.terminals, !!saved.terminalOpen); });
+    restored.forEach((t, i) => { const saved = cfg?.tabs?.[i]; if (saved?.terminals?.length) reopenTerminals(t.id, saved.terminals, !!saved.terminalOpen, !!saved.terminalFull); });
     // Selecting the tab connects its server(s); the other tabs connect when they are opened.
     selectTab(restored[Math.min(cfg?.activeTab ?? 0, restored.length - 1)].id);
   } else setState((s) => ({ activeTabId: s.tabs[0]?.id ?? '' }));

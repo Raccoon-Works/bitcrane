@@ -10,7 +10,7 @@ import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, 
 import { formatAgo, formatDate, formatSize, permsToText } from '../../util/format';
 import { ServerTile } from '../ServerTile';
 import { BMark, FileGlyph, FolderGlyph } from '../icons';
-import { Button, Checkbox, Select, TextField } from '../ui';
+import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { installUpdate } from '../../state/updates';
 import { ACTIONS, FIXED, formatCombo, keysFor } from '../../state/keys';
@@ -18,8 +18,12 @@ import { $t } from '../../i18n';
 
 /* ----------------------------------------------------------- Quick connect */
 
-export function QuickConnect() {
+export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
   const [address, setAddress] = useState(LIVE ? '' : 'ubuntu@bots.example:22');
+  const [as, setAs] = useState<'files' | 'terminal'>(terminal ? 'terminal' : 'files');
+  // FTP, WebDAV and SMB have no terminal; the choice only shows for SSH addresses.
+  const sshAddress = !/^(ftps?|davs?|https?|smb):\/\//i.test(address.trim());
+  const go = () => quickConnect(address, save, auth as 'auto' | 'key' | 'password', undefined, undefined, as === 'terminal' && sshAddress ? 'terminal' : undefined);
   const [auth, setAuth] = useState('auto');
   const [save, setSave] = useState(false);
   const servers = useStore((s) => s.servers);
@@ -29,7 +33,7 @@ export function QuickConnect() {
   const used = servers.filter((x) => x.lastUsed).sort((a, b) => (b.lastUsed ?? 0) - (a.lastUsed ?? 0)).slice(0, 5);
   const addr = (x: Server) => `${x.user ? `${x.user}@` : ''}${x.host}${x.port !== 22 ? `:${x.port}` : ''}`;
   const recent = [
-    ...used.map((x) => ({ key: x.id, server: x, label: x.name, sub: addr(x), when: formatAgo(x.lastUsed!, now), run: () => { closeDialog(); openServer(x.id); } })),
+    ...used.map((x) => ({ key: x.id, server: x, label: x.name, sub: addr(x), when: formatAgo(x.lastUsed!, now), run: () => { closeDialog(); if (as === 'terminal' && (!x.protocol || x.protocol === 'sftp')) void import('../../state/terminal').then((m) => m.openServerTerminal(x.id)); else openServer(x.id); } })),
     ...addresses.filter((a) => !used.some((x) => addr(x) === a.replace(/\/.*$/, ''))).slice(0, 8 - used.length)
       .map((a) => ({ key: `a:${a}`, server: undefined, label: a, sub: $t('Adresse'), when: '', run: () => setAddress(a) })),
   ];
@@ -37,17 +41,23 @@ export function QuickConnect() {
     <Dialog
       label={$t('Schnell verbinden')}
       title={$t('Schnell verbinden')}
-      subtitle={$t('Ohne den Server zu speichern. Adresse wie im Terminal eingeben; für FTP, WebDAV oder SMB mit ftp://, ftps://, davs:// oder smb:// davor.')}
+      subtitle={$t('Ohne den Server zu speichern. Adresse wie im Terminal eingeben, auch als „ssh benutzer@server“; für FTP, WebDAV oder SMB mit ftp://, ftps://, davs:// oder smb:// davor.')}
       icon={<span className="icon-tile tone-accent"><Zap size={18} strokeWidth={1.75} /></span>}
       width={560}
-      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={() => quickConnect(address, save, auth as 'auto' | 'key' | 'password')}>{$t('Verbinden')}</Button></>}
+      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={go}>{$t('Verbinden')}</Button></>}
     >
       <div className="form-stack">
-        <TextField value={address} onChange={setAddress} mono autoFocus prefix={/^[a-z]+:\/\//i.test(address) ? undefined : <span className="muted">sftp://</span>} onEnter={() => quickConnect(address, save, auth as 'auto' | 'key' | 'password')} className="big-field" />
+        <TextField value={address} onChange={setAddress} mono autoFocus prefix={/^[a-z]+:\/\/|^ssh\s/i.test(address.trim()) ? undefined : <span className="muted">sftp://</span>} onEnter={go} className="big-field" />
         <div className="row-inline">
           <span className="muted">{$t('Anmeldung')}</span>
           <Select value={auth} onChange={setAuth} label={$t('Anmeldung')} options={[{ value: 'auto', label: $t('Automatisch (Agent, Schlüssel, Passwort)') }, { value: 'key', label: $t('SSH-Schlüssel') }, { value: 'password', label: $t('Passwort') }]} />
         </div>
+        {sshAddress && (
+          <div className="row-inline">
+            <span className="muted">{$t('Öffnen')}</span>
+            <Segmented<'files' | 'terminal'> label={$t('Öffnen')} value={as} onChange={setAs} options={[{ value: 'files', label: $t('Dateien') }, { value: 'terminal', label: $t('Terminal') }]} />
+          </div>
+        )}
         <Checkbox checked={save} onChange={setSave} label={$t('Nach dem Verbinden als Server speichern')} />
         {recent.length > 0 && (
           <section className="form-stack-tight" aria-label={$t('Zuletzt verwendet')}>

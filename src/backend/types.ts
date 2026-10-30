@@ -106,6 +106,8 @@ export interface Server {
   vaultStorageId?: string;
   /** Built-in terminal: colour scheme for this server (e.g. red for production), else the setting. */
   termScheme?: string;
+  /** SFTP / SSH servers: what opening the server shows, the files (default) or only a terminal. */
+  openAs?: 'files' | 'terminal';
   /** Built-in terminal: command typed in after connecting. */
   termStart?: string;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */

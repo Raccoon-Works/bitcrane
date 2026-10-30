@@ -7,7 +7,8 @@ import { toggleTerminal } from '../state/terminal';
 import {
   ArrowClockwise, ArrowsClockwise, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
 } from '@phosphor-icons/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { TermNewMenu } from './TermNewMenu';
 import {
   activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
   refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
@@ -143,9 +144,16 @@ export function Toolbar() {
   const defs = useToolDefs();
   const sk = useKeyLabel();
   const groupTools = toolbar.filter((t) => t !== 'nav');
+  const [termMenu, setTermMenu] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <header className="toolbar" data-tauri-drag-region onContextMenu={(e) => { e.preventDefault(); openDialog({ type: 'toolbar' }); }}>
+    <header className="toolbar" data-tauri-drag-region onContextMenu={(e) => {
+      e.preventDefault();
+      // Right click on the terminal button: which terminal to open (this computer, an SSH server, a new SSH connection).
+      if ((e.target as HTMLElement).closest('[data-tool="terminal"]')) setTermMenu({ x: e.clientX, y: e.clientY });
+      else openDialog({ type: 'toolbar' });
+    }}>
+      {termMenu && <TermNewMenu x={termMenu.x} y={termMenu.y} onClose={() => setTermMenu(null)} />}
       {toolbar.includes('nav') && (
         <div className="tool-group">
           <IconButton label={$t('Zurück')} shortcut={defs.nav.key} disabled={!tab?.back.length} onClick={goBack}><CaretLeft size={19} /></IconButton>

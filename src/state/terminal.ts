@@ -17,7 +17,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import type { Tab } from '../backend/types';
 import { $t } from '../i18n';
-import { isSftp } from './live';
+import { connectNow, isSftp } from './live';
 import { Suggester } from './termSuggest';
 import { activeTab, getState, LIVE, openDialog, openExternal, serverById, setState, showToast, subscribeStore, uid } from './store';
 
@@ -28,6 +28,8 @@ export interface TermSession {
   /** Number shown in the panel's tab ("bot-host 2"). */
   number: number;
   alive: boolean;
+  /** Terminals on this computer: the shell chosen in the "+" menu; missing = the setting. */
+  shell?: string;
 }
 
 export interface Snippet {
@@ -274,7 +276,7 @@ function previewEcho(term: Terminal, d: string) {
 }
 
 /** Recreates the terminals of a restored tab; they start when the tab shows them. */
-export function reopenTerminals(tabId: string, serverIds: string[], open: boolean) {
+export function reopenTerminals(tabId: string, serverIds: string[], open: boolean, full = false) {
   const sessions: TermSession[] = [];
   for (const serverId of serverIds) {
     if (serverId && !serverById(serverId)) continue;
@@ -285,7 +287,7 @@ export function reopenTerminals(tabId: string, serverIds: string[], open: boolea
   }
   if (!sessions.length) return;
   setState((s) => ({ terminals: [...s.terminals, ...sessions] }));
-  patchTab(tabId, { open, active: sessions[0].id });
+  patchTab(tabId, { open: open || full, active: sessions[0].id, ...(full ? { full: true } : {}) });
 }
 
 /**
@@ -293,7 +295,7 @@ export function reopenTerminals(tabId: string, serverIds: string[], open: boolea
  * server half has the focus), otherwise on this computer like Tabby or the
  * system terminal. `where` forces one of the two.
  */
-export function newTerminal(where?: 'local' | 'server', full = false) {
+export function newTerminal(where?: 'local' | 'server', full = false, shell?: string) {
   const t = activeTab();
   if (!t) return;
   const srv = t.serverId ? serverById(t.serverId) : undefined;
@@ -305,10 +307,58 @@ export function newTerminal(where?: 'local' | 'server', full = false) {
   }
   const serverId = onServer ? t.serverId : '';
   const number = getState().terminals.filter((x) => x.serverId === serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
-  const session: TermSession = { id: uid('term'), serverId, tabId: t.id, number, alive: true };
+  const session: TermSession = { id: uid('term'), serverId, tabId: t.id, number, alive: true, ...(serverId || !shell ? {} : { shell }) };
   live.set(session.id, makeTerminal(session));
   setState((s) => ({ terminals: [...s.terminals, session] }));
   patchTab(t.id, { open: true, active: session.id, full: full || t.terminal?.full });
+}
+
+/** Shells this computer offers (term_shells), asked once; the prototype has none. */
+let shellList: Array<{ id: string; name: string }> | null = null;
+export async function localShells(): Promise<Array<{ id: string; name: string }>> {
+  if (shellList) return shellList;
+  if (!LIVE) return [];
+  shellList = await invoke<Array<{ id: string; name: string }>>('term_shells').catch(() => []);
+  return shellList;
+}
+
+/**
+ * An SSH terminal on a saved server, for people who only want a console:
+ * a tab of its own that the terminal fills, connecting first if needed (the
+ * session waits for the connection). A tab of that server that already shows
+ * only terminals is brought to the front instead.
+ */
+export function openServerTerminal(serverId: string) {
+  const srv = serverById(serverId);
+  if (!srv) return;
+  if (!isSftp(srv)) {
+    showToast($t('Ein SSH-Terminal gibt es für SSH-Server (SFTP / SSH).'));
+    return;
+  }
+  const st = getState();
+  setState((s) => ({ contextMenu: null, firstRun: false, servers: s.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)) }));
+  // Already shown in the panel of the current tab: another session right there.
+  const cur = activeTab();
+  if (cur?.serverId === serverId && (srv.online || !LIVE) && !cur.terminal?.full) {
+    newTerminal('server');
+    return;
+  }
+  const existing = st.tabs.find((t) => t.serverId === serverId && t.terminal?.full && st.terminals.some((x) => x.tabId === t.id && x.serverId === serverId && x.alive));
+  if (existing) {
+    setState({ activeTabId: existing.id });
+    if (LIVE && !srv.online) connectNow(serverId);
+    return;
+  }
+  const number = st.terminals.filter((x) => x.serverId === serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
+  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [] };
+  const session: TermSession = { id: uid('term'), serverId, tabId: tab.id, number, alive: true };
+  live.set(session.id, makeTerminal(session));
+  setState((s) => ({
+    tabs: [...s.tabs, { ...tab, terminal: { open: true, active: session.id, full: true } }],
+    activeTabId: tab.id,
+    terminals: [...s.terminals, session],
+  }));
+  if (LIVE && !srv.online) connectNow(serverId);
 }
 
 /** Called once the session's element is on screen and has a size. */
@@ -327,7 +377,7 @@ export function attachTerminal(id: string, container: HTMLElement) {
     const folder = session.serverId ? t?.remotePath : t?.localPath;
     const cwd = terminalSettings().startInFolder && folder ? folder : undefined;
     if (LIVE) {
-      const start = () => void invoke('term_open', { id, serverId: session.serverId, cols: l.term.cols, rows: l.term.rows, cwd, startup: srv?.termStart || null, shell: session.serverId ? null : terminalSettings().localShell || null }).catch((e) => {
+      const start = () => void invoke('term_open', { id, serverId: session.serverId, cols: l.term.cols, rows: l.term.rows, cwd, startup: srv?.termStart || null, shell: session.serverId ? null : session.shell || terminalSettings().localShell || null }).catch((e) => {
         l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
         markEnded(id);
       });

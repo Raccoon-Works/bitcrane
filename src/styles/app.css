@@ -2328,3 +2328,12 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .term-complete-item.is-sel { background: var(--accent); color: var(--on-accent); }
 .term-complete-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .term-complete-kind { flex: none; font-family: var(--font-ui); font-size: 11px; opacity: 0.65; }
+
+/* "+" menu of the terminal: this computer, SSH servers, new SSH connection. */
+.term-new-menu { position: fixed; min-width: 260px; max-width: 380px; z-index: 80; }
+.term-new-servers { max-height: 300px; overflow-y: auto; }
+.term-new-server { gap: var(--space-2); }
+.term-new-host { max-width: 150px; }
+.menu-item:hover .term-new-host, .menu-item.is-hl .term-new-host { color: inherit; opacity: 0.8; }
+.term-new-online { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+.term-new-empty { display: block; padding: 4px 12px 6px; }

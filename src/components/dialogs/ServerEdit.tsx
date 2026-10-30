@@ -58,12 +58,12 @@ function cloudDefaults(service: Protocol): Partial<Server> {
   return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
 }
 
-export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string; cloud?: Protocol }) {
+export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverId?: string; cloud?: Protocol; terminal?: boolean }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
   const platform = useStore((s) => s.platform);
   const [currentId, setCurrentId] = useState<string | undefined>(serverId);
-  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : newServerTemplate()));
+  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : { ...newServerTemplate(), ...(terminal ? { openAs: 'terminal' as const } : {}) }));
   // The user's own Google app key (Google Drive only): the id from the settings, the secret only typed here.
   const [googleId, setGoogleId] = useState(() => getState().settings.googleClientId ?? '');
   const [googleSecret, setGoogleSecret] = useState('');
@@ -271,7 +271,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
               <>
                 <span>{$t('Protokoll#protocol')}</span>
                 <div className="row-inline">
-                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
+                  <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
@@ -300,7 +300,7 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
             <>
             <span>{$t('Protokoll#protocol')}</span>
             <div className="row-inline">
-              <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
+              <Segmented<'sftp' | 'ftp' | 'webdav' | 'smb' | 'cloud'> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
             </div>
 
             {family === 'ftp' && (
@@ -414,6 +414,17 @@ export function ServerEdit({ serverId, cloud: presetCloud }: { serverId?: string
               <Select id="s-jump" label={$t('Sprungserver')} value={draft.jumpServerId ?? ''} onChange={(v) => set('jumpServerId', v || undefined)}
                 options={[{ value: '', label: $t('Keiner, direkt verbinden') }, ...servers.filter((x) => x.id !== draft.id).map((x) => ({ value: x.id, label: $t('Über {0}', x.name) }))]} />
               <span className="small muted">{$t('Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).')}</span>
+            </div>}
+
+            {family === 'sftp' && <span>{$t('Beim Öffnen')}</span>}
+            {family === 'sftp' && <div className="col-text">
+              <div className="row-inline">
+                <Segmented<'files' | 'terminal'> label={$t('Beim Öffnen')} value={draft.openAs ?? 'files'} onChange={(v) => set('openAs', v === 'terminal' ? 'terminal' : undefined)}
+                  options={[{ value: 'files', label: $t('Dateien') }, { value: 'terminal', label: $t('Nur Terminal') }]} />
+              </div>
+              <span className="small muted">{draft.openAs === 'terminal'
+                ? $t('Ein Doppelklick öffnet eine SSH-Konsole im eigenen Tab. Die Dateien erreichst du per Rechtsklick › Dateien öffnen.')
+                : $t('Derselbe Server kann beides: Dateien hier, SSH-Terminal über den Terminal-Knopf oder per Rechtsklick.')}</span>
             </div>}
 
             <label htmlFor="s-group">{$t('Gruppe')}</label>

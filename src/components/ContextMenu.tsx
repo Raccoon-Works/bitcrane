@@ -65,12 +65,14 @@ export function ContextMenu() {
     const id = menu.serverId;
     const srv = getState().servers.find((x) => x.id === id);
     const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
+    const ssh = !!srv && (!srv.protocol || srv.protocol === 'sftp');
+    const termFirst = ssh && srv?.openAs === 'terminal';
+    const openTerm = () => void import('../state/terminal').then((m) => m.openServerTerminal(id));
     groups.push([
-      { label: $t('Verbinden'), run: () => openServerIn(menu.side, id) },
-      { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) },
+      ...(termFirst ? [{ label: $t('Terminal öffnen'), run: openTerm }, { label: $t('Dateien öffnen'), run: () => openServerIn(menu.side, id) }] : [{ label: $t('Verbinden'), run: () => openServerIn(menu.side, id) }, { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) }]),
       ...(tab && tab.serverId !== id && tab.leftServerId !== id ? [{ label: other === 'local' ? $t('In der linken Hälfte öffnen') : $t('In der rechten Hälfte öffnen'), run: () => openServerIn(other, id) }] : []),
       ...(srv?.online ? [{ label: $t('Verbindung trennen'), run: () => disconnect(id) }] : []),
-      ...(srv && (!srv.protocol || srv.protocol === 'sftp') ? [{ label: $t('SSH-Terminal öffnen'), run: () => { if (activeTab()?.serverId !== id) openServerInNewTab(id); window.setTimeout(() => void import('../state/terminal').then((m) => m.newTerminal('server')), srv.online ? 0 : 2500); } }] : []),
+      ...(ssh && !termFirst ? [{ label: $t('Terminal öffnen'), run: openTerm }] : []),
     ]);
     groups.push([
       ...(srv?.temporary ? [{ label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'), run: () => keepServer(id) }] : srv?.protocol === 'vault' ? [] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),

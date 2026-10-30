@@ -9,9 +9,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { ArrowsInSimple, ArrowsOutSimple, BracketsCurly, CaretDown, MagnifyingGlass, Plus, Trash, X } from '@phosphor-icons/react';
 import { $t } from '../i18n';
 import { openDialog, serverById, updateSettings, useStore } from '../state/store';
-import { themeFor, attachTerminal, clearTerminal, closeTerminal, findInTerminal, fitTerminal, newTerminal, sendSnippet, setActiveTerminal, terminalBackToPanel, terminalInOwnTab, toggleTerminal } from '../state/terminal';
+import { themeFor, attachTerminal, clearTerminal, closeTerminal, findInTerminal, fitTerminal, sendSnippet, setActiveTerminal, terminalBackToPanel, terminalInOwnTab, toggleTerminal } from '../state/terminal';
 import type { Snippet } from '../state/terminal';
 import { ResizeHandle } from './ResizeHandle';
+import { TermNewMenu } from './TermNewMenu';
 import { IconButton } from './ui';
 
 /** Stable empty list: a new [] on every render would redraw the store endlessly. */
@@ -80,6 +81,7 @@ export function TerminalPanel() {
   const height = useStore((s) => s.settings.terminalHeight ?? 260);
   const [snippets, setSnippets] = useState(false);
   const [find, setFind] = useState<string | null>(null);
+  const [newMenu, setNewMenu] = useState<{ x: number; y: number } | null>(null);
   // Re-render when the look changes, so the frame matches the terminal's background.
   useStore((s) => s.settings.terminal);
   useStore((s) => s.theme);
@@ -104,8 +106,11 @@ export function TerminalPanel() {
               <button type="button" className="term-tab-close" aria-label={$t('Terminal schließen')} onClick={(e) => { e.stopPropagation(); closeTerminal(x.id); }}><X size={11} weight="bold" /></button>
             </span>
           ))}
-          <IconButton label={$t('Neues Terminal')} onClick={() => newTerminal(active.serverId ? 'server' : 'local')}><Plus size={15} weight="bold" /></IconButton>
+          <IconButton label={$t('Neues Terminal')} aria-haspopup="menu" aria-expanded={!!newMenu}
+            onMouseDown={(e) => { if (newMenu) e.stopPropagation(); }}
+            onClick={(e) => { if (newMenu) { setNewMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setNewMenu({ x: r.left, y: r.bottom + 4 }); }}><Plus size={15} weight="bold" /></IconButton>
         </div>
+        {newMenu && <TermNewMenu x={newMenu.x} y={newMenu.y} onClose={() => setNewMenu(null)} />}
         <span className="flex-1" />
         {find !== null && (
           <input className="term-find" autoFocus value={find} placeholder={$t('Im Terminal suchen')} onChange={(e) => { setFind(e.target.value); findInTerminal(active.id, e.target.value); }}
