@@ -50,6 +50,7 @@ export function MainWindow() {
   // "Hälften untereinander" (ForkLift): for narrow windows the halves can stack.
   const stacked = useStore((s) => !!s.settings.stackHalves);
   const sidebar = useStore((s) => s.settings.sidebar !== false);
+  const sideWidth = useStore((s) => s.settings.sidebarWidth ?? 200);
   const panesRef = useRef<HTMLDivElement>(null);
   const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
@@ -65,7 +66,11 @@ export function MainWindow() {
         </div>
       )}
       <div className="window-body">
-          {sidebar && !settingsTab && <Sidebar />}
+          {sidebar && !settingsTab && <>
+            <Sidebar />
+            <ResizeHandle orientation="vertical" label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')} value={sideWidth} min={150} max={340} step={10}
+              toValue={(start, d) => start + d} onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })} onReset={() => updateSettings({ sidebarWidth: 200 })} className="side-handle" />
+          </>}
           {settingsTab ? <SettingsPage section={settingsTab} /> : <div className="main-col">
             <Toolbar />
             <div className="content">

@@ -2070,5 +2070,20 @@
   "Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)": "Hauteur des moitiés (faire glisser ; double-clic : réinitialiser)",
   "Markierungen gehen im echten Programm.": "Les tags fonctionnent dans l’app complète.",
   "Als Spalten": "Par colonnes",
-  "Spalten": "Colonnes"
+  "Spalten": "Colonnes",
+  "Favoriten": "Favoris",
+  "Tags": "Tags",
+  "Freigaben": "Partagés",
+  "Ordner hierher ziehen": "Glissez des dossiers ici",
+  "„{0}“ ist schon in den Favoriten.": "« {0} » est déjà dans les favoris.",
+  "„{0}“ zu den Favoriten hinzugefügt.": "« {0} » ajouté aux favoris.",
+  "Nach oben": "Monter",
+  "Nach unten": "Descendre",
+  "Aus den Favoriten entfernen": "Retirer des favoris",
+  "Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)": "Largeur de la barre latérale (glisser, double-clic : réinitialiser)",
+  "Tag": "Tag",
+  "{0} Objekte mit diesem Tag": "{0} éléments avec ce tag",
+  "Keine Dateien mit diesem Tag gefunden.": "Aucun fichier avec ce tag.",
+  "Die Suche nach Tags geht im echten Programm.": "La recherche par tag fonctionne dans l’application réelle.",
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Favoris, dossiers récents, appareils, partages et tags à gauche de la fenêtre. Désactivé : les barres d’emplacements au-dessus des moitiés."
 }

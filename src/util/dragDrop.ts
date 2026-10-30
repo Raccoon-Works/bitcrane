@@ -10,7 +10,7 @@
  * highlight it.
  */
 import type { PaneSide } from '../backend/types';
-import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace } from '../state/store';
+import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace } from '../state/store';
 import { join } from './paths';
 import { $t } from '../i18n';
 
@@ -27,7 +27,7 @@ interface DragState {
 
 let drag: DragState | null = null;
 
-type Target = { side: PaneSide; name: string; place?: string; addPlace?: boolean };
+type Target = { side: PaneSide; name: string; place?: string; addPlace?: boolean; sidebar?: boolean };
 
 /**
  * Drop target under a viewport point: side and folder name ('' = the folder
@@ -36,6 +36,11 @@ type Target = { side: PaneSide; name: string; place?: string; addPlace?: boolean
  */
 function targetAt(x: number, y: number, from?: PaneSide, names: string[] = []): Target | null {
   const el = document.elementFromPoint(x, y) as HTMLElement | null;
+  // A folder of this computer dragged onto the sidebar's favourites becomes a favourite.
+  if (el?.closest('[data-sidebar-favs]')) {
+    const ok = !!from && names.length === 1 && paneLoc(from)[0] === 'local' && isDirName(from, names[0]);
+    return ok && from ? { side: from, name: names[0], addPlace: true, sidebar: true } : null;
+  }
   const pane = el?.closest<HTMLElement>('.pane[data-side]');
   if (!pane) return null;
   const side = pane.dataset.side as PaneSide;
@@ -62,7 +67,7 @@ function dirOf(t: Target): string {
 
 function setHint(hint: Target | null) {
   const cur = getState().dropHint;
-  if (cur?.side === hint?.side && cur?.name === hint?.name && cur?.place === hint?.place && cur?.addPlace === hint?.addPlace) return;
+  if (cur?.side === hint?.side && cur?.name === hint?.name && cur?.place === hint?.place && cur?.addPlace === hint?.addPlace && cur?.sidebar === hint?.sidebar) return;
   setState({ dropHint: hint });
 }
 
@@ -102,7 +107,8 @@ function finish(e: PointerEvent, cancel: boolean) {
   if (!d?.active || cancel || !hint) return;
   e.preventDefault();
   if (hint.addPlace) {
-    addPlace(hint.side, join(panePath(hint.side), hint.name));
+    if (hint.sidebar) addLocalPlace(join(panePath(hint.side), hint.name));
+    else addPlace(hint.side, join(panePath(hint.side), hint.name));
     return;
   }
   const dir = dirOf(hint);

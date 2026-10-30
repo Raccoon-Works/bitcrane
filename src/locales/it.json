@@ -2070,5 +2070,20 @@
   "Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)": "Altezza delle metà (trascina; doppio clic: ripristina)",
   "Markierungen gehen im echten Programm.": "I tag funzionano nell’app completa.",
   "Als Spalten": "Come colonne",
-  "Spalten": "Colonne"
+  "Spalten": "Colonne",
+  "Favoriten": "Preferiti",
+  "Tags": "Tag",
+  "Freigaben": "Condivisi",
+  "Ordner hierher ziehen": "Trascina qui le cartelle",
+  "„{0}“ ist schon in den Favoriten.": "“{0}” è già nei Preferiti.",
+  "„{0}“ zu den Favoriten hinzugefügt.": "“{0}” aggiunto ai Preferiti.",
+  "Nach oben": "Sposta su",
+  "Nach unten": "Sposta giù",
+  "Aus den Favoriten entfernen": "Rimuovi dai Preferiti",
+  "Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)": "Larghezza della barra laterale (trascina, doppio clic: ripristina)",
+  "Tag": "Tag",
+  "{0} Objekte mit diesem Tag": "{0} elementi con questo tag",
+  "Keine Dateien mit diesem Tag gefunden.": "Nessun file con questo tag.",
+  "Die Suche nach Tags geht im echten Programm.": "La ricerca per tag funziona nell’app reale.",
+  "Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.": "Preferiti, cartelle recenti, dispositivi, condivisioni e tag a sinistra della finestra. Disattivato: le barre dei luoghi sopra le metà."
 }

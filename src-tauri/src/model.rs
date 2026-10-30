@@ -47,6 +47,9 @@ pub struct WalkItem {
 pub struct Place {
     pub name: String,
     pub path: String,
+    /// A network share (SMB, AFP, NFS, WebDAV mount or mapped network drive).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub network: bool,
 }
 
 /// Formats Unix mode bits as three octal digits.

@@ -441,7 +441,8 @@ export function Pane({ side }: { side: PaneSide }) {
       style={{ '--cols': [columns.mtime && '124px', columns.kind && '120px', showPerms && '84px', columns.owner && '84px', columns.size && '76px'].filter(Boolean).join(' ') || '0px' } as CSSProperties}
       aria-label={onServer ? $t('Server') : $t('Lokal')}
     >
-      {!sidebarOn && <PlacesBar side={side} />}
+      {/* With the sidebar, only halves showing a server keep their own places (that server's folders). */}
+      {(!sidebarOn || onServer) && <PlacesBar side={side} />}
       <div className="pane-head">
         {/* Location button: this computer and its drives, or which server the half shows. */}
         <button type="button" className="pane-source" title={onServer ? `${server?.name ?? ''} · ${$t('Ort wechseln')}` : $t('Laufwerke und Server')} aria-label={$t('Ort wechseln')} aria-haspopup="menu"

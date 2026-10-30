@@ -1,83 +1,117 @@
 /**
- * Sidebar of the window (Finder, ForkLift, Transmit): favourite folders,
- * drives, saved servers and, on the Mac, Finder tags. A click acts on the
- * active half, which is marked with an accent line, so it is always clear
- * where a folder or server will open. It replaces the places bars above the
- * halves and can be hidden (View menu, Cmd+Alt+S / Ctrl+Alt+S).
+ * Sidebar of the window (Finder, ForkLift): this computer only. Favourite
+ * folders, the folders opened last, devices (disks, USB sticks), network
+ * shares and, on the Mac, Finder tags. A click opens in the active half, which
+ * is marked with an accent line. Servers keep their own small places bar above
+ * their half, because those folders belong to one server.
+ *
+ * - A folder dragged from a half onto "Favoriten" becomes a favourite.
+ * - Right click on a favourite: open, copy path, move up or down, remove.
+ * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
-import { HardDrives, House, Desktop, DownloadSimple, FileText, FolderSimple, Cloud } from '@phosphor-icons/react';
+import { ClockCounterClockwise, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, HardDrive, HardDrives, House, Usb, Network } from '@phosphor-icons/react';
 import type { Place } from '../backend/types';
 import { $t } from '../i18n';
-import { LIVE, activeTab, navigate, openPlace, openServerIn, setRightLocal, showToast, useStore } from '../state/store';
+import { LIVE, activeTab, localPlaces, navigate, openDialog, openPlace, setRightLocal, setState, useStore } from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
 import { BrandLogo, isBrandService } from './BrandLogo';
 import { placeLabel } from './PlacesBar';
-import { ServerTile } from './ServerTile';
+import * as paths from '../util/paths';
+
+const ICON = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
 
 function PlaceIcon({ place }: { place: Place }) {
   const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
-  const props = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
   if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={15} />;
-  if (place.cloud) return <Cloud {...props} />;
-  if (place.path === '~') return <House {...props} />;
-  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...props} />;
-  if (last === 'downloads') return <DownloadSimple {...props} />;
-  if (last === 'documents' || last === 'dokumente') return <FileText {...props} />;
-  return <FolderSimple {...props} />;
+  if (place.cloud) return <Cloud {...ICON} />;
+  if (place.path === '~') return <House {...ICON} />;
+  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...ICON} />;
+  if (last === 'downloads') return <DownloadSimple {...ICON} />;
+  if (last === 'documents' || last === 'dokumente') return <FileText {...ICON} />;
+  return <FolderSimple {...ICON} />;
+}
+
+/** Start disk, other disks and removable drives look different (Finder). */
+function DriveIcon({ drive, first }: { drive: Place; first: boolean }) {
+  if (first) return <HardDrive {...ICON} />;
+  if (/usb|stick/i.test(drive.name)) return <Usb {...ICON} />;
+  return <HardDrives {...ICON} />;
+}
+
+/** Typical drives for the browser prototype, which has no real ones. */
+function mockDrives(mac: boolean): Place[] {
+  return mac
+    ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }, { name: 'iMac von Elna', path: '~/Projekte/newsbot', network: true }]
+    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads' }, { name: 'Z: (NAS)', path: '~/Projekte/newsbot', network: true }];
 }
 
 export function Sidebar() {
   const platform = useStore((s) => s.platform);
   const focus = useStore((s) => s.focusSide);
   const tab = useStore((s) => activeTab(s));
-  const places = useStore((s) => s.settings.localPlaces ?? s.places);
-  const servers = useStore((s) => s.servers);
+  const places = useStore((s) => localPlaces(s));
+  const recentAll = useStore((s) => s.settings.recentDirs);
   const liveDrives = useStore((s) => s.drives);
-  // The browser prototype has no real drives; it shows typical ones.
-  const drives: Place[] = LIVE ? liveDrives : platform === 'mac'
-    ? [{ name: 'Macintosh HD', path: '~' } as Place, { name: 'USB-Stick', path: '~/Downloads' } as Place]
-    : [{ name: 'C:', path: '~' } as Place, { name: 'D:', path: '~/Downloads' } as Place];
-  const localPath = tab ? (focus === 'local' ? tab.localPath : tab.remotePath) : '';
-  const activeServer = tab ? (focus === 'local' ? tab.leftServerId : tab.serverId) : '';
+  const width = useStore((s) => s.settings.sidebarWidth ?? 200);
+  const dropHere = useStore((s) => !!s.dropHint?.sidebar);
+  const mac = platform === 'mac';
+  const drives = LIVE ? liveDrives : mockDrives(mac);
+  const devices = drives.filter((d) => !d.network);
+  const shares = drives.filter((d) => d.network);
+  // Recent folders that are not favourites already, newest first.
+  const recent = (recentAll ?? []).filter((p) => !places.some((x) => x.path === p) && p !== '~').slice(0, 5);
+
+  // Folder of this computer shown in the active half (for the highlight).
+  const activeLocal = (() => {
+    if (!tab) return '';
+    if (focus === 'local') return tab.leftServerId ? '' : tab.localPath;
+    return tab.rightLocal && !tab.serverId ? tab.remotePath : '';
+  })();
 
   /** Opens a folder of this computer in the active half. */
-  const openLocal = (path: string) => {
+  const open = (path: string) => {
     if (focus === 'local') openPlace(path);
     else if (tab?.rightLocal && !tab.serverId) navigate('remote', path);
     else setRightLocal(path);
   };
 
-  const item = (key: string, icon: React.ReactNode, label: string, active: boolean, onClick: () => void, title?: string, trailing?: React.ReactNode) => (
-    <button key={key} type="button" className={`side-item${active ? ' is-active' : ''}`} title={title ?? label} onClick={onClick}>
+  const item = (key: string, icon: React.ReactNode, label: string, path: string | null, onClick: () => void, extra: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> = {}) => (
+    <button key={key} type="button" className={`side-item${path !== null && activeLocal === path ? ' is-active' : ''}`} title={path ?? label} onClick={onClick} {...extra}>
       <span className="side-icon">{icon}</span>
       <span className="ellipsis">{label}</span>
-      {trailing}
     </button>
   );
 
-  const shown = servers.filter((x) => !x.temporary || x.online);
   return (
-    <nav className="sidebar" aria-label={$t('Seitenleiste')}>
-      <div className="side-group">
+    <nav className="sidebar" aria-label={$t('Seitenleiste')} style={{ width }}>
+      <div className={`side-group${dropHere ? ' is-drop' : ''}`} data-sidebar-favs="">
         <div className="side-title">{$t('Favoriten')}</div>
-        {places.map((p) => item(`p:${p.path}`, <PlaceIcon place={p} />, placeLabel(p), !activeServer && localPath === p.path, () => openLocal(p.path), p.path))}
+        {places.map((p) => item(`p:${p.path}`, <PlaceIcon place={p} />, placeLabel(p), p.path, () => open(p.path), {
+          onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarPlace', place: p.path } }); },
+        }))}
+        {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
       </div>
-      <div className="side-group">
-        <div className="side-title">{platform === 'mac' ? $t('Orte') : $t('Laufwerke')}</div>
-        {drives.map((d) => item(`d:${d.path}:${d.name}`, <HardDrives size={17} weight="duotone" aria-hidden="true" />, d.name, false, () => openLocal(d.path), d.path))}
-      </div>
-      {shown.length > 0 && (
+      {recent.length > 0 && (
         <div className="side-group">
-          <div className="side-title">{$t('Server')}</div>
-          {shown.map((x) => item(`s:${x.id}`, <ServerTile server={x} size={18} />, x.name, activeServer === x.id, () => openServerIn(focus, x.id), x.name,
-            x.online ? <span className="side-online" title={$t('verbunden')} /> : undefined))}
+          <div className="side-title">{$t('Zuletzt verwendet')}</div>
+          {recent.map((p) => item(`r:${p}`, <ClockCounterClockwise {...ICON} />, paths.basename(p) || p, p, () => open(p)))}
         </div>
       )}
-      {platform === 'mac' && (
+      <div className="side-group">
+        <div className="side-title">{$t('Geräte')}</div>
+        {devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, d.name, d.path, () => open(d.path)))}
+      </div>
+      {shares.length > 0 && (
+        <div className="side-group">
+          <div className="side-title">{$t('Freigaben')}</div>
+          {shares.map((d) => item(`n:${d.path}:${d.name}`, <Network {...ICON} />, d.name, d.path, () => open(d.path)))}
+        </div>
+      )}
+      {mac && (
         <div className="side-group">
           <div className="side-title">{$t('Tags')}</div>
-          {TAG_COLORS.map((c) => item(`t:${c.color}`, <span className="tag-dot side-tag" style={{ background: c.css }} />, tagName(c), false,
-            () => showToast($t('Dateien mit dem Tag „{0}“ suchen kommt mit dem fertigen Ausbau.', tagName(c)))))}
+          {TAG_COLORS.map((c) => item(`t:${c.color}`, <span className="tag-dot side-tag" style={{ background: c.css }} />, tagName(c), null,
+            () => openDialog({ type: 'tagFiles', name: tagName(c), color: c.color })))}
         </div>
       )}
     </nav>
