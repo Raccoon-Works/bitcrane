@@ -3,7 +3,7 @@
  * Verbindungen, Darstellung, Erweitert. Changes apply immediately.
  */
 import { ArrowUpDown, Eye, Radio, Settings as Gear, Shield, SlidersHorizontal, SunMoon, X, Plus, Keyboard } from '../glyphs';
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
@@ -11,7 +11,7 @@ import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
 import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
-import { Bug, GithubLogo, ListChecks, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
+import { Bug, GithubLogo, ListChecks, MagnifyingGlass, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
 import { terminalSettings, type TerminalSettings } from '../../state/terminal';
 import { checkForUpdates, startUpdateChecks } from '../../state/updates';
@@ -407,6 +407,53 @@ function AboutHeader() {
 }
 
 /** The settings, shown in a tab of their own with the areas listed on the left. */
+/** Lower case without accents, so "ubertragung" finds "Übertragung". */
+function fold(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss');
+}
+
+/** Every word of the query occurs in the text. */
+function matches(text: string, query: string): boolean {
+  const t = fold(text);
+  return fold(query).split(/\s+/).filter(Boolean).every((w) => t.includes(w));
+}
+
+/**
+ * Shows only what fits the query in the search results: rows by their name and
+ * description, whole groups or areas when their title fits. Returns whether
+ * anything is left. Works on the rendered rows, so every area is covered
+ * without a separate list of settings.
+ */
+function filterSettings(root: HTMLElement, query: string): boolean {
+  let any = false;
+  root.querySelectorAll<HTMLElement>('.set-search-section').forEach((sec) => {
+    const secMatch = sec.dataset.match === '1';
+    let secAny = false;
+    sec.querySelectorAll<HTMLElement>('.set-group').forEach((g) => {
+      const caption = g.getAttribute('aria-label') ?? '';
+      const groupMatch = secMatch || matches(caption, query);
+      let groupAny = groupMatch;
+      g.querySelectorAll<HTMLElement>('.set-card > *').forEach((el) => {
+        let show = groupMatch;
+        if (!show && el.classList.contains('set-row')) {
+          // The name and description, not the buttons ("Ändern", "Wählen …").
+          const text = el.querySelector('.col-text, .flex-1')?.textContent ?? '';
+          show = matches(text, query);
+        }
+        el.hidden = !show;
+        if (show) groupAny = true;
+      });
+      g.hidden = !groupAny;
+      if (groupAny) secAny = true;
+    });
+    // Loose content outside groups (notes, lists) only with a matching area.
+    sec.querySelectorAll<HTMLElement>(':scope > :not(.set-search-head):not(.set-group)').forEach((el) => { el.hidden = !secMatch; });
+    sec.hidden = !(secAny || secMatch);
+    if (!sec.hidden) any = true;
+  });
+  return any;
+}
+
 export function SettingsPage({ section }: { section: SettingsTab }) {
   const current = section;
   const setCurrent = setSettingsSection;
@@ -416,6 +463,29 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
   const s = useStore((st) => st.settings);
   const platform = useStore((st) => st.platform);
   const [pattern, setPattern] = useState<string | null>(null);
+  // Search over all areas: every row whose name or description fits stays, the rest is hidden.
+  const [query, setQuery] = useState('');
+  const [noHits, setNoHits] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  // Ctrl+F / Cmd+F inside the settings goes to the search field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useLayoutEffect(() => {
+    const root = resultsRef.current;
+    if (!root) return;
+    const apply = () => setNoHits(!filterSettings(root, query));
+    apply();
+    // Rows that appear later (lists that load) are filtered as well.
+    const mo = new MutationObserver(apply);
+    mo.observe(root, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  });
   const mac = platform === 'mac';
   const tabs: Array<{ id: SettingsTab; label: string; icon: ReactNode }> = [
     { id: 'general', label: $t('Allgemein'), icon: <Gear size={18} strokeWidth={1.6} /> },
@@ -458,22 +528,9 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
     if (typeof picked === 'string') updateSettings({ startLocal: await invoke<string>('path_to_ui', { path: picked }) });
   };
 
-  return (
-    <div className="settings-page">
-      <nav role="tablist" aria-orientation="vertical" aria-label={$t('Bereiche')} className="set-nav">
-        <span className="set-nav-title">{$t('Einstellungen')}</span>
-        {tabs.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={t.id === current} className={`set-tab${t.id === current ? ' is-sel' : ''}`} onClick={() => setCurrent(t.id)}>
-            {/* Each area has its own colour, as in Transmit's and the Windows settings. */}
-            <span className="set-tab-icon" style={{ color: TAB_COLORS[t.id] }}>{t.icon}</span><span>{t.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="set-scroll" ref={scrollRef}>
-      <SectionTitle.Provider value={title}>
-      <div className="set-body" role="tabpanel" aria-label={title}>
-        {current === 'general' && <AboutHeader />}
-        <h1 className="set-heading">{title}</h1>
+  /** The rows of one area; the search shows all areas with this at once. */
+  const body = (current: SettingsTab) => (
+    <>
         {current === 'rules' && <RulesSettings />}
         {current === 'watch' && (
           <>
@@ -673,8 +730,48 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
           </Group>
           </>
         )}
+    </>
+  );
+  const searching = query.trim().length > 0;
+
+  return (
+    <div className="settings-page">
+      <nav role="tablist" aria-orientation="vertical" aria-label={$t('Bereiche')} className="set-nav">
+        <span className="set-nav-title">{$t('Einstellungen')}</span>
+        <label className="set-search">
+          <MagnifyingGlass size={15} aria-hidden="true" />
+          <input ref={searchRef} type="search" value={query} placeholder={$t('Einstellungen durchsuchen')} aria-label={$t('Einstellungen durchsuchen')}
+            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); } }} />
+        </label>
+        {tabs.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={!searching && t.id === current} className={`set-tab${!searching && t.id === current ? ' is-sel' : ''}`} onClick={() => { setQuery(''); setCurrent(t.id); }}>
+            {/* Each area has its own colour, as in Transmit's and the Windows settings. */}
+            <span className="set-tab-icon" style={{ color: TAB_COLORS[t.id] }}>{t.icon}</span><span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="set-scroll" ref={scrollRef}>
+      {searching ? (
+        <div className="set-body set-search-results" ref={resultsRef} aria-label={$t('Suchergebnisse')}>
+          {tabs.map((t) => (
+            <section key={t.id} className="set-search-section" data-match={matches(t.label, query) ? '1' : undefined}>
+              <button type="button" className="set-search-head" onClick={() => { setQuery(''); setCurrent(t.id); }}>
+                <span className="set-tab-icon" style={{ color: TAB_COLORS[t.id] }}>{t.icon}</span>{t.label}
+              </button>
+              <SectionTitle.Provider value={t.label}>{body(t.id)}</SectionTitle.Provider>
+            </section>
+          ))}
+          {noHits && <p className="muted set-search-empty">{$t('Keine Einstellung zu „{0}“ gefunden.', query.trim())}</p>}
+        </div>
+      ) : (
+      <SectionTitle.Provider value={title}>
+      <div className="set-body" role="tabpanel" aria-label={title}>
+        {current === 'general' && <AboutHeader />}
+        <h1 className="set-heading">{title}</h1>
+        {body(current)}
       </div>
       </SectionTitle.Provider>
+      )}
       </div>
     </div>
   );
