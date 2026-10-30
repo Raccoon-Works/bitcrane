@@ -140,6 +140,10 @@ export interface Settings {
   sidebarWidth?: number;
   /** Folders of this computer opened last (sidebar). */
   recentDirs?: string[];
+  /** Built-in editor: font size, line wrapping, tab width (CodeEditor.tsx). */
+  editorPrefs?: { fontSize: number; wrap: boolean; tabSize: number };
+  /** "Im Editor öffnen": the built-in editor (standard) or a program of the system. */
+  editorMode?: 'builtin' | 'external';
   /** Sidebar sections in the user's order, folded ones, and hidden ones. */
   sidebarOrder?: SidebarSection[];
   sidebarCollapsed?: SidebarSection[];
@@ -376,7 +380,7 @@ export interface WatchTemplate {
 
 export type ToolId =
   | 'nav' | 'newFolder' | 'refresh' | 'info' | 'activity' | 'upload' | 'download' | 'delete' | 'rename'
-  | 'perms' | 'hidden' | 'terminal' | 'disconnect' | 'copyPath' | 'editor' | 'sync' | 'syncBrowse' | 'palette' | 'compareDirs' | 'selectMask';
+  | 'perms' | 'hidden' | 'terminal' | 'disconnect' | 'copyPath' | 'editor' | 'codeEditor' | 'sync' | 'syncBrowse' | 'palette' | 'compareDirs' | 'selectMask';
 
 export interface AppState {
   platform: Platform;
@@ -540,6 +544,7 @@ export const allTools: Array<{ id: ToolId; label: string }> = [
   { id: 'disconnect', label: $t('Trennen') },
   { id: 'copyPath', label: $t('Pfad kopieren') },
   { id: 'editor', label: $t('Im Editor öffnen') },
+  { id: 'codeEditor', label: $t('Editor') },
   { id: 'sync', label: $t('Ordner abgleichen') },
   { id: 'syncBrowse', label: $t('Synchron blättern') },
   { id: 'compareDirs', label: $t('Verzeichnisse vergleichen') },
@@ -1402,6 +1407,12 @@ export function openInEditor(side: PaneSide, name: string) {
   const path = paths.join(panePath(side), name);
   setState({ contextMenu: null });
   const [ls, sid] = paneLoc(side, t);
+  // The built-in editor, unless a program of the system is chosen (in general or for this kind of file).
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
+  if (state.settings.editorMode !== 'external' && !(ext && state.settings.editorByExt[ext])) {
+    void import('./editor').then((m) => m.openFile(ls === 'local' ? '' : sid, path));
+    return;
+  }
   if (!LIVE) {
     showToast(ls === 'local' ? $t('„{0}“ wird im Editor geöffnet.', name) : $t('„{0}“ wird geladen und im Editor geöffnet. Änderungen gehen beim Sichern zurück auf den Server.', name));
     return;
