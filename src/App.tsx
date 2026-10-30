@@ -90,8 +90,10 @@ function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const s = getState();
       const target = e.target as HTMLElement;
-      const typing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+      const typing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
       if (s.dialog) return;
+      // Keys the code editor handled itself (⌘S, ⌘F, ⌘D …) do not reach Bitcrane's shortcuts.
+      if (e.defaultPrevented && target.closest?.('.cm-editor')) return;
       if (e.key === 'Escape') {
         if (s.popoverOpen || s.contextMenu || s.appMenu || s.menuBarWindowOpen) setState({ popoverOpen: false, contextMenu: null, appMenu: null, menuBarWindowOpen: false });
         return;

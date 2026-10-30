@@ -94,6 +94,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Verkleinern'), ...sc('zoomOut'), run: () => stepZoom(-1) },
         { label: $t('Originalgröße'), ...sc('zoomReset'), run: () => stepZoom(0) },
         sep,
+        { label: $t('Editor ein/aus'), ...sc('codeEditor'), run: () => void import('../state/editor').then((m) => m.toggleEditor()) },
         { label: $t('Seitenleiste ein/aus'), ...sc('sidebar'), run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
         { label: $t('Hälften untereinander ein/aus'), run: () => updateSettings({ stackHalves: !getState().settings.stackHalves }) },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },

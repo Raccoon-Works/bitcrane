@@ -44,6 +44,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'viewList', group: $t('Darstellung'), label: $t('Als Liste'), mac: ['Mod+1'], win: ['Mod+Shift+6'], run: () => setViewMode(focus(), 'list') },
   { id: 'viewIcons', group: $t('Darstellung'), label: $t('Als Symbole'), mac: ['Mod+2'], win: ['Mod+Shift+2'], run: () => setViewMode(focus(), 'icons') },
   { id: 'viewColumns', group: $t('Darstellung'), label: $t('Als Spalten'), mac: ['Mod+3'], win: ['Mod+Shift+3'], run: () => setViewMode(focus(), 'columns') },
+  { id: 'codeEditor', group: $t('Darstellung'), label: $t('Editor ein/aus'), mac: ['Mod+Shift+E'], win: ['Mod+Shift+E'], run: () => void import('./editor').then((m) => m.toggleEditor()) },
   { id: 'sidebar', group: $t('Darstellung'), label: $t('Seitenleiste ein/aus'), mac: ['Mod+Ctrl+S'], win: ['Mod+B'], run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
   { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },

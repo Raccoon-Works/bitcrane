@@ -3,7 +3,11 @@
  * then the tabs, the toolbar, the two halves, activity and info column.
  */
 import { Sidebar } from './Sidebar';
-import { useRef, type CSSProperties } from 'react';
+import { useEditor } from '../state/editor';
+import { lazy, Suspense, useRef, type CSSProperties } from 'react';
+
+// The code editor (CodeMirror) loads when it is first opened, so starting Bitcrane stays quick.
+const CodeEditor = lazy(() => import('./CodeEditor').then((m) => ({ default: m.CodeEditor })));
 import { setState, updateSettings, useStore } from '../state/store';
 import { ResizeHandle } from './ResizeHandle';
 import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../util/appWindow';
@@ -52,6 +56,8 @@ export function MainWindow() {
   const panesRef = useRef<HTMLDivElement>(null);
   const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
   const showSide = sidebar && !settingsTab;
+  // The built-in editor takes the place of the two halves while it is shown.
+  const editorOpen = useEditor().open;
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
 
   return (
@@ -86,7 +92,8 @@ export function MainWindow() {
             <div className="content">
               <div className="content-main">
                 {/* A terminal in a tab of its own fills the place of the two halves. */}
-                {!termFull && <div className={`panes${stacked ? ' is-stacked' : ''}`} ref={panesRef} style={{ '--split': split } as CSSProperties}>
+                {editorOpen && !termFull && <Suspense fallback={<div className="code-editor" />}><CodeEditor /></Suspense>}
+                {!termFull && !editorOpen && <div className={`panes${stacked ? ' is-stacked' : ''}`} ref={panesRef} style={{ '--split': split } as CSSProperties}>
                   {swap ? <Pane side="remote" /> : <Pane side="local" />}
                   {/* The line between the halves: drag to share the width differently (double click: half and half). */}
                   <ResizeHandle orientation={stacked ? 'horizontal' : 'vertical'} label={stacked ? $t('Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)') : $t('Breite der Hälften (ziehen, Doppelklick: zurücksetzen)')} value={split} min={0.2} max={0.8} step={0.02}

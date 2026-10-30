@@ -5,10 +5,11 @@
  */
 import { toggleTerminal } from '../state/terminal';
 import {
-  ArrowClockwise, ArrowsClockwise, SidebarSimple, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
+  ArrowClockwise, ArrowsClockwise, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
 } from '@phosphor-icons/react';
 import { useState, type ReactNode } from 'react';
 import { TermNewMenu } from './TermNewMenu';
+import { toggleEditor, useEditor } from '../state/editor';
 import {
   activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
   refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
@@ -72,7 +73,7 @@ function WatchButton() {
 
 /** Kind of each tool: neighbours of the same kind share one capsule, so the bar reads in groups. */
 const TOOL_KIND: Record<ToolId, string> = {
-  nav: 'nav', upload: 'transfer', download: 'transfer', newFolder: 'files', refresh: 'files', rename: 'files', delete: 'files', editor: 'files', copyPath: 'files', selectMask: 'files',
+  nav: 'nav', upload: 'transfer', download: 'transfer', newFolder: 'files', refresh: 'files', rename: 'files', delete: 'files', editor: 'files', codeEditor: 'more', copyPath: 'files', selectMask: 'files',
   sync: 'compare', syncBrowse: 'compare', compareDirs: 'compare', info: 'view', activity: 'view', hidden: 'view', perms: 'view', terminal: 'more', disconnect: 'more', palette: 'more',
 };
 
@@ -101,6 +102,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
   const selRemote = useStore((s) => s.selection.remote.names.length);
   const sel = focus === 'local' ? selLocal : selRemote;
   const compareOn = useStore((s) => s.compareDirs);
+  const editorOpen = useEditor().open;
   const ic = (n: ReactNode) => n;
   return {
     nav: { label: $t('Zurück'), key: sk('back'), icon: ic(<CaretLeft size={19} />), run: goBack, disabled: !tab?.back.length },
@@ -118,6 +120,7 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
     disconnect: { label: $t('Trennen'), icon: ic(<Plugs size={19} />), run: () => disconnect() },
     copyPath: { label: $t('Pfad kopieren'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
     editor: { label: $t('Im Editor öffnen'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },
+    codeEditor: { label: $t('Editor'), key: sk('codeEditor'), icon: ic(<Code size={19} />), run: toggleEditor, active: editorOpen },
     sync: { label: $t('Ordner abgleichen'), icon: ic(<ArrowsClockwise size={19} />), run: () => openDialog({ type: 'compare' }) },
     syncBrowse: { label: $t('Synchron blättern'), key: sk('syncBrowse'), icon: ic(<LinkSimple size={19} />), run: toggleSyncBrowse, active: !!tab?.syncBrowse },
     palette: { label: $t('Befehle'), key: sk('palette'), icon: ic(<Command size={19} />), run: () => openDialog({ type: 'palette' }) },

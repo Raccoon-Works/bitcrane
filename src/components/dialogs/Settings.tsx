@@ -500,6 +500,9 @@ function filterSettings(root: HTMLElement, query: string): boolean {
   return any;
 }
 
+/** Standard editor settings (CodeEditor.tsx). */
+const EP = { fontSize: 13, wrap: false, tabSize: 4 };
+
 /** Zoom steps as a row of points (Spotify): smaller on the left, larger on the right. */
 function ZoomPicker({ value, standard }: { value: number; standard: number }) {
   const near = ZOOM_STEPS.reduce((b, z) => (Math.abs(z - value) < Math.abs(b - value) ? z : b), ZOOM_STEPS[0]);
@@ -672,12 +675,23 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
               <Select value={s.fileDoubleClick} onChange={(v) => updateSettings({ fileDoubleClick: v })} label={$t('Doppelklick auf eine Datei')} options={[{ value: 'open', label: $t('Öffnen') }, { value: 'edit', label: $t('Im Editor öffnen') }, { value: 'transfer', label: $t('In die andere Hälfte übertragen') }]} />
             </Row>
             <Row label={$t('Vor dem Löschen nachfragen')} note={$t('Auf dem Server wird immer nachgefragt, dort gibt es keinen Papierkorb.')}><Switch checked={s.confirmDelete} onChange={(v) => updateSettings({ confirmDelete: v })} label={$t('Vor dem Löschen nachfragen')} /></Row>
-            <Row label={$t('Editor für „Im Editor öffnen“')} note={s.editorApp ? s.editorApp : $t('Das Programm, das das System für die Dateiart vorsieht.')}>
+            <Row label={$t('Editor für „Im Editor öffnen“')} note={s.editorMode === 'external' ? (s.editorApp ? s.editorApp : $t('Das Programm, das das System für die Dateiart vorsieht.')) : $t('Der Editor von Bitcrane: Dateien vom Server und von diesem Computer, Speichern lädt direkt hoch.')}>
               <span className="row-inline">
-                {s.editorApp && <Button small variant="ghost" onClick={() => updateSettings({ editorApp: '' })}>{$t('Standard')}</Button>}
-                <Button small onClick={() => void chooseEditor()}>{s.editorApp ? $t('Ändern …') : $t('Wählen …')}</Button>
+                {s.editorMode === 'external' && s.editorApp && <Button small variant="ghost" onClick={() => updateSettings({ editorApp: '' })}>{$t('Standard')}</Button>}
+                {s.editorMode === 'external' && <Button small onClick={() => void chooseEditor()}>{s.editorApp ? $t('Ändern …') : $t('Wählen …')}</Button>}
+                <Select<'builtin' | 'external'> value={s.editorMode === 'external' ? 'external' : 'builtin'} onChange={(v) => updateSettings({ editorMode: v })} label={$t('Editor')}
+                  options={[{ value: 'builtin', label: $t('Eingebauter Editor') }, { value: 'external', label: $t('Programm des Systems') }]} />
               </span>
             </Row>
+            <Row label={$t('Schriftgröße im Editor')}>
+              <Select value={String(s.editorPrefs?.fontSize ?? 13)} onChange={(v) => updateSettings({ editorPrefs: { ...EP, ...s.editorPrefs, fontSize: Number(v) } })} label={$t('Schriftgröße im Editor')}
+                options={[11, 12, 13, 14, 15, 16, 18, 20].map((n) => ({ value: String(n), label: `${n} pt` }))} />
+            </Row>
+            <Row label={$t('Tabulatorbreite')} note={$t('Für neue Dateien; bei bestehenden erkennt der Editor die Einrückung selbst.')}>
+              <Select value={String(s.editorPrefs?.tabSize ?? 4)} onChange={(v) => updateSettings({ editorPrefs: { ...EP, ...s.editorPrefs, tabSize: Number(v) } })} label={$t('Tabulatorbreite')}
+                options={[2, 4, 8].map((n) => ({ value: String(n), label: String(n) }))} />
+            </Row>
+            <Row label={$t('Lange Zeilen umbrechen')}><Switch checked={!!s.editorPrefs?.wrap} onChange={(v) => updateSettings({ editorPrefs: { ...EP, ...s.editorPrefs, wrap: v } })} label={$t('Lange Zeilen umbrechen')} /></Row>
             {Object.entries(s.editorByExt).map(([ext, app]) => (
               <Row key={ext} label={$t('Dateien {0}', ext)} note={app}>
                 <span className="row-inline">

@@ -1064,6 +1064,110 @@ async fn remote_read_text(state: State<'_, AppState>, server_id: String, path: S
     bytes_to_text(bytes)
 }
 
+/* ------------------------------------------------------------------ Built-in editor */
+
+/// Largest file the built-in editor opens (larger files are better served by a
+/// download and a desktop editor; the editor stays fast this way).
+const EDITOR_LIMIT: usize = 24 * 1024 * 1024;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EditorFile {
+    text: String,
+    /// Modification time when read (ms), to notice changes by others before saving.
+    mtime: i64,
+    /// Line ending found in the file ("\r\n" or "\n"), kept when saving.
+    eol: String,
+    /// The file started with a UTF-8 byte order mark, kept when saving.
+    bom: bool,
+}
+
+fn editor_text(mut bytes: Vec<u8>, mtime: i64) -> AppResult<EditorFile> {
+    if bytes.len() > EDITOR_LIMIT {
+        return Err(AppError::other("Die Datei ist zu groß für den eingebauten Editor (über 24 MB)."));
+    }
+    // Binary files (NUL bytes in the first part) are not opened as text.
+    if bytes.iter().take(64 * 1024).any(|&b| b == 0) {
+        return Err(AppError::other("Das ist keine Textdatei; der Editor öffnet nur Text."));
+    }
+    let bom = bytes.starts_with(&[0xEF, 0xBB, 0xBF]);
+    if bom {
+        bytes.drain(..3);
+    }
+    let text = match String::from_utf8(bytes) {
+        Ok(t) => t,
+        // Not UTF-8: read as Latin-1 (Windows-1252 is close enough for old configuration files).
+        Err(e) => e.into_bytes().iter().map(|&b| b as char).collect(),
+    };
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
+    Ok(EditorFile { text: text.replace("\r\n", "\n"), mtime, eol, bom })
+}
+
+/// Reads a file for the built-in editor: of this computer (no server) or of a server.
+#[tauri::command]
+async fn editor_read(state: State<'_, AppState>, server_id: Option<String>, path: String) -> AppResult<EditorFile> {
+    match server_id.filter(|s| !s.is_empty()) {
+        None => {
+            let native = paths::to_native(&path);
+            let md = tokio::fs::metadata(&native).await?;
+            let mtime = md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            if md.len() as usize > EDITOR_LIMIT {
+                return Err(AppError::other("Die Datei ist zu groß für den eingebauten Editor (über 24 MB)."));
+            }
+            editor_text(tokio::fs::read(&native).await?, mtime)
+        }
+        Some(sid) => {
+            let st = remote!(state, sid, |c| c.stat(&path))?;
+            if st.size as usize > EDITOR_LIMIT {
+                return Err(AppError::other("Die Datei ist zu groß für den eingebauten Editor (über 24 MB)."));
+            }
+            let bytes = remote!(state, sid, |c| c.read_head(&path, EDITOR_LIMIT + 1))?;
+            editor_text(bytes, st.mtime)
+        }
+    }
+}
+
+/// Modification time of a file (ms), to check for changes by others before saving.
+#[tauri::command]
+async fn editor_mtime(state: State<'_, AppState>, server_id: Option<String>, path: String) -> AppResult<i64> {
+    match server_id.filter(|s| !s.is_empty()) {
+        None => {
+            let md = tokio::fs::metadata(paths::to_native(&path)).await?;
+            Ok(md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0))
+        }
+        Some(sid) => Ok(remote!(state, sid, |c| c.stat(&path))?.mtime),
+    }
+}
+
+/// Saves the editor's text, with the file's own line ending and byte order mark,
+/// and returns the new modification time. Writes in place, so permissions and
+/// owner of a server file stay as they were.
+#[tauri::command]
+async fn editor_write(state: State<'_, AppState>, server_id: Option<String>, path: String, text: String, eol: String, bom: bool) -> AppResult<i64> {
+    use tokio::io::AsyncWriteExt;
+    let body = if eol == "\r\n" { text.replace('\n', "\r\n") } else { text };
+    let mut bytes = Vec::with_capacity(body.len() + 3);
+    if bom {
+        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+    }
+    bytes.extend_from_slice(body.as_bytes());
+    match server_id.filter(|s| !s.is_empty()) {
+        None => {
+            let native = paths::to_native(&path);
+            tokio::fs::write(&native, &bytes).await?;
+            let md = tokio::fs::metadata(&native).await?;
+            Ok(md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0))
+        }
+        Some(sid) => {
+            let len = bytes.len() as u64;
+            let mut w = remote!(state, sid, |c| c.writer(&path, 0, Some(len), None))?;
+            w.write_all(&bytes).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Speichern auf dem Server fehlgeschlagen.").with_detail(e.to_string()))?;
+            w.close().await?;
+            Ok(remote!(state, sid, |c| c.stat(&path)).map(|st| st.mtime).unwrap_or(0))
+        }
+    }
+}
+
 /* ------------------------------------------------------------------ Keys and test */
 
 #[derive(Serialize)]
@@ -1697,6 +1801,9 @@ pub fn run() {
             local_tag_find,
             local_real_paths,
             local_free_space,
+            editor_read,
+            editor_mtime,
+            editor_write,
             network_hosts,
             local_tag,
             git_action,

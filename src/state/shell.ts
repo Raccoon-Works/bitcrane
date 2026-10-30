@@ -21,6 +21,7 @@ import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';
 import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, undoLast, updateSettings, type AppState } from './store';
 import { checkForUpdates } from './updates';
+import { editorMenuKey } from './editor';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
 import { initMounts } from './mount';
 import { $t, menuText } from '../i18n';
@@ -71,7 +72,11 @@ async function installMacMenu() {
         text: menuText(it.label),
         enabled: !!it.run,
         accelerator: it.mac && !TEXT_KEYS.has(it.mac) ? toAccelerator(it.mac) : undefined,
-        action: () => it.run?.(),
+        action: () => {
+          // While the code editor has the keyboard, its own ⌘ shortcuts win (⌘W, ⌘F, ⌘D …).
+          if (it.mac && editorMenuKey(it.mac)) return;
+          it.run?.();
+        },
       }));
     }
     return out;
@@ -320,6 +325,12 @@ export async function startShell() {
     if (getState().settings.runInBackground) {
       e.preventDefault();
       await win.hide();
+      return;
+    }
+    // Unsaved documents in the editor: shown first (closing again goes ahead).
+    const ed = await import('./editor');
+    if (!ed.editorCanQuit()) {
+      e.preventDefault();
       return;
     }
     // Closing quits Bitcrane: install an update that is already loaded first.
