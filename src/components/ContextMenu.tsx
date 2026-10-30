@@ -195,7 +195,8 @@ export function ContextMenu() {
     if (one && !isDir) first.push({ label: $t('Vorschau'), key: k($t('Leertaste'), $t('Leertaste')), run: () => { setState({ contextMenu: null }); openDialog({ type: 'preview', side: menu.side }); } });
     if (leftServer) first.push({ label: $t('Zu „{0}“ übertragen', otherName(menu.side)), key: sk(menu.side === 'remote' ? 'download' : 'upload'), run: () => (menu.side === 'remote' ? download(menu.names) : upload(menu.names)) });
     else if (menu.side === 'remote') first.push({ label: $t('Herunterladen'), key: sk('download'), run: () => download(menu.names) });
-    else first.push({ label: $t('Hochladen'), key: sk('upload'), run: () => upload(menu.names) });
+    // Upload only when the other half shows a server (not with the server list or two local halves).
+    else if (tab?.serverId) first.push({ label: $t('Hochladen'), key: sk('upload'), run: () => upload(menu.names) });
     groups.push(first);
     const second: Item[] = [
       { label: $t('Kopieren'), key: sk('copy'), run: () => copySelection(menu.side) },

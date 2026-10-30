@@ -12,7 +12,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
-  activeTab, askDelete, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
+  activeTab, askDelete, stepZoom, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
 import { closeWindow, minimizeWindow, quitApp, toggleMaximizeWindow } from '../util/appWindow';
@@ -90,6 +90,10 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Versteckte Dateien ein/aus'), ...sc('hidden'), run: toggleHidden },
         { label: $t('Spalte „Rechte“ ein/aus'), run: togglePermsColumn },
         { label: $t('Seiten tauschen'), run: toggleSwapSides },
+        { label: $t('Vergrößern'), ...sc('zoomIn'), run: () => stepZoom(1) },
+        { label: $t('Verkleinern'), ...sc('zoomOut'), run: () => stepZoom(-1) },
+        { label: $t('Originalgröße'), ...sc('zoomReset'), run: () => stepZoom(0) },
+        sep,
         { label: $t('Seitenleiste ein/aus'), ...sc('sidebar'), run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
         { label: $t('Hälften untereinander ein/aus'), run: () => updateSettings({ stackHalves: !getState().settings.stackHalves }) },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
