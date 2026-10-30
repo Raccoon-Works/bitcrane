@@ -1,8 +1,6 @@
 /**
- * The Bitcrane main window: toolbar, the two halves, activity and info
- * column. No sidebar: servers are chosen inside a half and favourite folders
- * sit in each half's places bar (Transmit 5). On Windows a title bar with the
- * connection tabs sits on top.
+ * The Bitcrane main window: the sidebar over the full height (can be hidden),
+ * then the tabs, the toolbar, the two halves, activity and info column.
  */
 import { Sidebar } from './Sidebar';
 import { useRef, type CSSProperties } from 'react';
@@ -21,7 +19,7 @@ import { TrafficLights } from './TrafficLights';
 import { $t } from '../i18n';
 import { CheckCircle, DownloadSimple, Info, WarningCircle } from '@phosphor-icons/react';
 
-function WinTitleBar() {
+function WinTitleBar({ menu = true }: { menu?: boolean }) {
   return (
     <div
       className="win-titlebar"
@@ -29,7 +27,7 @@ function WinTitleBar() {
       data-tauri-drag-region
       onContextMenu={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); setState({ appMenu: 'system' }); } }}
     >
-      <WinSystemMenu />
+      {menu && <WinSystemMenu />}
       <ConnectionTabs variant="win" />
       <span className="flex-1 drag-area" data-tauri-drag-region />
       <div className="caption-buttons">
@@ -53,24 +51,36 @@ export function MainWindow() {
   const sideWidth = useStore((s) => s.settings.sidebarWidth ?? 200);
   const panesRef = useRef<HTMLDivElement>(null);
   const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
+  const showSide = sidebar && !settingsTab;
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
 
   return (
     <div className="window" role="application" aria-label="Bitcrane">
-      {platform === 'win' && <WinTitleBar />}
+      <div className="window-row">
+        {/* Sidebar over the full height (Finder, ForkLift): the window buttons (Mac) or the
+            Bitcrane menu (Windows) sit at its top, the tabs and the toolbar start right of it. */}
+        {showSide && (
+          <>
+            <div className="side-col" style={{ width: sideWidth }}>
+              <div className="side-top" data-tauri-drag-region>
+                {platform === 'mac' ? <TrafficLights /> : <WinSystemMenu />}
+              </div>
+              <Sidebar />
+            </div>
+            <ResizeHandle orientation="vertical" label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')} value={sideWidth} min={150} max={340} step={10}
+              toValue={(start, d) => start + d} onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })} onReset={() => updateSettings({ sidebarWidth: 200 })} className="side-handle" />
+          </>
+        )}
+        <div className="window-col">
+      {platform === 'win' && <WinTitleBar menu={!showSide} />}
       {/* Mac: the title bar holds the window buttons and the tabs (Transmit); the toolbar sits below, as on Windows. */}
       {platform === 'mac' && (
         <div className="mac-titlebar" data-tauri-drag-region>
-          <TrafficLights />
+          {!showSide && <TrafficLights />}
           <ConnectionTabs variant="mac" />
         </div>
       )}
       <div className="window-body">
-          {sidebar && !settingsTab && <>
-            <Sidebar />
-            <ResizeHandle orientation="vertical" label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')} value={sideWidth} min={150} max={340} step={10}
-              toValue={(start, d) => start + d} onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })} onReset={() => updateSettings({ sidebarWidth: 200 })} className="side-handle" />
-          </>}
           {settingsTab ? <SettingsPage section={settingsTab} /> : <div className="main-col">
             <Toolbar />
             <div className="content">
@@ -90,6 +100,8 @@ export function MainWindow() {
               {inspector && <Inspector />}
             </div>
           </div>}
+      </div>
+        </div>
       </div>
       {/* Neutral card in the normal text colour; only the small symbol shows the kind of message. */}
       {toast && (

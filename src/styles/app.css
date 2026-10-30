@@ -2405,11 +2405,10 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 
 /* Sidebar (Finder, ForkLift): favourites, drives, servers, tags. Acts on the active half. */
 .sidebar {
-  width: 200px;
-  flex: none;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: var(--space-3) var(--space-2) var(--space-4);
-  background: var(--bg-sidebar);
+  padding: var(--space-2) var(--space-2) var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -2444,26 +2443,13 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .side-tag { width: 10px; height: 10px; }
 /* With the sidebar the active half carries an accent line, so it is clear where a click opens. */
 
-.window-body:has(> .sidebar) .main-col .content { padding-left: var(--space-2); }
-.window-body:has(> .sidebar) .pane { position: relative; }
-.window-body:has(> .sidebar) .pane.is-focused::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); pointer-events: none; }
+.window-row:has(> .side-col) .main-col .content { padding-left: var(--space-2); }
+.window-row:has(> .side-col) .pane { position: relative; }
+.window-row:has(> .side-col) .pane.is-focused::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); pointer-events: none; }
 
-/* Light theme: the sidebar is a dark grey-blue card like the server list, so the
-   light file views sit between two calm dark areas (Transmit). */
-.page[data-theme='light'] .sidebar {
-  --text: #ececf1; --text-muted: #9ea4b0; --text-faint: #7d8390; --accent-text: #5fb0ff;
-  --bg-hover: rgba(255, 255, 255, 0.06); --bg-sidebar-sel: rgba(255, 255, 255, 0.10);
-  --line: rgba(255, 255, 255, 0.07); --accent-tint: rgba(95, 176, 255, 0.12);
-  background: #2a3240; color: var(--text); color-scheme: dark;
-}
 
-/* Dark theme: the sidebar is a dark grey-blue card like the server list, set apart from the black title bar. */
-.page[data-theme='dark'] .sidebar {
-  --text: #ececf1; --text-2: #d3d6de; --text-muted: #9ea4b0; --text-faint: #7d8390;
-  --bg-hover: rgba(255, 255, 255, 0.05); --bg-sidebar-sel: rgba(255, 255, 255, 0.09);
-  background: #1c1f27;
-}
-.page[data-theme='light'] .sidebar { --text-2: #d3d6de; }
+
+
 .sidebar .side-item { height: 26px; }
 
 /* The drive symbol sits optically centred on the folder names (their x-height is below the box centre). */
@@ -2471,3 +2457,26 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 
 /* Server list: the group column can be hidden (Transmit). */
 .server-split.no-sources .server-sources, .server-split.no-sources .sources-handle { display: none; }
+
+/* Full-height sidebar (Finder, ForkLift). A neutral near-black column in both themes,
+   the same tone as the title bar, with the window buttons (Mac) or the Bitcrane menu
+   (Windows) at its top; tabs and toolbar start right of it. */
+.window-row { flex: 1; min-height: 0; display: flex; }
+.window-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.side-col {
+  flex: none; display: flex; flex-direction: column; min-height: 0;
+  background: #0d0d0d; color: var(--text);
+  --text: #ececee; --text-2: #cfd0d4; --text-muted: #9a9ba1; --text-faint: #75767c; --accent-text: #5fb0ff;
+  --bg-hover: rgba(255, 255, 255, 0.05); --bg-sidebar-sel: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.07); --accent-tint: rgba(95, 176, 255, 0.12);
+  color-scheme: dark;
+}
+.page[data-theme='light'] .side-col { background: #26272b; }
+.side-top { flex: none; display: flex; align-items: center; }
+[data-platform='mac'] .side-top { height: 38px; }
+[data-platform='mac'] .side-top > .traffic { padding: 0 0 0 16px; height: auto; }
+[data-platform='win'] .side-top { height: 44px; padding-left: var(--space-2); }
+.side-handle { border-left: 0 !important; }
+/* The title bar beside the sidebar starts with a fine line instead of the window buttons. */
+.window-row:has(> .side-col) .mac-titlebar, .window-row:has(> .side-col) .win-titlebar { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 var(--line-strong, var(--line)); }
+[data-platform='mac'] .window-row:has(> .side-col) .mac-tabs { border-left: 0; }
