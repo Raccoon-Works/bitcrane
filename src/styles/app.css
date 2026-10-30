@@ -2480,3 +2480,21 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 /* The title bar beside the sidebar starts with a fine line instead of the window buttons. */
 .window-row:has(> .side-col) .mac-titlebar, .window-row:has(> .side-col) .win-titlebar { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 var(--line-strong, var(--line)); }
 [data-platform='mac'] .window-row:has(> .side-col) .mac-tabs { border-left: 0; }
+
+/* Zoom picker (Settings > Darstellung): points on a line, like Spotify. */
+.zoom-picker { margin: var(--space-1) 0 var(--space-3); padding: var(--space-4); border-radius: var(--radius-card); background: var(--bg-section); }
+.zoom-ends { display: flex; justify-content: space-between; font-size: var(--text-small); color: var(--text-muted); margin-bottom: var(--space-2); }
+.zoom-track { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.zoom-track::before { content: ''; position: absolute; left: 4%; right: 4%; top: 10px; height: 1px; background: var(--line-strong, var(--line)); }
+.zoom-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: var(--text-small); cursor: default; }
+.zoom-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--text-faint); background: var(--bg-section); }
+.zoom-step:hover .zoom-dot { border-color: var(--text-muted); }
+.zoom-step.is-on .zoom-dot { border: 4px solid var(--accent-text); }
+.zoom-step.is-on { color: var(--text); font-weight: 600; }
+.zoom-step.is-default .zoom-label { text-decoration: underline dotted; text-underline-offset: 3px; }
+.zoom-reset { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
+
+/* Mac app: the system's window buttons keep their size at every zoom, so the bars around them do too. */
+.page.is-app[data-platform='mac'] .mac-titlebar, .page.is-app[data-platform='mac'] .side-top { height: calc(38px / var(--zoom, 1)); }
+.page.is-app[data-platform='mac'] .mac-titlebar > .traffic { width: calc(86px / var(--zoom, 1)); padding-left: 0; }
+.page.is-app[data-platform='mac'] .side-top > .traffic { width: calc(86px / var(--zoom, 1)); padding-left: 0; }

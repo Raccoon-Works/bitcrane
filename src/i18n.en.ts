@@ -2091,4 +2091,6 @@ export const EN: Record<string, string> = {
   "Seitenleiste einblenden": "Show sidebar",
   "Gruppen einblenden": "Show groups",
   "Gruppen ausblenden": "Hide groups",
+  "Kleiner": "Smaller",
+  "Größer": "Larger",
 };

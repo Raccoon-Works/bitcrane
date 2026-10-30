@@ -182,6 +182,8 @@ export default function App() {
   const zoom = useStore((s) => s.settings.zoom ?? 1);
   useEffect(() => {
     if (LIVE) void import('@tauri-apps/api/webview').then((m) => m.getCurrentWebview().setZoom(zoom)).catch(() => undefined);
+    // The Mac's own window buttons do not zoom: the bar around them keeps its real size (CSS divides by --zoom).
+    document.documentElement.style.setProperty('--zoom', String(LIVE ? zoom : 1));
   }, [zoom]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
