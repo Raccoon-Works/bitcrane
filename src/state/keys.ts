@@ -9,7 +9,7 @@
  */
 import type { Platform } from '../backend/types';
 import {
-  activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, goBack, goForward, LIVE, newFolder, newTab, openDialog,
+  activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
   pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
@@ -43,6 +43,7 @@ export const ACTIONS: ShortcutAction[] = [
   // Transmit: ⌘1 / ⌘2. Windows Explorer: Strg+Umschalt+6 (Details) and Strg+Umschalt+2 (große Symbole).
   { id: 'viewList', group: $t('Darstellung'), label: $t('Als Liste'), mac: ['Mod+1'], win: ['Mod+Shift+6'], run: () => setViewMode(focus(), 'list') },
   { id: 'viewIcons', group: $t('Darstellung'), label: $t('Als Symbole'), mac: ['Mod+2'], win: ['Mod+Shift+2'], run: () => setViewMode(focus(), 'icons') },
+  { id: 'viewColumns', group: $t('Darstellung'), label: $t('Als Spalten'), mac: ['Mod+3'], win: ['Mod+Shift+3'], run: () => setViewMode(focus(), 'columns') },
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
   { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
   { id: 'deepSearch', group: $t('Darstellung'), label: $t('Suche in Unterordnern ein/aus'), mac: ['Mod+Shift+F'], win: ['Mod+Shift+F'], run: () => setDeepSearch(!getState().deepSearchOn) },
@@ -64,6 +65,9 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'paste', group: $t('Dateien'), label: $t('In die andere Hälfte einfügen'), mac: ['Mod+V'], win: ['Mod+V'], run: () => pasteClipboard(focus()), notInText: true },
   { id: 'copyPath', group: $t('Dateien'), label: $t('Pfad kopieren'), mac: ['Mod+Alt+C'], win: ['Mod+Shift+C'], run: () => copyPath(focus()), notInText: true },
   { id: 'newFolder', group: $t('Dateien'), label: $t('Neuer Ordner'), mac: ['Mod+Shift+N'], win: ['Mod+Shift+N'], run: () => newFolder() },
+  { id: 'copyTo', group: $t('Dateien'), label: $t('Kopieren nach …'), mac: [], win: [], run: () => { const side = getState().focusSide; const names = selectedNames(side); if (names.length) openDialog({ type: 'copyTo', side, names }); } },
+  { id: 'undo', group: $t('Dateien'), label: $t('Widerrufen'), mac: ['Mod+Z'], win: ['Mod+Z'], run: () => undoLast(), notInText: true },
+  { id: 'newFile', group: $t('Dateien'), label: $t('Neue Datei'), mac: ['Mod+Alt+N'], win: ['Mod+Alt+N'], run: () => newFile() },
   { id: 'selectMask', group: $t('Dateien'), label: $t('Auswählen nach Muster'), mac: ['Mod+Alt+S'], win: ['Mod+Alt+S'], run: () => openDialog({ type: 'selectMask', side: focus() }) },
   { id: 'invertSelection', group: $t('Dateien'), label: $t('Auswahl umkehren'), mac: ['Mod+Shift+I'], win: ['Mod+Shift+I'], run: () => void import('./tools').then((m) => m.invertSelection(focus())), notInText: true },
 

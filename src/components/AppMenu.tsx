@@ -12,7 +12,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
-  activeTab, askDelete, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFolder, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
+  activeTab, askDelete, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
 import { closeWindow, minimizeWindow, quitApp, toggleMaximizeWindow } from '../util/appWindow';
@@ -20,7 +20,7 @@ import { formatTime } from '../util/format';
 import { keyLabel } from '../state/keys';
 import { BMark } from './icons';
 import { Tooltip } from './ui';
-import { $t, LANG, menuText } from '../i18n';
+import { $t, LOCALE, menuText } from '../i18n';
 
 export interface MenuItem { label: string; mac?: string; win?: string; run?: () => void; danger?: boolean; sep?: boolean }
 export interface MenuDef { id: string; label: string; items: MenuItem[] }
@@ -52,6 +52,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Neue SSH-Verbindung …'), run: () => openDialog({ type: 'quickConnect', terminal: true }) },
         sep,
         { label: $t('Neuer Ordner'), ...sc('newFolder'), run: () => newFolder() },
+        { label: $t('Neue Datei'), ...sc('newFile'), run: () => newFile() },
         { label: $t('Hochladen'), ...sc('upload'), run: () => upload() },
         { label: $t('Herunterladen'), ...sc('download'), run: () => download() },
         sep,
@@ -64,6 +65,8 @@ export function menuDefs(): MenuDef[] {
     },
     {
       id: 'edit', label: $t('Bearbeiten'), items: [
+        { label: $t('Widerrufen'), ...sc('undo'), run: undoLast },
+        sep,
         { label: $t('Kopieren'), ...sc('copy'), run: () => copySelection(focus()) },
         { label: $t('Einfügen'), ...sc('paste'), run: () => pasteClipboard(focus()) },
         { label: $t('Pfad kopieren'), ...sc('copyPath'), run: () => copyPath(focus()) },
@@ -78,6 +81,7 @@ export function menuDefs(): MenuDef[] {
       id: 'view', label: $t('Darstellung'), items: [
         { label: $t('Als Liste'), ...sc('viewList'), run: () => setViewMode(focus(), 'list') },
         { label: $t('Als Symbole'), ...sc('viewIcons'), run: () => setViewMode(focus(), 'icons') },
+        { label: $t('Als Spalten'), ...sc('viewColumns'), run: () => setViewMode(focus(), 'columns') },
         { label: $t('Serverliste zeigen'), run: () => setPaneServerList(focus(), true) },
         sep,
         { label: $t('Info-Spalte ein/aus'), ...sc('inspector'), run: toggleInspector },
@@ -86,6 +90,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Versteckte Dateien ein/aus'), ...sc('hidden'), run: toggleHidden },
         { label: $t('Spalte „Rechte“ ein/aus'), run: togglePermsColumn },
         { label: $t('Seiten tauschen'), run: toggleSwapSides },
+        { label: $t('Hälften untereinander ein/aus'), run: () => updateSettings({ stackHalves: !getState().settings.stackHalves }) },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
         { label: $t('Verzeichnisse vergleichen'), ...sc('compareDirs'), run: toggleCompareDirs },
         { label: $t('Suche in Unterordnern'), ...sc('deepSearch'), run: () => setDeepSearch(!getState().deepSearchOn) },
@@ -182,7 +187,7 @@ export function MacMenuBar() {
   useCloseOnOutside(!!open, ref, close);
   const defs = menuDefs();
   const d = new Date(now);
-  const day = d.toLocaleDateString(LANG === 'en' ? 'en-US' : 'de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+  const day = d.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' });
   return (
     <div className="mac-menubar" ref={ref} role="menubar" aria-label={$t('Menüleiste')}>
       <span className="apple" aria-hidden="true"></span>

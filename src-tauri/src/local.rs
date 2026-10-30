@@ -129,6 +129,15 @@ pub fn mkdir(path: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// "Neue Datei": an empty file; an existing one is never overwritten.
+pub fn new_file(path: &str) -> AppResult<()> {
+    if crate::archive_vfs::split(path).is_some() {
+        return Err(crate::archive_vfs::read_only());
+    }
+    fs::OpenOptions::new().write(true).create_new(true).open(to_native(path))?;
+    Ok(())
+}
+
 pub fn rename(path: &str, new_name: &str) -> AppResult<()> {
     if new_name.contains('/') || new_name.contains('\\') {
         return Err(AppError::new(ErrorKind::Other, "Der Name darf keinen Schrägstrich enthalten."));

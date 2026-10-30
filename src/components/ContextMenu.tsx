@@ -9,15 +9,17 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
 import { addressOf } from './ServerList';
+import { gitFor, gitRun } from '../state/git';
+import { TAG_COLORS, tagName, tagsFor, toggleTag } from '../state/tags';
 import { openExplorerFolder, setExplorerFolder } from '../state/mount';
 import { runCustomCommand } from '../state/tools';
 
-interface Item { label: string; key?: string; run: () => void; danger?: boolean; checked?: boolean }
+interface Item { label: string; key?: string; run: () => void; danger?: boolean; checked?: boolean; /** Colour dot before the label (Finder tags). */ dot?: string }
 
 export function ContextMenu() {
   const menu = useStore((s) => s.contextMenu);
@@ -89,6 +91,19 @@ export function ContextMenu() {
         : [{ label: $t('Im Explorer als Ordner zeigen'), run: () => setExplorerFolder(id, true) }]);
     }
     if (srv && !srv.temporary) groups.push([{ label: $t('Entfernen …'), danger: true, run: () => askRemoveServer(id) }]);
+  } else if (menu.kind === 'git') {
+    // The branch chip of a half: the everyday git commands of its working copy.
+    const st = gitFor(panePath(menu.side));
+    if (st) {
+      groups.push([
+        { label: $t('Commit …'), run: () => openDialog({ type: 'gitCommit', root: st.root }) },
+        { label: $t('Alles hinzufügen'), run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'addAll'); } },
+      ]);
+      groups.push([
+        { label: st.behind ? $t('Pull ({0} neue)', st.behind) : 'Pull', run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'pull'); } },
+        { label: st.ahead ? $t('Push ({0} Commits)', st.ahead) : 'Push', run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'push'); } },
+      ]);
+    }
   } else if (menu.kind === 'serverGroup' && menu.group) {
     const g = menu.group;
     groups.push([{ label: $t('Umbenennen'), run: () => setState({ renamingGroup: g }) }]);
@@ -170,6 +185,7 @@ export function ContextMenu() {
     groups.push(first);
     const second: Item[] = [
       { label: $t('Kopieren'), key: sk('copy'), run: () => copySelection(menu.side) },
+      { label: $t('Kopieren nach …'), key: sk('copyTo'), run: () => openDialog({ type: 'copyTo', side: menu.side, names: menu.names }) },
       { label: $t('Pfad kopieren'), key: sk('copyPath'), run: () => copyPath(menu.side, one) },
     ];
     const web = one && tab && onServer ? webUrlFor(sid, join(panePath(menu.side), one)) : undefined;
@@ -205,7 +221,26 @@ export function ContextMenu() {
     if (one && menu.side === 'remote' && sftpTab) second.push({ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: join(panePath('remote'), one) }) });
     if (one) second.push({ label: $t('Informationen und Rechte …'), key: k('⌘I', 'Strg+I'), run: () => openDialog({ type: 'perms', side: menu.side, path: join(panePath(menu.side), one) }) });
     groups.push(second);
-    const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }];
+    // Finder tags (Mac, this computer): the seven colours, ticked when every chosen file has it.
+    if (!onServer && platform === 'mac') {
+      const dir = panePath(menu.side);
+      const have = tagsFor(dir);
+      groups.push(TAG_COLORS.map((c) => ({
+        label: tagName(c), dot: c.css,
+        checked: menu.names.every((n) => (have[n] ?? []).some((t) => t.color === c.color)),
+        run: () => { setState({ contextMenu: null }); void toggleTag(dir, menu.names, c); },
+      })));
+    }
+    // In a git working copy on this computer: add the chosen files for the next commit.
+    const gst = !onServer ? gitFor(panePath(menu.side)) : null;
+    if (gst) {
+      const rel = menu.names.map((n) => join(panePath(menu.side), n).slice(gst.root.length + 1));
+      groups.push([
+        { label: $t('Git: Für Commit hinzufügen'), run: () => { setState({ contextMenu: null }); void gitRun(gst.root, 'add', { paths: rel }); } },
+        { label: $t('Git: Commit …'), run: () => openDialog({ type: 'gitCommit', root: gst.root }) },
+      ]);
+    }
+    const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) }];
     if (isDir && one) third.push({ label: $t('In neuem Tab öffnen'), run: () => { newTab(); setState({ contextMenu: null }); window.setTimeout(() => openEntry(menu.side, one), 0); } });
     groups.push(third);
     if (commands.length) groups.push(commands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, menu.names) })));
@@ -213,7 +248,7 @@ export function ContextMenu() {
   } else {
     groups.push([
       ...(clip ? [{ label: clip.serverId === (onServer ? sid : '') ? $t('Hier einfügen (Kopie)') : !clip.serverId ? $t('Hier einfügen (hochladen)') : !onServer ? $t('Hier einfügen (herunterladen)') : $t('Hier einfügen (übertragen)'), key: sk('paste'), run: () => pasteClipboard(menu.side) }] : []),
-      { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) },
+      { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) },
       { label: $t('Pfad dieses Ordners kopieren'), run: () => copyPath(menu.side) },
       ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
       { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
@@ -242,6 +277,7 @@ export function ContextMenu() {
             <button key={it.label} type="button" role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={it.checked} className={`menu-item${it.danger ? ' is-danger' : ''}`} onClick={() => { setState({ contextMenu: null }); it.run(); }}>
               {/* As in the system menus: once any item can carry a tick, all texts start at the same edge. */}
               {(it.checked !== undefined || anyCheck) && <span className="menu-check" aria-hidden="true">{it.checked ? <Check size={13} strokeWidth={2.2} /> : null}</span>}
+              {it.dot && <span className="tag-dot menu-tag-dot" style={{ background: it.dot }} aria-hidden="true" />}
               <span className="flex-1">{menuText(it.label)}</span>
               {it.key && <span className="menu-key">{it.key}</span>}
             </button>

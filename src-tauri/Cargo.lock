@@ -647,6 +647,7 @@ dependencies = [
  "objc2-core-graphics",
  "objc2-foundation",
  "percent-encoding",
+ "plist",
  "png",
  "portable-pty",
  "rand 0.10.3",
@@ -684,6 +685,7 @@ dependencies = [
  "webpki-roots",
  "windows-sys 0.61.2",
  "winreg 0.56.0",
+ "xattr",
  "zip",
 ]
 

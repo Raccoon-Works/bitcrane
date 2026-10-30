@@ -177,6 +177,7 @@ export interface Backend {
   localList(path: string): Promise<FileEntry[]>;
   localStat(path: string): Promise<FileEntry>;
   localMkdir(path: string): Promise<void>;
+  localNewFile(path: string): Promise<void>;
   localRename(path: string, newName: string): Promise<void>;
   localTrash(paths: string[]): Promise<void>;
   localChecksum(path: string): Promise<string>;
@@ -246,6 +247,7 @@ export interface Backend {
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;
   remoteMkdir(serverId: string, path: string): Promise<void>;
+  remoteNewFile(serverId: string, path: string): Promise<void>;
   remoteRename(serverId: string, path: string, newName: string): Promise<void>;
   remoteRemove(serverId: string, paths: string[]): Promise<void>;
   remoteMove(serverId: string, from: string, to: string): Promise<void>;

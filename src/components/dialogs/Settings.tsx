@@ -20,7 +20,7 @@ import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
 import { Button, IconButton, Select, Switch, TextField } from '../ui';
-import { $t, LANG } from '../../i18n';
+import { $t, LANGUAGES, LOCALE } from '../../i18n';
 import { SnippetSettings } from './SnippetSettings';
 import { SchemePicker } from '../SchemePicker';
 
@@ -83,7 +83,7 @@ function TerminalSettingsPage() {
         </Row>
         <Row label={$t('Vor dem Einfügen mehrerer Zeilen fragen')} note={$t('Jede Zeile würde sofort ausgeführt.')}><Switch checked={t.pasteWarn} onChange={(v) => set({ pasteWarn: v })} label={$t('Vor dem Einfügen mehrerer Zeilen fragen')} /></Row>
         <Row label={$t('Zeilen zum Zurückblättern')}>
-          <Select value={String(t.scrollback)} onChange={(v) => set({ scrollback: Number(v) })} label={$t('Zeilen zum Zurückblättern')} options={[1000, 5000, 10000, 25000, 50000, 100000].map((n) => ({ value: String(n), label: n.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') }))} />
+          <Select value={String(t.scrollback)} onChange={(v) => set({ scrollback: Number(v) })} label={$t('Zeilen zum Zurückblättern')} options={[1000, 5000, 10000, 25000, 50000, 100000].map((n) => ({ value: String(n), label: n.toLocaleString(LOCALE) }))} />
         </Row>
         <Row label={$t('Terminals beim Start wieder öffnen')} note={$t('Zusammen mit „Tabs vom letzten Mal wieder öffnen“ (Allgemein); Terminals auf Servern starten, sobald die Verbindung steht.')}>
           <Switch checked={t.restore} onChange={(v) => set({ restore: v })} label={$t('Terminals beim Start wieder öffnen')} />
@@ -213,6 +213,52 @@ function KeysSettings() {
       ))}
       {Object.keys(own).length > 0 && <Button onClick={() => updateSettings({ shortcuts: {} })}>{$t('Alle zurücksetzen')}</Button>}
     </>
+  );
+}
+
+/**
+ * "Berechtigungen" (Mac): everything macOS asks the user to allow, in one
+ * place, each with its state where it can be read and a button to the right
+ * page of the System Settings. The state is read again when Bitcrane gets the
+ * focus back (after a visit to the System Settings).
+ */
+function MacPermissions() {
+  const [fullDisk, setFullDisk] = useState<boolean | null>(null);
+  const [notify, setNotify] = useState<boolean | null>(null);
+  const startAtLogin = useStore((st) => st.settings.startAtLogin);
+  useEffect(() => {
+    if (!LIVE) return;
+    const read = () => {
+      void invoke<boolean>('mac_full_disk_access').then(setFullDisk).catch(() => setFullDisk(null));
+      void import('@tauri-apps/plugin-notification').then((m) => m.isPermissionGranted()).then(setNotify).catch(() => setNotify(null));
+    };
+    read();
+    window.addEventListener('focus', read);
+    return () => window.removeEventListener('focus', read);
+  }, []);
+  const open = (page: string) => void invoke('open_mac_settings', { page }).catch(() => undefined);
+  const state = (ok: boolean | null) => ok === null ? null : ok
+    ? <span className="small tone-ok perm-state">{$t('erlaubt')}</span>
+    : <span className="small tone-warn perm-state">{$t('nicht erlaubt')}</span>;
+  return (
+    <Group title={$t('Berechtigungen')}>
+      <Row label={$t('Festplattenvollzugriff')} note={$t('Damit Bitcrane alle Ordner lesen und überwachen kann (Schreibtisch, Dokumente, Downloads, iCloud Drive, externe Laufwerke), ohne dass macOS für jeden einzeln fragt.')}>
+        <span className="row-inline">{state(fullDisk)}<Button small onClick={() => open('fullDisk')}>{$t('Öffnen …')}</Button></span>
+      </Row>
+      <Row label={$t('Mitteilungen')} note={$t('Für Meldungen zu Überwachungen, fertigen Übertragungen und Fehlern.')}>
+        <span className="row-inline">{state(notify)}
+          {notify === false
+            ? <Button small onClick={() => void import('@tauri-apps/plugin-notification').then((m) => m.requestPermission()).then((r) => setNotify(r === 'granted')).catch(() => open('notifications'))}>{$t('Erlauben …')}</Button>
+            : <Button small onClick={() => open('notifications')}>{$t('Öffnen …')}</Button>}
+        </span>
+      </Row>
+      <Row label={$t('Lokales Netzwerk')} note={$t('Für Server im eigenen Netz (NAS, SMB-Freigaben, Raspberry Pi). macOS fragt beim ersten Verbinden; wurde es abgelehnt, hier wieder einschalten.')}>
+        <Button small onClick={() => open('localNetwork')}>{$t('Öffnen …')}</Button>
+      </Row>
+      <Row label={$t('Anmeldeobjekte')} note={startAtLogin ? $t('Bitcrane startet beim Anmelden. macOS zeigt es unter „Anmeldeobjekte“.') : $t('Für „Beim Anmelden am Mac starten“ (Überwachung). macOS zeigt es unter „Anmeldeobjekte“.')}>
+        <Button small onClick={() => open('loginItems')}>{$t('Öffnen …')}</Button>
+      </Row>
+    </Group>
   );
 }
 
@@ -575,7 +621,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
         {current === 'general' && (
           <>
           <Group title={$t('Allgemein')}>
-            <Row label={$t('Sprache')} note={$t('Gilt ab dem nächsten Start.')}><Select value={s.language} onChange={(v) => updateSettings({ language: v })} label={$t('Sprache')} options={[{ value: 'de', label: $t('Deutsch') }, { value: 'en', label: $t('English') }]} /></Row>
+            <Row label={$t('Sprache')} note={$t('Gilt ab dem nächsten Start.')}><Select value={s.language} onChange={(v) => updateSettings({ language: v })} label={$t('Sprache')} options={LANGUAGES.map((l) => ({ value: l.id, label: l.name }))} /></Row>
             <Row label={mac ? $t('Symbol in der Menüleiste zeigen') : $t('Symbol im Infobereich zeigen')} note={$t('Zeigt den Zustand und ein Menü mit Servern, Überwachungen und Einstellungen, auch ohne geöffnetes Fenster. Aus: Bitcrane ist dann nur über das Programmsymbol erreichbar.')}><Switch checked={s.showMenuBarIcon} onChange={(v) => updateSettings({ showMenuBarIcon: v })} label={$t('Symbol zeigen')} /></Row>
             <Row label={mac ? $t('Schnellaktion im Finder') : $t('Eintrag im Explorer-Kontextmenü')} note={mac ? $t('Rechtsklick auf Dateien › Schnellaktionen › „Mit Bitcrane hochladen“.') : $t('Rechtsklick auf Dateien › „Mit Bitcrane hochladen“ (unter Windows 11 in „Weitere Optionen anzeigen“).')}><Switch checked={s.shellIntegration !== false} onChange={(v) => updateSettings({ shellIntegration: v })} label={$t('Mit Bitcrane hochladen')} /></Row>
             <CliRow />
@@ -599,11 +645,6 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
               <Select value={s.newTabRight ?? 'servers'} onChange={(v) => updateSettings({ newTabRight: v as 'servers' | 'local' })} label={$t('Neuer Tab: rechte Hälfte')}
                 options={[{ value: 'servers', label: $t('Serverliste') }, { value: 'local', label: mac ? $t('Dieser Mac') : $t('Dieser PC') }]} />
             </Row>
-            {mac && LIVE && (
-              <Row label={$t('Zugriff auf alle Ordner')} note={$t('macOS fragt sonst bei jedem geschützten Ordner einzeln. Mit „Festplattenvollzugriff“ für Bitcrane entfällt das.')}>
-                <Button small onClick={() => void invoke('open_full_disk_access').catch(() => undefined)}>{$t('Systemeinstellungen öffnen')}</Button>
-              </Row>
-            )}
             <Row label={$t('Cloud-Ordner')} note={$t('Google Drive, OneDrive, Dropbox, iCloud Drive und Box in die Ortsleiste übernehmen.')}>
               <Button small onClick={() => void offerCloudPlaces(true)}>{$t('Suchen …')}</Button>
             </Row>
@@ -632,6 +673,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
               </span>
             </Row>
           </Group>
+          {mac && <MacPermissions />}
           <SyncSettings />
           </>
         )}
@@ -701,6 +743,8 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Spalte „Geändert“')} note={$t('Spalten lassen sich auch mit einem Rechtsklick auf die Spaltenköpfe ein- und ausblenden.')}><Switch checked={s.columns.mtime} onChange={(v) => updateSettings({ columns: { ...s.columns, mtime: v } })} label={$t('Spalte Geändert')} /></Row>
             <Row label={$t('Spalte „Rechte“')}><Switch checked={s.showPerms} onChange={(v) => updateSettings({ showPerms: v })} label={$t('Spalte Rechte')} /></Row>
             <Row label={$t('Spalte „Größe“')}><Switch checked={s.columns.size} onChange={(v) => updateSettings({ columns: { ...s.columns, size: v } })} label={$t('Spalte Größe')} /></Row>
+            <Row label={$t('Hälften untereinander')} note={$t('Für schmale Fenster: die beiden Hälften übereinander statt nebeneinander.')}><Switch checked={!!s.stackHalves} onChange={(v) => updateSettings({ stackHalves: v })} label={$t('Hälften untereinander')} /></Row>
+            <Row label={$t('Git-Status in Ordnern dieses Computers')} note={$t('Zeigt in Git-Projekten geänderte Dateien und den Zweig mit Commit, Pull und Push. Braucht ein installiertes Git.')}><Switch checked={s.gitStatus !== false} onChange={(v) => updateSettings({ gitStatus: v })} label={$t('Git-Status')} /></Row>
             <Row label={$t('Bewegung')} note={$t('Folgt der Systemeinstellung „Bewegung reduzieren“.')}><span className="small muted"><Eye size={13} strokeWidth={1.5} aria-hidden="true" /> {$t('automatisch')}</span></Row>
           </Group>
         )}

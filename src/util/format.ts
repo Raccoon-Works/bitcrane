@@ -1,4 +1,4 @@
-import { $t, LANG } from '../i18n';
+import { $t, LANG, LOCALE } from '../i18n';
 /**
  * Formatting helpers for sizes, dates and file types (German or English).
  */
@@ -14,7 +14,7 @@ export function formatSize(bytes: number): string {
     i++;
   }
   const digits = v < 10 && i > 0 ? 1 : 0;
-  return `${v.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE', { maximumFractionDigits: digits, minimumFractionDigits: 0 })} ${units[i]}`;
+  return `${v.toLocaleString(LOCALE, { maximumFractionDigits: digits, minimumFractionDigits: 0 })} ${units[i]}`;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -27,7 +27,9 @@ export function formatDate(ms: number): string {
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   if (ms >= startToday) return $t('Heute, {0}', time);
   if (ms >= startToday - 86400000) return $t('Gestern, {0}', time);
-  return LANG === 'en' ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  if (LANG === 'en') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (LANG === 'de') return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  return d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 /** "vor 12 Sek.", "vor 3 Min.", "vor 2 Std." or the date. */

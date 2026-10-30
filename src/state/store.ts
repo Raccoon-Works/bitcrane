@@ -22,7 +22,7 @@ import { isCloudProtocol } from '../backend/types';
 import { describeFile, formatSize, matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
-import { $t, LANG, rememberLanguage } from '../i18n';
+import { $t, LANG, rememberLanguage, type Lang } from '../i18n';
 
 /** True inside the desktop app: real files and real servers instead of the demo data. */
 export const LIVE = isTauri;
@@ -52,6 +52,8 @@ export type DialogState =
   | { type: 'toolbar' }
   | { type: 'transfers' }
   | { type: 'confirmDelete'; side: PaneSide; names: string[] }
+  | { type: 'copyTo'; side: PaneSide; names: string[] }
+  | { type: 'gitCommit'; root: string }
   | { type: 'shortcuts' }
   | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
   | { type: 'diff'; transferId: string }
@@ -92,7 +94,7 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'crumbs' | 'serverGroup' | 'placesMore';
+  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
   /** Group right-clicked in the server list ("serverGroup"). */
   group?: string;
   serverId?: string;
@@ -129,8 +131,14 @@ export interface Settings {
   showSystem?: boolean;
   confirmDelete: boolean;
   parallel: number;
+  /** The two halves on top of each other instead of side by side. */
+  stackHalves?: boolean;
+  /** Git state in local file lists (on unless switched off). */
+  gitStatus?: boolean;
+  /** "Kopieren nach …": the folders used last. */
+  copyToRecent?: string[];
   /** Interface language. */
-  language: 'de' | 'en';
+  language: Lang;
   /**
    * "Beim Start öffnen" (after Transmit): the folder of this computer in the left
    * half, and optionally a server for the right half that connects right away.
@@ -253,7 +261,7 @@ export interface Settings {
   /** Places bar of this computer; missing until the user changes it (then the system places are used). */
   localPlaces?: Place[];
   /** List or icons, per half. */
-  viewMode: Record<PaneSide, 'list' | 'icons'>;
+  viewMode: Record<PaneSide, ViewMode>;
 }
 
 export type SortKey = 'name' | 'mtime' | 'size' | 'perms' | 'kind' | 'owner';
@@ -845,6 +853,29 @@ export function paneStatus(side: PaneSide, s: AppState = state): { loading: bool
  * folders carry their path relative to the folder shown as `name` (e.g.
  * "cogs/welcome.py") and their nesting level as `depth`.
  */
+export type ViewMode = 'list' | 'icons' | 'columns';
+
+/**
+ * Entries of any folder of a half, filtered and sorted like the half itself
+ * (column view: the folder above and the folder chosen). Undefined until read.
+ */
+export function folderRows(side: PaneSide, dir: string, s: AppState = state): FileEntry[] | undefined {
+  const t = activeTab(s);
+  if (!t) return undefined;
+  const loc = paneLoc(side, t);
+  let list = listEntries(...loc, dir);
+  if (!list) return undefined;
+  if (!s.settings.showSystem) list = list.filter((e) => (e.hidden ?? 0) < 2);
+  if (!s.settings.showHidden) list = list.filter((e) => !e.name.startsWith('.') && !e.hidden);
+  return sortEntries(list, s.settings.sort[side]);
+}
+
+/** Reads a folder of a half when it is not cached yet (call from effects, not while rendering). */
+export function loadFolder(side: PaneSide, dir: string) {
+  const t = activeTab();
+  if (t && LIVE) live.requestListing(...paneLoc(side, t), dir);
+}
+
 export function paneEntries(side: PaneSide, s: AppState = state): FileEntry[] {
   const t = activeTab(s);
   if (!t || paneShowsServers(side, t)) return [];
@@ -884,8 +915,8 @@ export function toggleExpand(side: PaneSide, rel: string) {
   if (!open && LIVE) live.requestListing(...paneLoc(side, t), paths.join(panePath(side), rel));
 }
 
-/** Switches a half between list and icons. */
-export function setViewMode(side: PaneSide, mode: 'list' | 'icons') {
+/** Switches a half between list, icons and columns. */
+export function setViewMode(side: PaneSide, mode: ViewMode) {
   setState((s) => ({ settings: { ...s.settings, viewMode: { ...s.settings.viewMode, [side]: mode } } }));
 }
 
@@ -1465,6 +1496,39 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
 }
 
 /** Renames several entries at once (from the "Mehrere umbenennen" window). */
+/* ------------------------------------------------------------------ Undo */
+
+/**
+ * "Widerrufen" for file actions (ForkLift): renaming, moving on this computer
+ * and new files and folders can be taken back with ⌘Z / Ctrl+Z, the last one
+ * first. Deleting is not on the list: on this computer it goes to the trash
+ * (put back from there), on a server it is final and asked for beforehand.
+ */
+interface UndoEntry { label: string; run: () => Promise<unknown> | void }
+const undoStack: UndoEntry[] = [];
+
+export function pushUndo(entry: UndoEntry) {
+  undoStack.push(entry);
+  if (undoStack.length > 30) undoStack.shift();
+}
+
+export function undoLast() {
+  const e = undoStack.pop();
+  if (!e) {
+    showToast($t('Nichts zum Widerrufen.'));
+    return;
+  }
+  void Promise.resolve(e.run()).then((ok) => { if (ok !== false) showToast($t('Widerrufen: {0}', e.label), 'ok'); });
+}
+
+/** Renames in a folder of a place (this computer or a server); for undo. */
+function renameAt(side: PaneSide, serverId: string, dir: string, from: string, to: string): Promise<boolean> {
+  if (LIVE) return live.renameEntry(side, serverId, dir, from, to);
+  const ok = fs.rename(side, serverId, paths.join(dir, from), to);
+  setState((s) => ({ fsRev: s.fsRev + 1 }));
+  return Promise.resolve(!!ok);
+}
+
 export function renameMany(side: PaneSide, pairs: Array<[string, string]>) {
   const t = activeTab();
   setState({ dialog: null });
@@ -1474,13 +1538,18 @@ export function renameMany(side: PaneSide, pairs: Array<[string, string]>) {
   if (LIVE) {
     void (async () => {
       let ok = 0;
-      for (const [from, to] of pairs) if (await live.renameEntry(...paneLoc(side, t), dir, from, to)) ok++;
+      const loc = paneLoc(side, t);
+      const done: Array<[string, string]> = [];
+      for (const [from, to] of pairs) if (await live.renameEntry(...loc, dir, from, to)) { ok++; done.push([from, to]); }
+      if (done.length) pushUndo({ label: $t('{0} Objekte umbenannt', done.length), run: async () => { for (const [from, to] of [...done].reverse()) await renameAt(...loc, dir, to, from); } });
       showToast(ok === pairs.length ? $t('{0} Objekte umbenannt.', ok) : $t('{0} von {1} umbenannt.', ok, pairs.length), ok === pairs.length ? 'ok' : 'error');
       if (state.activeTabId === t.id && panePath(side) === dir) setState((s) => ({ selection: { ...s.selection, [side]: { names: pairs.map((p) => p[1]), cursor: -1, anchor: -1 } } }));
     })();
     return;
   }
   for (const [from, to] of pairs) fs.rename(...paneLoc(side, t), paths.join(dir, from), to);
+  const loc = paneLoc(side, t);
+  pushUndo({ label: $t('{0} Objekte umbenannt', pairs.length), run: async () => { for (const [from, to] of [...pairs].reverse()) await renameAt(...loc, dir, to, from); } });
   setState((s) => ({ fsRev: s.fsRev + 1, selection: { ...s.selection, [side]: { names: pairs.map((p) => p[1]), cursor: -1, anchor: -1 } } }));
   showToast($t('{0} Objekte umbenannt.', pairs.length), 'ok');
 }
@@ -1932,15 +2001,18 @@ export function commitRename(side: PaneSide, oldName: string, newName: string) {
   }
   const dir = prefix ? paths.join(panePath(side), prefix.slice(0, -1)) : panePath(side);
   const selectRenamed = () => setState((s) => ({ selection: { ...s.selection, [side]: { ...s.selection[side], names: [prefix + name] } } }));
+  const loc = paneLoc(side, t);
+  const undo = () => pushUndo({ label: $t('„{0}“ umbenannt', name), run: () => renameAt(...loc, dir, name, base) });
   if (LIVE) {
-    void live.renameEntry(...paneLoc(side, t), dir, base, name).then((ok) => { if (ok) selectRenamed(); });
+    void live.renameEntry(...loc, dir, base, name).then((ok) => { if (ok) { selectRenamed(); undo(); } });
     return;
   }
-  const ok = fs.rename(...paneLoc(side, t), paths.join(dir, base), name);
+  const ok = fs.rename(...loc, paths.join(dir, base), name);
   if (!ok) {
     showToast($t('„{0}“ gibt es hier schon.', name), 'error');
     return;
   }
+  undo();
   setState((s) => ({ fsRev: s.fsRev + 1 }));
   selectRenamed();
 }
@@ -1957,6 +2029,7 @@ export function newFolder(side: PaneSide = state.focusSide) {
   if (LIVE) {
     const dir = panePath(side);
     void live.makeFolder(...loc, dir, name).then((ok) => {
+      if (ok) pushUndo({ label: $t('Neuer Ordner „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
       if (ok && state.activeTabId === t.id && panePath(side) === dir) setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
     });
     setState({ contextMenu: null });
@@ -1966,6 +2039,34 @@ export function newFolder(side: PaneSide = state.focusSide) {
   setState((s) => ({ fsRev: s.fsRev + 1, focusSide: side, contextMenu: null }));
   const idx = paneEntries(side).findIndex((e) => e.name === name);
   setState((s) => ({ selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } }, renaming: { side, name } }));
+}
+
+/** "Neue Datei" (ForkLift): an empty text file, named right away. */
+export function newFile(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  if (!t) return;
+  const loc = paneLoc(side, t);
+  if (loc[0] === 'remote' && isOffline(loc[1])) return;
+  const existing = new Set((listEntries(...loc, panePath(side)) ?? []).map((e) => e.name));
+  let name = $t('Neue Datei.txt');
+  let i = 2;
+  while (existing.has(name)) name = $t('Neue Datei {0}.txt', i++);
+  const dir = panePath(side);
+  const select = () => {
+    const idx = paneEntries(side).findIndex((e) => e.name === name);
+    setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } }, renaming: { side, name } }));
+  };
+  setState({ contextMenu: null });
+  if (LIVE) {
+    void live.makeFile(...loc, dir, name).then((ok) => {
+      if (ok) pushUndo({ label: $t('Neue Datei „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
+      if (ok && state.activeTabId === t.id && panePath(side) === dir) select();
+    });
+    return;
+  }
+  fs.writeFile(...loc, paths.join(dir, name), 0);
+  setState((s) => ({ fsRev: s.fsRev + 1 }));
+  select();
 }
 
 export function askDelete(side: PaneSide, names = selectedNames(side)) {
@@ -2239,6 +2340,27 @@ function transferNames(from: string, fromDir: string, names: string[], to: strin
 }
 
 /** Copies or moves between two folders of this computer; names may carry a relative path. */
+/**
+ * "Kopieren nach …" (ForkLift): the chosen entries of a half into a folder of
+ * this computer, without opening it in the other half first. From a server
+ * that is a download; on this computer a copy or, if chosen, a move.
+ */
+export function copyTo(side: PaneSide, names: string[], toDir: string, move = false) {
+  const t = activeTab();
+  if (!t || !names.length) return;
+  setState({ dialog: null });
+  const from = placeOf(side, t);
+  const fromDir = panePath(side);
+  if (!from && fromDir === toDir) {
+    showToast($t('Das ist schon der Ordner der Dateien.'));
+    return;
+  }
+  if (!from) copyOrMoveLocal(fromDir, names, toDir, move);
+  else transferNames(from, fromDir, names, '', toDir);
+  const recent = [toDir, ...(state.settings.copyToRecent ?? []).filter((p) => p !== toDir)].slice(0, 6);
+  updateSettings({ copyToRecent: recent });
+}
+
 function copyOrMoveLocal(fromDir: string, names: string[], toDir: string, move: boolean) {
   setState({ contextMenu: null });
   const groups = new Map<string, string[]>();
@@ -2256,7 +2378,11 @@ function copyOrMoveLocal(fromDir: string, names: string[], toDir: string, move: 
       openDialog({ type: 'mergeFolders', fromDir: src, names: list, toDir, move, clashes });
       continue;
     }
-    if (LIVE) { void (move ? live.moveLocal(src, list, toDir) : live.copyLocal(src, list, toDir)); continue; }
+    if (LIVE) {
+      if (move) void live.moveLocal(src, list, toDir).then((made) => { if (made?.length) pushUndo({ label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length), run: () => live.moveLocal(toDir, made, src) }); });
+      else void live.copyLocal(src, list, toDir);
+      continue;
+    }
     showToast(move ? $t('{0} Objekte verschoben (simuliert).', list.length) : $t('{0} Objekte kopiert (simuliert).', list.length), 'ok');
   }
 }

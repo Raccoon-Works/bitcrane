@@ -1,26 +1,48 @@
 /**
- * Interface language. German texts are the keys; `en.ts` holds the English
- * versions. The language is read once at start (it is also kept in local
- * storage so it is known before the settings file is loaded); a change in
- * the settings applies after the next start.
+ * Interface language. German texts are the keys; `i18n.en.ts` holds the
+ * English versions and `locales/<lang>.json` the other languages. The language
+ * is read once at start (it is also kept in local storage so it is known
+ * before the settings file is loaded); a change in the settings applies after
+ * the next start. A text missing in a language falls back to English, then
+ * to the German original.
  */
 import { EN } from './i18n.en';
 
-export type Lang = 'de' | 'en';
+export type Lang = 'de' | 'en' | 'fr' | 'es' | 'it' | 'nl' | 'pl';
+
+/** Languages with their own name, for the settings. */
+export const LANGUAGES: Array<{ id: Lang; name: string; locale: string }> = [
+  { id: 'de', name: 'Deutsch', locale: 'de-DE' },
+  { id: 'en', name: 'English', locale: 'en-US' },
+  { id: 'fr', name: 'Français', locale: 'fr-FR' },
+  { id: 'es', name: 'Español', locale: 'es-ES' },
+  { id: 'it', name: 'Italiano', locale: 'it-IT' },
+  { id: 'nl', name: 'Nederlands', locale: 'nl-NL' },
+  { id: 'pl', name: 'Polski', locale: 'pl-PL' },
+];
 
 const STORE_KEY = 'bitcrane.language';
+const isLang = (v: unknown): v is Lang => LANGUAGES.some((l) => l.id === v);
 
 function initial(): Lang {
   try {
     const saved = localStorage.getItem(STORE_KEY);
-    if (saved === 'de' || saved === 'en') return saved;
+    if (isLang(saved)) return saved;
   } catch {
     // Storage blocked: fall back to the system language.
   }
-  return (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+  const sys = (navigator.language || 'de').toLowerCase().slice(0, 2);
+  return isLang(sys) ? sys : 'en';
 }
 
 export const LANG: Lang = initial();
+
+/** Locale for numbers and dates in the interface language. */
+export const LOCALE: string = LANGUAGES.find((l) => l.id === LANG)?.locale ?? 'de-DE';
+
+/** The other languages are bundled as JSON (German original → translation). */
+const OTHER = import.meta.glob<Record<string, string>>('./locales/*.json', { eager: true, import: 'default' });
+const DICT: Record<string, string> | null = LANG === 'de' ? null : LANG === 'en' ? EN : { ...EN, ...(OTHER[`./locales/${LANG}.json`] ?? {}) };
 
 /** Remembers the language for the next start. */
 export function rememberLanguage(lang: Lang) {
@@ -32,21 +54,21 @@ export function rememberLanguage(lang: Lang) {
 }
 
 /** Patterns for texts with variable parts (messages from the Rust side). */
-const PATTERNS: Array<[RegExp, string]> = Object.entries(EN)
+const PATTERNS: Array<[RegExp, string]> = Object.entries(DICT ?? {})
   .filter(([k]) => /\{\d\}/.test(k))
   .map(([k, v]) => [new RegExp('^' + k.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\\?\{(\d)\\?\}/g, '(.*?)') + '$', 's'), v]);
 
 /** Translates a text; `{0}`, `{1}` … are replaced by the arguments. */
 export function $t(text: string, ...args: unknown[]): string {
   // "Wort#context" tells apart equal German words with different meanings.
-  const out = LANG === 'en' ? EN[text] ?? text.split('#')[0] : text.split('#')[0];
+  const out = DICT ? DICT[text] ?? text.split('#')[0] : text.split('#')[0];
   return args.length ? out.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)] ?? '')) : out;
 }
 
 /** Translates a complete text from outside (e.g. an error message from the backend). */
 export function tr(message: string): string {
-  if (LANG !== 'en' || !message) return message;
-  if (EN[message]) return EN[message];
+  if (!DICT || !message) return message;
+  if (DICT[message]) return DICT[message];
   for (const [re, en] of PATTERNS) {
     const m = message.match(re);
     if (m) return en.replace(/\{(\d)\}/g, (_, i) => tr(m[Number(i) + 1] ?? ''));

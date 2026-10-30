@@ -2,6 +2,8 @@
  * Root component: page background, scaled stage with the app window,
  * dialogs, global keyboard shortcuts and the prototype control bar.
  */
+import { CopyToDialog } from './components/dialogs/CopyToDialog';
+import { GitCommit } from './components/dialogs/GitCommit';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
@@ -50,6 +52,8 @@ function Dialogs() {
     case 'toolbar': return <ToolbarCustomize />;
     case 'transfers': return <TransfersDialog />;
     case 'confirmDelete': return <ConfirmDelete side={dialog.side} names={dialog.names} />;
+    case 'copyTo': return <CopyToDialog side={dialog.side} names={dialog.names} />;
+    case 'gitCommit': return <GitCommit root={dialog.root} />;
     case 'shortcuts': return <Shortcuts />;
     case 'checksum': return <ChecksumDialog side={dialog.side} name={dialog.name} />;
     case 'symlink': return <SymlinkDialog target={dialog.target} />;
