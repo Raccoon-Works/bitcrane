@@ -72,7 +72,7 @@
 [data-platform='mac'][data-theme='dark'] {
   --bg-desktop: radial-gradient(120% 90% at 20% 0%, #24314d 0%, #1a1d2b 45%, #141418 100%);
   --bg-window: #161618;
-  --bg-sidebar: rgba(44, 44, 48, 0.72);
+  --bg-sidebar: transparent;
   --sidebar-border: 1px solid rgba(255, 255, 255, 0.07);
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.35);
   --bg-card: #1e1e21;
