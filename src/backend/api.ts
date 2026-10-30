@@ -143,7 +143,7 @@ export interface ImportedServer {
   user: string;
   protocol: 'sftp' | 'ftp' | 'ftps' | 'webdav';
   implicitTls: boolean;
-  auth: 'key' | 'agent' | 'password';
+  auth: 'key' | 'agent' | 'password' | 'auto';
   keyPath?: string;
   remoteDir?: string;
   localDir?: string;

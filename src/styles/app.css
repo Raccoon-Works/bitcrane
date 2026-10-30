@@ -2356,3 +2356,8 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .set-search-head:hover { color: var(--accent-text); }
 .set-search-head .set-tab-icon { display: inline-grid; }
 .set-search-empty { padding: var(--space-6) 0; text-align: center; }
+
+/* Two-way sync: a file changed on both sides gets a choice instead of an arrow. */
+.sync-row .sync-conflict { grid-column: span 1; min-width: 0; }
+.sync-list.has-conflicts .sync-row { grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) 150px minmax(0, 1fr); }
+.sync-conflict .select, .sync-conflict select { width: 100%; font-size: 12px; }

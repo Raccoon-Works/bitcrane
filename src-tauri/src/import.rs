@@ -1,5 +1,6 @@
 //! Import of saved servers from other programs: FileZilla (sitemanager.xml),
-//! WinSCP (Windows registry or WinSCP.ini) and the OpenSSH configuration.
+//! WinSCP (Windows registry or WinSCP.ini), Cyberduck / Mountain Duck
+//! (bookmark files), PuTTY (Windows registry) and the OpenSSH configuration.
 //! Passwords are never taken over; they are asked for on the first connection.
 
 use crate::paths::{home, to_ui};
@@ -84,7 +85,178 @@ pub fn find_all() -> ImportResult {
         sources.push("WinSCP".into());
         servers.extend(list);
     }
+
+    let mut duck_found = false;
+    for dir in cyberduck_dirs() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        duck_found = true;
+        for e in entries.flatten() {
+            let path = e.path();
+            if path.extension().and_then(|x| x.to_str()) != Some("duck") {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                servers.extend(parse_cyberduck(&text));
+            }
+        }
+    }
+    if duck_found {
+        sources.push("Cyberduck".into());
+    }
+
+    if let Some(list) = read_putty() {
+        sources.push("PuTTY".into());
+        servers.extend(list);
+    }
     ImportResult { servers, sources }
+}
+
+/* ------------------------------------------------------------------ Cyberduck */
+
+/// Bookmark folders of Cyberduck (and Mountain Duck, which shares them):
+/// one `.duck` file (an XML property list) per bookmark.
+fn cyberduck_dirs() -> Vec<PathBuf> {
+    let mut v = Vec::new();
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        v.push(Path::new(&appdata).join("Cyberduck").join("Bookmarks"));
+    }
+    let lib = home().join("Library");
+    v.push(lib.join("Group Containers").join("G69SCX94XU.duck").join("Library").join("Application Support").join("duck").join("Bookmarks"));
+    v.push(lib.join("Application Support").join("Cyberduck").join("Bookmarks"));
+    v
+}
+
+/// One Cyberduck bookmark. Keys of the property list: Protocol, Nickname,
+/// Hostname, Port, Username, Path, "Private Key File"; the first label
+/// becomes the group. Protocols Bitcrane has no counterpart for (S3, cloud
+/// services) are left out.
+pub fn parse_cyberduck(text: &str) -> Vec<ImportedServer> {
+    // Property lists start with a DOCTYPE, which roxmltree refuses unless allowed.
+    let opts = roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() };
+    let Ok(doc) = roxmltree::Document::parse_with_options(text, opts) else { return Vec::new() };
+    let Some(dict) = doc.descendants().find(|n| n.has_tag_name("dict")) else { return Vec::new() };
+    // A plist dict alternates <key> and value elements.
+    let items: Vec<roxmltree::Node> = dict.children().filter(|n| n.is_element()).collect();
+    let mut string = std::collections::HashMap::new();
+    let mut labels = Vec::new();
+    for pair in items.chunks(2) {
+        let [k, v] = pair else { continue };
+        if !k.has_tag_name("key") {
+            continue;
+        }
+        let key = k.text().unwrap_or("").to_string();
+        if v.has_tag_name("array") {
+            if key == "Labels" {
+                labels = v.children().filter(|c| c.has_tag_name("string")).filter_map(|c| c.text()).map(|t| t.trim().to_string()).collect();
+            }
+        } else {
+            string.insert(key, v.text().unwrap_or("").trim().to_string());
+        }
+    }
+    let get = |k: &str| string.get(k).cloned().unwrap_or_default();
+    let host = get("Hostname");
+    if host.is_empty() {
+        return Vec::new();
+    }
+    let (protocol, implicit_tls, default_port) = match get("Protocol").to_ascii_lowercase().as_str() {
+        "sftp" | "scp" => ("sftp", false, 22),
+        "ftp" => ("ftp", false, 21),
+        "ftps" => ("ftps", false, 21),
+        "dav" | "davs" => ("webdav", false, if get("Protocol").eq_ignore_ascii_case("dav") { 80 } else { 443 }),
+        _ => return Vec::new(),
+    };
+    let key = get("Private Key File");
+    let name = get("Nickname");
+    vec![ImportedServer {
+        source: "Cyberduck".into(),
+        name: if name.is_empty() { host.clone() } else { name },
+        group: labels.into_iter().next().unwrap_or_default(),
+        port: get("Port").parse().unwrap_or(default_port),
+        user: get("Username"),
+        protocol: protocol.into(),
+        implicit_tls,
+        auth: if protocol != "sftp" { "password".into() } else if key.is_empty() { "agent".into() } else { "key".into() },
+        key_path: (!key.is_empty()).then(|| to_ui(Path::new(&key))),
+        remote_dir: Some(get("Path")).filter(|p| !p.is_empty()),
+        local_dir: None,
+        jump: None,
+        host,
+    }]
+}
+
+/* ---------------------------------------------------------------------- PuTTY */
+
+/// PuTTY's saved sessions (Windows registry): SSH sessions only, with their
+/// .ppk key file (Bitcrane reads PuTTY keys, see keys.rs).
+fn read_putty() -> Option<Vec<ImportedServer>> {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let sessions = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\SimonTatham\PuTTY\Sessions").ok()?;
+        let mut out = Vec::new();
+        for raw in sessions.enum_keys().flatten() {
+            let Ok(key) = sessions.open_subkey(&raw) else { continue };
+            let s = |v: &str| key.get_value::<String, _>(v).unwrap_or_default();
+            let port = key.get_value::<u32, _>("PortNumber").unwrap_or(22);
+            if let Some(server) = putty_session(&raw, &s("Protocol"), &s("HostName"), port, &s("UserName"), &s("PublicKeyFile")) {
+                out.push(server);
+            }
+        }
+        return Some(out);
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+/// One PuTTY session; the registry key name is percent-encoded ("My%20Server").
+pub fn putty_session(raw_name: &str, protocol: &str, host: &str, port: u32, user: &str, key_file: &str) -> Option<ImportedServer> {
+    let name = percent_decode(raw_name);
+    if name == "Default Settings" || !protocol.eq_ignore_ascii_case("ssh") {
+        return None;
+    }
+    // HostName may carry the user: "admin@server".
+    let (user_in_host, host) = match host.rsplit_once('@') {
+        Some((u, h)) => (u.to_string(), h.to_string()),
+        None => (String::new(), host.to_string()),
+    };
+    if host.trim().is_empty() {
+        return None;
+    }
+    let user = if user.is_empty() { user_in_host } else { user.to_string() };
+    Some(ImportedServer {
+        source: "PuTTY".into(),
+        name,
+        group: String::new(),
+        host: host.trim().to_string(),
+        port: u16::try_from(port).unwrap_or(22),
+        user,
+        protocol: "sftp".into(),
+        implicit_tls: false,
+        auth: if key_file.trim().is_empty() { "auto".into() } else { "key".into() },
+        key_path: (!key_file.trim().is_empty()).then(|| to_ui(Path::new(key_file.trim()))),
+        remote_dir: None,
+        local_dir: None,
+        jump: None,
+    })
+}
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /* ---------------------------------------------------------------------- Tabby */
@@ -310,6 +482,42 @@ fn read_winscp() -> Option<Vec<ImportedServer>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cyberduck_bookmark() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Protocol</key><string>sftp</string>
+  <key>Nickname</key><string>Web</string>
+  <key>Hostname</key><string>web.example</string>
+  <key>Port</key><string>2222</string>
+  <key>Username</key><string>deploy</string>
+  <key>Path</key><string>/var/www</string>
+  <key>Labels</key><array><string>Kunden</string></array>
+</dict></plist>"#;
+        let s = parse_cyberduck(xml);
+        assert_eq!(s.len(), 1);
+        assert_eq!((s[0].name.as_str(), s[0].host.as_str(), s[0].port, s[0].user.as_str()), ("Web", "web.example", 2222, "deploy"));
+        assert_eq!(s[0].group, "Kunden");
+        assert_eq!(s[0].remote_dir.as_deref(), Some("/var/www"));
+        assert_eq!(s[0].auth, "agent");
+        let s3 = xml.replace("<string>sftp</string>", "<string>s3</string>");
+        assert!(parse_cyberduck(&s3).is_empty());
+        let dav = xml.replace("<string>sftp</string>", "<string>davs</string>").replace("<key>Port</key><string>2222</string>", "");
+        let d = parse_cyberduck(&dav);
+        assert_eq!((d[0].protocol.as_str(), d[0].port), ("webdav", 443));
+    }
+
+    #[test]
+    fn putty_sessions() {
+        let s = putty_session("My%20Bot", "ssh", "admin@bot.example", 2200, "", "").unwrap();
+        assert_eq!((s.name.as_str(), s.host.as_str(), s.user.as_str(), s.port), ("My Bot", "bot.example", "admin", 2200));
+        assert!(putty_session("Default%20Settings", "ssh", "x", 22, "", "").is_none());
+        assert!(putty_session("Telnet", "telnet", "x", 23, "", "").is_none());
+        let u = putty_session("Web", "ssh", "web.example", 22, "deploy", "C:\\k.ppk").unwrap();
+        assert_eq!((u.user.as_str(), u.auth.as_str()), ("deploy", "key"));
+    }
 
     #[test]
     fn filezilla_sites() {

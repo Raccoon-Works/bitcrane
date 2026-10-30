@@ -12,7 +12,7 @@ import { addLog } from './log';
 import { connectServer, isConnected } from './live';
 import { notify } from './shell';
 import { getState, ruleFor, runSyncBetween, serverById, updateSettings, watchForLocal, type SyncFavorite } from './store';
-import { actionsOf, contentDiffers, planLines, sameSizePairs, walkPlace, type Place } from './syncPlan';
+import { actionsOf, baseKey, contentDiffers, learnBase, planLines, sameSizePairs, walkPlace, type Place } from './syncPlan';
 import { $t } from '../i18n';
 
 const HOUR_MS = 3600 * 1000;
@@ -65,22 +65,26 @@ export async function runScheduled(f: SyncFavorite): Promise<void> {
     const own = (!leftServer ? watchForLocal(f.local)?.excludes : undefined) ?? s.defaultExcludes;
     const excludes = [...new Set([...own, ...[leftServer, rightServer].filter(Boolean).flatMap((sid) => ruleFor(sid, undefined, undefined, false)?.excludes ?? [])])];
     const differs = f.byContent ? await contentDiffers(left, right, sameSizePairs(local, remote, excludes)) : null;
-    const base = { direction: f.direction, bySize: f.bySize, days: f.days ?? 0, excludes, differs };
+    const agreed = f.direction === 'both' ? learnBase(baseKey(left, right), local, remote) : null;
+    const base = { direction: f.direction, bySize: f.bySize, days: f.days ?? 0, excludes, differs, base: agreed };
     const allowDelete = f.deletes && !!f.schedule?.allowDelete;
     const lines = planLines(local, remote, { ...base, deletes: allowDelete });
     // What a run with deleting would have removed; reported, not done.
     const notDeleted = f.deletes && !allowDelete ? planLines(local, remote, { ...base, deletes: true }).filter((l) => l.action.startsWith('delete')).length : 0;
     const actions = actionsOf(lines);
+    // Changed on both sides: never decided by a scheduled run, only reported.
+    const conflicts = lines.filter((l) => l.action === 'conflict').length;
     const { n, deleteCount } = actions.length ? runSyncBetween(leftServer, f.local, rightServer, f.remote, actions) : { n: 0, deleteCount: 0 };
     const parts = [
       n ? $t('{0} übertragen', n) : '',
       deleteCount ? $t('{0} gelöscht', deleteCount) : '',
       notDeleted ? $t('{0} nicht gelöscht (Löschen ist für geplante Läufe aus)', notDeleted) : '',
+      conflicts ? $t('{0} auf beiden Seiten geändert, bitte im Abgleichfenster entscheiden', conflicts) : '',
     ].filter(Boolean);
     const result = parts.length ? parts.join(', ') : $t('nichts zu tun');
     saveResult(f.id, result);
     addLog(n || deleteCount ? 'ok' : 'info', $t('Geplanter Abgleich „{0}“: {1}', f.name, result), rightServer || leftServer || undefined);
-    if (n || deleteCount || notDeleted) void notify($t('Abgleich „{0}“', f.name), result);
+    if (n || deleteCount || notDeleted || conflicts) void notify($t('Abgleich „{0}“', f.name), result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     saveResult(f.id, $t('Fehler: {0}', msg));

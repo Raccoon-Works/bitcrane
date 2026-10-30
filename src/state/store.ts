@@ -2882,6 +2882,8 @@ export function importServers(list: ImportedServer[]) {
     auth: s.protocol === 'sftp' ? s.auth : 'password', keyPath: s.keyPath ?? '~/.ssh/id_ed25519', group: s.group,
     localStart: s.localDir ?? '~', remoteStart: s.remoteDir ?? '', online: false,
     protocol: s.protocol, implicitTls: s.implicitTls || undefined,
+    // WebDAV from Cyberduck: plain http only on port 80.
+    ...(s.protocol === 'webdav' ? { davHttps: s.port !== 80 } : {}),
   }));
   // ProxyJump names refer to other entries of the SSH configuration.
   const all = [...state.servers, ...created];
