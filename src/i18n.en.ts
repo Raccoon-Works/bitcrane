@@ -1979,4 +1979,8 @@ export const EN: Record<string, string> = {
   "Einstellungen durchsuchen": "Search settings",
   "Suchergebnisse": "Search results",
   "Keine Einstellung zu „{0}“ gefunden.": "No setting found for \"{0}\".",
+  "Alles im Fenster größer oder kleiner, auch mit ⌘ + Plus/Minus, ⌘ + 0 setzt zurück.": "Everything in the window larger or smaller, also with ⌘ + plus/minus; ⌘ + 0 resets.",
+  "Statt der farbigen Bitcrane-Symbole die Symbole von macOS zeigen.": "Show the macOS icons instead of Bitcrane's coloured ones.",
+  "Statt der farbigen Bitcrane-Symbole die Symbole von Windows zeigen.": "Show the Windows icons instead of Bitcrane's coloured ones.",
+  "Neue SSH-Verbindung": "New SSH connection",
 };
