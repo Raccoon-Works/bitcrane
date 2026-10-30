@@ -30,6 +30,8 @@ export interface TermSession {
   alive: boolean;
   /** Terminals on this computer: the shell chosen in the "+" menu; missing = the setting. */
   shell?: string;
+  /** Its name for the session tab ("Git Bash" instead of "Lokal"). */
+  shellName?: string;
 }
 
 export interface Snippet {
@@ -306,8 +308,10 @@ export function newTerminal(where?: 'local' | 'server', full = false, shell?: st
     return;
   }
   const serverId = onServer ? t.serverId : '';
-  const number = getState().terminals.filter((x) => x.serverId === serverId).reduce((n, x) => Math.max(n, x.number), 0) + 1;
-  const session: TermSession = { id: uid('term'), serverId, tabId: t.id, number, alive: true, ...(serverId || !shell ? {} : { shell }) };
+  const own = !serverId && shell ? shell : '';
+  const number = getState().terminals.filter((x) => x.serverId === serverId && (x.shell ?? '') === own).reduce((n, x) => Math.max(n, x.number), 0) + 1;
+  const shellName = own ? shellList?.find((x) => x.id === own)?.name : undefined;
+  const session: TermSession = { id: uid('term'), serverId, tabId: t.id, number, alive: true, ...(own ? { shell: own, ...(shellName ? { shellName } : {}) } : {}) };
   live.set(session.id, makeTerminal(session));
   setState((s) => ({ terminals: [...s.terminals, session] }));
   patchTab(t.id, { open: true, active: session.id, full: full || t.terminal?.full });

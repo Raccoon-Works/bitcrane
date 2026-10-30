@@ -106,13 +106,14 @@ export function TransfersDialog() {
       <div className="tr-top">
         <Segmented<Filter> label={$t('Filter')} value={filter} onChange={setFilter} options={[{ value: 'all', label: $t('Alle') }, { value: 'up', label: $t('Hochladen') }, { value: 'down', label: $t('Herunterladen') }, { value: 'watch', label: $t('Überwachung') }]} />
         <span className="flex-1" />
-        <Button small onClick={pauseAllTransfers}>{anyActive ? <><Pause size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle pausieren')}</> : <><Play size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle fortsetzen')}</>}</Button>
+        {/* Nothing running and nothing paused: no button (it would do nothing). */}
+        {(anyActive || transfers.some((t) => t.state === 'paused')) && <Button small onClick={pauseAllTransfers}>{anyActive ? <><Pause size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle pausieren')}</> : <><Play size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle fortsetzen')}</>}</Button>}
       </div>
       <div className="tr-stats">
-        <div><span className="stat tone-accent">{running.length}</span><span className="small muted">{$t('laufen gerade')}</span></div>
+        <div><span className={`stat${running.length ? ' tone-accent' : ''}`}>{running.length}</span><span className="small muted">{$t('laufen gerade')}</span></div>
         <div><span className="stat">{waiting.length}</span><span className="small muted">{$t('warten')}</span></div>
-        <div><span className="stat tone-danger">{errors.length}</span><span className="small muted">{$t('Fehler')}</span></div>
-        <div><span className="stat tone-ok">{today}</span><span className="small muted">{$t('heute fertig')}</span></div>
+        <div><span className={`stat${errors.length ? ' tone-danger' : ''}`}>{errors.length}</span><span className="small muted">{$t('Fehler')}</span></div>
+        <div><span className={`stat${today ? ' tone-ok' : ''}`}>{today}</span><span className="small muted">{$t('heute fertig')}</span></div>
         <div><span className="stat">{running.length ? formatSpeed(speed) : '–'}</span><span className="small muted">{$t('Geschwindigkeit')}</span></div>
         <div><span className="stat">{totalBytes ? `${Math.floor((doneBytes / totalBytes) * 100)} %` : '–'}</span><span className="small muted">{totalBytes ? $t('von {0}', formatSize(totalBytes)) : $t('gesamt')}</span></div>
         <div><span className="stat">{remaining > 0 ? formatDuration(remaining) : '–'}</span><span className="small muted">{$t('Restzeit')}</span></div>

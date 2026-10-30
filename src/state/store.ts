@@ -540,10 +540,15 @@ function detectPlatform(): Platform {
   return /Win/i.test(p) ? 'win' : 'mac';
 }
 
+/**
+ * A host page (e.g. the artifact viewer) may fix the theme on the root element.
+ * Read once at load: the app itself writes data-theme on the root later, and
+ * reading it then would turn "Wie das System" into the last chosen theme.
+ */
+const HOST_THEME = typeof document !== 'undefined' ? document.documentElement.dataset.theme : undefined;
+
 function detectTheme(): Theme {
-  // A host page (e.g. the artifact viewer) may already fix the theme on the root element.
-  const fixed = document.documentElement.dataset.theme;
-  if (fixed === 'dark' || fixed === 'light') return fixed;
+  if (HOST_THEME === 'dark' || HOST_THEME === 'light') return HOST_THEME;
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
