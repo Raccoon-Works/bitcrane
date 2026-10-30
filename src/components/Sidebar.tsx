@@ -10,6 +10,8 @@
  * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
 import { ClockCounterClockwise, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, HardDrive, HardDrives, House, Usb, Network } from '@phosphor-icons/react';
+import { invoke } from '@tauri-apps/api/core';
+import { useEffect, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t } from '../i18n';
 import { LIVE, activeTab, localPlaces, navigate, openDialog, openPlace, setRightLocal, setState, useStore } from '../state/store';
@@ -45,11 +47,51 @@ function mockDrives(mac: boolean): Place[] {
     : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads' }, { name: 'Z: (NAS)', path: '~/Projekte/newsbot', network: true }];
 }
 
+/** Account part of a cloud folder's name ("GoogleDrive-name@example.com" → "name"). */
+function accountOf(place: Place): string {
+  const folder = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+  if (!place.cloud || !folder.includes('-')) return '';
+  return folder.slice(folder.indexOf('-') + 1).split('@')[0];
+}
+
+/**
+ * Favourites as shown: a folder reached by two paths (e.g. ~/Dropbox and its
+ * target in ~/Library/CloudStorage) appears once; two accounts of the same
+ * service keep both entries and are told apart by the account name.
+ */
+function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }> {
+  const [real, setReal] = useState<Record<string, string>>({});
+  const key = places.map((p) => p.path).join('\n');
+  useEffect(() => {
+    if (!LIVE || !places.length) return;
+    let live = true;
+    void invoke<string[]>('local_real_paths', { list: places.map((p) => p.path) })
+      .then((r) => { if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path]))); })
+      .catch(() => {});
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const seen = new Set<string>();
+  const unique = places.filter((p) => {
+    const target = real[p.path] ?? p.path;
+    if (seen.has(target)) return false;
+    seen.add(target);
+    return true;
+  });
+  return unique.map((p) => {
+    const label = placeLabel(p);
+    const twin = unique.some((o) => o !== p && placeLabel(o) === label);
+    const acc = twin ? accountOf(p) : '';
+    return { place: p, label: acc ? `${label} (${acc})` : label };
+  });
+}
+
 export function Sidebar() {
   const platform = useStore((s) => s.platform);
   const focus = useStore((s) => s.focusSide);
   const tab = useStore((s) => activeTab(s));
   const places = useStore((s) => localPlaces(s));
+  const shown = useShownPlaces(places);
   const recentAll = useStore((s) => s.settings.recentDirs);
   const liveDrives = useStore((s) => s.drives);
   const width = useStore((s) => s.settings.sidebarWidth ?? 200);
@@ -86,7 +128,7 @@ export function Sidebar() {
     <nav className="sidebar" aria-label={$t('Seitenleiste')} style={{ width }}>
       <div className={`side-group${dropHere ? ' is-drop' : ''}`} data-sidebar-favs="">
         <div className="side-title">{$t('Favoriten')}</div>
-        {places.map((p) => item(`p:${p.path}`, <PlaceIcon place={p} />, placeLabel(p), p.path, () => open(p.path), {
+        {shown.map(({ place: p, label }) => item(`p:${p.path}`, <PlaceIcon place={p} />, label, p.path, () => open(p.path), {
           onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarPlace', place: p.path } }); },
         }))}
         {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
