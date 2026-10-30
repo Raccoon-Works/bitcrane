@@ -16,7 +16,8 @@ import { LIVE, type SyncAction } from './store';
 export type Direction = 'up' | 'down' | 'both';
 
 export interface Side { size: number; mtime: number; path: string }
-export interface Line { rel: string; local?: Side; remote?: Side; action: SyncAction['kind'] | 'none' }
+/** 'conflict': both sides changed since the last sync; the user decides (never done by itself). */
+export interface Line { rel: string; local?: Side; remote?: Side; action: SyncAction['kind'] | 'none' | 'conflict' }
 /** One half as a place: this computer ('') or a server id, with the folder. */
 export interface Place { serverId: string; dir: string; name: string }
 
@@ -29,6 +30,63 @@ export interface PlanOptions {
   excludes: string[];
   /** Checksum results for files of equal size (true = content differs), when "Inhalt prüfen" is on. */
   differs?: Map<string, boolean> | null;
+  /** "Beide Richtungen": the state both sides last agreed on (see learnBase). */
+  base?: Base | null;
+}
+
+/**
+ * The last agreed state of a folder pair, per file: size and time both sides
+ * had when they were last seen equal. With it, "Beide Richtungen" can tell
+ * which side changed a file (and a conflict when both did) and that a file
+ * missing on one side was deleted there rather than new on the other.
+ *
+ * Only states actually seen on both sides are recorded, never a planned one:
+ * a transfer that fails leaves the old entry, so the next comparison simply
+ * offers it again instead of copying the stale side back.
+ */
+export type Base = Map<string, [number, number]>;
+
+const BASE_PREFIX = 'bitcrane.syncBase.';
+
+/** Key of a folder pair (the same pair from a favourite or by hand shares it). */
+export function baseKey(left: Place, right: Place): string {
+  return `${BASE_PREFIX}${left.serverId}|${left.dir}||${right.serverId}|${right.dir}`;
+}
+
+export function loadBase(key: string): Base {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? new Map(Object.entries(JSON.parse(raw) as Record<string, [number, number]>)) : new Map();
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Updates the agreed state from what both sides show now: files equal on both
+ * sides are recorded, files gone from both are dropped. Returns the base as it
+ * was before (that is the one to plan with) and stores the new one.
+ */
+export function learnBase(key: string, local: Map<string, Side>, remote: Map<string, Side>): Base {
+  const before = loadBase(key);
+  const next: Base = new Map(before);
+  for (const rel of new Set([...local.keys(), ...remote.keys(), ...before.keys()])) {
+    const l = local.get(rel);
+    const r = remote.get(rel);
+    if (l && r && l.size === r.size && Math.abs(l.mtime - r.mtime) <= TOLERANCE_MS) next.set(rel, [l.size, l.mtime]);
+    else if (!l && !r) next.delete(rel);
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(Object.fromEntries(next)));
+  } catch {
+    // Storage full or unavailable: two-way then works without the memory (newer file wins).
+  }
+  return before;
+}
+
+/** Whether a side differs from the agreed state. */
+function changedSince(side: Side, agreed: [number, number]): boolean {
+  return side.size !== agreed[0] || Math.abs(side.mtime - agreed[1]) > TOLERANCE_MS;
 }
 
 /** Margin for "same time": SFTP and FTP keep whole seconds or less. */
@@ -102,12 +160,23 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
     const localNewer = l && r && l.mtime - r.mtime > TOLERANCE_MS;
     const remoteNewer = l && r && r.mtime - l.mtime > TOLERANCE_MS;
     let action: Line['action'] = 'none';
-    if (l && !r) action = o.direction === 'down' ? (o.deletes ? 'deleteLocal' : 'none') : 'upload';
-    else if (!l && r) action = o.direction === 'up' ? (o.deletes ? 'deleteRemote' : 'none') : 'download';
-    else if (differsNow) {
+    const agreed = o.direction === 'both' ? o.base?.get(rel) : undefined;
+    if (l && !r) {
+      // Two-way: gone on the right although it was there and the left copy is unchanged = deleted there.
+      if (agreed && !changedSince(l, agreed)) action = o.deletes ? 'deleteLocal' : 'upload';
+      else action = o.direction === 'down' ? (o.deletes ? 'deleteLocal' : 'none') : 'upload';
+    } else if (!l && r) {
+      if (agreed && !changedSince(r, agreed)) action = o.deletes ? 'deleteRemote' : 'download';
+      else action = o.direction === 'up' ? (o.deletes ? 'deleteRemote' : 'none') : 'download';
+    } else if (differsNow) {
       if (o.direction === 'up') action = o.bySize || contentChanged || localNewer || !remoteNewer ? 'upload' : 'none';
       else if (o.direction === 'down') action = o.bySize || contentChanged || remoteNewer || !localNewer ? 'download' : 'none';
-      else action = localNewer ? 'upload' : remoteNewer ? 'download' : 'none';
+      else if (agreed && l && r) {
+        // The side that changed since the last sync wins; both changed = conflict.
+        const lc = changedSince(l, agreed);
+        const rc = changedSince(r, agreed);
+        action = lc && rc ? 'conflict' : lc ? 'upload' : rc ? 'download' : localNewer ? 'upload' : remoteNewer ? 'download' : 'conflict';
+      } else action = localNewer ? 'upload' : remoteNewer ? 'download' : 'conflict';
     }
     out.push({ rel, local: l, remote: r, action });
   }
@@ -116,7 +185,7 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
 
 /** Sync actions for the lines with something to do. */
 export function actionsOf(lines: Line[]): SyncAction[] {
-  return lines.filter((l) => l.action !== 'none').map((l) => ({
+  return lines.filter((l) => l.action !== 'none' && l.action !== 'conflict').map((l) => ({
     kind: l.action as SyncAction['kind'], rel: l.rel, size: (l.action === 'download' ? l.remote : l.local)?.size ?? 0,
   }));
 }

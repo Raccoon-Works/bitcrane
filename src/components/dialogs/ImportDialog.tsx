@@ -1,5 +1,5 @@
 /**
- * "Server importieren": shows the servers saved in FileZilla, WinSCP and the
+ * "Server importieren": shows the servers saved in FileZilla, WinSCP, Cyberduck, PuTTY and the
  * SSH configuration; ticked ones are added to Bitcrane. Passwords are never
  * taken over (they are asked for on the first connection).
  */
@@ -52,14 +52,14 @@ export function ImportDialog() {
     <Dialog
       label={$t('Server importieren')}
       title={$t('Server importieren')}
-      subtitle={$t('Aus FileZilla, WinSCP und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.')}
+      subtitle={$t('Aus FileZilla, WinSCP, Cyberduck, PuTTY und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.')}
       width={760}
       maxHeight={680}
       footer={<><span className="small muted">{picked.size ? $t('{0} ausgewählt', picked.size) : ''}</span><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!picked.size} onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}>{$t('Übernehmen')}</Button></>}
     >
       {!found && <span className="row-inline muted"><Loader2 size={14} className="spin" aria-hidden="true" />{$t('Wird gesucht …')}</span>}
       {found && !found.servers.length && (
-        <p className="muted">{$t('Keine gespeicherten Server gefunden. Gesucht wurde in: FileZilla (sitemanager.xml), WinSCP (Registry bzw. WinSCP.ini) und ~/.ssh/config.')}</p>
+        <p className="muted">{$t('Keine gespeicherten Server gefunden. Gesucht wurde in: FileZilla (sitemanager.xml), WinSCP (Registry bzw. WinSCP.ini), Cyberduck und Mountain Duck (Lesezeichen), PuTTY (Registry) und ~/.ssh/config.')}</p>
       )}
       {found && found.servers.length > 0 && (
         <div className="form-stack">
@@ -75,7 +75,7 @@ export function ImportDialog() {
                       <span className="small muted mono ellipsis">{s.user ? `${s.user}@` : ''}{s.host}:{s.port}{s.remoteDir ? ` · ${s.remoteDir}` : ''}</span>
                     </span>
                     <span className="small muted">{protoLabel(s)}</span>
-                    <span className="small muted">{s.auth === 'key' ? $t('Schlüssel') : s.auth === 'agent' ? $t('Agent') : $t('Passwort')}</span>
+                    <span className="small muted">{s.auth === 'key' ? $t('Schlüssel') : s.auth === 'agent' ? $t('Agent') : s.auth === 'auto' ? $t('Automatisch') : $t('Passwort')}</span>
                     {existing.has(keyOf(s)) ? <span className="tag">{$t('schon vorhanden')}</span> : firstIndex(found.servers, s) !== i && <span className="tag">{$t('doppelt')}</span>}
                   </label>
                 )))}
