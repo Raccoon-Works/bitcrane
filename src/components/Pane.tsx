@@ -213,20 +213,7 @@ export function Pane({ side }: { side: PaneSide }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
 
-  if (!tab) return null;
-
-  if (showServers) {
-    return (
-      <section data-side={side} className={`pane is-servers${focusSide === side ? ' is-focused' : ''}`} aria-label={$t('Server')} onMouseDown={() => setFocusSide(side)}>
-        <ServerList side={side} />
-      </section>
-    );
-  }
-
-  // All levels while they fit; when space runs out the first ones fold into "…" (Explorer).
-  const allCrumbs = path ? crumbsFor(path, homeName) : [];
-  const crumbs = allCrumbs.slice(Math.min(crumbsHidden, Math.max(0, allCrumbs.length - 1)));
-  const icons = viewMode === 'icons';
+  // All hooks stay above the early returns below, so their order never changes.
   // Column view (Finder, ForkLift): the folder above, the folder shown, and what the chosen folder holds.
   const colView = viewMode === 'columns' && !deep;
   const parentDir = colView && path && paths.parent(path) !== path ? paths.parent(path) : null;
@@ -241,6 +228,27 @@ export function Pane({ side }: { side: PaneSide }) {
   const parentColRef = useRef<HTMLDivElement>(null);
   // The folder shown stays in view in the column above it.
   useEffect(() => { parentColRef.current?.querySelector('.is-here')?.scrollIntoView({ block: 'nearest' }); }, [parentDir, parentRows]);
+  // Git working copies on this computer: changed files and the branch (ForkLift).
+  const gitOn = useStore((s) => s.settings.gitStatus !== false);
+  const git = useGit(path, !onServer && gitOn && !!path);
+  // Finder tags (Mac, this computer).
+  const isMac = useStore((s) => s.platform === 'mac');
+  const tags = useTags(path, !onServer && !!path && isMac);
+
+  if (!tab) return null;
+
+  if (showServers) {
+    return (
+      <section data-side={side} className={`pane is-servers${focusSide === side ? ' is-focused' : ''}`} aria-label={$t('Server')} onMouseDown={() => setFocusSide(side)}>
+        <ServerList side={side} />
+      </section>
+    );
+  }
+
+  // All levels while they fit; when space runs out the first ones fold into "…" (Explorer).
+  const allCrumbs = path ? crumbsFor(path, homeName) : [];
+  const crumbs = allCrumbs.slice(Math.min(crumbsHidden, Math.max(0, allCrumbs.length - 1)));
+  const icons = viewMode === 'icons';
   /** A row of the side columns: the folder above or the chosen folder's contents. */
   const sideRow = (e: FileEntry, here: boolean, onPick: () => void, onOpen: () => void) => (
     <div key={e.name} role="option" aria-selected={here} className={`row${here ? ' is-sel-inactive is-here' : ''}`}
@@ -260,12 +268,6 @@ export function Pane({ side }: { side: PaneSide }) {
   };
 
   const watched = !onServer && !!watchForLocal(path);
-  // Git working copies on this computer: changed files and the branch (ForkLift).
-  const gitOn = useStore((s) => s.settings.gitStatus !== false);
-  const git = useGit(path, !onServer && gitOn && !!path);
-  // Finder tags (Mac, this computer).
-  const isMac = useStore((s) => s.platform === 'mac');
-  const tags = useTags(path, !onServer && !!path && isMac);
   const stateLabel = !onServer
     ? (watched ? { text: $t('überwacht'), tone: 'accent' } : null)
     : offline ? { text: $t('getrennt'), tone: 'warn' } : status.connecting ? { text: $t('verbindet'), tone: 'muted' } : server?.online ? { text: $t('verbunden'), tone: 'ok' } : { text: $t('nicht verbunden'), tone: 'muted' };
