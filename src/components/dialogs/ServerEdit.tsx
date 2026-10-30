@@ -375,7 +375,10 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal }: { serverI
                   </div>
                   {keyPanel && <KeyPanel server={draft} onCreated={(p) => set('keyPath', p)} onClose={() => setKeyPanel(false)} />}
                   {!LIVE && <span className="small tone-ok row-inline"><Check size={12} strokeWidth={2.2} aria-hidden="true" />{$t('ED25519 · Passphrase {0} gespeichert', store)}</span>}
-                  {LIVE && keyInfo && !keyInfo.exists && <span className="small tone-danger row-inline"><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />{$t('Datei nicht gefunden')}</span>}
+                  {/* "Automatisch" only tries the key; a missing one is normal there (agent or password follow). */}
+                  {LIVE && keyInfo && !keyInfo.exists && (draft.auth === 'auto'
+                    ? <span className="small muted">{$t('Kein Schlüssel unter diesem Pfad. Dann versucht Bitcrane den Agent und das Passwort.')}</span>
+                    : <span className="small tone-danger row-inline"><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />{$t('Datei nicht gefunden')}</span>)}
                   {LIVE && keyInfo?.invalid && <span className="small tone-danger row-inline"><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />{$t('Das ist kein privater SSH-Schlüssel')}</span>}
                   {LIVE && keyInfo?.exists && !keyInfo.invalid && (
                     <span className="small muted row-inline"><KeyRound size={12} strokeWidth={1.75} aria-hidden="true" />

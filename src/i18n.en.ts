@@ -1972,4 +1972,8 @@ export const EN: Record<string, string> = {
   "Noch kein SSH-Server gespeichert.": "No SSH server saved yet.",
   "Neue SSH-Verbindung …": "New SSH connection …",
   "SSH-Server anlegen …": "Add SSH server …",
+  "Kein Schlüssel unter diesem Pfad. Dann versucht Bitcrane den Agent und das Passwort.": "No key at this path. Bitcrane then tries the agent and the password.",
+  "Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnest du mit dem Terminal-Knopf oben oder {1}; ein Rechtsklick auf den Knopf zeigt die Auswahl (Shell, SSH-Server).": "Terminal shortcuts: copy and paste with {0}. Open a terminal with the Terminal button at the top or {1}; a right click on the button shows the choice (shell, SSH server).",
+  "Änderungen in überwachten Ordnern": "Changes in watched folders",
+  "meldet das System sofort": "reported by the system right away",
 };

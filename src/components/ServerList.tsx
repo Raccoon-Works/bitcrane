@@ -376,10 +376,10 @@ function QuickForm({ side }: { side: PaneSide }) {
     const dir = path.trim() ? (path.trim().startsWith('/') ? path.trim() : `/${path.trim()}`) : '';
     return `${protocol}://${user.trim() ? `${user.trim()}@` : ''}${h}${p}${dir}`;
   };
-  const go = (save: boolean) => {
+  const go = (save: boolean, terminal = false) => {
     const a = address();
     if (!a) return;
-    quickConnect(a, save, 'auto', side, password || undefined);
+    quickConnect(a, save, 'auto', side, password || undefined, terminal ? 'terminal' : undefined);
   };
   // A recent address fills the form again.
   const fill = (a: string) => {
@@ -416,6 +416,8 @@ function QuickForm({ side }: { side: PaneSide }) {
         : $t('Das Passwort gilt nur für diese Verbindung. Mit „Zu Servern hinzufügen“ wird es in der Windows-Anmeldeinformationsverwaltung gesichert.')}</p>
       <div className="quick-buttons">
         <Button onClick={() => go(true)} disabled={!host.trim()}>{$t('Zu Servern hinzufügen')}</Button>
+        {/* SSH only: straight into a terminal tab, without the file view. */}
+        {protocol === 'sftp' && <Button onClick={() => go(false, true)} disabled={!host.trim()}>{$t('Terminal')}</Button>}
         <Button variant="primary" type="submit" className="btn-go" disabled={!host.trim()}>{$t('Verbinden')}</Button>
       </div>
       {recent.length > 0 && (
@@ -431,5 +433,5 @@ function QuickForm({ side }: { side: PaneSide }) {
 }
 
 function protocolLabel(p: QuickProtocol): string {
-  return { sftp: 'SFTP', ftp: 'FTP', ftpes: $t('FTPS (explizit)'), ftps: $t('FTPS (implizit)'), davs: 'WebDAV (HTTPS)', dav: 'WebDAV (HTTP)', smb: $t('SMB (Windows-Freigabe, NAS)') }[p];
+  return { sftp: 'SFTP / SSH', ftp: 'FTP', ftpes: $t('FTPS (explizit)'), ftps: $t('FTPS (implizit)'), davs: 'WebDAV (HTTPS)', dav: 'WebDAV (HTTP)', smb: $t('SMB (Windows-Freigabe, NAS)') }[p];
 }

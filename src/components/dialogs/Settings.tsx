@@ -101,7 +101,7 @@ function TerminalSettingsPage() {
       <Group title={$t('Snippets')}>
         <SnippetSettings />
       </Group>
-      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), formatCombo(keysFor('terminal', getState().platform)[0] ?? '', getState().platform))}</span>
+      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnest du mit dem Terminal-Knopf oben oder {1}; ein Rechtsklick auf den Knopf zeigt die Auswahl (Shell, SSH-Server).', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), formatCombo(keysFor('terminal', getState().platform)[0] ?? '', getState().platform))}</span>
     </>
   );
 }
@@ -669,7 +669,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
               <Switch checked={s.sftpLinks} onChange={(v) => updateSettings({ sftpLinks: v })} label={$t('sftp-Links mit Bitcrane öffnen')} />
             </Row>
             <Row label={$t('SSH-Konfiguration lesen')} note={$t('Kurznamen aus ~/.ssh/config funktionieren in „Schnell verbinden“, und neue Server lassen sich von dort übernehmen.')}><Switch checked={s.readSshConfig} onChange={(v) => updateSettings({ readSshConfig: v })} label={$t('SSH-Konfiguration lesen')} /></Row>
-            <Row label={$t('Überwachungen pro Ordner')}><span className="small muted"><Radio size={13} strokeWidth={1.5} aria-hidden="true" /> {mac ? 'FSEvents' : 'ReadDirectoryChangesW'}</span></Row>
+            <Row label={$t('Änderungen in überwachten Ordnern')}><span className="small muted" title={mac ? 'FSEvents' : 'ReadDirectoryChangesW'}><Radio size={13} strokeWidth={1.5} aria-hidden="true" /> {$t('meldet das System sofort')}</span></Row>
           </Group>
           </>
         )}

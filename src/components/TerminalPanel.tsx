@@ -90,7 +90,7 @@ export function TerminalPanel() {
   if (!tab || !t?.open || !sessions.length) return null;
   const active = sessions.find((x) => x.id === t.active) ?? sessions[0];
   const full = !!t.full;
-  const label = (n: number, serverId: string) => `${serverId ? serverById(serverId)?.name ?? '' : $t('Lokal')}${n > 1 ? ` ${n}` : ''}`;
+  const label = (x: { number: number; serverId: string; shellName?: string }) => `${x.serverId ? serverById(x.serverId)?.name ?? '' : x.shellName ?? $t('Lokal')}${x.number > 1 ? ` ${x.number}` : ''}`;
   return (
     <section className={`term-panel${full ? ' is-full' : ''}`} style={{ ...(full ? {} : { height }), '--term-bg': themeFor(active.serverId).background, '--term-fg': themeFor(active.serverId).foreground } as CSSProperties} aria-label={$t('Terminal')}>
       {!full && (
@@ -102,7 +102,7 @@ export function TerminalPanel() {
           {sessions.map((x) => (
             <span key={x.id} role="tab" aria-selected={x.id === active.id} className={`term-tab${x.id === active.id ? ' is-active' : ''}${x.alive ? '' : ' is-ended'}`}
               onClick={() => setActiveTerminal(tab.id, x.id)}>
-              <span className="ellipsis">{label(x.number, x.serverId)}</span>
+              <span className="ellipsis">{label(x)}</span>
               <button type="button" className="term-tab-close" aria-label={$t('Terminal schließen')} onClick={(e) => { e.stopPropagation(); closeTerminal(x.id); }}><X size={11} weight="bold" /></button>
             </span>
           ))}
