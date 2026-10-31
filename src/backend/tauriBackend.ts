@@ -129,6 +129,7 @@ export const tauriBackend: Backend = {
   secretDelete: (account) => invoke('secret_delete', { account }),
   sshConfigHosts: () => invoke('ssh_config_hosts'),
   importFind: () => invoke('import_find'),
+  importFile: (path) => invoke('import_file', { path }),
   fileWrite: (path, text) => invoke('file_write', { path, text }),
   fileRead: (path) => invoke('file_read', { path }),
 

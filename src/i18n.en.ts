@@ -2162,4 +2162,9 @@ export const EN: Record<string, string> = {
   "Server": "Server",
   "Windows-Installer": "Windows installer",
   "Willkommen bei {0}": "Welcome to {0}",
+  "Aus FileZilla, WinSCP, Cyberduck, PuTTY, der SSH-Konfiguration oder einer exportierten Datei (etwa aus Transmit). Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.": "From FileZilla, WinSCP, Cyberduck, PuTTY, the SSH configuration or an exported file (for example from Transmit). Passwords are not taken over; Bitcrane asks for them on the first connection.",
+  "Aus Datei …": "From File …",
+  "Exportierte Server wählen": "Choose Exported Servers",
+  "Server-Export": "Server export",
+  "In dieser Datei wurden keine Server erkannt. Unterstützt: Transmit-Export (unverschlüsselt), FileZilla, WinSCP.ini und Cyberduck-Lesezeichen.": "No servers were recognised in this file. Supported: Transmit export (unencrypted), FileZilla, WinSCP.ini and Cyberduck bookmarks.",
 };

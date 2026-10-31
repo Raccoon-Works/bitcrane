@@ -2160,5 +2160,10 @@
   "Änderungen der Versionen": "Versie-informatie",
   "Server": "Server",
   "Windows-Installer": "Windows-installatieprogramma",
-  "Willkommen bei {0}": "Welkom bij {0}"
+  "Willkommen bei {0}": "Welkom bij {0}",
+  "Aus FileZilla, WinSCP, Cyberduck, PuTTY, der SSH-Konfiguration oder einer exportierten Datei (etwa aus Transmit). Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.": "Uit FileZilla, WinSCP, Cyberduck, PuTTY, de SSH-configuratie of een geëxporteerd bestand (bijvoorbeeld uit Transmit). Wachtwoorden worden niet overgenomen; Bitcrane vraagt erom bij de eerste verbinding.",
+  "Aus Datei …": "Uit bestand …",
+  "Exportierte Server wählen": "Geëxporteerde servers kiezen",
+  "Server-Export": "Serverexport",
+  "In dieser Datei wurden keine Server erkannt. Unterstützt: Transmit-Export (unverschlüsselt), FileZilla, WinSCP.ini und Cyberduck-Lesezeichen.": "In dit bestand zijn geen servers herkend. Ondersteund: Transmit-export (onversleuteld), FileZilla, WinSCP.ini en Cyberduck-bladwijzers."
 }

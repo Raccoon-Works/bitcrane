@@ -2570,5 +2570,5 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .side-item.is-drop-before { box-shadow: inset 0 2px 0 var(--accent-text); }
 /* Wordmark: "Bit" bold, "crane" regular, so the two words show without a capital C (decided 31.10.2026). */
 .wm-bit { font-weight: 800; }
-.wm-crane { font-weight: 300; color: var(--text-2, inherit); }
+.wm-crane { font-weight: 300; opacity: 0.92; }
 .wordmark { letter-spacing: -0.01em; }

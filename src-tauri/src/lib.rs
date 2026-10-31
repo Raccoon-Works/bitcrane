@@ -1651,6 +1651,12 @@ fn import_find() -> import::ImportResult {
     import::find_all()
 }
 
+/// Servers from an exported file the user chose (Transmit, FileZilla, WinSCP, Cyberduck).
+#[tauri::command]
+fn import_file(path: String) -> Vec<import::ImportedServer> {
+    import::from_file(std::path::Path::new(&path))
+}
+
 #[tauri::command]
 fn ssh_config_hosts() -> Vec<sshconfig::SshConfigHost> {
     sshconfig::read_hosts()
@@ -1895,6 +1901,7 @@ pub fn run() {
             secret_delete,
             ssh_config_hosts,
             import_find,
+            import_file,
             tabby_config,
             file_write,
             sync_read,
