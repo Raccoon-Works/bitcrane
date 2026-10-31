@@ -1727,6 +1727,22 @@ pub fn run() {
                 }
             });
         })
+        // Finder symbol of one item, e.g. an app's own icon (Mac, see sysicons::png_for_path).
+        .register_asynchronous_uri_scheme_protocol("itemicon", |_ctx, request, responder| {
+            let path = request.uri().path().to_string();
+            std::thread::spawn(move || {
+                let response = match sysicons::png_for_path(&path) {
+                    Some(bytes) => tauri::http::Response::builder()
+                        .header("Content-Type", "image/png")
+                        .header("Cache-Control", "max-age=3600")
+                        .body(bytes),
+                    None => tauri::http::Response::builder().status(404).body(Vec::new()),
+                };
+                if let Ok(r) = response {
+                    responder.respond(r);
+                }
+            });
+        })
         // PDF, audio and video in the preview window (see local::media_response).
         .register_asynchronous_uri_scheme_protocol("media", |_ctx, request, responder| {
             let path = request.uri().path().to_string();

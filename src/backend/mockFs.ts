@@ -104,6 +104,8 @@ function taskbotRemote(): DirNode {
     logs: dir({
       'bot.log': file(412 * 1024, ago(1 * MIN)),
       'error.log': file(18 * 1024, ago(2 * HOUR)),
+      // A large folder (rotated hourly logs), to try long lists in the prototype.
+      archiv: dir(Object.fromEntries(Array.from({ length: 2400 }, (_, i) => [`bot-${String(Math.floor(i / 24) + 1).padStart(3, '0')}-${String(i % 24).padStart(2, '0')}h.log`, file(20 * 1024 + ((i * 7919) % 90000), ago((i + 1) * HOUR))]))),
     }, ago(1 * MIN)),
     'bot.py': file(14 * 1024, ago(9 * MIN)),
     'config.py': file(3 * 1024, ago(1 * DAY + 4 * HOUR)),

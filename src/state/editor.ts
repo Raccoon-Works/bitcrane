@@ -17,7 +17,8 @@ import { useSyncExternalStore } from 'react';
 import { $t } from '../i18n';
 import * as paths from '../util/paths';
 import { addLog } from './log';
-import { LIVE, serverById, setState, showToast } from './store';
+import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
+import { isConnected } from './live';
 
 export interface EditorDoc {
   id: string;
@@ -70,9 +71,35 @@ const newId = () => `doc-${Date.now().toString(36)}-${++counter}`;
 
 /** Shows the editor (over the file halves); with no document a new, empty one is made. */
 export function showEditor() {
-  if (!st.docs.length) newDocument();
+  if (!st.docs.length && !restoreDocs()) newDocument();
   set({ open: true });
 }
+
+/**
+ * The documents that were open last time come back when the editor is first
+ * shown: files of this computer always, server files when that server is
+ * connected. Returns true when something was opened.
+ */
+let restored = false;
+function restoreDocs(): boolean {
+  if (restored) return false;
+  restored = true;
+  const list = getState().settings.editorDocs ?? [];
+  const ok = list.filter((d) => !d.serverId || (LIVE ? isConnected(d.serverId) : true));
+  for (const d of ok) void openFile(d.serverId, d.path);
+  return ok.length > 0;
+}
+
+// Remembers the open files (not new, unsaved documents) for the next start.
+let lastSaved = '';
+listeners.add(() => {
+  const list = st.docs.filter((d) => d.serverId !== null && !d.error).map((d) => ({ serverId: d.serverId as string, path: d.path }));
+  const key = JSON.stringify(list);
+  if (key === lastSaved || (!restored && !list.length)) return;
+  lastSaved = key;
+  restored = true;
+  updateSettings({ editorDocs: list });
+});
 
 /** Back to the file halves; the documents stay open. */
 export function hideEditor() {
@@ -93,6 +120,8 @@ export function newDocument() {
 
 /** Opens a file in the editor (or switches to it when it is open already). */
 export async function openFile(serverId: string, path: string) {
+  // The files of last time come along (like most editors), the new one comes on top.
+  if (!restored) restoreDocs();
   const known = st.docs.find((d) => d.serverId === serverId && d.path === path);
   if (known) {
     set({ active: known.id, open: true });

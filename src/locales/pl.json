@@ -2145,5 +2145,19 @@
   "„{0}“ gesichert.": "Zapisano „{0}”.",
   "„{0}“ hat Änderungen, die noch nicht gesichert sind.": "„{0}” ma niezapisane zmiany.",
   "„{0}“ schließen": "Zamknij „{0}”",
-  "„{0}“ wurde inzwischen woanders geändert.": "Plik „{0}” został w międzyczasie zmieniony gdzie indziej."
+  "„{0}“ wurde inzwischen woanders geändert.": "Plik „{0}” został w międzyczasie zmieniony gdzie indziej.",
+  "Auf GitHub": "W serwisie GitHub",
+  "Neues SSH-Terminal": "Nowy terminal SSH",
+  "Problem melden": "Zgłoś problem",
+  "Quellcode": "Kod źródłowy",
+  "SSH-Terminal": "Terminal SSH",
+  "Terminal (SSH)": "Terminal (SSH)",
+  "Update {0} bereit": "Aktualizacja {0} gotowa",
+  "Version {0}": "Wersja {0}",
+  "Verwendete Bausteine": "Użyte komponenty",
+  "Was ist neu?": "Co nowego?",
+  "Zurücksetzen": "Resetuj",
+  "Änderungen der Versionen": "Informacje o wersji",
+  "Server": "Serwer",
+  "Windows-Installer": "Instalator Windows"
 }
