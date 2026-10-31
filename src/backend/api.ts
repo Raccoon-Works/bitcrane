@@ -278,6 +278,8 @@ export interface Backend {
   secretDelete(account: string): Promise<void>;
   sshConfigHosts(): Promise<SshConfigHost[]>;
   importFind(): Promise<{ servers: ImportedServer[]; sources: string[] }>;
+  /** Servers from an exported file (Transmit, FileZilla, WinSCP, Cyberduck). */
+  importFile(path: string): Promise<ImportedServer[]>;
   fileWrite(path: string, text: string): Promise<void>;
   fileRead(path: string): Promise<string>;
 

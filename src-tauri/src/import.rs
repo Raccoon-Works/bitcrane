@@ -1,6 +1,7 @@
 //! Import of saved servers from other programs: FileZilla (sitemanager.xml),
 //! WinSCP (Windows registry or WinSCP.ini), Cyberduck / Mountain Duck
-//! (bookmark files), PuTTY (Windows registry) and the OpenSSH configuration.
+//! (bookmark files), PuTTY (Windows registry), the OpenSSH configuration and
+//! Transmit server exports (chosen as a file).
 //! Passwords are never taken over; they are asked for on the first connection.
 
 use crate::paths::{home, to_ui};
@@ -109,6 +110,95 @@ pub fn find_all() -> ImportResult {
         servers.extend(list);
     }
     ImportResult { servers, sources }
+}
+
+/* ------------------------------------------------------------------- Transmit */
+
+/// Decodes a Transmit protocol code: a four-character code stored as integer
+/// ("FTP " = 0x46545020).
+fn fourcc(n: u64) -> String {
+    let b = (n as u32).to_be_bytes();
+    String::from_utf8_lossy(&b).trim().to_ascii_uppercase()
+}
+
+/// A Transmit server export (Server › Export …, unencrypted): a keyed archive
+/// as JSON, `{"__NSArrayM": {"NS.object.0": {...}, ...}}`. Passwords are not
+/// part of an unencrypted export. Protocols Bitcrane has no counterpart for
+/// (S3 and cloud services) are left out.
+pub fn parse_transmit(text: &str) -> Vec<ImportedServer> {
+    let Ok(root) = serde_json::from_str::<serde_json::Value>(text) else { return Vec::new() };
+    let list = root.get("__NSArrayM").unwrap_or(&root);
+    let mut items: Vec<(u64, &serde_json::Value)> = match list {
+        serde_json::Value::Object(map) => map
+            .iter()
+            .filter_map(|(k, v)| k.strip_prefix("NS.object.").and_then(|i| i.parse().ok()).map(|i| (i, v)))
+            .collect(),
+        serde_json::Value::Array(a) => a.iter().enumerate().map(|(i, v)| (i as u64, v)).collect(),
+        _ => return Vec::new(),
+    };
+    items.sort_by_key(|(i, _)| *i);
+    let place = |v: &serde_json::Value| -> Option<String> {
+        let first = v.as_array()?.iter().next()?;
+        let s = first.as_str().map(str::to_string).or_else(|| {
+            ["path", "fallbackPath"].iter().find_map(|k| first.get(*k).and_then(|x| x.as_str()).map(str::to_string))
+        })?;
+        (!s.is_empty()).then_some(s)
+    };
+    let mut out = Vec::new();
+    for (_, v) in items {
+        let get = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+        let host = get("address");
+        if host.is_empty() {
+            continue;
+        }
+        let code = v.get("protocol").and_then(|x| x.as_u64()).map(fourcc).unwrap_or_default();
+        let (protocol, implicit_tls, default_port) = match code.as_str() {
+            "SFTP" => ("sftp", false, 22),
+            "FTP" => ("ftp", false, 21),
+            "FTPS" => ("ftps", false, 21),
+            c if c.contains("DAV") => ("webdav", false, if c.ends_with('S') { 443 } else { 80 }),
+            _ => continue,
+        };
+        let port = v.get("port").and_then(|x| x.as_u64()).filter(|p| *p > 0 && *p <= 65535).map(|p| p as u16).unwrap_or(default_port);
+        let name = get("name");
+        out.push(ImportedServer {
+            source: "Transmit".into(),
+            name: if name.is_empty() { host.clone() } else { name },
+            group: String::new(),
+            port,
+            user: get("username"),
+            protocol: protocol.into(),
+            implicit_tls,
+            auth: if protocol == "sftp" { "auto".into() } else { "password".into() },
+            key_path: None,
+            remote_dir: v.get("remotePlaces").and_then(place),
+            local_dir: v.get("localPlaces").and_then(place),
+            jump: None,
+            host,
+        });
+    }
+    out
+}
+
+/// Servers from a file the user chose: a Transmit export, a FileZilla
+/// sitemanager.xml or export, a WinSCP.ini or a Cyberduck bookmark. The format
+/// is recognised by the content, not by the file name.
+pub fn from_file(path: &Path) -> Vec<ImportedServer> {
+    let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
+    let t = text.trim_start_matches('\u{feff}').trim_start();
+    if t.starts_with('{') || t.starts_with('[') {
+        return parse_transmit(t);
+    }
+    if t.contains("<FileZilla3") {
+        return parse_filezilla(t);
+    }
+    if t.contains("<plist") {
+        return parse_cyberduck(t);
+    }
+    if t.contains("[Sessions\\") {
+        return parse_winscp_ini(t);
+    }
+    Vec::new()
 }
 
 /* ------------------------------------------------------------------ Cyberduck */
@@ -484,6 +574,21 @@ fn read_winscp() -> Option<Vec<ImportedServer>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transmit_export() {
+        let json = r#"{"__NSArrayM":{
+          "NS.object.1":{"protocol":1179930707,"address":"80.237.130.124","username":"web","name":"Host TLS","port":0,"remotePlaces":[],"localPlaces":[{"name":"Downloads","fallbackPath":"/Users/x/Downloads"}]},
+          "NS.object.0":{"protocol":1179930656,"address":"ftp.example","username":"u","name":"Plain","port":2121},
+          "NS.object.2":{"protocol":1397118032,"address":"sftp.example","username":"root","name":"","port":0},
+          "NS.object.3":{"protocol":1395851296,"address":"s3.example","name":"Bucket"}}}"#;
+        let s = parse_transmit(json);
+        assert_eq!(s.len(), 3);
+        assert_eq!((s[0].name.as_str(), s[0].protocol.as_str(), s[0].port), ("Plain", "ftp", 2121));
+        assert_eq!((s[1].protocol.as_str(), s[1].port, s[1].local_dir.as_deref()), ("ftps", 21, Some("/Users/x/Downloads")));
+        assert_eq!((s[2].name.as_str(), s[2].protocol.as_str(), s[2].port), ("sftp.example", "sftp", 22));
+        assert!(s.iter().all(|x| x.source == "Transmit"));
+    }
 
     #[test]
     fn cyberduck_bookmark() {

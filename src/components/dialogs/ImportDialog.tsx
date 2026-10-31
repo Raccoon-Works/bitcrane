@@ -1,13 +1,13 @@
 /**
  * "Server importieren": shows the servers saved in FileZilla, WinSCP, Cyberduck, PuTTY and the
- * SSH configuration; ticked ones are added to Bitcrane. Passwords are never
+ * SSH configuration, plus those of an exported file (e.g. from Transmit); ticked ones are added to Bitcrane. Passwords are never
  * taken over (they are asked for on the first connection).
  */
 import { Loader2 } from '../glyphs';
 import { useEffect, useState } from 'react';
 import type { ImportedServer } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { closeDialog, getState, importServers, LIVE } from '../../state/store';
+import { closeDialog, getState, importServers, LIVE, showToast } from '../../state/store';
 import { Button, Checkbox } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
@@ -41,6 +41,28 @@ export function ImportDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [found]);
 
+  const [fileNote, setFileNote] = useState('');
+  const fromFile = async () => {
+    if (!LIVE) {
+      setFound((f) => ({ servers: [...(f?.servers ?? []), { source: 'Transmit', name: 'Webseite', group: '', host: 'ftp.example', port: 21, user: 'web', protocol: 'ftps', implicitTls: false, auth: 'password' }], sources: f?.sources ?? [] }));
+      return;
+    }
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const path = await open({ multiple: false, directory: false, title: $t('Exportierte Server wählen'), filters: [{ name: $t('Server-Export'), extensions: ['transmitservers', 'xml', 'ini', 'duck', 'json'] }, { name: $t('Alle Dateien'), extensions: ['*'] }] });
+    if (typeof path !== 'string') return;
+    try {
+      const list = await backend.importFile(path);
+      if (!list.length) {
+        setFileNote($t('In dieser Datei wurden keine Server erkannt. Unterstützt: Transmit-Export (unverschlüsselt), FileZilla, WinSCP.ini und Cyberduck-Lesezeichen.'));
+        return;
+      }
+      setFileNote('');
+      setFound((f) => ({ servers: [...(f?.servers ?? []), ...list.filter((s) => !(f?.servers ?? []).some((x) => x.source === s.source && keyOf(x) === keyOf(s)))], sources: f?.sources ?? [] }));
+    } catch (e) {
+      showToast(String(e), 'error');
+    }
+  };
+
   const sources = found ? [...new Set(found.servers.map((s) => s.source))] : [];
   const toggle = (i: number) => setPicked((p) => {
     const n = new Set(p);
@@ -55,9 +77,10 @@ export function ImportDialog() {
       subtitle={$t('Aus FileZilla, WinSCP, Cyberduck, PuTTY und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.')}
       width={760}
       maxHeight={680}
-      footer={<><span className="small muted">{picked.size ? $t('{0} ausgewählt', picked.size) : ''}</span><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!picked.size} onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}>{$t('Übernehmen')}</Button></>}
+      footer={<><Button onClick={() => void fromFile()}>{$t('Aus Datei …')}</Button><span className="small muted">{picked.size ? $t('{0} ausgewählt', picked.size) : ''}</span><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!picked.size} onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}>{$t('Übernehmen')}</Button></>}
     >
       {!found && <span className="row-inline muted"><Loader2 size={14} className="spin" aria-hidden="true" />{$t('Wird gesucht …')}</span>}
+      {fileNote && <p className="muted">{fileNote}</p>}
       {found && !found.servers.length && (
         <p className="muted">{$t('Keine gespeicherten Server gefunden. Gesucht wurde in: FileZilla (sitemanager.xml), WinSCP (Registry bzw. WinSCP.ini), Cyberduck und Mountain Duck (Lesezeichen), PuTTY (Registry) und ~/.ssh/config.')}</p>
       )}
