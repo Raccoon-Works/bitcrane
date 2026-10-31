@@ -111,7 +111,9 @@ export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   for (const it of items) {
     // Walk results start with the walked folder's own name; drop it.
     const rel = LIVE ? it.relative.split('/').slice(1).join('/') : it.relative;
-    if (rel) map.set(rel, { size: it.size, mtime: it.mtime - offset, path: it.path });
+    // Keys in composed Unicode form (NFC): "ü" stored decomposed on one side (macOS)
+    // and composed on the other is the same file. `path` keeps the real name.
+    if (rel) map.set(rel.normalize('NFC'), { size: it.size, mtime: it.mtime - offset, path: it.path });
   }
   return map;
 }
@@ -185,7 +187,10 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
 
 /** Sync actions for the lines with something to do. */
 export function actionsOf(lines: Line[]): SyncAction[] {
-  return lines.filter((l) => l.action !== 'none' && l.action !== 'conflict').map((l) => ({
-    kind: l.action as SyncAction['kind'], rel: l.rel, size: (l.action === 'download' ? l.remote : l.local)?.size ?? 0,
-  }));
+  return lines.filter((l) => l.action !== 'none' && l.action !== 'conflict').map((l) => {
+    const fromRight = l.action === 'download' || l.action === 'deleteRemote';
+    const src = fromRight ? l.remote : l.local;
+    const dst = fromRight ? l.local : l.remote;
+    return { kind: l.action as SyncAction['kind'], rel: l.rel, size: src?.size ?? 0, from: src?.path, to: dst?.path };
+  });
 }

@@ -120,6 +120,18 @@ export interface Server {
   mountExplorer?: boolean;
   /** SSH tunnels of the server (forward.rs, state/forward.ts). */
   forwards?: PortForward[];
+  /** At most this many transfers with this server at once (hosts that limit connections); missing = the general setting. */
+  maxTransfers?: number;
+  /** Seconds to wait for the server when connecting; missing = 15 (Transmit: "Timeout"). */
+  connectTimeout?: number;
+  /**
+   * Keep file names exactly as they are on upload. By default names are stored
+   * in the composed Unicode form (NFC): the Mac sometimes keeps "ü" as "u" plus
+   * a combining mark (NFD), which other systems treat as a different name.
+   */
+  keepNameForm?: boolean;
+  /** Opening the server turns on "Synchron blättern" between its local and server start folders (Transmit: folder linking). */
+  syncBrowseOnOpen?: boolean;
 }
 
 /** An SSH tunnel: like ssh -L (local), -R (remote) or -D (dynamic, SOCKS5). */

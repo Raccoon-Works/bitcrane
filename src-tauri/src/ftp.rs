@@ -22,7 +22,6 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWrite
 use tokio::net::TcpStream;
 
 const REPLY_TIMEOUT: Duration = Duration::from_secs(30);
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Byte stream of a control or data connection (plain or TLS).
 pub trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
@@ -58,6 +57,9 @@ pub struct FtpParams {
     pub trust: Option<String>,
     #[serde(default)]
     pub proxy: Option<ProxyParams>,
+    /// Seconds to wait for the server when connecting (per server, default 15).
+    #[serde(default)]
+    pub timeout: Option<u64>,
 }
 
 fn default_tls() -> String {
@@ -166,7 +168,7 @@ impl Shared {
                 None => TcpStream::connect((host, port)).await.map_err(AppError::from),
             }
         };
-        let stream = tokio::time::timeout(CONNECT_TIMEOUT, connect)
+        let stream = tokio::time::timeout(crate::ssh::connect_timeout(self.params.timeout), connect)
             .await
             .map_err(|_| AppError::new(ErrorKind::Unreachable, "Der Server antwortet nicht (Zeitüberschreitung)."))??;
         let _ = stream.set_nodelay(true);
@@ -177,7 +179,7 @@ impl Shared {
     async fn wrap(&self, config: Arc<rustls::ClientConfig>, tcp: TcpStream) -> AppResult<Io> {
         let name = self.tls.clone().expect("TLS configured").1;
         let connector = tokio_rustls::TlsConnector::from(config);
-        match tokio::time::timeout(CONNECT_TIMEOUT, connector.connect(name, tcp)).await {
+        match tokio::time::timeout(crate::ssh::connect_timeout(self.params.timeout), connector.connect(name, tcp)).await {
             Err(_) => Err(AppError::new(ErrorKind::Unreachable, "TLS-Verbindung: keine Antwort (Zeitüberschreitung).")),
             Ok(Ok(s)) => Ok(Box::new(s)),
             Ok(Err(e)) => Err(self.tls_error(e)),
@@ -1108,7 +1110,7 @@ mod integration {
     }
 
     fn params(host: &str, port: u16, tls: &str, trust: Option<String>) -> FtpParams {
-        FtpParams {
+        FtpParams { timeout: None,
             host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: tls.into(), tls13_only: false,
             encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust, proxy: None,
         }

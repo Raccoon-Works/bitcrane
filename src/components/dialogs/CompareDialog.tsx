@@ -12,9 +12,9 @@ import { ArrowLeft, ArrowRight, Loader2, Star, Trash2 } from '../glyphs';
 import { useEffect, useMemo, useState } from 'react';
 import { toBackendError } from '../../backend/api';
 import { clockOffset, connectServer, isConnected } from '../../state/live';
-import { baseKey, contentDiffers, learnBase, planLines, sameSizePairs, walkPlace as walk, type Base, type Direction, type Line, type Place, type Side } from '../../state/syncPlan';
+import { actionsOf, baseKey, contentDiffers, learnBase, planLines, sameSizePairs, walkPlace as walk, type Base, type Direction, type Line, type Place, type Side } from '../../state/syncPlan';
 import {
-  activeTab, closeDialog, getState, LIVE, paneLoc, ruleFor, runSync, serverById, showToast, uid, updateSettings, useStore, watchForLocal, type SyncAction, type SyncFavorite, type SyncSchedule,
+  activeTab, closeDialog, getState, LIVE, paneLoc, ruleFor, runSync, serverById, showToast, uid, updateSettings, useStore, watchForLocal, type SyncFavorite, type SyncSchedule,
 } from '../../state/store';
 import { formatDate, formatSize } from '../../util/format';
 import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
@@ -124,9 +124,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
     if (n.has(rel)) n.delete(rel); else n.add(rel);
     return n;
   });
-  const run = () => runSync(chosen.map((l) => ({
-    kind: l.action as SyncAction['kind'], rel: l.rel, size: (l.action === 'download' ? l.remote : l.local)?.size ?? 0,
-  })));
+  const run = () => runSync(actionsOf(chosen));
 
   const saveFavorite = () => {
     if (!tab || !favName?.trim()) return;

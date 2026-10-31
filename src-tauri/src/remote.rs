@@ -782,7 +782,7 @@ pub(crate) mod integration {
         if let Ok(v) = std::env::var("BITCRANE_TEST_FTP") {
             let (host, ports) = v.split_once(':').unwrap();
             for (port, tls) in ports.split(',').map(|p| p.parse::<u16>().unwrap()).zip(["none", "explicit", "implicit"]) {
-                let mut p = crate::ftp::FtpParams {
+                let mut p = crate::ftp::FtpParams { timeout: None,
                     host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: tls.into(), tls13_only: false,
                     encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
                 };
@@ -799,7 +799,7 @@ pub(crate) mod integration {
         }
         if let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") {
             // A fresh bucket on the test server, then the same checks as everywhere.
-            let params = |bucket: &str| crate::s3::S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+            let params = |bucket: &str| crate::s3::S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None, timeout: None };
             let bucket = format!("bitcrane-tr-{}", uuid::Uuid::new_v4().simple());
             crate::s3::S3Conn::connect(params(""), known.clone()).await.unwrap().mkdir(&format!("/{bucket}")).await.unwrap();
             let c = crate::s3::S3Conn::connect(params(&bucket), known.clone()).await.unwrap();
@@ -812,7 +812,7 @@ pub(crate) mod integration {
         }
         if let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") {
             for url in urls.split(',') {
-                let mut p = crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None };
+                let mut p = crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None, timeout: None };
                 let c = match DavConn::connect(p.clone(), known.clone()).await {
                     Ok(c) => c,
                     Err(e) => {
@@ -834,7 +834,7 @@ pub(crate) mod integration {
         let (host, ports) = ftp.split_once(':').unwrap();
         let port: u16 = ports.split(',').next().unwrap().parse().unwrap();
         let f = FtpConn::connect(
-            crate::ftp::FtpParams {
+            crate::ftp::FtpParams { timeout: None,
                 host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: "none".into(), tls13_only: false,
                 encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
             },
@@ -845,7 +845,7 @@ pub(crate) mod integration {
         let ftp_home = f.home.clone();
         let ftp = Remote::Ftp(Arc::new(f));
         let url = dav.split(',').find(|u| u.starts_with("http://")).unwrap();
-        let dav = Remote::Dav(DavConn::connect(crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None }, known).await.unwrap());
+        let dav = Remote::Dav(DavConn::connect(crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None, timeout: None }, known).await.unwrap());
 
         let data: Vec<u8> = (0..700_000u32).map(|i| (i % 241) as u8).collect();
         let local = dir.path().join("x.bin");

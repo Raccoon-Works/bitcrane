@@ -40,6 +40,8 @@ export interface ConnectParams {
   jump?: ConnectParams;
   /** SOCKS5 or HTTP proxy for the connection. */
   proxy?: { kind: 'socks5' | 'http'; host: string; port: number; user?: string; password?: string };
+  /** Seconds to wait for the server when connecting (default 15). */
+  timeout?: number;
 }
 
 type ProxyParams = NonNullable<ConnectParams['proxy']>;
@@ -57,6 +59,7 @@ export interface FtpConnectParams {
   mode: 'binary' | 'ascii' | 'auto';
   trust?: string;
   proxy?: ProxyParams;
+  timeout?: number;
 }
 
 /** WebDAV connection (see `dav.rs`). */
@@ -71,6 +74,7 @@ export interface S3ConnectParams {
   tls13Only?: boolean;
   trust?: string;
   proxy?: ProxyParams;
+  timeout?: number;
 }
 
 export interface DavConnectParams {
@@ -80,6 +84,7 @@ export interface DavConnectParams {
   tls13Only: boolean;
   trust?: string;
   proxy?: ProxyParams;
+  timeout?: number;
 }
 
 /** SMB connection (see `smb.rs`). */
@@ -90,6 +95,7 @@ export interface SmbConnectParams {
   password?: string;
   share: string;
   encrypt: boolean;
+  timeout?: number;
 }
 
 /** Options of one transfer (see `transfer.rs`). */

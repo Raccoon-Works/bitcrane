@@ -37,6 +37,9 @@ pub struct SmbParams {
     /// Insist on SMB 3 encryption.
     #[serde(default)]
     pub encrypt: bool,
+    /// Seconds to wait for the server when connecting (per server, default 15).
+    #[serde(default)]
+    pub timeout: Option<u64>,
 }
 
 fn default_port() -> u16 {
@@ -172,7 +175,7 @@ impl SmbConn {
     fn new_client(params: &SmbParams) -> Client {
         let mut config = ClientConfig::default();
         config.connection.port = Some(params.port);
-        config.connection.timeout = Some(Duration::from_secs(20));
+        config.connection.timeout = Some(crate::ssh::connect_timeout(Some(params.timeout.unwrap_or(20))));
         config.connection.allow_unsigned_guest_access = params.user.trim().is_empty();
         if params.encrypt {
             config.connection.encryption_mode = smb::connection::EncryptionMode::Required;
@@ -798,7 +801,7 @@ pub fn test_params() -> Option<SmbParams> {
     let v = std::env::var("BITCRANE_TEST_SMB").ok()?;
     let mut it = v.split('/');
     let (host, port) = it.next()?.split_once(':')?;
-    Some(SmbParams { host: host.into(), port: port.parse().ok()?, share: it.next()?.into(), user: it.next()?.into(), password: Some(it.next()?.into()), encrypt: false })
+    Some(SmbParams { host: host.into(), port: port.parse().ok()?, share: it.next()?.into(), user: it.next()?.into(), password: Some(it.next()?.into()), encrypt: false, timeout: None })
 }
 
 /// Integration test against an SMB server: `BITCRANE_TEST_SMB=host:port/share/user/password`.

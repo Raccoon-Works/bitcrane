@@ -30,6 +30,9 @@ pub struct DavParams {
     pub trust: Option<String>,
     #[serde(default)]
     pub proxy: Option<ProxyParams>,
+    /// Seconds to wait for the server when connecting (per server, default 15).
+    #[serde(default)]
+    pub timeout: Option<u64>,
 }
 
 /// Characters escaped in one path segment.
@@ -134,7 +137,7 @@ impl DavConn {
         let (tls, seen) = crate::tls::client_config(known.clone(), host_id.clone(), params.trust.clone(), params.tls13_only);
         let mut builder = reqwest::Client::builder()
             .use_preconfigured_tls((*tls).clone())
-            .connect_timeout(Duration::from_secs(15))
+            .connect_timeout(crate::ssh::connect_timeout(params.timeout))
             .read_timeout(Duration::from_secs(60))
             .user_agent(concat!("Bitcrane/", env!("CARGO_PKG_VERSION")));
         if let Some(p) = &params.proxy {
@@ -398,7 +401,7 @@ mod integration {
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
         for url in urls.split(',') {
-            let params = |trust: Option<String>, password: &str| DavParams { url: url.into(), user: "test".into(), password: Some(password.into()), tls13_only: false, trust, proxy: None };
+            let params = |trust: Option<String>, password: &str| DavParams { url: url.into(), user: "test".into(), password: Some(password.into()), tls13_only: false, trust, proxy: None, timeout: None };
             assert_eq!(DavConn::connect(params(None, "falsch"), known.clone()).await.err().map(|e| e.kind).filter(|k| *k != ErrorKind::HostKeyUnknown), if url.starts_with("https") { None } else { Some(ErrorKind::AuthFailed) });
             let conn = match DavConn::connect(params(None, "geheim123"), known.clone()).await {
                 Ok(c) => c,

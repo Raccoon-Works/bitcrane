@@ -55,6 +55,9 @@ pub struct S3Params {
     pub trust: Option<String>,
     #[serde(default)]
     pub proxy: Option<ProxyParams>,
+    /// Seconds to wait for the service when connecting (per server, default 15).
+    #[serde(default)]
+    pub timeout: Option<u64>,
 }
 
 /// Hash of an empty body (requests without one are signed with it).
@@ -251,7 +254,7 @@ impl S3Conn {
         let (tls, _seen) = crate::tls::client_config(known.clone(), host_id, params.trust.clone(), params.tls13_only);
         let mut builder = reqwest::Client::builder()
             .use_preconfigured_tls((*tls).clone())
-            .connect_timeout(Duration::from_secs(15))
+            .connect_timeout(crate::ssh::connect_timeout(params.timeout))
             .read_timeout(Duration::from_secs(120))
             .user_agent(concat!("Bitcrane/", env!("CARGO_PKG_VERSION")));
         if let Some(p) = &params.proxy {
@@ -809,7 +812,7 @@ mod integration {
         let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") else { return };
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-        let params = |bucket: &str| S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+        let params = |bucket: &str| S3Params { timeout: None, endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
         let bucket = format!("bitcrane-{}", uuid::Uuid::new_v4().simple());
         let root = Arc::new(S3Conn::connect(params(""), known.clone()).await.unwrap());
         root.mkdir(&format!("/{bucket}")).await.unwrap();
