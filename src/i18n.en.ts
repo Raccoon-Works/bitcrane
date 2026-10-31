@@ -2161,4 +2161,5 @@ export const EN: Record<string, string> = {
   "Änderungen der Versionen": "Release notes",
   "Server": "Server",
   "Windows-Installer": "Windows installer",
+  "Willkommen bei {0}": "Welcome to {0}",
 };

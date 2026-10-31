@@ -2159,5 +2159,6 @@
   "Zurücksetzen": "Réinitialiser",
   "Änderungen der Versionen": "Notes de version",
   "Server": "Serveur",
-  "Windows-Installer": "Programme d’installation Windows"
+  "Windows-Installer": "Programme d’installation Windows",
+  "Willkommen bei {0}": "Bienvenue dans {0}"
 }

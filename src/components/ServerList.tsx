@@ -19,7 +19,7 @@ import { BMark } from './icons';
 import { scheduleLabel } from '../state/scheduler';
 import { CloudServicesIcon, CloudTile, LocalTile, ServerTile, type CloudService } from './ServerTile';
 import { ResizeHandle } from './ResizeHandle';
-import { Button, IconButton, Select, TextField } from './ui';
+import { Button, IconButton, Select, TextField, WithWordmark } from './ui';
 import { $t } from '../i18n';
 
 /** Address shown next to a server name ("user@host" plus a port other than the default). */
@@ -347,7 +347,7 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
   return (
     <div className="server-welcome">
       <BMark variant="brand" size={72} />
-      <h2 className="headline">{$t('Willkommen bei Bitcrane')}</h2>
+      <h2 className="headline"><WithWordmark text={$t('Willkommen bei {0}', '\u0000')} /></h2>
       <p className="muted center">{$t('Verbinde dich mit einem Server. Danach kannst du einen Ordner überwachen lassen.')}</p>
       <div className="server-welcome-actions">
         <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}><Plus size={14} strokeWidth={2} aria-hidden="true" />{$t('Server hinzufügen')}</Button>

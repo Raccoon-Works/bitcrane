@@ -19,7 +19,7 @@ import { newCommandId } from '../../state/tools';
 import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
-import { Button, IconButton, Select, Switch, TextField } from '../ui';
+import { Button, IconButton, Select, Switch, TextField, Wordmark } from '../ui';
 import { $t, LANGUAGES, LOCALE } from '../../i18n';
 import { SnippetSettings } from './SnippetSettings';
 import { SchemePicker } from '../SchemePicker';
@@ -435,7 +435,7 @@ function AboutHeader() {
       <div className="set-about-app">
         <BMark variant="brand" size={80} />
         <div className="col-text">
-          <span className="set-about-name" aria-label="Bitcrane"><span className="wm-bit">Bit</span><span className="wm-crane">crane</span></span>
+          <Wordmark className="set-about-name" />
           <span className="small muted">{version ? $t('Version {0}', version) : ' '}{update?.status === 'ready' ? ` · ${$t('Update {0} bereit', update.version ?? '')}` : ''}</span>
           <span className="small muted">{$t('von')} RaccoonWorks</span>
         </div>
