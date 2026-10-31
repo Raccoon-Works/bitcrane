@@ -179,3 +179,14 @@ export function Section({ title, children, aside }: { title: string; children: R
     </section>
   );
 }
+
+/** The name as a wordmark: "Bit" bold, "crane" light (decided 31.10.2026), read as one word "Bitcrane". */
+export function Wordmark({ className = '' }: { className?: string }) {
+  return <span className={`wordmark ${className}`} aria-label="Bitcrane"><span className="wm-bit" aria-hidden="true">Bit</span><span className="wm-crane" aria-hidden="true">crane</span></span>;
+}
+
+/** A translated sentence with the wordmark where "{0}" stands ("Willkommen bei {0}"). */
+export function WithWordmark({ text }: { text: string }) {
+  const [before, after = ''] = text.split('\u0000');
+  return <>{before}<Wordmark />{after}</>;
+}
