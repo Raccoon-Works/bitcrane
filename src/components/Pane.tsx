@@ -681,7 +681,8 @@ export function Pane({ side }: { side: PaneSide }) {
         {deep && (
           <>
             <div className="deep-head" role="presentation">
-              {deep.loading ? <><Loader2 size={13} className="spin" aria-hidden="true" />{$t('Suche in Unterordnern von')}{' '}{deep.base} …</> : deep.error ? <span className="tone-danger">{deep.error}</span>
+              {deep.loading ? <><Loader2 size={13} className="spin" aria-hidden="true" />{deep.content ? $t('Suche im Inhalt der Dateien in') : $t('Suche in Unterordnern von')}{' '}{deep.base} …</> : deep.error ? <span className="tone-danger">{deep.error}</span>
+                : deep.content ? <>{deep.results.length ? $t('{0}{1} Dateien enthalten „{2}“', deep.results.length, deep.more ? '+' : '', deep.query) : $t('Keine Datei in {0} enthält „{1}“.', deep.base, deep.query)}</>
                 : <>{deep.results.length ? $t('{0}{1} {2} in Unterordnern', deep.results.length, deep.more ? '+' : '', deep.results.length === 1 ? $t('Treffer') : $t('Treffer')) : $t('Nichts gefunden für „{0}“ in {1} und Unterordnern.', deep.query, deep.base)}</>}
             </div>
             {deep.results.map((r) => (
@@ -691,12 +692,14 @@ export function Pane({ side }: { side: PaneSide }) {
                 <span className="row-bar" />
                 <span />
                 <FileGlyph size={20} name={r.rel} />
-                <span className="row-name"><span className="ellipsis">{r.rel.split('/').pop()}</span>{r.rel.includes('/') && <span className="result-path ellipsis">{r.rel.split('/').slice(0, -1).join('/')}</span>}</span>
-                {columns.mtime && <span className="row-sub nowrap">{formatDate(r.mtime)}</span>}
+                <span className="row-name"><span className="ellipsis">{r.rel.split('/').pop()}</span>{r.line !== undefined
+                  ? <span className="result-path result-line ellipsis" title={r.line}>{r.rel.includes('/') ? `${r.rel.split('/').slice(0, -1).join('/')} · ` : ''}{$t('Zeile {0}', r.lineNo ?? 0)}: {r.line}</span>
+                  : r.rel.includes('/') && <span className="result-path ellipsis">{r.rel.split('/').slice(0, -1).join('/')}</span>}</span>
+                {columns.mtime && <span className="row-sub nowrap">{r.mtime ? formatDate(r.mtime) : ''}</span>}
                 {columns.kind && <span className="row-sub" />}
                 {showPerms && <span className="row-sub" />}
                 {columns.owner && <span className="row-sub" />}
-                {columns.size && <span className="row-sub num">{formatSize(r.size)}</span>}
+                {columns.size && <span className="row-sub num">{r.size || !deep.content ? formatSize(r.size) : ''}</span>}
               </div>
             ))}
           </>

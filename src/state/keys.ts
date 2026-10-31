@@ -10,7 +10,7 @@
 import type { Platform } from '../backend/types';
 import {
   activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
-  computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
+  computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
 
@@ -49,6 +49,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
   { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
   { id: 'deepSearch', group: $t('Darstellung'), label: $t('Suche in Unterordnern ein/aus'), mac: ['Mod+Shift+F'], win: ['Mod+Shift+F'], run: () => setDeepSearch(!getState().deepSearchOn) },
+  { id: 'contentSearch', group: $t('Darstellung'), label: $t('Suche im Inhalt ein/aus'), mac: ['Mod+Alt+F'], win: ['Mod+Alt+F'], run: () => setSearchContent(!getState().searchContent) },
   { id: 'zoomIn', group: $t('Darstellung'), label: $t('Vergrößern'), mac: ['Mod++', 'Mod+='], win: ['Mod++', 'Mod+='], run: () => stepZoom(1) },
   { id: 'zoomOut', group: $t('Darstellung'), label: $t('Verkleinern'), mac: ['Mod+-'], win: ['Mod+-'], run: () => stepZoom(-1) },
   { id: 'zoomReset', group: $t('Darstellung'), label: $t('Originalgröße'), mac: ['Mod+0'], win: ['Mod+0'], run: () => stepZoom(0) },

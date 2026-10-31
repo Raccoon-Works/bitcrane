@@ -306,7 +306,7 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             if client_id.is_empty() || client_secret.is_empty() {
                 return Err(AppError::other("The Google app key is missing. Enter it once in Bitcrane."));
             }
-            Remote::GDrive(Arc::new(crate::gdrive::GDriveConn::connect(crate::gdrive::GDriveParams { refresh_token: cloud_token()?, client_id, client_secret }).await?))
+            Remote::GDrive(Arc::new(crate::gdrive::GDriveConn::connect(crate::gdrive::GDriveParams { pdf_export: false, refresh_token: cloud_token()?, client_id, client_secret }).await?))
         }
         _ => crate::remote::connect_ssh(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e.kind {
             ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => AppError::new(e.kind, format!("The host key of {name} is not confirmed. Connect once in Bitcrane.")),

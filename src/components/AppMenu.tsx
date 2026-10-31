@@ -12,7 +12,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
-  computeFolderSizes, newFolderWithSelection, selectedNames, showToast,
+  computeFolderSizes, newFolderWithSelection, selectedNames, setSearchContent, showToast,
   activeTab, askDelete, stepZoom, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
@@ -105,6 +105,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
         { label: $t('Verzeichnisse vergleichen'), ...sc('compareDirs'), run: toggleCompareDirs },
         { label: $t('Suche in Unterordnern'), ...sc('deepSearch'), run: () => setDeepSearch(!getState().deepSearchOn) },
+        { label: $t('Suche im Inhalt'), ...sc('contentSearch'), run: () => setSearchContent(!getState().searchContent) },
         { label: $t('Aktualisieren'), ...sc('refresh'), run: refresh },
       ],
     },

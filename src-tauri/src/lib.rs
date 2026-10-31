@@ -715,7 +715,7 @@ fn edit_temp_path(app: tauri::AppHandle, server_id: String, remote_path: String)
     let base = app.path().app_cache_dir().map_err(|e| AppError::other("Kein Cache-Ordner.").with_detail(e.to_string()))?;
     let mut p = base.join("edit").join(server_id.replace(['/', '\\', ':'], "_"));
     for seg in remote_path.split('/').filter(|s| !s.is_empty() && *s != "..") {
-        p.push(seg);
+        p.push(paths::storable_name(seg));
     }
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir)?;
@@ -1045,6 +1045,70 @@ async fn remote_chmod(state: State<'_, AppState>, server_id: String, path: Strin
 #[tauri::command]
 async fn remote_share_link(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
     remote!(state, server_id, |c| c.share_link(&path))
+}
+
+/// Starts a drag of files of this computer out of the window, into the
+/// Finder, the Explorer or another program (Transmit, ForkLift, WinSCP).
+/// Runs on the main thread, as both systems require; the files are copied.
+#[tauri::command]
+fn drag_out(window: tauri::WebviewWindow, paths: Vec<String>) -> AppResult<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let files: Vec<std::path::PathBuf> = paths.iter().map(|p| paths::to_native(p)).collect();
+        let w = window.clone();
+        window
+            .run_on_main_thread(move || {
+                let icon = drag::Image::Raw(include_bytes!("../icons/64x64.png").to_vec());
+                if let Err(e) = drag::start_drag(&w, drag::DragItem::Files(files), icon, |_, _| {}, drag::Options::default()) {
+                    log::warn!("drag out failed: {e}");
+                }
+            })
+            .map_err(|e| AppError::other("Ziehen nicht möglich.").with_detail(e.to_string()))?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = window;
+        Err(AppError::other("Herausziehen gibt es auf diesem System nicht."))
+    }
+}
+
+/// Copies server files into a temporary folder so they can be dragged out of
+/// the window (the drag needs real files). Removed when Bitcrane ends.
+#[tauri::command]
+async fn remote_drag_prepare(state: State<'_, AppState>, server_id: String, paths: Vec<String>) -> AppResult<Vec<String>> {
+    use tokio::io::AsyncWriteExt;
+    let dir = std::env::temp_dir().join("bitcrane-drag").join(uuid::Uuid::new_v4().simple().to_string());
+    std::fs::create_dir_all(&dir)?;
+    let conn = state.conn(&server_id).await?;
+    let mut out = Vec::new();
+    for path in paths {
+        let target = dir.join(paths::storable_name(&crate::paths::remote_name(&path)));
+        let mut reader = conn.reader(&path, 0).await?;
+        let mut file = tokio::fs::File::create(&target).await?;
+        let copied = tokio::io::copy(&mut reader, &mut file).await;
+        reader.close(copied.is_ok()).await?;
+        copied?;
+        file.flush().await?;
+        out.push(paths::to_ui(&target));
+    }
+    Ok(out)
+}
+
+/// "Inhalt durchsuchen" on this computer.
+#[tauri::command]
+async fn local_grep(path: String, query: String, max: Option<usize>) -> AppResult<Vec<model::GrepHit>> {
+    tokio::task::spawn_blocking(move || local::grep(&path, &query, max.unwrap_or(500))).await.map_err(|e| AppError::other("Suche abgebrochen.").with_detail(e.to_string()))?
+}
+
+/// "Inhalt durchsuchen" on an SSH server.
+#[tauri::command]
+async fn remote_grep(state: State<'_, AppState>, server_id: String, path: String, query: String, max: Option<usize>) -> AppResult<Vec<model::GrepHit>> {
+    let max = max.unwrap_or(500);
+    remote!(state, server_id, |c| c.grep(&path, &query, max))
 }
 
 /// S3: a download link valid for `secs` seconds (at most 7 days).
@@ -1438,7 +1502,7 @@ async fn remote_media(state: State<'_, AppState>, server_id: String, path: Strin
     let name = crate::paths::remote_name(&path);
     let dir = std::env::temp_dir().join("bitcrane-preview");
     std::fs::create_dir_all(&dir)?;
-    let target = dir.join(format!("{}-{}", uuid::Uuid::new_v4().simple(), name));
+    let target = dir.join(format!("{}-{}", uuid::Uuid::new_v4().simple(), paths::storable_name(&name)));
     let conn = state.conn(&server_id).await?;
     let mut reader = conn.reader(&path, 0).await?;
     let mut file = tokio::fs::File::create(&target).await?;
@@ -1844,6 +1908,7 @@ pub fn run() {
             }
             // Server files copied for playing in the preview are only needed while Bitcrane runs.
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-preview"));
+            let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-drag"));
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-archive"));
             let dir = app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane"));
             app.manage(AppState::new(dir));
@@ -1915,6 +1980,10 @@ pub fn run() {
             shell_integration_set,
             remote_share_link,
             remote_presign,
+            local_grep,
+            drag_out,
+            remote_drag_prepare,
+            remote_grep,
             local_unzip,
             local_open,
             local_reveal,

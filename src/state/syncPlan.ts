@@ -11,7 +11,8 @@ import * as fs from '../backend/mockFs';
 import type { WalkItem } from '../backend/api';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { clockOffset } from './live';
-import { LIVE, type SyncAction } from './store';
+import { getState, LIVE, type SyncAction } from './store';
+import { winNameFromSafe } from '../util/paths';
 
 export type Direction = 'up' | 'down' | 'both';
 
@@ -108,12 +109,15 @@ export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   else items = fs.walkFiles(side, place.serverId, place.dir).map((f) => ({ path: f.path, relative: f.path.slice(place.dir.length + 1), size: f.entry.size, mtime: f.entry.mtime }));
   const offset = LIVE && place.serverId ? clockOffset(place.serverId) : 0;
   const map = new Map<string, Side>();
+  const winLocal = side === 'local' && getState().platform === 'win';
   for (const it of items) {
     // Walk results start with the walked folder's own name; drop it.
     const rel = LIVE ? it.relative.split('/').slice(1).join('/') : it.relative;
     // Keys in composed Unicode form (NFC): "ü" stored decomposed on one side (macOS)
     // and composed on the other is the same file. `path` keeps the real name.
-    if (rel) map.set(rel.normalize('NFC'), { size: it.size, mtime: it.mtime - offset, path: it.path });
+    // On Windows, names stored as "a%3Ab.txt" meet their server counterpart "a:b.txt".
+    const key = winLocal ? rel.split('/').map(winNameFromSafe).join('/') : rel;
+    if (key) map.set(key.normalize('NFC'), { size: it.size, mtime: it.mtime - offset, path: it.path });
   }
   return map;
 }

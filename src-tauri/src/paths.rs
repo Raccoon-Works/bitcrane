@@ -124,3 +124,46 @@ mod sync_root_tests {
         assert_eq!(to_remote(&root, "/", Path::new(r"C:\Users\c\Bitcrane\Web\x")).as_deref(), Some("/x"));
     }
 }
+
+/// A name from a server as a file name this system can store: on Windows,
+/// forbidden characters, a dot or space at the end and reserved names are
+/// written as %XX (same rule as the interface, see winSafeName in paths.ts).
+pub fn storable_name(name: &str) -> String {
+    if !cfg!(windows) {
+        return name.to_string();
+    }
+    windows_name(name)
+}
+
+/// The Windows rule itself (kept separate so it is tested on every system).
+pub fn windows_name(name: &str) -> String {
+    let pct = |c: char| format!("%{:02X}", c as u32);
+    let mut out: String = name.chars().map(|c| if "<>:\"|?*\\".contains(c) || (c as u32) < 32 { pct(c) } else { c.to_string() }).collect();
+    if let Some(last) = out.chars().last().filter(|c| *c == '.' || *c == ' ') {
+        out.pop();
+        out.push_str(&pct(last));
+    }
+    let lower = out.to_ascii_lowercase();
+    let stem = lower.split('.').next().unwrap_or("");
+    let reserved = matches!(stem, "con" | "prn" | "aux" | "nul") || ((stem.starts_with("com") || stem.starts_with("lpt")) && stem.len() == 4 && stem.as_bytes()[3].is_ascii_digit() && stem.as_bytes()[3] != b'0');
+    if reserved {
+        let first = out.chars().next().unwrap_or('_');
+        out = format!("{}{}", pct(first), &out[first.len_utf8()..]);
+    }
+    out
+}
+
+#[cfg(test)]
+mod windows_name_tests {
+    use super::windows_name;
+
+    #[test]
+    fn makes_names_storable() {
+        assert_eq!(windows_name("a:b.txt"), "a%3Ab.txt");
+        assert_eq!(windows_name("CON"), "%43ON");
+        assert_eq!(windows_name("con.txt"), "%63on.txt");
+        assert_eq!(windows_name("Name."), "Name%2E");
+        assert_eq!(windows_name("ok.txt"), "ok.txt");
+        assert_eq!(windows_name("com1"), "%63om1");
+    }
+}
