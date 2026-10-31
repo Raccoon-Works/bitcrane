@@ -144,6 +144,10 @@ pub struct ConnectParams {
     /// SOCKS5 or HTTP proxy for the TCP connection.
     #[serde(default)]
     pub proxy: Option<crate::proxy::ProxyParams>,
+    /// Pass the local SSH agent on to the server for the built-in terminal
+    /// (ssh -A), e.g. for `git pull` there without a key on the server.
+    #[serde(default)]
+    pub forward_agent: bool,
     /// Seconds to wait for the server when connecting (per server, default 15).
     #[serde(default)]
     pub timeout: Option<u64>,
@@ -177,6 +181,25 @@ pub(crate) struct Handler {
     trust: Option<String>,
     seen: Arc<Mutex<Option<SeenKey>>>,
     forwards: RemoteForwards,
+    /// Agent forwarding was asked for (only then are agent channels of the server accepted).
+    forward_agent: bool,
+}
+
+/// Connects to the SSH agent of this computer for a forwarded agent channel.
+#[cfg(unix)]
+async fn local_agent_stream() -> Option<tokio::net::UnixStream> {
+    for sock in agent_sockets() {
+        if let Ok(s) = tokio::net::UnixStream::connect(&sock).await {
+            return Some(s);
+        }
+    }
+    None
+}
+
+/// Windows: the OpenSSH agent pipe (also served by 1Password and Bitwarden). Pageant has no stream to forward.
+#[cfg(windows)]
+async fn local_agent_stream() -> Option<tokio::net::windows::named_pipe::NamedPipeClient> {
+    tokio::net::windows::named_pipe::ClientOptions::new().open(r"\\.\pipe\openssh-ssh-agent").ok()
 }
 
 impl client::Handler for Handler {
@@ -229,6 +252,30 @@ impl client::Handler for Handler {
         });
         Ok(())
     }
+
+    /// The server asks for the forwarded agent (a program on the server used
+    /// the key): the request goes to the agent on this computer and back.
+    async fn server_channel_open_agent_forward(&mut self, channel: russh::Channel<client::Msg>, reply: client::ChannelOpenHandle, _session: &mut client::Session) -> Result<(), Self::Error> {
+        if !self.forward_agent {
+            reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
+        }
+        #[cfg(any(unix, windows))]
+        {
+            let Some(mut agent) = local_agent_stream().await else {
+                reply.reject(russh::ChannelOpenFailure::ConnectFailed).await;
+                return Ok(());
+            };
+            reply.accept().await;
+            tokio::spawn(async move {
+                let mut stream = channel.into_stream();
+                let _ = tokio::io::copy_bidirectional(&mut agent, &mut stream).await;
+            });
+        }
+        #[cfg(not(any(unix, windows)))]
+        reply.reject(russh::ChannelOpenFailure::ConnectFailed).await;
+        Ok(())
+    }
 }
 
 /* ----------------------------------------------------------------- Connection */
@@ -241,6 +288,7 @@ pub struct Connection {
     /// Session to the jump server, kept open while this connection lives.
     jump: Option<client::Handle<Handler>>,
     pub(crate) forwards: RemoteForwards,
+    forward_agent: bool,
 }
 
 fn agent_error(e: impl std::fmt::Display) -> AppError {
@@ -447,7 +495,7 @@ enum Transport {
 async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport: Transport, prompter: Option<Prompter>, forwards: RemoteForwards) -> AppResult<client::Handle<Handler>> {
     let host_id = format!("{}:{}", params.host, params.port);
     let seen = Arc::new(Mutex::new(None));
-    let handler = Handler { host_id: host_id.clone(), known: known.clone(), trust: params.trust.clone(), seen: seen.clone(), forwards };
+    let handler = Handler { host_id: host_id.clone(), known: known.clone(), trust: params.trust.clone(), seen: seen.clone(), forwards, forward_agent: params.forward_agent };
 
     let config = Arc::new(client::Config {
         inactivity_timeout: None,
@@ -513,6 +561,7 @@ pub struct Session {
     pub(crate) handle: client::Handle<Handler>,
     pub(crate) jump: Option<client::Handle<Handler>>,
     pub(crate) forwards: RemoteForwards,
+    pub(crate) forward_agent: bool,
 }
 
 /// Opens the session: host key check and login (through the jump server if set).
@@ -534,7 +583,7 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
         }
     };
 
-    Ok(Session { handle, jump, forwards })
+    Ok(Session { handle, jump, forwards, forward_agent: params.forward_agent })
 }
 
 impl Session {
@@ -555,7 +604,7 @@ impl Session {
         };
         sftp.set_timeout(30);
         let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
-        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump, forwards: self.forwards })
+        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump, forwards: self.forwards, forward_agent: self.forward_agent })
     }
 }
 
@@ -954,7 +1003,7 @@ impl Connection {
 
     /// Opens an interactive shell with a terminal (built-in terminal, terminal.rs).
     pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
-        open_shell(&self.handle, cols, rows, command).await
+        open_shell(&self.handle, cols, rows, command, self.forward_agent).await
     }
 
     /// The SSH handle and remote forwards, for port forwarding (forward.rs).
@@ -1022,7 +1071,7 @@ mod integration {
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
-        ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
+        ConnectParams { forward_agent: false, host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
     }
 
     /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.
@@ -1332,8 +1381,12 @@ mod params_tests {
 
 /// A shell with a pseudo terminal on an SSH session. `command` replaces the
 /// plain login shell (e.g. to start in a folder); empty starts the shell.
-pub(crate) async fn open_shell(handle: &client::Handle<Handler>, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
+pub(crate) async fn open_shell(handle: &client::Handle<Handler>, cols: u32, rows: u32, command: &str, forward_agent: bool) -> AppResult<russh::Channel<client::Msg>> {
     let channel = handle.channel_open_session().await?;
+    if forward_agent {
+        // Like ssh -A: programs in this shell may ask the agent on this computer to sign.
+        let _ = channel.agent_forward(false).await;
+    }
     channel.request_pty(false, "xterm-256color", cols.max(10), rows.max(2), 0, 0, &[]).await?;
     if command.is_empty() {
         channel.request_shell(true).await?;

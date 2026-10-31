@@ -349,6 +349,28 @@ impl Remote {
         }
     }
 
+    /// Files below `base` containing `query`, found with grep on the server
+    /// (SSH only; other protocols would have to download every file).
+    pub async fn grep(&self, base: &str, query: &str, max: usize) -> AppResult<Vec<crate::model::GrepHit>> {
+        if !matches!(self, Remote::Sftp(_) | Remote::Scp(_)) {
+            return Err(AppError::other(format!("Die Suche im Inhalt gibt es auf diesem Computer und auf SSH-Servern, nicht über {}.", self.protocol())));
+        }
+        let q = crate::scp::quote;
+        // -I skips binary files, -m 1 stops at the first hit per file, -F searches the text literally.
+        let cmd = format!("grep -rIinF -m 1 --exclude-dir=.git --exclude-dir=node_modules -- {} {} 2>/dev/null | head -n {}", q(query), q(base), max);
+        let (_, out) = self.exec(&cmd).await?;
+        let prefix = format!("{}/", base.trim_end_matches('/'));
+        let mut hits = Vec::new();
+        for line in out.lines() {
+            // "path:line:text"; the path itself may contain ":" so split at the first ":<digits>:".
+            let Some((path, rest)) = split_grep_line(line) else { continue };
+            let Some((no, text)) = rest.split_once(':') else { continue };
+            let rel = path.strip_prefix(&prefix).unwrap_or(path).to_string();
+            hits.push(crate::model::GrepHit { path: path.to_string(), rel, size: 0, mtime: 0, line: crate::local::snippet(text), line_no: no.parse().unwrap_or(0) });
+        }
+        Ok(hits)
+    }
+
     /// Interactive shell for the built-in terminal (SSH only).
     pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<russh::client::Msg>> {
         match self {
@@ -919,5 +941,30 @@ pub async fn connect_ssh(params: &crate::ssh::ConnectParams, known: Arc<crate::s
             Ok(c) => Ok(Remote::Scp(Arc::new(c))),
             Err(_) => Err(e),
         },
+    }
+}
+
+/// Splits a grep output line "path:12:text" at the first ":<number>:".
+fn split_grep_line(line: &str) -> Option<(&str, &str)> {
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while let Some(off) = line[i..].find(':') {
+        let at = i + off;
+        let digits = bytes[at + 1..].iter().take_while(|b| b.is_ascii_digit()).count();
+        if digits > 0 && bytes.get(at + 1 + digits) == Some(&b':') {
+            return Some((&line[..at], &line[at + 1..]));
+        }
+        i = at + 1;
+    }
+    None
+}
+
+#[cfg(test)]
+mod grep_line_tests {
+    #[test]
+    fn splits_grep_lines() {
+        assert_eq!(super::split_grep_line("/var/www/a.php:12:echo 'x:1';"), Some(("/var/www/a.php", "12:echo 'x:1';")));
+        assert_eq!(super::split_grep_line("/a:b/c.txt:3:hi"), Some(("/a:b/c.txt", "3:hi")));
+        assert_eq!(super::split_grep_line("kein treffer"), None);
     }
 }

@@ -79,6 +79,10 @@ tempfile = "3"
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
+# Dragging files out of the window into the Finder or Explorer (drag_out in lib.rs).
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+drag = "2.1.1"
+
 [target."cfg(windows)".dependencies]
 winreg = "0.56.0"
 # Servers as folders in the Explorer (mount_win.rs).

@@ -5,7 +5,7 @@
  */
 import { toggleTerminal } from '../state/terminal';
 import {
-  ArrowClockwise, ArrowsClockwise, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, UploadSimple,
+  ArrowClockwise, ArrowsClockwise, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, TextAa, UploadSimple,
 } from '@phosphor-icons/react';
 import { useState, type ReactNode } from 'react';
 import { TermNewMenu } from './TermNewMenu';
@@ -14,7 +14,7 @@ import {
   activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
   refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
   upload, useStore, type ToolId,
-  getState, openInEditor, searchTarget, setDeepSearch, toggleSyncBrowse, updateSettings,
+  getState, openInEditor, searchTarget, setDeepSearch, setSearchContent, toggleSyncBrowse, updateSettings,
 } from '../state/store';
 import { formatAgo } from '../util/format';
 import { useKeyLabel } from '../state/keys';
@@ -136,6 +136,7 @@ export function Toolbar() {
   const labels = useStore((s) => s.toolbarLabels);
   const search = useStore((s) => s.search);
   const deepOn = useStore((s) => s.deepSearchOn);
+  const contentOn = useStore((s) => s.searchContent);
   // Like Transmit, the field says what it searches: this computer, a server or the server list.
   // Selected as a string: the store hook needs a stable value.
   const targetKey = useStore((s) => { const x = searchTarget(s); return `${x.kind}\n${x.name}`; });
@@ -195,6 +196,11 @@ export function Toolbar() {
         <span className="vh">{where}</span>
         {search && <span className="search-side" aria-hidden="true">{target.kind === 'local' ? $t('Lokal') : target.kind === 'servers' ? $t('Server') : target.name}</span>}
         <input type="search" placeholder={where} title={where} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setSearch('')} />
+        {target.kind !== 'servers' && <Tooltip text={contentOn ? $t('Nach Namen suchen') : $t('Im Inhalt der Dateien suchen')} shortcut={sk('contentSearch')}>
+          <button type="button" className={`search-scope${contentOn ? ' is-on' : ''}`} aria-pressed={contentOn} aria-label={$t('Im Inhalt suchen')} onClick={(e) => { e.preventDefault(); setSearchContent(!contentOn); }}>
+            <TextAa size={16} />
+          </button>
+        </Tooltip>}
         {target.kind !== 'servers' && <Tooltip text={deepOn ? $t('Nur in diesem Ordner suchen') : $t('Auch in Unterordnern suchen')} shortcut={sk('deepSearch')}>
           <button type="button" className={`search-scope${deepOn ? ' is-on' : ''}`} aria-pressed={deepOn} aria-label={$t('In Unterordnern suchen')} onClick={(e) => { e.preventDefault(); setDeepSearch(!deepOn); }}>
             <TreeStructure size={16} />

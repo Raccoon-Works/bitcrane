@@ -25,6 +25,9 @@ export type AuthParams =
   | { method: 'password'; password: string }
   | { method: 'auto'; keyPath?: string; passphrase?: string; password?: string };
 
+/** A file whose content matches "Im Inhalt suchen". */
+export interface GrepHit { path: string; rel: string; size: number; mtime: number; line: string; lineNo: number }
+
 /** Checksum algorithms offered in "Prüfsumme". */
 export type ChecksumAlgo = 'md5' | 'sha1' | 'sha256' | 'sha512';
 
@@ -45,6 +48,8 @@ export interface ConnectParams {
   proxy?: { kind: 'socks5' | 'http'; host: string; port: number; user?: string; password?: string };
   /** Seconds to wait for the server when connecting (default 15). */
   timeout?: number;
+  /** Pass the local SSH agent on for the terminal (ssh -A). */
+  forwardAgent?: boolean;
 }
 
 type ProxyParams = NonNullable<ConnectParams['proxy']>;
@@ -213,6 +218,9 @@ export interface Backend {
   syncWrite(dir: string, text: string): Promise<number>;
   /** Link to share a file or folder (cloud services only). */
   remoteShareLink(serverId: string, path: string): Promise<string>;
+  /** Files below a folder whose text contains `query` (see local.rs grep / remote.rs grep). */
+  localGrep(path: string, query: string, max?: number): Promise<GrepHit[]>;
+  remoteGrep(serverId: string, path: string, query: string, max?: number): Promise<GrepHit[]>;
   /** S3: download link valid for `secs` seconds (at most 7 days). */
   remotePresign(serverId: string, path: string, secs: number): Promise<string>;
   /** Unpacks a zip into a new folder next to it; returns the folder's name. */
@@ -254,7 +262,7 @@ export interface Backend {
   /** OneDrive; `refreshToken` in the answer is the renewed sign-in to keep. */
   connectOneDrive(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null; refreshToken?: string }>;
   /** Google Drive with the refresh token and the user's own app key. */
-  connectGDrive(serverId: string, params: { refreshToken: string; clientId: string; clientSecret: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  connectGDrive(serverId: string, params: { refreshToken: string; clientId: string; clientSecret: string; pdfExport?: boolean }): Promise<{ home: string; clockOffsetMs?: number | null }>;
   cloudSignInCancel(): Promise<void>;
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;

@@ -78,3 +78,43 @@ export function crumbs(path: string, homeName: string): Array<{ name: string; pa
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ Windows names */
+
+/** Characters Windows does not allow in file names (besides control characters). */
+const WIN_BAD = new Set(['<', '>', ':', '"', '|', '?', '*', '\\']);
+const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(\.|$)/i;
+const pct = (c: string) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
+
+/**
+ * One name from a server made storable on Windows (WinSCP does the same):
+ * forbidden characters become %XX ("a:b.txt" → "a%3Ab.txt"), as do a dot or
+ * space at the end and the first letter of reserved names ("CON" → "%43ON").
+ * `winNameFromSafe` turns it back on upload.
+ */
+export function winSafeName(name: string): string {
+  let out = [...name].map((c) => (WIN_BAD.has(c) || c.charCodeAt(0) < 32 ? pct(c) : c)).join('');
+  if (/[. ]$/.test(out)) out = out.slice(0, -1) + pct(out.slice(-1));
+  if (WIN_RESERVED.test(out)) out = pct(out[0]) + out.slice(1);
+  return out;
+}
+
+/** A relative path ("a/b:c") with every part made storable on Windows. */
+export function winSafeRel(rel: string): string {
+  return rel.split('/').map(winSafeName).join('/');
+}
+
+/** Reverses `winSafeName` for exactly what it encodes; any other "%" stays as it is. */
+export function winNameFromSafe(name: string): string {
+  let out = name.replace(/%([0-9A-F]{2})/g, (m, hex: string) => {
+    const c = String.fromCharCode(parseInt(hex, 16));
+    return WIN_BAD.has(c) || c.charCodeAt(0) < 32 ? c : m;
+  });
+  out = out.replace(/%(2E|20)$/, (_m, hex: string) => (hex === '2E' ? '.' : ' '));
+  const lead = /^%([0-9A-F]{2})/.exec(out);
+  if (lead) {
+    const restored = String.fromCharCode(parseInt(lead[1], 16)) + out.slice(3);
+    if (WIN_RESERVED.test(restored)) out = restored;
+  }
+  return out;
+}

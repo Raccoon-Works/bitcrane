@@ -305,7 +305,9 @@ export interface DeepSearch {
   loading: boolean;
   error?: string;
   /** Files whose path below `base` matches; `rel` is relative to `base`. */
-  results: Array<{ path: string; rel: string; size: number; mtime: number }>;
+  results: Array<{ path: string; rel: string; size: number; mtime: number; line?: string; lineNo?: number }>;
+  /** Searched in the files' content ("Inhalt durchsuchen") instead of their names. */
+  content?: boolean;
   /** True when there were more matches than shown. */
   more: boolean;
 }
@@ -443,6 +445,8 @@ export interface AppState {
   searchSide: PaneSide;
   /** "In Unterordnern suchen" is switched on. */
   deepSearchOn: boolean;
+  /** Search also looks inside files (with deepSearchOn): local and SSH servers. */
+  searchContent: boolean;
   /** Results of the search in subfolders of the focused side. */
   deepSearch: DeepSearch | null;
   toolbar: ToolId[];
@@ -652,6 +656,7 @@ function initialState(): AppState {
     search: '',
     searchSide: 'local',
     deepSearchOn: false,
+    searchContent: false,
     deepSearch: null,
     toolbar: [...defaultToolbar],
     toolbarLabels: 'icons',
@@ -1649,7 +1654,9 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
     const toRight = a.kind === 'upload';
     const [from, to] = toRight ? [L, R] : [R, L];
     const source = a.from ?? paths.join(toRight ? t.localPath : t.remotePath, a.rel);
-    const target = a.to ?? paths.join(toRight ? t.remotePath : t.localPath, a.rel);
+    // A new file on this computer gets a name Windows can store; one on a server its real name back.
+    const rel = !to ? live.localRel(a.rel) : !from ? live.remoteRel(to, a.rel) : a.rel;
+    const target = a.to ?? paths.join(toRight ? t.remotePath : t.localPath, rel);
     const base = { id: uid('t'), name: paths.basename(a.rel), folder: relFolder(toRight ? t.remotePath : t.localPath, target), source, target, size: a.size, done: 0, state: 'queued' as const, decided: true };
     if (!from && !to) localPairs.push([source, target]);
     else if (!from) items.push({ ...base, direction: 'up', serverId: to });
@@ -2016,18 +2023,53 @@ let deepTimer: number | undefined;
 let deepRun = 0;
 
 export function setDeepSearch(on: boolean) {
-  setState({ deepSearchOn: on, ...(on ? {} : { deepSearch: null }) });
+  setState({ deepSearchOn: on, ...(on ? {} : { deepSearch: null, searchContent: false }) });
   if (on) {
     if (!state.search.trim()) showToast($t('Suche in Unterordnern an: einen Namen ins Suchfeld tippen.'));
     scheduleDeepSearch();
   }
 }
 
+/**
+ * "Im Inhalt suchen" (ForkLift, Commander One, WinSCP "grep"): finds text inside
+ * files below the folder, on this computer and on SSH servers. Turns on the
+ * search in subfolders as well.
+ */
+export function setSearchContent(on: boolean) {
+  setState({ searchContent: on, ...(on ? { deepSearchOn: true } : {}), deepSearch: null });
+  if (on && !state.search.trim()) showToast($t('Suche im Inhalt an: einen Text ins Suchfeld tippen.'));
+  scheduleDeepSearch();
+}
+
 function scheduleDeepSearch() {
   window.clearTimeout(deepTimer);
   const q = state.search.trim();
-  if (!q) { setState({ deepSearch: null }); return; }
-  deepTimer = window.setTimeout(() => void runDeepSearch(q), 300);
+  if (!q || (state.searchContent && q.length < 2)) { setState({ deepSearch: null }); return; }
+  // Searching in content reads files, so it waits a little longer for the typing to stop.
+  deepTimer = window.setTimeout(() => void (state.searchContent ? runContentSearch(q) : runDeepSearch(q)), state.searchContent ? 600 : 300);
+}
+
+async function runContentSearch(query: string) {
+  const t = activeTab();
+  if (!t) return;
+  const side = state.searchSide;
+  if (paneShowsServers(side, t)) return;
+  const base = panePath(side);
+  const run = ++deepRun;
+  const loc = paneLoc(side, t);
+  setState({ deepSearch: { side, base, query, loading: true, results: [], more: false, content: true } });
+  try {
+    const max = 300;
+    const hits = !LIVE
+      ? fs.walkFiles(...loc, base).filter((f) => f.path.toLowerCase().includes(query.toLowerCase().slice(0, 2))).slice(0, 12).map((f, i) => ({ path: f.path, rel: f.path.slice(base.length + 1), size: f.entry.size, mtime: f.entry.mtime, line: `… ${query} …`, lineNo: i + 3 }))
+      : await live.grep(...loc, base, query, max + 1);
+    if (run !== deepRun) return;
+    const visible = hits.filter((h) => state.settings.showHidden || !h.rel.split('/').some((seg) => seg.startsWith('.')));
+    setState({ deepSearch: { side, base, query, loading: false, results: visible.slice(0, max), more: hits.length > max, content: true } });
+  } catch (e) {
+    if (run !== deepRun) return;
+    setState({ deepSearch: { side, base, query, loading: false, results: [], more: false, error: (e as { message?: string })?.message ?? String(e), content: true } });
+  }
 }
 
 async function runDeepSearch(query: string) {

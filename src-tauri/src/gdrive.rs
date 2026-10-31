@@ -42,6 +42,31 @@ pub struct GDriveParams {
     pub refresh_token: String,
     pub client_id: String,
     pub client_secret: String,
+    /// Google Docs, Sheets and Slides arrive as PDF instead of Word, Excel and PowerPoint files.
+    #[serde(default)]
+    pub pdf_export: bool,
+}
+
+/// What a Google Docs item becomes when read: extension and MIME type to
+/// export as (Transmit and FileZilla Pro convert the same way). None for items
+/// Drive cannot export (Forms, Sites, Maps).
+pub fn export_as(mime: &str, pdf: bool) -> Option<(&'static str, &'static str)> {
+    const PDF: (&str, &str) = ("pdf", "application/pdf");
+    match mime {
+        "application/vnd.google-apps.document" if pdf => Some(PDF),
+        "application/vnd.google-apps.document" => Some(("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+        "application/vnd.google-apps.spreadsheet" if pdf => Some(PDF),
+        "application/vnd.google-apps.spreadsheet" => Some(("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+        "application/vnd.google-apps.presentation" if pdf => Some(PDF),
+        "application/vnd.google-apps.presentation" => Some(("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")),
+        "application/vnd.google-apps.drawing" if pdf => Some(PDF),
+        "application/vnd.google-apps.drawing" => Some(("png", "image/png")),
+        _ => None,
+    }
+}
+
+fn is_google_doc(v: &Value) -> bool {
+    v.get("mimeType").and_then(|m| m.as_str()).is_some_and(|m| m.starts_with("application/vnd.google-apps.") && m != FOLDER)
 }
 
 struct Token {
@@ -57,6 +82,8 @@ pub struct GDriveConn {
     token: tokio::sync::Mutex<Token>,
     /// Path ("/a/b") to file id; "/" is "root".
     ids: std::sync::Mutex<HashMap<String, String>>,
+    /// Export Google Docs as PDF (else as Office files).
+    pdf: bool,
     pub home: String,
 }
 
@@ -84,11 +111,16 @@ fn is_dir(v: &Value) -> bool {
 }
 
 /// One entry of a listing. Shortcuts and other non-file items are left out.
-fn entry_of(v: &Value) -> Option<FileEntry> {
-    let name = v.get("name")?.as_str()?.to_string();
+/// Google Docs get the extension they are exported with ("Bericht" →
+/// "Bericht.docx"), so downloads, previews and comparisons use that name.
+fn entry_of(v: &Value, pdf: bool) -> Option<FileEntry> {
+    let mut name = v.get("name")?.as_str()?.to_string();
     let mime = v.get("mimeType").and_then(|m| m.as_str()).unwrap_or_default();
     if mime == "application/vnd.google-apps.shortcut" {
         return None;
+    }
+    if let Some((ext, _)) = export_as(mime, pdf) {
+        name = format!("{name}.{ext}");
     }
     let dir = mime == FOLDER;
     Some(FileEntry {
@@ -117,6 +149,7 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
         403 if reason.contains("RateLimit") || reason.contains("rateLimit") => {
             AppError::new(ErrorKind::ConnectionLost, "Google Drive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.").with_detail(detail)
         }
+        403 if reason == "exportSizeLimitExceeded" => AppError::new(ErrorKind::Other, format!("{what}: Das Dokument ist zu groß zum Umwandeln (Google wandelt höchstens 10 MB um). In Google Drive selbst herunterladen.")).with_detail(detail),
         403 if reason.contains("storageQuota") => AppError::new(ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in Google Drive.")).with_detail(detail),
         403 if reason == "accessNotConfigured" || message.contains("has not been used") || message.contains("is disabled") => AppError::new(
             ErrorKind::Other,
@@ -176,14 +209,14 @@ pub async fn sign_in(client_id: &str, client_secret: &str, open: impl FnOnce(&st
     )
     .await?;
     let refresh = answer.refresh_token.ok_or_else(|| AppError::other("Google hat keine dauerhafte Anmeldung geschickt."))?;
-    let conn = GDriveConn::new(client, client_id.trim().into(), client_secret.trim().into(), refresh.clone());
+    let conn = GDriveConn::new(client, client_id.trim().into(), client_secret.trim().into(), refresh.clone(), false);
     *conn.token.lock().await = Token { access: answer.access_token, valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) };
     let account = conn.account().await.unwrap_or_else(|_| "Google Drive".into());
     Ok(oauth::SignedIn { refresh_token: refresh, account })
 }
 
 impl GDriveConn {
-    fn new(client: reqwest::Client, client_id: String, client_secret: String, refresh: String) -> GDriveConn {
+    fn new(client: reqwest::Client, client_id: String, client_secret: String, refresh: String, pdf: bool) -> GDriveConn {
         let mut ids = HashMap::new();
         ids.insert("/".to_string(), "root".to_string());
         GDriveConn {
@@ -193,6 +226,7 @@ impl GDriveConn {
             refresh,
             token: tokio::sync::Mutex::new(Token { access: String::new(), valid_until: Instant::now() }),
             ids: std::sync::Mutex::new(ids),
+            pdf,
             home: "/".into(),
         }
     }
@@ -201,7 +235,7 @@ impl GDriveConn {
         if params.client_id.trim().is_empty() || params.client_secret.trim().is_empty() {
             return Err(not_set_up());
         }
-        let conn = GDriveConn::new(oauth::http_client()?, params.client_id.trim().into(), params.client_secret.trim().into(), params.refresh_token);
+        let conn = GDriveConn::new(oauth::http_client()?, params.client_id.trim().into(), params.client_secret.trim().into(), params.refresh_token, params.pdf_export);
         // Renews the access token and checks the account at once.
         conn.account().await?;
         Ok(conn)
@@ -291,7 +325,19 @@ impl GDriveConn {
         }
         let parent = Box::pin(self.lookup(&remote_parent(&path))).await?;
         let parent_id = parent.get("id").and_then(|i| i.as_str()).unwrap_or("root").to_string();
-        let item = self.child(&parent_id, &remote_name(&path), &what).await?.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(&path))))?;
+        let name = remote_name(&path);
+        let mut item = self.child(&parent_id, &name, &what).await?;
+        // "Bericht.docx" may be the Google Doc "Bericht" shown with its export extension.
+        if item.is_none() {
+            if let Some((stem, ext)) = name.rsplit_once('.') {
+                let doc = self.child(&parent_id, stem, &what).await?;
+                let mime = doc.as_ref().and_then(|d| d.get("mimeType")).and_then(|m| m.as_str()).unwrap_or_default();
+                if export_as(mime, self.pdf).is_some_and(|(e, _)| e == ext) {
+                    item = doc;
+                }
+            }
+        }
+        let item = item.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", name)))?;
         if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
             self.ids.lock().unwrap().insert(path, id.to_string());
         }
@@ -318,7 +364,7 @@ impl GDriveConn {
         let mut seen = std::collections::HashSet::new();
         let mut out = Vec::new();
         for v in &items {
-            let Some(e) = entry_of(v) else { continue };
+            let Some(e) = entry_of(v, self.pdf) else { continue };
             // Same name twice: Bitcrane shows (and uses) the first one only.
             if !seen.insert(e.name.clone()) {
                 continue;
@@ -341,7 +387,7 @@ impl GDriveConn {
             return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: "755".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
         }
         let v = self.lookup(path).await?;
-        entry_of(&v).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v, self.pdf).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -382,7 +428,16 @@ impl GDriveConn {
         if self.exists(&to).await {
             return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es schon.", remote_name(&to))));
         }
-        let id = self.id_of(&from).await?;
+        let item = self.lookup(&from).await?;
+        let id = item.get("id").and_then(|i| i.as_str()).unwrap_or_default().to_string();
+        // Google Docs keep their name without the export extension ("Neu.docx" → "Neu").
+        let mime = item.get("mimeType").and_then(|m| m.as_str()).unwrap_or_default();
+        let mut new_name = remote_name(&to);
+        if let Some((ext, _)) = export_as(mime, self.pdf) {
+            if let Some(stem) = new_name.strip_suffix(&format!(".{ext}")) {
+                new_name = stem.to_string();
+            }
+        }
         let old_parent = self.id_of(&remote_parent(&from)).await?;
         let new_parent = self.id_of(&remote_parent(&to)).await?;
         let mut query: Vec<(&str, &str)> = vec![("fields", "id")];
@@ -390,7 +445,7 @@ impl GDriveConn {
             query.push(("addParents", &new_parent));
             query.push(("removeParents", &old_parent));
         }
-        self.call(reqwest::Method::PATCH, &format!("{API}/files/{id}"), &query, Some(json!({ "name": remote_name(&to) })), &what).await?;
+        self.call(reqwest::Method::PATCH, &format!("{API}/files/{id}"), &query, Some(json!({ "name": new_name })), &what).await?;
         self.forget(&from);
         self.ids.lock().unwrap().insert(to, id);
         Ok(())
@@ -485,12 +540,19 @@ impl GDriveConn {
         let what = format!("„{}“ lesen", remote_name(path));
         let item = self.lookup(path).await?;
         let mime = item.get("mimeType").and_then(|m| m.as_str()).unwrap_or_default();
-        if mime.starts_with("application/vnd.google-apps.") {
-            return Err(AppError::other(format!("„{}“ ist ein Google-Dokument und lässt sich nicht direkt herunterladen. In Google Drive über „Herunterladen“ als Word-, Excel- oder PDF-Datei speichern.", remote_name(path))));
-        }
         let id = item.get("id").and_then(|i| i.as_str()).unwrap_or_default();
         let token = self.access().await?;
-        let mut req = self.client.get(format!("{API}/files/{id}")).query(&[("alt", "media")]).bearer_auth(token);
+        let mut req = if let Some((_, export_mime)) = export_as(mime, self.pdf) {
+            // Converted by Google on the fly; such a download always starts from the beginning.
+            if offset > 0 {
+                return Err(AppError::other("Google Drive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range"));
+            }
+            self.client.get(format!("{API}/files/{id}/export")).query(&[("mimeType", export_mime)]).bearer_auth(token)
+        } else if mime.starts_with("application/vnd.google-apps.") {
+            return Err(AppError::other(format!("„{}“ ist ein Google-Element, das sich nicht herunterladen lässt (z. B. ein Formular). In Google Drive öffnen.", remote_name(path))));
+        } else {
+            self.client.get(format!("{API}/files/{id}")).query(&[("alt", "media")]).bearer_auth(token)
+        };
         if offset > 0 {
             req = req.header("Range", format!("bytes={offset}-"));
         }
@@ -515,7 +577,8 @@ impl GDriveConn {
         if let Some(t) = mtime.and_then(rfc3339) {
             meta["modifiedTime"] = json!(t);
         }
-        let existing = self.lookup(path).await.ok().filter(|v| !is_dir(v));
+        // A Google Doc shown as "Bericht.docx" is never overwritten by an upload; a real file is created next to it.
+        let existing = self.lookup(path).await.ok().filter(|v| !is_dir(v) && !is_google_doc(v));
         let req = match existing.as_ref().and_then(|v| v.get("id")).and_then(|i| i.as_str()) {
             Some(id) => self.client.patch(format!("{UPLOAD}/files/{id}")),
             None => {
@@ -609,11 +672,15 @@ mod tests {
         assert_eq!(norm(""), "/");
         assert_eq!(norm("/Fotos/2026/"), "/Fotos/2026");
         assert_eq!(quoted("Max's \\ Ordner"), "'Max\\'s \\\\ Ordner'");
-        let f = entry_of(&json!({ "id": "1", "name": "a.txt", "mimeType": "text/plain", "size": "42", "modifiedTime": "2026-10-29T08:00:00.000Z" })).unwrap();
+        let f = entry_of(&json!({ "id": "1", "name": "a.txt", "mimeType": "text/plain", "size": "42", "modifiedTime": "2026-10-29T08:00:00.000Z" }), false).unwrap();
         assert_eq!((f.kind.as_str(), f.size, f.mtime), ("file", 42, 1793260800000));
-        let d = entry_of(&json!({ "id": "2", "name": "Fotos", "mimeType": FOLDER })).unwrap();
+        let d = entry_of(&json!({ "id": "2", "name": "Fotos", "mimeType": FOLDER }), false).unwrap();
         assert_eq!(d.kind, "dir");
-        assert!(entry_of(&json!({ "id": "3", "name": "x", "mimeType": "application/vnd.google-apps.shortcut" })).is_none());
+        assert!(entry_of(&json!({ "id": "3", "name": "x", "mimeType": "application/vnd.google-apps.shortcut" }), false).is_none());
+        let doc = json!({ "id": "4", "name": "Bericht", "mimeType": "application/vnd.google-apps.document" });
+        assert_eq!(entry_of(&doc, false).unwrap().name, "Bericht.docx");
+        assert_eq!(entry_of(&doc, true).unwrap().name, "Bericht.pdf");
+        assert_eq!(entry_of(&json!({ "id": "5", "name": "Umfrage", "mimeType": "application/vnd.google-apps.form" }), false).unwrap().name, "Umfrage");
         assert_eq!(rfc3339(1793260800).as_deref(), Some("2026-10-29T08:00:00Z"));
     }
 }

@@ -1,7 +1,7 @@
 //! Local file system operations.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{perms_string, FileEntry, Place, WalkItem};
+use crate::model::{perms_string, FileEntry, GrepHit, Place, WalkItem};
 use crate::paths::{to_native, to_ui};
 use std::fs;
 use std::path::Path;
@@ -832,5 +832,75 @@ mod tests {
         assert_eq!(copy(&[format!("{base}/sub")], &base, false).unwrap(), vec!["sub Kopie".to_string()]);
         assert!(dir.path().join("sub Kopie/a.py").exists());
         assert!(copy(&[format!("{base}/sub")], &format!("{base}/sub"), false).is_err());
+    }
+}
+
+/// Shortens a matching line for the result list (whole characters, at most 160).
+pub fn snippet(line: &str) -> String {
+    let t = line.trim();
+    if t.chars().count() <= 160 {
+        t.to_string()
+    } else {
+        format!("{}…", t.chars().take(160).collect::<String>())
+    }
+}
+
+/// Files below `path` whose text contains `query` (case does not matter).
+/// Binary files, files over 20 MB and the folders .git and node_modules are
+/// skipped; at most `max` hits.
+pub fn grep(path: &str, query: &str, max: usize) -> AppResult<Vec<GrepHit>> {
+    use std::io::Read;
+    let needle = query.to_lowercase();
+    if needle.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let root = to_native(path);
+    let mut out = Vec::new();
+    let walker = walkdir::WalkDir::new(&root).follow_links(false).into_iter().filter_entry(|e| {
+        let n = e.file_name().to_string_lossy();
+        !(e.file_type().is_dir() && (n == ".git" || n == "node_modules"))
+    });
+    for entry in walker.flatten() {
+        if out.len() >= max {
+            break;
+        }
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else { continue };
+        if meta.len() > 20 * 1024 * 1024 {
+            continue;
+        }
+        let Ok(mut f) = fs::File::open(entry.path()) else { continue };
+        let mut bytes = Vec::new();
+        if f.read_to_end(&mut bytes).is_err() || bytes.iter().take(8192).any(|b| *b == 0) {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&bytes);
+        if let Some((i, line)) = text.lines().enumerate().find(|(_, l)| l.to_lowercase().contains(&needle)) {
+            let rel = entry.path().strip_prefix(&root).unwrap_or(entry.path()).to_string_lossy().replace('\\', "/");
+            out.push(GrepHit { path: to_ui(entry.path()), rel, size: meta.len(), mtime: mtime_ms(&meta), line: snippet(line), line_no: i as u32 + 1 });
+        }
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod grep_tests {
+    #[test]
+    fn finds_text_and_skips_binaries() {
+        let dir = std::env::temp_dir().join(format!("bitcrane-grep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        std::fs::write(dir.join("a.txt"), "eins\nZwei Drei\n").unwrap();
+        std::fs::write(dir.join("sub/b.py"), "print('zwei')\n").unwrap();
+        std::fs::write(dir.join("bin.dat"), b"zwei\0\0").unwrap();
+        std::fs::write(dir.join(".git/c"), "zwei").unwrap();
+        let mut hits = super::grep(&dir.to_string_lossy(), "ZWEI", 10).unwrap();
+        hits.sort_by(|a, b| a.rel.cmp(&b.rel));
+        assert_eq!(hits.iter().map(|h| h.rel.as_str()).collect::<Vec<_>>(), vec!["a.txt", "sub/b.py"]);
+        assert_eq!((hits[0].line.as_str(), hits[0].line_no), ("Zwei Drei", 2));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

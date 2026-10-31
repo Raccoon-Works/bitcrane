@@ -59,3 +59,18 @@ pub struct Place {
 pub fn perms_string(mode: u32) -> String {
     format!("{:03o}", mode & 0o777)
 }
+
+/// A file whose content matches a search ("Inhalt durchsuchen").
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrepHit {
+    /// Full UI path of the file.
+    pub path: String,
+    /// Path relative to the searched folder.
+    pub rel: String,
+    pub size: u64,
+    pub mtime: i64,
+    /// First matching line (trimmed, shortened) and its number.
+    pub line: String,
+    pub line_no: u32,
+}

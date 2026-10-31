@@ -16,7 +16,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { isCloudProtocol, type FileEntry, type PaneSide, type Server, type Tab, type Transfer, type Watch } from '../backend/types';
-import { basename, insideArchive, join, parent } from '../util/paths';
+import { basename, insideArchive, join, parent, winNameFromSafe, winSafeRel } from '../util/paths';
 import { addLog } from './log';
 import { reopenTerminals } from './terminal';
 import { refreshForwards, startAutoForwards } from './forward';
@@ -269,9 +269,9 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     const key = await (await import('./cloud')).googleKey();
     if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
-    return backend.connectGDrive(id, { refreshToken, ...key });
+    return backend.connectGDrive(id, { refreshToken, ...key, pdfExport: srv.gdocExport === 'pdf' });
   }
-  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout });
+  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout, forwardAgent: !!srv.forwardAgent });
 }
 
 /**
@@ -960,7 +960,14 @@ export async function uploadNativePaths(serverId: string, nativePaths: string[],
  * and Windows servers treat as a different name than the same word typed there.
  */
 export function remoteRel(serverId: string, rel: string): string {
-  return serverById(serverId)?.keepNameForm ? rel : rel.normalize('NFC');
+  // On Windows, names that were made storable on download ("a%3Ab.txt") get their real form back.
+  const real = getState().platform === 'win' ? rel.split('/').map(winNameFromSafe).join('/') : rel;
+  return serverById(serverId)?.keepNameForm ? real : real.normalize('NFC');
+}
+
+/** Path below a download target folder: on Windows with forbidden characters replaced (see winSafeName). */
+export function localRel(rel: string): string {
+  return getState().platform === 'win' ? winSafeRel(rel) : rel;
 }
 
 /** Downloads remote files or folders (names in `remoteDir`) into `localDir`. */
@@ -979,7 +986,7 @@ export async function downloadNames(serverId: string, remoteDir: string, localDi
     }
     for (const f of walk) {
       if (skippedByRules(f.relative, f.size, serverId)) { skipped++; continue; }
-      const target = join(localDir, f.relative);
+      const target = join(localDir, localRel(f.relative));
       items.push({ id: uid('t'), name: basename(f.path), direction: 'down', serverId, folder: relFolder(localDir, target), source: f.path, target, size: f.size, done: 0, state: 'queued', manual: true });
     }
   }
@@ -1071,6 +1078,11 @@ function openAfterDownload(path: string) {
   if (openedRecently.length >= 5) return;
   openedRecently.push(now);
   backend.localOpen(path).catch(() => undefined);
+}
+
+/** "Im Inhalt suchen": files below `base` containing `query` (this computer or an SSH server). */
+export function grep(side: PaneSide, serverId: string, base: string, query: string, max: number) {
+  return side === 'local' ? backend.localGrep(base, query, max) : backend.remoteGrep(serverId, base, query, max);
 }
 
 /** One transfer's share of a limit in KB/s (0 = unlimited). */
@@ -1519,7 +1531,7 @@ async function initialSync(w: Watch, manual = false) {
     for (const f of local) {
       const rel = relOf(w, f.path);
       if (isExcluded(rel, watchExcludes(w)) || !inSelection(w, rel)) continue;
-      const r = remoteByRel.get(rel.normalize('NFC'));
+      const r = remoteByRel.get(remoteRel(w.serverId, rel).normalize('NFC'));
       if (!r && w.options.onlyExisting) continue;
       if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, f.path, f.size, r?.path));
     }

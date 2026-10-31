@@ -10,7 +10,8 @@
  * highlight it.
  */
 import type { PaneSide } from '../backend/types';
-import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace, moveIntoFolder, navigate } from '../state/store';
+import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace, moveIntoFolder, navigate, listEntries } from '../state/store';
+import { invoke } from '@tauri-apps/api/core';
 import { join } from './paths';
 import { $t } from '../i18n';
 
@@ -30,6 +31,12 @@ interface DragState {
 }
 
 let drag: DragState | null = null;
+/** Files handed to the system drag (to ignore them if they are dropped back into the window). */
+let handedOut: { names: Set<string>; until: number } | null = null;
+/** Server files copied to a temporary folder for dragging them out (started near the window edge). */
+let prepared: { key: string; job: Promise<string[]> } | null = null;
+/** Largest amount of server data copied for dragging out (more goes into the other half). */
+const OUT_LIMIT = 100 * 1024 * 1024;
 let spring: { key: string; timer: number } | null = null;
 
 function clearSpring() {
@@ -104,8 +111,73 @@ function canDropOn(side: PaneSide): boolean {
   return !!t && !(ls === 'remote' && isOffline(sid));
 }
 
+/** Server files that may be dragged out: only files, together at most OUT_LIMIT. */
+function outEligible(d: DragState): string[] | null {
+  const t = activeTab();
+  const loc = paneLoc(d.side, t);
+  if (loc[0] === 'local') return d.names.map((n) => join(d.fromDir, n));
+  const list = listEntries(...loc, d.fromDir) ?? [];
+  let total = 0;
+  for (const n of d.names) {
+    const e = list.find((x) => x.name === n);
+    if (!e || e.kind !== 'file') return null;
+    total += e.size;
+  }
+  return total <= OUT_LIMIT ? d.names.map((n) => join(d.fromDir, n)) : null;
+}
+
+/** Near the window edge: start copying server files, so they are ready when the pointer leaves. */
+function prepareOut(d: DragState) {
+  const t = activeTab();
+  const loc = paneLoc(d.side, t);
+  if (loc[0] === 'local' || !LIVE) return;
+  const list = outEligible(d);
+  const key = `${loc[1]}|${list?.join('|')}`;
+  if (!list || prepared?.key === key) return;
+  prepared = { key, job: invoke<string[]>('remote_drag_prepare', { serverId: loc[1], paths: list }) };
+}
+
+/**
+ * The pointer left the window during a drag: hand the files to the system,
+ * so they can be dropped into the Finder, the Explorer or another program.
+ */
+async function handOut(d: DragState) {
+  const t = activeTab();
+  const loc = paneLoc(d.side, t);
+  const list = outEligible(d);
+  if (!list) {
+    showToast($t('Ordner und große Dateien vom Server bitte in die andere Hälfte ziehen; dort werden sie heruntergeladen.'));
+    return;
+  }
+  if (!LIVE) {
+    showToast(d.names.length === 1 ? $t('„{0}“ in den Finder gezogen (Prototyp).', d.names[0]) : $t('{0} Objekte herausgezogen (Prototyp).', d.names.length));
+    return;
+  }
+  try {
+    let files = list;
+    if (loc[0] === 'remote') {
+      prepareOut(d);
+      files = (await prepared?.job) ?? [];
+    }
+    handedOut = { names: new Set(files.map((f) => f.split(/[\\/]/).pop() ?? '')), until: Date.now() + 120000 };
+    await invoke('drag_out', { paths: files });
+  } catch (e) {
+    showToast((e as { message?: string })?.message ?? String(e), 'error');
+  } finally {
+    prepared = null;
+  }
+}
+
 function onMove(e: PointerEvent) {
   if (!drag) return;
+  // Outside the window: the system takes over the drag (the web view keeps getting moves while the button is held).
+  if (drag.active && (e.clientX < 0 || e.clientY < 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+    const d = drag;
+    finish(e, true);
+    void handOut(d);
+    return;
+  }
+  if (drag.active && (e.clientX < 40 || e.clientY < 40 || e.clientX > window.innerWidth - 40 || e.clientY > window.innerHeight - 40)) prepareOut(drag);
   if (!drag.active) {
     if (Math.abs(e.clientX - drag.x) < THRESHOLD && Math.abs(e.clientY - drag.y) < THRESHOLD) return;
     drag.active = true;
@@ -195,6 +267,8 @@ export async function startNativeDrop() {
     // Drop.
     setHint(null);
     if (!t || t.addPlace) return;
+    // Files just dragged out of Bitcrane and dropped back in: nothing to do.
+    if (handedOut && Date.now() < handedOut.until && p.paths.every((x) => handedOut?.names.has(x.split(/[\\/]/).pop() ?? ''))) return;
     if (!paneOnServer(t.side)) {
       showToast($t('Zum Hochladen die Dateien auf die Server-Seite ziehen.'));
       return;

@@ -321,6 +321,12 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                       <span className="small muted">{$t('Google Drive braucht einen eigenen, kostenlosen App-Schlüssel aus deinem Google-Konto. Einmal einrichten, etwa 10 Minuten.')}{' '}
                         <button type="button" className="link small" onClick={() => openExternal(GDRIVE_GUIDE_URL)}>{$t('Zur Anleitung')}</button></span>
                     </div>
+                    <label htmlFor="s-gdoc">{$t('Google-Dokumente')}</label>
+                    <div className="col-text">
+                      <Select<'office' | 'pdf'> id="s-gdoc" label={$t('Google-Dokumente')} value={draft.gdocExport ?? 'office'} onChange={(v) => set('gdocExport', v === 'office' ? undefined : v)}
+                        options={[{ value: 'office', label: $t('Als Word, Excel und PowerPoint (Standard)') }, { value: 'pdf', label: $t('Als PDF') }]} />
+                      <span className="small muted">{$t('Docs, Tabellen, Präsentationen und Zeichnungen werden beim Herunterladen umgewandelt. In der Liste stehen sie schon mit der passenden Endung.')}</span>
+                    </div>
                   </>
                 )}
                 <span>{$t('Konto')}</span>
@@ -553,6 +559,11 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                         <TextField label={$t('Befehl beim Start')} value={draft.termStart ?? ''} onChange={(v) => set('termStart', v || undefined)} placeholder={$t('Befehl beim Start, z. B. tmux attach')} mono className="flex-1" />
                       </div>
                       <span className="small muted">{$t('Für das eingebaute Terminal. Ein eigenes Farbschema (z. B. rot) zeigt sofort, auf welchem Server du tippst.')}</span>
+                    </div>
+                    <span>{$t('SSH-Agent')}</span>
+                    <div className="col-text">
+                      <span className="row-inline"><Switch checked={!!draft.forwardAgent} onChange={(v) => set('forwardAgent', v || undefined)} label={$t('SSH-Agent an den Server weiterleiten')} /><span>{$t('SSH-Agent an den Server weiterleiten')}</span></span>
+                      <span className="small muted">{$t('Im Terminal auf dem Server können Programme wie git deine Schlüssel von diesem Computer nutzen, ohne dass dort ein Schlüssel liegt. Nur bei Servern einschalten, denen du vertraust.')}</span>
                     </div>
                   </>
                 )}

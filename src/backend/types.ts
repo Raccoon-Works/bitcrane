@@ -116,6 +116,8 @@ export interface Server {
   openAs?: 'files' | 'terminal';
   /** Built-in terminal: command typed in after connecting. */
   termStart?: string;
+  /** Built-in terminal: pass the local SSH agent on to the server (ssh -A). */
+  forwardAgent?: boolean;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
   mountExplorer?: boolean;
   /** SSH tunnels of the server (forward.rs, state/forward.ts). */
@@ -130,6 +132,8 @@ export interface Server {
    * a combining mark (NFD), which other systems treat as a different name.
    */
   keepNameForm?: boolean;
+  /** Google Drive: Docs, Sheets and Slides are downloaded as Office files (default) or as PDF. */
+  gdocExport?: 'office' | 'pdf';
   /** Opening the server turns on "Synchron blättern" between its local and server start folders (Transmit: folder linking). */
   syncBrowseOnOpen?: boolean;
 }

@@ -20,6 +20,7 @@ pub struct ScpConn {
     jump: Option<client::Handle<Handler>>,
     pub home: String,
     forwards: crate::ssh::RemoteForwards,
+    forward_agent: bool,
 }
 
 /// Quotes a path for the POSIX shell: 'it'\''s' for "it's".
@@ -178,7 +179,7 @@ fn ls_command(path: &str, single: bool) -> String {
 
 impl ScpConn {
     pub async fn new(session: Session) -> AppResult<ScpConn> {
-        let mut conn = ScpConn { handle: session.handle, jump: session.jump, home: "/".into(), forwards: session.forwards };
+        let mut conn = ScpConn { handle: session.handle, jump: session.jump, home: "/".into(), forwards: session.forwards, forward_agent: session.forward_agent };
         let out = conn.run("pwd").await?;
         if out.code != 0 {
             return Err(AppError::other("Der Server bietet weder SFTP noch eine Shell für Dateibefehle an.").with_detail(out.err));
@@ -286,7 +287,7 @@ impl ScpConn {
     }
 
     pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
-        crate::ssh::open_shell(&self.handle, cols, rows, command).await
+        crate::ssh::open_shell(&self.handle, cols, rows, command, self.forward_agent).await
     }
 
     /// The SSH handle and remote forwards, for port forwarding (forward.rs).
