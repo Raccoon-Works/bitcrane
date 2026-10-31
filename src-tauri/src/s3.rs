@@ -324,6 +324,30 @@ impl S3Conn {
         b.header("Authorization", auth)
     }
 
+    /// Pre-signed GET address of a file (SigV4 in the query): anyone with the
+    /// link can download it until it expires. S3 allows at most 7 days.
+    pub fn presigned_url(&self, path: &str, secs: u64) -> AppResult<String> {
+        let (bucket, key) = self.split(path);
+        let Some(bucket) = bucket.filter(|_| !key.is_empty()) else {
+            return Err(AppError::other("Ein Link geht nur für Dateien, nicht für Buckets."));
+        };
+        let secs = secs.clamp(60, 7 * 24 * 3600);
+        let now = chrono::Utc::now();
+        let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
+        let scope = format!("{}/{}/s3/aws4_request", &amz_date[..8], self.region);
+        let mut r = self.req(Method::GET, Some(&bucket), &key);
+        r.query = vec![
+            ("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()),
+            ("X-Amz-Credential".into(), format!("{}/{scope}", self.access_key)),
+            ("X-Amz-Date".into(), amz_date.clone()),
+            ("X-Amz-Expires".into(), secs.to_string()),
+            ("X-Amz-SignedHeaders".into(), "host".into()),
+        ];
+        let auth = r.authorization(&self.access_key, &self.secret, &self.region, &amz_date, UNSIGNED);
+        let signature = auth.rsplit("Signature=").next().unwrap_or_default();
+        Ok(format!("{}://{}{}?{}&X-Amz-Signature={signature}", self.scheme, r.host, r.path, r.canonical_query()))
+    }
+
     async fn send(&self, r: &Req, what: &str) -> AppResult<reqwest::Response> {
         let resp = self.build(r, EMPTY_SHA256).send().await.map_err(net_err)?;
         if resp.status().is_success() {
@@ -775,6 +799,26 @@ mod tests {
         };
         let auth = r.authorization("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", "20130524T000000Z", EMPTY_SHA256);
         assert!(auth.ends_with("Signature=fea454ca298b7da1c68078a5d1bdbfbbe0d65c699e0f91ac7a200a0136783543"), "{auth}");
+    }
+
+    /// The pre-signed URL example from the AWS documentation (query string auth).
+    #[test]
+    fn presigns_like_aws() {
+        let r = Req {
+            method: Method::GET,
+            host: "examplebucket.s3.amazonaws.com".into(),
+            path: "/test.txt".into(),
+            query: vec![
+                ("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()),
+                ("X-Amz-Credential".into(), "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request".into()),
+                ("X-Amz-Date".into(), "20130524T000000Z".into()),
+                ("X-Amz-Expires".into(), "86400".into()),
+                ("X-Amz-SignedHeaders".into(), "host".into()),
+            ],
+            headers: Vec::new(),
+        };
+        let auth = r.authorization("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", "20130524T000000Z", UNSIGNED);
+        assert!(auth.ends_with("Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"), "{auth}");
     }
 
     #[test]

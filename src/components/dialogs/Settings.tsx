@@ -24,6 +24,8 @@ import { $t, LANGUAGES, LOCALE } from '../../i18n';
 import { SnippetSettings } from './SnippetSettings';
 import { SchemePicker } from '../SchemePicker';
 
+/** Speed limits offered for uploads and downloads, in KB/s (0 = unlimited). */
+const SPEEDS = [0, 256, 512, 1024, 2048, 5120, 10240, 25600, 51200].map((n) => ({ value: String(n), label: n === 0 ? $t('Unbegrenzt') : n >= 1024 ? `${n / 1024} MB/s` : `${n} KB/s` }));
 /** Stable empty list for the store selector (a new [] would redraw endlessly). */
 const NO_RULES: TransferRule[] = [];
 
@@ -51,6 +53,7 @@ function CliRow() {
 /** Settings › Terminal: look of the built-in terminal and the snippets. */
 function TerminalSettingsPage() {
   useStore((s) => s.settings.terminal);
+  useStore((s) => s.settings.externalTerminal);
   const t = terminalSettings();
   const set = (patch: Partial<TerminalSettings>) => updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const [historyN, setHistoryN] = useState(historyCount);
@@ -77,6 +80,12 @@ function TerminalSettingsPage() {
       <Group title={$t('Verhalten')}>
         <Row label={$t('Shell auf diesem Computer')} note={$t('Für das Terminal ohne Server.')}>
           <Select value={t.localShell} onChange={(v) => set({ localShell: v })} label={$t('Shell auf diesem Computer')} options={[{ value: '', label: $t('Standard') }, ...shells.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
+        </Row>
+        <Row label={$t('Externes Terminal')} note={$t('Für „Im System-Terminal öffnen“ (Rechtsklick in einer Hälfte). Das Programm muss installiert sein.')}>
+          <Select value={getState().settings.externalTerminal ?? ''} onChange={(v) => updateSettings({ externalTerminal: v || undefined })} label={$t('Externes Terminal')}
+            options={getState().platform === 'mac'
+              ? [{ value: '', label: 'Terminal' }, { value: 'iterm', label: 'iTerm2' }, { value: 'ghostty', label: 'Ghostty' }]
+              : [{ value: '', label: 'Windows Terminal' }, { value: 'powershell', label: 'Windows PowerShell' }, { value: 'cmd', label: $t('Eingabeaufforderung (cmd)') }]} />
         </Row>
         <Row label={$t('Rechtsklick')} note={$t('Mit Auswahl wird kopiert, sonst eingefügt – wie in PuTTY und Windows Terminal.')}>
           <Select<'smart' | 'off'> value={t.rightClick} onChange={(v) => set({ rightClick: v })} label={$t('Rechtsklick')} options={[{ value: 'smart', label: $t('Kopieren oder einfügen') }, { value: 'off', label: $t('Nichts') }]} />
@@ -721,11 +730,15 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
               <Row label={$t('Beim Herunterladen, wenn die Datei hier schon existiert')}>
                 <Select value={s.existingDownload} onChange={(v) => updateSettings({ existingDownload: v })} label={$t('Beim Herunterladen, wenn die Datei schon existiert')} options={existingOptions} />
               </Row>
+              <Row label={$t('Nach dem Herunterladen öffnen')} note={$t('Heruntergeladene Dateien öffnen sich mit ihrem üblichen Programm. Gilt für Downloads von Hand, nicht für den Abgleich.')}><Switch checked={!!s.openAfterDownload} onChange={(v) => updateSettings({ openAfterDownload: v || undefined })} label={$t('Nach dem Herunterladen öffnen')} /></Row>
               <Row label={$t('Unveränderte Dateien überspringen')} note={$t('Liegt am Ziel schon eine Datei mit gleicher Größe und gleicher Änderungszeit, wird sie nicht noch einmal übertragen.')}><Switch checked={s.skipUnchanged} onChange={(v) => updateSettings({ skipUnchanged: v })} label={$t('Unveränderte Dateien überspringen')} /></Row>
               <Row label={$t('Ruhezustand verhindern, solange übertragen wird')} note={$t('Der Bildschirm darf ausgehen, der Rechner schläft aber erst ein, wenn alles fertig ist.')}><Switch checked={s.keepAwake !== false} onChange={(v) => updateSettings({ keepAwake: v })} label={$t('Ruhezustand verhindern')} /></Row>
               <Row label={$t('Bei Fehlern automatisch erneut versuchen')} note={$t('Bis zu drei Versuche im Abstand von 5 Sekunden, nicht bei fehlenden Rechten.')}><Switch checked={s.autoRetry} onChange={(v) => updateSettings({ autoRetry: v })} label={$t('Automatisch erneut versuchen')} /></Row>
-              <Row label={$t('Geschwindigkeit begrenzen')} note={$t('Gilt für alle Übertragungen zusammen.')}>
-                <Select value={String(s.bandwidthLimit)} onChange={(v) => updateSettings({ bandwidthLimit: Number(v) })} label={$t('Geschwindigkeit begrenzen')} options={[0, 256, 512, 1024, 2048, 5120, 10240].map((n) => ({ value: String(n), label: n === 0 ? $t('Unbegrenzt') : n >= 1024 ? `${n / 1024} MB/s` : `${n} KB/s` }))} />
+              <Row label={$t('Hochladen begrenzen')} note={$t('Gilt für alle Uploads zusammen, auch von Server zu Server.')}>
+                <Select value={String(s.bandwidthLimit)} onChange={(v) => updateSettings({ bandwidthLimit: Number(v) })} label={$t('Hochladen begrenzen')} options={SPEEDS} />
+              </Row>
+              <Row label={$t('Herunterladen begrenzen')} note={$t('Gilt für alle Downloads zusammen.')}>
+                <Select value={String(s.bandwidthLimitDown ?? s.bandwidthLimit)} onChange={(v) => updateSettings({ bandwidthLimitDown: Number(v) })} label={$t('Herunterladen begrenzen')} options={SPEEDS} />
               </Row>
             </Group>
             <Group title={$t('Beim Übertragen von Hand auslassen')}>

@@ -311,6 +311,17 @@ export function rename(side: 'local' | 'remote', serverId: string, path: string,
   return true;
 }
 
+/** Moves an entry into another folder of the same place (prototype). */
+export function move(side: 'local' | 'remote', serverId: string, path: string, toDir: string): boolean {
+  const from = findDir(side, serverId, parent(path));
+  const to = findDir(side, serverId, toDir);
+  const name = basename(path);
+  if (!from || !to || !from.children[name] || to.children[name]) return false;
+  to.children[name] = from.children[name];
+  delete from.children[name];
+  return true;
+}
+
 export function chmod(side: 'local' | 'remote', serverId: string, path: string, perms: string, owner?: string, group?: string, recursive = false) {
   const n = find(side, serverId, path);
   if (!n) return;

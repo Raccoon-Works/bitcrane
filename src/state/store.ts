@@ -36,6 +36,7 @@ export type DialogState =
   | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }
   | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
   | { type: 'checksum'; side: PaneSide; name: string }
+  | { type: 'presign'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
   | { type: 'palette' }
   | { type: 'edits' }
@@ -95,7 +96,9 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git';
+  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git' | 'tab';
+  /** Tab right-clicked in the tab bar ("tab"). */
+  tabId?: string;
   /** Group right-clicked in the server list ("serverGroup"). */
   group?: string;
   serverId?: string;
@@ -183,6 +186,8 @@ export interface Settings {
   uploadTempName: boolean;
   /** Keep the modification time of transferred files. */
   keepMtime: boolean;
+  /** Algorithm last used in "Prüfsumme". */
+  checksumAlgo?: 'md5' | 'sha1' | 'sha256' | 'sha512';
   /** What happens when a manually uploaded file already exists on the server. */
   existingFiles: ExistingRule;
   /** The same for downloads (file exists on this computer). */
@@ -227,8 +232,16 @@ export interface Settings {
   workspaces?: Workspace[];
   /** Skip files larger than this many MB when transferring by hand (0 = no limit). */
   skipLargerMb: number;
-  /** Speed limit for all transfers together in KB/s (0 = unlimited). */
+  /** Speed limit for uploads (and server to server) together in KB/s (0 = unlimited). */
   bandwidthLimit: number;
+  /** Speed limit for downloads in KB/s (0 = unlimited); missing = the same as `bandwidthLimit` (before 0.2.84 one limit for both). */
+  bandwidthLimitDown?: number;
+  /** Open downloaded files with their usual program (manual downloads only). */
+  openAfterDownload?: boolean;
+  /** "Im System-Terminal öffnen": Mac iterm / ghostty, Windows powershell / cmd; missing = Terminal / Windows Terminal. */
+  externalTerminal?: string;
+  /** Duration last chosen for an S3 link, in seconds. */
+  presignSecs?: number;
   /** Reconnect automatically after a dropped connection. */
   autoReconnect: boolean;
   /** Send keepalive messages every 30 seconds. */
@@ -1192,6 +1205,31 @@ export function closeTab(id: string) {
   setState({ tabs, activeTabId, selection: s.activeTabId === id ? clearSelection() : s.selection, expanded: s.activeTabId === id ? { local: [], remote: [] } : s.expanded });
 }
 
+/** "Andere Tabs schließen" (ForkLift): keeps only the given tab. */
+export function closeOtherTabs(id: string) {
+  const keep = state.tabs.find((t) => t.id === id);
+  if (!keep) return;
+  setState((s) => ({ tabs: [keep], activeTabId: id, selection: s.activeTabId === id ? s.selection : clearSelection(), contextMenu: null }));
+}
+
+/** Closes the tabs to the right of the given one. */
+export function closeTabsRight(id: string) {
+  const idx = state.tabs.findIndex((t) => t.id === id);
+  if (idx < 0) return;
+  const tabs = state.tabs.slice(0, idx + 1);
+  const activeTabId = tabs.some((t) => t.id === state.activeTabId) ? state.activeTabId : id;
+  setState((s) => ({ tabs, activeTabId, selection: activeTabId === s.activeTabId ? s.selection : clearSelection(), contextMenu: null }));
+}
+
+/** "Tab duplizieren": the same folders (and server) in a new tab next to it. */
+export function duplicateTab(id: string) {
+  const idx = state.tabs.findIndex((t) => t.id === id);
+  const t = state.tabs[idx];
+  if (!t || t.settings) return;
+  const copy: Tab = { ...t, id: uid('tab'), back: [], forward: [] };
+  setState((s) => ({ tabs: [...s.tabs.slice(0, idx + 1), copy, ...s.tabs.slice(idx + 1)], activeTabId: copy.id, selection: clearSelection(), contextMenu: null }));
+}
+
 function updateTab(patch: Partial<Tab>) {
   setState((s) => ({ tabs: s.tabs.map((t) => (t.id === s.activeTabId ? { ...t, ...patch } : t)) }));
 }
@@ -1450,8 +1488,8 @@ export function openTerminal(side: PaneSide = state.focusSide) {
   }
   const home = t?.leftServerId ? '~' : panePath('local');
   const target = onServer && srv
-    ? { host: srv.host, port: srv.port, user: srv.user, keyPath: srv.auth === 'key' ? srv.keyPath : undefined, remotePath: panePath(side), localPath: home }
-    : { localPath: home };
+    ? { host: srv.host, port: srv.port, user: srv.user, keyPath: srv.auth === 'key' ? srv.keyPath : undefined, remotePath: panePath(side), localPath: home, app: state.settings.externalTerminal }
+    : { localPath: home, app: state.settings.externalTerminal };
   void invoke('open_terminal', { target }).catch((e) => showToast(String((e as { message?: string }).message ?? e), 'error'));
 }
 
@@ -2335,20 +2373,115 @@ export function compareFiles(a: { side: PaneSide; name: string }, b: { side: Pan
 }
 
 export async function computeFolderSize(side: PaneSide, name: string) {
+  await computeFolderSizes(side, [name]);
+}
+
+/**
+ * "Ordnergrößen berechnen" (ForkLift, WinSCP): the given folders, or every
+ * folder of the half when none are given. Sizes appear in the list as they
+ * come in; three folders are read at a time.
+ */
+export async function computeFolderSizes(side: PaneSide = state.focusSide, names?: string[]) {
   const t = activeTab();
   if (!t) return;
-  const path = paths.join(panePath(side), name);
   setState({ contextMenu: null });
-  showToast($t('Größe von „{0}“ wird berechnet …', name));
-  try {
-    const loc = paneLoc(side, t);
-    const files = LIVE ? await live.walkFiles(...loc, path) : fs.walkFiles(...loc, path).map((f) => ({ size: f.entry.size }));
-    const total = files.reduce((a, f) => a + f.size, 0);
-    setState((s) => ({ folderSizes: { ...s.folderSizes, [folderSizeKey(...loc, path)]: total } }));
-    showToast($t('„{0}“: {1} in {2} {3}.', name, formatSize(total), files.length, files.length === 1 ? $t('Datei') : $t('Dateien')), 'ok');
-  } catch (e) {
-    showToast($t('Größe nicht berechenbar: {0}', e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e)), 'error');
+  const loc = paneLoc(side, t);
+  if (loc[0] === 'remote' && isOffline(loc[1])) return;
+  const dir = panePath(side);
+  const folders = names?.length ? names : (listEntries(...loc, dir) ?? []).filter((e) => e.kind === 'dir').map((e) => e.name);
+  if (!folders.length) {
+    showToast($t('In diesem Ordner gibt es keine Unterordner.'));
+    return;
   }
+  showToast(folders.length === 1 ? $t('Größe von „{0}“ wird berechnet …', folders[0]) : $t('Größe von {0} Ordnern wird berechnet …', folders.length));
+  let files = 0;
+  let total = 0;
+  let failed = 0;
+  const one = async (name: string) => {
+    const path = paths.join(dir, name);
+    try {
+      const list = LIVE ? await live.walkFiles(...loc, path) : fs.walkFiles(...loc, path).map((f) => ({ size: f.entry.size }));
+      const size = list.reduce((a, f) => a + f.size, 0);
+      files += list.length;
+      total += size;
+      setState((s) => ({ folderSizes: { ...s.folderSizes, [folderSizeKey(...loc, path)]: size } }));
+    } catch {
+      failed++;
+    }
+  };
+  for (let i = 0; i < folders.length; i += 3) await Promise.all(folders.slice(i, i + 3).map(one));
+  if (failed === folders.length) {
+    showToast($t('Größe nicht berechenbar.'), 'error');
+    return;
+  }
+  const what = folders.length === 1 ? `„${folders[0]}“` : $t('{0} Ordner', folders.length);
+  showToast($t('{0}: {1} in {2} {3}.', what, formatSize(total), files, files === 1 ? $t('Datei') : $t('Dateien')) + (failed ? ' ' + $t('{0} nicht lesbar.', failed) : ''), 'ok');
+}
+
+/**
+ * Entries dragged onto a folder of the same half are moved into it (Finder,
+ * Transmit, ForkLift). Moves on this computer can be taken back with ⌘Z.
+ */
+export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, dir: string = panePath(side)) {
+  const t = activeTab();
+  if (!t || !names.length) return;
+  const loc = paneLoc(side, t);
+  if (loc[0] === 'remote' && isOffline(loc[1])) return;
+  // Never into itself or one of its own subfolders, and not where it already is.
+  const list = names.filter((n) => {
+    const from = paths.join(dir, n);
+    return toDir !== from && !toDir.startsWith(from + '/') && paths.parent(from) !== toDir;
+  });
+  if (!list.length) return;
+  if (!LIVE) {
+    for (const n of list) fs.move(...loc, paths.join(dir, n), toDir);
+    setState((s) => ({ fsRev: s.fsRev + 1, selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+    showToast(list.length === 1 ? $t('„{0}“ verschoben.', paths.basename(list[0])) : $t('{0} Objekte verschoben.', list.length), 'ok');
+    return;
+  }
+  if (loc[0] === 'local') {
+    // Grouped by the folder each entry comes from (rows of opened subfolders carry a path).
+    const groups = new Map<string, string[]>();
+    for (const n of list) {
+      const from = n.includes('/') ? paths.join(dir, n.slice(0, n.lastIndexOf('/'))) : dir;
+      groups.set(from, [...(groups.get(from) ?? []), paths.basename(n)]);
+    }
+    for (const [from, items] of groups) {
+      void live.moveLocal(from, items, toDir).then((made) => {
+        if (made?.length) pushUndo({ label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length), run: () => live.moveLocal(toDir, made, from) });
+      });
+    }
+  } else void live.moveInto(...loc, dir, list, toDir);
+  setState((s) => ({ selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+}
+
+/**
+ * "Neuer Ordner mit Auswahl" (ForkLift): moves the chosen entries into a new
+ * folder of the same half and starts renaming it.
+ */
+export async function newFolderWithSelection(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  const names = selectedNames(side).filter((n) => !n.includes('/'));
+  if (!t || !names.length) return;
+  setState({ contextMenu: null });
+  const loc = paneLoc(side, t);
+  if (loc[0] === 'remote' && isOffline(loc[1])) return;
+  const dir = panePath(side);
+  const existing = new Set((listEntries(...loc, dir) ?? []).map((e) => e.name));
+  let name = $t('Neuer Ordner');
+  let i = 2;
+  while (existing.has(name)) name = $t('Neuer Ordner {0}', i++);
+  const target = paths.join(dir, name);
+  if (!LIVE) {
+    fs.makeDir(...loc, target);
+    for (const n of names) fs.move(...loc, paths.join(dir, n), target);
+    setState((s) => ({ fsRev: s.fsRev + 1, focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
+    return;
+  }
+  const ok = await live.makeFolder(...loc, dir, name);
+  if (!ok) return;
+  const moved = await live.moveInto(...loc, dir, names, target);
+  if (moved) setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
 }
 
 /** ⌘L: turns the path above a file list into an input field. */

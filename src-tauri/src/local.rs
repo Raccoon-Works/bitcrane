@@ -188,12 +188,71 @@ pub fn walk(path: &str) -> AppResult<Vec<WalkItem>> {
     Ok(out)
 }
 
-/// SHA-256 of a file as hex.
+/// Checksum algorithms offered in "Prüfsumme" (hosts often publish MD5 or SHA-1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Algo {
+    Md5,
+    Sha1,
+    Sha256,
+    Sha512,
+}
+
+impl Algo {
+    /// "md5", "sha1", "sha256" (default) or "sha512".
+    pub fn parse(name: Option<&str>) -> Algo {
+        match name.unwrap_or("").to_ascii_lowercase().replace('-', "").as_str() {
+            "md5" => Algo::Md5,
+            "sha1" => Algo::Sha1,
+            "sha512" => Algo::Sha512,
+            _ => Algo::Sha256,
+        }
+    }
+
+    pub fn hasher(self) -> Box<dyn sha2::digest::DynDigest + Send> {
+        match self {
+            Algo::Md5 => Box::new(md5::Md5::default()),
+            Algo::Sha1 => Box::new(sha1::Sha1::default()),
+            Algo::Sha256 => Box::new(sha2::Sha256::default()),
+            Algo::Sha512 => Box::new(sha2::Sha512::default()),
+        }
+    }
+
+    /// Length of the hex string.
+    pub fn hex_len(self) -> usize {
+        match self {
+            Algo::Md5 => 32,
+            Algo::Sha1 => 40,
+            Algo::Sha256 => 64,
+            Algo::Sha512 => 128,
+        }
+    }
+
+    /// Shell commands that print the checksum first on their line (Linux, BSD/macOS).
+    pub fn commands(self, quoted: &str) -> Vec<String> {
+        match self {
+            Algo::Md5 => vec![format!("md5sum -- {quoted}"), format!("md5 -q -- {quoted}")],
+            Algo::Sha1 => vec![format!("sha1sum -- {quoted}"), format!("shasum -a 1 -- {quoted}")],
+            Algo::Sha256 => vec![format!("sha256sum -- {quoted}"), format!("shasum -a 256 -- {quoted}")],
+            Algo::Sha512 => vec![format!("sha512sum -- {quoted}"), format!("shasum -a 512 -- {quoted}")],
+        }
+    }
+}
+
+/// Lowercase hex of a finished hash.
+pub fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Checksum of a file as hex (SHA-256 unless another algorithm is asked for).
+#[allow(dead_code)]
 pub fn checksum(path: &str) -> AppResult<String> {
-    use sha2::{Digest, Sha256};
+    checksum_with(path, Algo::Sha256)
+}
+
+pub fn checksum_with(path: &str, algo: Algo) -> AppResult<String> {
     use std::io::Read;
     let mut f = fs::File::open(to_native(path))?;
-    let mut h = Sha256::new();
+    let mut h = algo.hasher();
     let mut buf = vec![0u8; 1 << 20];
     loop {
         let n = f.read(&mut buf)?;
@@ -202,7 +261,7 @@ pub fn checksum(path: &str) -> AppResult<String> {
         }
         h.update(&buf[..n]);
     }
-    Ok(format!("{:x}", h.finalize()))
+    Ok(hex(&h.finalize()))
 }
 
 /// Free name for a copy: the name itself, else "name Kopie.ext", "name Kopie 2.ext", ...

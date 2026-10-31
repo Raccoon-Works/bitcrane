@@ -872,19 +872,23 @@ impl Connection {
 
     /// SHA-256 of a server file as hex: `sha256sum` on the server when
     /// commands are allowed, otherwise read through this connection.
+    #[allow(dead_code)]
     pub async fn checksum(&self, path: &str) -> AppResult<String> {
+        self.checksum_with(path, crate::local::Algo::Sha256).await
+    }
+
+    pub async fn checksum_with(&self, path: &str, algo: crate::local::Algo) -> AppResult<String> {
         let quoted = format!("'{}'", path.replace('\'', "'\\''"));
-        for cmd in [format!("sha256sum -- {quoted}"), format!("shasum -a 256 -- {quoted}")] {
+        for cmd in algo.commands(&quoted) {
             if let Ok((0, out)) = self.exec(&cmd).await {
-                if let Some(hex) = out.split_whitespace().next().filter(|h| h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit())) {
+                if let Some(hex) = out.split_whitespace().next().filter(|h| h.len() == algo.hex_len() && h.chars().all(|c| c.is_ascii_hexdigit())) {
                     return Ok(hex.to_lowercase());
                 }
             }
         }
-        use sha2::{Digest, Sha256};
         use tokio::io::AsyncReadExt;
         let mut f = self.sftp.open(path).await?;
-        let mut h = Sha256::new();
+        let mut h = algo.hasher();
         let mut buf = vec![0u8; 256 * 1024];
         loop {
             let n = f.read(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
@@ -893,7 +897,7 @@ impl Connection {
             }
             h.update(&buf[..n]);
         }
-        Ok(format!("{:x}", h.finalize()))
+        Ok(crate::local::hex(&h.finalize()))
     }
 
     /// Copies files or folders into `dest_dir` on the same server. Uses `cp`

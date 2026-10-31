@@ -10,7 +10,7 @@ import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
 import { AuthPrompt, CloudPlacesDialog, ConfirmDialog, ConflictDialog, About, Licenses, UpdateDialog, ConfirmDelete, Fingerprint, PermsDialog, QuickConnect, SecretPrompt, Shortcuts } from './components/dialogs/SmallDialogs';
 import { DiffDialog, CompareFilesDialog } from './components/dialogs/DiffDialog';
-import { ChecksumDialog, EditsDialog, SymlinkDialog } from './components/dialogs/FileTools';
+import { ChecksumDialog, PresignDialog, EditsDialog, SymlinkDialog } from './components/dialogs/FileTools';
 import { Palette } from './components/dialogs/Palette';
 import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportDialogs';
 import { LogDialog } from './components/dialogs/LogDialog';
@@ -27,7 +27,7 @@ import { MainWindow } from './components/MainWindow';
 import { MenuBarWindow } from './components/MenuBarWindow';
 import { PrototypeBar } from './components/PrototypeBar';
 import { STAGE_ID } from './components/stage';
-import { activeTab, copySelection, getState, LIVE, pasteClipboard, setState, startSimulation, useStore, currentZoom } from './state/store';
+import { activeTab, copySelection, getState, goBack, goForward, LIVE, pasteClipboard, setState, startSimulation, useStore, currentZoom } from './state/store';
 import { actionFor } from './state/keys';
 import { startAfterQueueWatch } from './state/tools';
 
@@ -58,6 +58,7 @@ function Dialogs() {
     case 'tagFiles': return <TagFiles name={dialog.name} color={dialog.color} />;
     case 'shortcuts': return <Shortcuts />;
     case 'checksum': return <ChecksumDialog side={dialog.side} name={dialog.name} />;
+    case 'presign': return <PresignDialog side={dialog.side} name={dialog.name} />;
     case 'symlink': return <SymlinkDialog target={dialog.target} />;
     case 'palette': return <Palette />;
     case 'edits': return <EditsDialog />;
@@ -130,12 +131,23 @@ function useShortcuts() {
     const inList = () => !!document.activeElement?.closest('[role="listbox"]');
     const onCopy = (e: ClipboardEvent) => { if (inList() && !getState().dialog) { e.preventDefault(); copySelection(getState().focusSide); } };
     const onPaste = (e: ClipboardEvent) => { if (inList() && !getState().dialog) { e.preventDefault(); pasteClipboard(getState().focusSide); } };
+    // Mouse buttons 4 and 5 go back and forward (ForkLift, WinSCP, browsers), not in dialogs.
+    const onMouseNav = (e: MouseEvent) => {
+      if ((e.button !== 3 && e.button !== 4) || getState().dialog) return;
+      e.preventDefault();
+      if (e.button === 3) goBack(); else goForward();
+    };
+    const swallow = (e: MouseEvent) => { if (e.button === 3 || e.button === 4) e.preventDefault(); };
+    window.addEventListener('mouseup', onMouseNav);
+    window.addEventListener('mousedown', swallow);
     document.addEventListener('copy', onCopy);
     document.addEventListener('paste', onPaste);
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('keydown', onDownAlt, true);
     window.addEventListener('keyup', onUpAlt, true);
     return () => {
+      window.removeEventListener('mouseup', onMouseNav);
+      window.removeEventListener('mousedown', swallow);
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('paste', onPaste);
       window.removeEventListener('keydown', onKey, true);

@@ -9,10 +9,11 @@
  */
 import { Plus, Settings as Gear, X } from './glyphs';
 import { addressOf } from './ServerList';
-import { LocalTile, ServerTile } from './ServerTile';
+import { LocalTile, ServerTile, swatch } from './ServerTile';
+import type { CSSProperties } from 'react';
 import { IconButton, Tooltip } from './ui';
 import { useKeyLabel } from '../state/keys';
-import { closeTab, newTab, selectTab, serverById, tabTitle, useStore } from '../state/store';
+import { closeTab, newTab, selectTab, serverById, setState, tabTitle, useStore } from '../state/store';
 import type { Tab } from '../backend/types';
 import { $t } from '../i18n';
 
@@ -48,7 +49,9 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
               role="tab"
               aria-selected={sel}
               tabIndex={sel ? 0 : -1}
-              className={`${cls}${sel ? ' is-sel' : ''}`}
+              className={`${cls}${sel ? ' is-sel' : ''}${srv?.color && srv.color !== 'gray' ? ' has-srv-color' : ''}`}
+              style={srv?.color && srv.color !== 'gray' ? ({ '--srv-color': swatch[srv.color] } as CSSProperties) : undefined}
+              onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: 'local', names: [], kind: 'tab', tabId: t.id } }); }}
               onClick={() => selectTab(t.id)}
               onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(t.id); } }}
               onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}

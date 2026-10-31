@@ -75,6 +75,9 @@ function cloudDefaults(service: Protocol): Partial<Server> {
   return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
 }
 
+
+/** Names of the server colours for screen readers and tooltips. */
+const COLOR_NAMES: Record<ServerColor, string> = { gray: $t('Keine Farbe'), blue: $t('Blau'), purple: $t('Lila'), green: $t('Grün'), yellow: $t('Gelb'), orange: $t('Orange'), red: $t('Rot') };
 export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: { serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
@@ -282,10 +285,10 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
             <div className="detail-head-fields">
               <TextField value={draft.name} onChange={(v) => set('name', v)} placeholder={$t('Name, z. B. Cloud · Bots')} className="name-field" />
               <div className="swatches" role="radiogroup" aria-label={$t('Farbe')}>
-                <span className="small muted">{$t('Farbe')}</span>
+                <span className="small muted" title={$t('Die Farbe erscheint im Tab und über der Serverhälfte, z. B. Rot für den Produktivserver.')}>{$t('Farbe')}</span>
                 {colors.map((c) => (
                   // "gray" means no colour: shown as an empty ring and listed first.
-                  <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={c === 'gray' ? $t('Keine Farbe') : c} title={c === 'gray' ? $t('Keine Farbe') : undefined}
+                  <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={COLOR_NAMES[c]} title={COLOR_NAMES[c]}
                     className={`swatch${c === 'gray' ? ' is-none' : ''}${draft.color === c ? ' is-on' : ''}`} style={c === 'gray' ? undefined : { background: swatch[c] }} onClick={() => set('color', c)} />
                 ))}
                 {draft.image

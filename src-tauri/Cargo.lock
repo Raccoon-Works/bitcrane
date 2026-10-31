@@ -641,6 +641,7 @@ dependencies = [
  "keepawake",
  "keyring",
  "log",
+ "md-5 0.10.6",
  "mdns-sd",
  "notify",
  "notify-debouncer-full",
@@ -3708,6 +3709,16 @@ dependencies = [
 
 [[package]]
 name = "md-5"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
+dependencies = [
+ "cfg-if",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "md-5"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98"
@@ -4754,7 +4765,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "inout 0.2.5",
- "md-5",
+ "md-5 0.11.0",
  "p256",
  "p384",
  "p521",
@@ -6715,7 +6726,7 @@ dependencies = [
  "futures",
  "getrandom 0.3.4",
  "hmac 0.13.0",
- "md-5",
+ "md-5 0.11.0",
  "md4",
  "num-derive",
  "num-traits",
