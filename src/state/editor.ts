@@ -297,8 +297,14 @@ let menuKeyHandler: ((key: string) => boolean) | null = null;
 export function setMenuKeyHandler(h: ((key: string) => boolean) | null) {
   menuKeyHandler = h;
 }
+// Where the keyboard was last: while a menu of the menu bar is in use, the page has
+// no focused element, so the last element that received focus is what counts.
+let focusInEditor = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener('focusin', (e) => { focusInEditor = !!(e.target as HTMLElement | null)?.closest?.('.cm-editor'); }, true);
+}
 export function editorMenuKey(key: string): boolean {
   if (!st.open || !menuKeyHandler) return false;
-  if (!document.activeElement?.closest('.cm-editor')) return false;
+  if (!focusInEditor && !document.activeElement?.closest('.cm-editor')) return false;
   return menuKeyHandler(key);
 }

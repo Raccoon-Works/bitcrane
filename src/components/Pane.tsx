@@ -286,6 +286,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
 
   const sidebarOn = useStore((s) => s.settings.sidebar !== false);
+  const macLocal = useStore((s) => s.platform === 'mac') && !onServer;
   const freeSpace = useFreeSpace(path, !onServer && !!path, fsRev);
   // All hooks stay above the early returns below, so their order never changes.
   // Column view (Finder, ForkLift): the folder above, the folder shown, and what the chosen folder holds.
@@ -438,7 +439,10 @@ export function Pane({ side }: { side: PaneSide }) {
     const label = entry.name.slice(entry.name.lastIndexOf('/') + 1);
     const isOpen = openSet.has(entry.name);
     // Packages (apps, libraries) look and open like files, as in the Finder.
-    const dirLike = entry.kind === 'dir' && !isPackage(side, entry);
+    const pkg = entry.kind === 'dir' && isPackage(side, entry);
+    const dirLike = entry.kind === 'dir' && !pkg;
+    // The Finder hides ".app" of programs and ".localized" of system folders; so does Bitcrane (display only).
+    const shown = macLocal ? (pkg ? label.replace(/\.app$/i, '') : entry.kind === 'dir' ? label.replace(/\.localized$/i, '') : label) : label;
     const props = {
       role: 'option',
       'aria-selected': sel.names.includes(entry.name),
@@ -465,7 +469,7 @@ export function Pane({ side }: { side: PaneSide }) {
         setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names } });
       },
     } as const;
-    const nameEl = isRenaming ? <RenameInput side={side} name={entry.name} /> : <span className={icons ? 'tile-name' : 'ellipsis'}>{label}</span>;
+    const nameEl = isRenaming ? <RenameInput side={side} name={entry.name} /> : <span className={icons ? 'tile-name' : 'ellipsis'} title={shown !== label ? label : undefined}>{shown}</span>;
     const link = entry.link !== undefined && !isRenaming && <span className="link-mark" title={$t('Verknüpfung auf {0}', entry.link || $t('ein Ziel, das es nicht mehr gibt'))} aria-label={$t('Verknüpfung')}><CornerDownRight size={11} strokeWidth={2} /></span>;
     const busyTag = isBusy && <span className="tag tag-accent">{tab.leftServerId ? $t('wird übertragen') : side === 'local' ? $t('lädt hoch') : $t('lädt herunter')}</span>;
     if (icons) {
