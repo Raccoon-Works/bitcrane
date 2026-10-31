@@ -131,6 +131,7 @@ export function Sidebar() {
   const recentAll = useStore((s) => s.settings.recentDirs);
   const liveDrives = useStore((s) => s.drives);
   const dropHere = useStore((s) => !!s.dropHint?.sidebar);
+  const homeName = useStore((s) => s.homeName);
   const savedOrder = useStore((s) => s.settings.sidebarOrder);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const order = useMemo(() => sidebarOrder(getState()), [savedOrder]);
@@ -266,7 +267,13 @@ export function Sidebar() {
       {favDrag && favDrag.before === null && <div className="side-drop-end" />}
       {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
     </>, { 'data-sidebar-favs': '' } as Partial<React.HTMLAttributes<HTMLDivElement>>),
-    recent: recent.length > 0 ? section('recent', recent.map((p) => item(`r:${p}`, <ClockCounterClockwise {...ICON} />, paths.basename(p) || p, p, () => open(p)))) : null,
+    recent: recent.length > 0 ? section('recent', recent.map((p) => {
+      // Two recent folders with the same name ("Applications" and "~/Applications") show where they are.
+      const base = paths.basename(p) || p;
+      const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
+      const where = paths.parent(p);
+      return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p));
+    })) : null,
     devices: section('devices', devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, d.name, d.path, () => open(d.path), {},
       d.free !== undefined ? <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>{shortSize(d.free)}</span> : undefined))),
     shares: mounted.length + others.length > 0 ? section('shares', <>

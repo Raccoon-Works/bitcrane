@@ -22,7 +22,28 @@ fn instance_name(fullname: &str, ty: &str) -> String {
     name.replace("\\032", " ").replace("\\.", ".")
 }
 
-/// Searches the network for `wait` and returns the SMB hosts found, sorted by name.
+/// Names of this computer (to leave it out of its own list of shares).
+fn own_names() -> Vec<String> {
+    let mut names = Vec::new();
+    for var in ["COMPUTERNAME", "HOSTNAME"] {
+        if let Ok(v) = std::env::var(var) {
+            names.push(v);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    for key in ["LocalHostName", "ComputerName"] {
+        if let Ok(o) = std::process::Command::new("/usr/sbin/scutil").args(["--get", key]).output() {
+            names.push(String::from_utf8_lossy(&o.stdout).trim().to_string());
+        }
+    }
+    #[cfg(unix)]
+    if let Ok(o) = std::process::Command::new("hostname").output() {
+        names.push(String::from_utf8_lossy(&o.stdout).trim().to_string());
+    }
+    names.into_iter().filter(|n| !n.is_empty()).map(|n| n.trim_end_matches(".local").to_lowercase()).collect()
+}
+
+/// Searches the network for `wait` and returns the SMB hosts found (without this computer), sorted by name.
 pub fn discover(wait: Duration) -> Vec<NetHost> {
     const TY: &str = "_smb._tcp.local.";
     let Ok(daemon) = mdns_sd::ServiceDaemon::new() else { return Vec::new() };
@@ -30,6 +51,7 @@ pub fn discover(wait: Duration) -> Vec<NetHost> {
         let _ = daemon.shutdown();
         return Vec::new();
     };
+    let own = own_names();
     let mut found: BTreeMap<String, NetHost> = BTreeMap::new();
     let end = Instant::now() + wait;
     while let Some(left) = end.checked_duration_since(Instant::now()) {
@@ -37,7 +59,9 @@ pub fn discover(wait: Duration) -> Vec<NetHost> {
             Ok(mdns_sd::ServiceEvent::ServiceResolved(info)) => {
                 let name = instance_name(&info.fullname, TY);
                 let host = info.host.trim_end_matches('.').to_string();
-                if !name.is_empty() && !host.is_empty() {
+                let short = host.trim_end_matches(".local").to_lowercase();
+                let mine = own.iter().any(|n| *n == short || *n == name.to_lowercase());
+                if !name.is_empty() && !host.is_empty() && !mine {
                     found.insert(name.to_lowercase(), NetHost { name, host });
                 }
             }
