@@ -357,8 +357,8 @@ fn start_decided(info: State<'_, StartInfo>) {
 }
 
 #[tauri::command]
-fn local_checksum(path: String) -> AppResult<String> {
-    local::checksum(&path)
+fn local_checksum(path: String, algo: Option<String>) -> AppResult<String> {
+    local::checksum_with(&path, local::Algo::parse(algo.as_deref()))
 }
 
 /// Copies on a worker thread: two local halves can copy large folders,
@@ -555,6 +555,11 @@ struct TerminalTarget {
     user: Option<String>,
     key_path: Option<String>,
     remote_path: Option<String>,
+    /// Terminal program: Mac "terminal" (default), "iterm", "ghostty"; Windows
+    /// "wt" (default, Windows Terminal), "powershell", "cmd".
+    #[serde(default)]
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
+    app: Option<String>,
 }
 
 /// Single-quotes a value for a POSIX shell.
@@ -600,6 +605,30 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
     Ok(parts.join(" "))
 }
 
+/// The `ssh` call for PowerShell: every value in single quotes ('' inside), so
+/// nothing in a name or folder can run as a command on this computer.
+#[cfg(windows)]
+fn powershell_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String> {
+    // Same checks and remote command as for cmd.exe; only the local quoting differs.
+    terminal_ssh_command(host, target)?;
+    let q = |v: &str| format!("'{}'", v.replace('\'', "''"));
+    let dir = target.remote_path.clone().unwrap_or_else(|| "~".into());
+    let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", sh_quote(&dir)) };
+    let user = target.user.clone().unwrap_or_default();
+    let mut parts = vec!["ssh".to_string(), "-t".to_string()];
+    if let Some(p) = target.port.filter(|p| *p != 22) {
+        parts.push("-p".into());
+        parts.push(p.to_string());
+    }
+    if let Some(k) = target.key_path.as_ref().filter(|k| !k.is_empty()) {
+        parts.push("-i".into());
+        parts.push(q(&paths::to_native(k).display().to_string()));
+    }
+    parts.push(if user.is_empty() { host.to_string() } else { format!("{user}@{host}") });
+    parts.push(q(&format!("{cd} && exec $SHELL -l")));
+    Ok(parts.join(" "))
+}
+
 /// Opens the system terminal: in a local folder, or with an SSH session that
 /// starts in the server folder shown in Bitcrane.
 #[tauri::command]
@@ -612,25 +641,53 @@ fn open_terminal(target: TerminalTarget) -> AppResult<()> {
 
     #[cfg(target_os = "macos")]
     {
-        let status = match &ssh_cmd {
-            Some(cmd) => {
-                let script = cmd.replace('\\', "\\\\").replace('"', "\\\"");
-                std::process::Command::new("osascript")
-                    .arg("-e").arg(format!("tell application \"Terminal\" to do script \"{script}\""))
-                    .arg("-e").arg("tell application \"Terminal\" to activate")
-                    .spawn()
-            }
-            None => std::process::Command::new("open").arg("-a").arg("Terminal").arg(&local).spawn(),
+        // Quoted for an AppleScript string.
+        let apple = |cmd: &str| cmd.replace('\\', "\\\\").replace('"', "\\\"");
+        let status = match (target.app.as_deref().unwrap_or("terminal"), &ssh_cmd) {
+            ("iterm", Some(cmd)) => std::process::Command::new("osascript")
+                .arg("-e").arg("tell application \"iTerm\"")
+                .arg("-e").arg(format!("create window with default profile command \"{}\"", apple(cmd)))
+                .arg("-e").arg("activate")
+                .arg("-e").arg("end tell")
+                .spawn(),
+            ("iterm", None) => std::process::Command::new("open").arg("-a").arg("iTerm").arg(&local).spawn(),
+            // Ghostty takes its options after --args (it cannot be started from its own CLI on the Mac).
+            ("ghostty", Some(cmd)) => std::process::Command::new("open").args(["-na", "Ghostty", "--args"]).arg(format!("--working-directory={}", local.display())).arg("-e").arg("/bin/sh").arg("-c").arg(cmd).spawn(),
+            ("ghostty", None) => std::process::Command::new("open").args(["-na", "Ghostty", "--args"]).arg(format!("--working-directory={}", local.display())).spawn(),
+            (_, Some(cmd)) => std::process::Command::new("osascript")
+                .arg("-e").arg(format!("tell application \"Terminal\" to do script \"{}\"", apple(cmd)))
+                .arg("-e").arg("tell application \"Terminal\" to activate")
+                .spawn(),
+            (_, None) => std::process::Command::new("open").arg("-a").arg("Terminal").arg(&local).spawn(),
         };
         status.map(|_| ()).map_err(AppError::from)
     }
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        // Windows Terminal when installed, otherwise a classic console window.
-        let wt = std::process::Command::new("wt.exe").arg("-d").arg(&local).args(ssh_cmd.as_ref().map(|c| vec!["cmd".to_string(), "/k".to_string(), c.clone()]).unwrap_or_default()).spawn();
-        if wt.is_ok() {
-            return Ok(());
+        let app = target.app.as_deref().unwrap_or("wt");
+        if app == "powershell" {
+            let mut c = std::process::Command::new("cmd");
+            c.current_dir(&local);
+            match target.host.as_ref() {
+                // Handed over encoded, so neither cmd.exe nor PowerShell reinterprets quotes or "$".
+                Some(host) => {
+                    let ps = powershell_ssh_command(host, &target)?;
+                    let wide: Vec<u8> = ps.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+                    use base64::Engine;
+                    let encoded = base64::engine::general_purpose::STANDARD.encode(wide);
+                    c.raw_arg(format!("/c start \"Bitcrane\" powershell -NoExit -EncodedCommand {encoded}"))
+                }
+                None => c.raw_arg("/c start \"Bitcrane\" powershell -NoExit"),
+            };
+            return c.spawn().map(|_| ()).map_err(AppError::from);
+        }
+        // Windows Terminal when installed (and chosen), otherwise a classic console window.
+        if app == "wt" {
+            let wt = std::process::Command::new("wt.exe").arg("-d").arg(&local).args(ssh_cmd.as_ref().map(|c| vec!["cmd".to_string(), "/k".to_string(), c.clone()]).unwrap_or_default()).spawn();
+            if wt.is_ok() {
+                return Ok(());
+            }
         }
         let mut c = std::process::Command::new("cmd");
         c.current_dir(&local);
@@ -990,6 +1047,12 @@ async fn remote_share_link(state: State<'_, AppState>, server_id: String, path: 
     remote!(state, server_id, |c| c.share_link(&path))
 }
 
+/// S3: a download link valid for `secs` seconds (at most 7 days).
+#[tauri::command]
+async fn remote_presign(state: State<'_, AppState>, server_id: String, path: String, secs: u64) -> AppResult<String> {
+    remote!(state, server_id, |c| c.presigned_url(&path, secs))
+}
+
 #[tauri::command]
 async fn remote_walk(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<Vec<WalkItem>> {
     remote!(state, server_id, |c| c.walk(&path))
@@ -1003,8 +1066,9 @@ struct ExecResult {
 }
 
 #[tauri::command]
-async fn remote_checksum(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
-    remote!(state, server_id, |c| c.checksum(&path))
+async fn remote_checksum(state: State<'_, AppState>, server_id: String, path: String, algo: Option<String>) -> AppResult<String> {
+    let algo = local::Algo::parse(algo.as_deref());
+    remote!(state, server_id, |c| c.checksum_with(&path, algo))
 }
 
 #[tauri::command]
@@ -1850,6 +1914,7 @@ pub fn run() {
             mount_folder,
             shell_integration_set,
             remote_share_link,
+            remote_presign,
             local_unzip,
             local_open,
             local_reveal,
@@ -1942,7 +2007,7 @@ mod terminal_tests {
     use super::*;
 
     fn target(dir: &str, user: &str) -> TerminalTarget {
-        TerminalTarget { local_path: None, host: Some("example.com".into()), port: Some(2222), user: Some(user.into()), key_path: None, remote_path: Some(dir.into()) }
+        TerminalTarget { app: None, local_path: None, host: Some("example.com".into()), port: Some(2222), user: Some(user.into()), key_path: None, remote_path: Some(dir.into()) }
     }
 
     #[test]

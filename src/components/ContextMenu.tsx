@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSize, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -191,6 +191,19 @@ export function ContextMenu() {
       { label: $t('Serverliste zeigen'), run: () => setPaneServerList(menu.side, true) },
       ...(onServer ? [{ label: $t('Trennen'), run: () => closePaneServer(menu.side) }] : []),
     ]);
+  } else if (menu.kind === 'tab' && menu.tabId) {
+    const id = menu.tabId;
+    const all = getState().tabs;
+    const idx = all.findIndex((x) => x.id === id);
+    groups.push([
+      { label: $t('Neuer Tab'), key: sk('newTab'), run: newTab },
+      ...(!all[idx]?.settings ? [{ label: $t('Tab duplizieren'), run: () => duplicateTab(id) }] : []),
+    ]);
+    groups.push([
+      { label: $t('Tab schließen'), key: sk('closeTab'), run: () => closeTab(id) },
+      ...(all.length > 1 ? [{ label: $t('Andere Tabs schließen'), run: () => closeOtherTabs(id) }] : []),
+      ...(idx < all.length - 1 ? [{ label: $t('Tabs rechts davon schließen'), run: () => closeTabsRight(id) }] : []),
+    ]);
   } else if (menu.kind === 'columns') {
     const st = getState().settings;
     const col = (c: 'mtime' | 'size' | 'kind' | 'owner') => () => updateSettings({ columns: { ...st.columns, [c]: !st.columns[c] } });
@@ -225,10 +238,12 @@ export function ContextMenu() {
     }
     // Cloud services: a sharing link (Transmit "Copy Link").
     if (one && paneServer && isCloudProtocol(paneServer.protocol)) second.push({ label: $t('Link zum Teilen kopieren'), run: () => copyShareLink(menu.side, one) });
+    if (one && !folder && paneServer?.protocol === 's3') second.push({ label: $t('Link mit Ablaufdatum …'), run: () => openDialog({ type: 'presign', side: menu.side, name: one }) });
     if (one) second.push({ label: $t('Umbenennen'), key: k('↩', 'F2'), run: () => startRename(menu.side, one) });
     else second.push({ label: $t('{0} Objekte umbenennen …', menu.names.length), run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }) });
-    if (one && !folder) second.push({ label: $t('Prüfsumme (SHA-256) …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
-    if (one && folder) second.push({ label: $t('Größe berechnen'), run: () => void computeFolderSize(menu.side, one) });
+    if (one && !folder) second.push({ label: $t('Prüfsumme …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
+    const chosenDirs = tab ? menu.names.filter((n) => isDirEntry(...paneLoc(menu.side, tab), join(panePath(menu.side), n))) : [];
+    if (chosenDirs.length) second.push({ label: chosenDirs.length === 1 ? $t('Größe berechnen') : $t('Größe von {0} Ordnern berechnen', chosenDirs.length), run: () => void computeFolderSizes(menu.side, chosenDirs) });
     // "Dateien vergleichen" (after ForkLift): two files of this half, or this file and the one picked in the other half.
     const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
     const otherPick = getState().selection[other].names;
@@ -270,7 +285,7 @@ export function ContextMenu() {
         { label: $t('Git: Commit …'), run: () => openDialog({ type: 'gitCommit', root: gst.root }) },
       ]);
     }
-    const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) }];
+    const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neuer Ordner mit Auswahl'), key: sk('newFolderWithSelection'), run: () => void newFolderWithSelection(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) }];
     if (isDir && one) third.push({ label: $t('In neuem Tab öffnen'), run: () => { newTab(); setState({ contextMenu: null }); window.setTimeout(() => openEntry(menu.side, one), 0); } });
     groups.push(third);
     if (commands.length) groups.push(commands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, menu.names) })));
@@ -280,6 +295,7 @@ export function ContextMenu() {
       ...(clip ? [{ label: clip.serverId === (onServer ? sid : '') ? $t('Hier einfügen (Kopie)') : !clip.serverId ? $t('Hier einfügen (hochladen)') : !onServer ? $t('Hier einfügen (herunterladen)') : $t('Hier einfügen (übertragen)'), key: sk('paste'), run: () => pasteClipboard(menu.side) }] : []),
       { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) },
       { label: $t('Pfad dieses Ordners kopieren'), run: () => copyPath(menu.side) },
+      { label: $t('Alle Ordnergrößen berechnen'), key: sk('folderSizes'), run: () => void computeFolderSizes(menu.side) },
       ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
       { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
       ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),

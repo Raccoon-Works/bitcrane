@@ -24,7 +24,7 @@ import { crumbs as crumbsFor } from '../util/paths';
 import { FileGlyph, FolderGlyph, PackageGlyph, typeIconFor } from './icons';
 import { Thumb } from './Thumb';
 import * as paths from '../util/paths';
-import { LocalTile, ServerTile } from './ServerTile';
+import { LocalTile, ServerTile, swatch } from './ServerTile';
 import { Button, IconButton } from './ui';
 import { $t, LOCALE } from '../i18n';
 import { invoke } from '@tauri-apps/api/core';
@@ -515,11 +515,13 @@ export function Pane({ side }: { side: PaneSide }) {
     );
   };
 
+  // A server with its own colour (e.g. red for a live server) tints its half's path bar (WinSCP, FileZilla).
+  const srvColor = onServer && server?.color && server.color !== 'gray' ? swatch[server.color] : undefined;
   return (
     <section
       data-side={side}
-      className={`pane${focusSide === side ? ' is-focused' : ''}${dropHint === '' ? ' is-drop' : ''} icon-step-${iconStep}`}
-      style={{ '--cols': [columns.mtime && '124px', columns.kind && '120px', showPerms && '84px', columns.owner && '84px', columns.size && '76px'].filter(Boolean).join(' ') || '0px' } as CSSProperties}
+      className={`pane${focusSide === side ? ' is-focused' : ''}${dropHint === '' ? ' is-drop' : ''}${srvColor ? ' has-srv-color' : ''} icon-step-${iconStep}`}
+      style={{ '--cols': [columns.mtime && '124px', columns.kind && '120px', showPerms && '84px', columns.owner && '84px', columns.size && '76px'].filter(Boolean).join(' ') || '0px', ...(srvColor ? { '--srv-color': srvColor } : {}) } as CSSProperties}
       aria-label={onServer ? $t('Server') : $t('Lokal')}
     >
       {/* With the sidebar, only halves showing a server keep their own places (that server's folders). */}

@@ -2572,3 +2572,12 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .wm-bit { font-weight: 800; }
 .wm-crane { font-weight: 300; opacity: 0.92; }
 .wordmark { letter-spacing: -0.01em; }
+
+/* S3 link with expiry: the address wraps instead of widening the dialog. */
+.presign-link { display: block; padding: var(--space-2); border-radius: 6px; background: var(--bg-control); word-break: break-all; user-select: text; }
+
+/* Server colour (WinSCP site colour): a tinted path bar over the server half and a line under its tab. */
+.pane.has-srv-color .pane-head { background: color-mix(in srgb, var(--srv-color) 14%, transparent); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--srv-color) 45%, transparent); }
+.window-row:has(> .side-col) .pane.has-srv-color.is-focused::after { background: var(--srv-color); }
+.mac-tab.has-srv-color, .win-tab.has-srv-color { position: relative; }
+.mac-tab.has-srv-color::before, .win-tab.has-srv-color::before { content: ''; position: absolute; left: 10px; right: 10px; bottom: 2px; height: 2px; border-radius: 2px; background: var(--srv-color); pointer-events: none; }

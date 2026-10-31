@@ -12,6 +12,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
+  computeFolderSizes, newFolderWithSelection, selectedNames, showToast,
   activeTab, askDelete, stepZoom, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
@@ -53,8 +54,12 @@ export function menuDefs(): MenuDef[] {
         sep,
         { label: $t('Neuer Ordner'), ...sc('newFolder'), run: () => newFolder() },
         { label: $t('Neue Datei'), ...sc('newFile'), run: () => newFile() },
+        { label: $t('Neuer Ordner mit Auswahl'), ...sc('newFolderWithSelection'), run: () => void newFolderWithSelection() },
         { label: $t('Hochladen'), ...sc('upload'), run: () => upload() },
         { label: $t('Herunterladen'), ...sc('download'), run: () => download() },
+        sep,
+        { label: $t('Prüfsumme …'), ...sc('checksum'), run: () => { const side = focus(); const n = selectedNames(side); if (n.length === 1) openDialog({ type: 'checksum', side, name: n[0] }); else showToast($t('Bitte genau eine Datei auswählen.')); } },
+        { label: $t('Ordnergrößen berechnen'), ...sc('folderSizes'), run: () => void computeFolderSizes(focus(), selectedNames(focus()).length ? selectedNames(focus()) : undefined) },
         sep,
         { label: $t('Tab schließen'), ...sc('closeTab'), run: () => { const t = activeTab(); if (t) closeTab(t.id); } },
         { label: $t('Arbeitsbereiche …'), ...sc('workspaces'), run: () => openDialog({ type: 'workspaces' }) },

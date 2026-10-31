@@ -10,7 +10,7 @@
 import type { Platform } from '../backend/types';
 import {
   activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
-  pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
+  computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
 
@@ -70,6 +70,9 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'copyTo', group: $t('Dateien'), label: $t('Kopieren nach …'), mac: [], win: [], run: () => { const side = getState().focusSide; const names = selectedNames(side); if (names.length) openDialog({ type: 'copyTo', side, names }); } },
   { id: 'undo', group: $t('Dateien'), label: $t('Widerrufen'), mac: ['Mod+Z'], win: ['Mod+Z'], run: () => undoLast(), notInText: true },
   { id: 'newFile', group: $t('Dateien'), label: $t('Neue Datei'), mac: ['Mod+Alt+N'], win: ['Mod+Alt+N'], run: () => newFile() },
+  { id: 'newFolderWithSelection', group: $t('Dateien'), label: $t('Neuer Ordner mit Auswahl'), mac: ['Mod+Ctrl+N'], win: ['Mod+Alt+Shift+N'], run: () => void newFolderWithSelection(), notInText: true },
+  { id: 'checksum', group: $t('Dateien'), label: $t('Prüfsumme'), mac: [], win: [], run: () => { const side = focus(); const n = selectedNames(side); if (n.length === 1) openDialog({ type: 'checksum', side, name: n[0] }); } },
+  { id: 'folderSizes', group: $t('Dateien'), label: $t('Ordnergrößen berechnen'), mac: [], win: [], run: () => void computeFolderSizes(focus(), selectedNames(focus()).length ? selectedNames(focus()) : undefined) },
   { id: 'selectMask', group: $t('Dateien'), label: $t('Auswählen nach Muster'), mac: ['Mod+Alt+S'], win: ['Mod+Alt+S'], run: () => openDialog({ type: 'selectMask', side: focus() }) },
   { id: 'invertSelection', group: $t('Dateien'), label: $t('Auswahl umkehren'), mac: ['Mod+Shift+I'], win: ['Mod+Shift+I'], run: () => void import('./tools').then((m) => m.invertSelection(focus())), notInText: true },
 

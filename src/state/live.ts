@@ -679,6 +679,27 @@ export async function copyOnServer(serverId: string, fromDir: string, names: str
   if (ok) showToast(copiedText(made), 'ok');
 }
 
+/**
+ * Moves entries of a folder into another folder of the same place: on this
+ * computer with a move, on a server with renames (drag onto a folder,
+ * "Neuer Ordner mit Auswahl"). Returns false when nothing could be moved.
+ */
+export async function moveInto(side: PaneSide, serverId: string, fromDir: string, names: string[], toDir: string): Promise<boolean> {
+  if (side === 'local') return !!(await moveLocal(fromDir, names, toDir));
+  let moved = 0;
+  const ok = await run('remote', serverId, fromDir, async () => {
+    for (const n of names) {
+      await backend.remoteMove(serverId, join(fromDir, n), join(toDir, basename(n)));
+      moved++;
+    }
+  });
+  invalidate('remote', serverId, toDir);
+  for (const n of names) if (n.includes('/')) invalidate('remote', serverId, parent(join(fromDir, n)));
+  bump();
+  if (moved) showToast(moved === 1 ? $t('„{0}“ verschoben.', basename(names[0])) : $t('{0} Objekte verschoben.', moved), 'ok');
+  return ok;
+}
+
 /** Copies on this computer. */
 /** Moves files or folders between two folders of this computer (two local halves). */
 export async function moveLocal(fromDir: string, names: string[], toDir: string, merge = false) {
@@ -1033,8 +1054,28 @@ function transferOptions(tr: Transfer): TransferOptions {
     dirPerms: octal(rule?.dirPerms) ?? octal(s.settings.uploadDirPerms) ?? (w?.options.setPermissions ? 0o755 : undefined),
     keepVersions: rule?.keepOldVersion || w?.options.keepOldVersion ? KEEP_VERSIONS : 0,
     // The overall limit is shared between the parallel transfers.
-    limitKbps: s.settings.bandwidthLimit > 0 ? Math.max(1, Math.floor(s.settings.bandwidthLimit / share)) : 0,
+    limitKbps: limitFor(tr.direction === 'down' ? s.settings.bandwidthLimitDown ?? s.settings.bandwidthLimit : s.settings.bandwidthLimit, share),
   };
+}
+
+/**
+ * "Nach dem Herunterladen öffnen" (Transmit): opens downloaded files with
+ * their usual program. At most five within ten seconds, so downloading a
+ * whole folder does not open dozens of windows.
+ */
+const openedRecently: number[] = [];
+function openAfterDownload(path: string) {
+  if (!getState().settings.openAfterDownload) return;
+  const now = Date.now();
+  while (openedRecently.length && now - openedRecently[0] > 10000) openedRecently.shift();
+  if (openedRecently.length >= 5) return;
+  openedRecently.push(now);
+  backend.localOpen(path).catch(() => undefined);
+}
+
+/** One transfer's share of a limit in KB/s (0 = unlimited). */
+function limitFor(total: number, share: number): number {
+  return total > 0 ? Math.max(1, Math.floor(total / share)) : 0;
 }
 
 /** Number of older versions kept per file ("Ältere Version auf dem Server behalten"). */
@@ -1140,6 +1181,7 @@ async function start(tr: Transfer) {
     patchTransfer(tr.id, { state: 'done', done: size, size, finishedAt: Date.now() });
     addLog('ok', `${verb(tr)}: ${tr.target}`, tr.serverId);
     if (tr.editMtime !== undefined) editUploaded(tr);
+    if (tr.direction === 'down' && tr.manual) openAfterDownload(tr.target);
     const side: PaneSide = tr.direction === 'down' ? 'local' : 'remote';
     invalidate(side, tr.serverId, parent(tr.target));
     bump();

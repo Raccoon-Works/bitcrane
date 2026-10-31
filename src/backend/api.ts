@@ -25,6 +25,9 @@ export type AuthParams =
   | { method: 'password'; password: string }
   | { method: 'auto'; keyPath?: string; passphrase?: string; password?: string };
 
+/** Checksum algorithms offered in "Prüfsumme". */
+export type ChecksumAlgo = 'md5' | 'sha1' | 'sha256' | 'sha512';
+
 export interface ConnectParams {
   host: string;
   port: number;
@@ -186,8 +189,9 @@ export interface Backend {
   localNewFile(path: string): Promise<void>;
   localRename(path: string, newName: string): Promise<void>;
   localTrash(paths: string[]): Promise<void>;
-  localChecksum(path: string): Promise<string>;
-  remoteChecksum(serverId: string, path: string): Promise<string>;
+  /** Checksum as hex; `algo` is md5, sha1, sha256 (default) or sha512. */
+  localChecksum(path: string, algo?: ChecksumAlgo): Promise<string>;
+  remoteChecksum(serverId: string, path: string, algo?: ChecksumAlgo): Promise<string>;
   remoteSymlink(serverId: string, link: string, target: string): Promise<void>;
   /** Opens an http(s) address in the default browser. */
   openUrl(url: string): Promise<void>;
@@ -209,6 +213,8 @@ export interface Backend {
   syncWrite(dir: string, text: string): Promise<number>;
   /** Link to share a file or folder (cloud services only). */
   remoteShareLink(serverId: string, path: string): Promise<string>;
+  /** S3: download link valid for `secs` seconds (at most 7 days). */
+  remotePresign(serverId: string, path: string, secs: number): Promise<string>;
   /** Unpacks a zip into a new folder next to it; returns the folder's name. */
   localUnzip(path: string): Promise<string>;
   localWalk(path: string): Promise<WalkItem[]>;

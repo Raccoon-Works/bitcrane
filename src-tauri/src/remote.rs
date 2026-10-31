@@ -315,6 +315,14 @@ impl Remote {
         }
     }
 
+    /// Download link that expires (S3 only).
+    pub async fn presigned_url(&self, path: &str, secs: u64) -> AppResult<String> {
+        match self {
+            Remote::S3(c) => c.presigned_url(path, secs),
+            _ => Err(AppError::other("Zeitlich begrenzte Links gibt es nur bei S3.")),
+        }
+    }
+
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
         let mut items = match self {
             Remote::Sftp(c) => c.walk(path).await,
@@ -388,13 +396,17 @@ impl Remote {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn checksum(&self, path: &str) -> AppResult<String> {
+        self.checksum_with(path, crate::local::Algo::Sha256).await
+    }
+
+    pub async fn checksum_with(&self, path: &str, algo: crate::local::Algo) -> AppResult<String> {
         match self {
-            Remote::Sftp(c) => c.checksum(path).await,
+            Remote::Sftp(c) => c.checksum_with(path, algo).await,
             _ => {
-                use sha2::{Digest, Sha256};
                 let mut r = self.reader(path, 0).await?;
-                let mut h = Sha256::new();
+                let mut h = algo.hasher();
                 let mut buf = vec![0u8; 256 * 1024];
                 loop {
                     let n = r.read(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
@@ -404,7 +416,7 @@ impl Remote {
                     h.update(&buf[..n]);
                 }
                 r.close(true).await?;
-                Ok(format!("{:x}", h.finalize()))
+                Ok(crate::local::hex(&h.finalize()))
             }
         }
     }

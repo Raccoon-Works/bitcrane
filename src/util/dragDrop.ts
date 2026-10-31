@@ -10,14 +10,18 @@
  * highlight it.
  */
 import type { PaneSide } from '../backend/types';
-import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace } from '../state/store';
+import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace, moveIntoFolder, navigate } from '../state/store';
 import { join } from './paths';
 import { $t } from '../i18n';
 
 const THRESHOLD = 5;
+/** A folder held under a dragged item this long opens (spring-loaded folders, Finder). */
+const SPRING_MS = 900;
 
 interface DragState {
   side: PaneSide;
+  /** Folder the dragged names belong to (the half may open another folder while dragging). */
+  fromDir: string;
   names: string[];
   x: number;
   y: number;
@@ -26,6 +30,29 @@ interface DragState {
 }
 
 let drag: DragState | null = null;
+let spring: { key: string; timer: number } | null = null;
+
+function clearSpring() {
+  if (spring) window.clearTimeout(spring.timer);
+  spring = null;
+}
+
+/** Starts or keeps the timer that opens the folder under the pointer. */
+function armSpring(t: Target | null) {
+  const key = t && t.name && !t.place && !t.addPlace ? `${t.side}|${t.name}` : '';
+  if (spring?.key === key) return;
+  clearSpring();
+  if (!key || !t) return;
+  spring = {
+    key,
+    timer: window.setTimeout(() => {
+      spring = null;
+      if (!drag?.active) return;
+      navigate(t.side, join(panePath(t.side), t.name));
+      setState({ dropHint: null });
+    }, SPRING_MS),
+  };
+}
 
 type Target = { side: PaneSide; name: string; place?: string; addPlace?: boolean; sidebar?: boolean };
 
@@ -91,7 +118,13 @@ function onMove(e: PointerEvent) {
   }
   if (drag.ghost) drag.ghost.style.transform = `translate(${e.clientX + 12}px, ${e.clientY + 8}px)`;
   const t = targetAt(e.clientX, e.clientY, drag.side, drag.names);
-  setHint(t && (t.addPlace || (t.side !== drag.side && canDropOn(t.side))) ? t : null);
+  // In the same half only a folder that is not part of the drag is a target (moves it there).
+  // After a spring-loaded folder opened, the empty part of the list is a target too.
+  const sameOk = !!t && t.side === drag.side && !t.place && canDropOn(t.side)
+    && (t.name ? !(panePath(t.side) === drag.fromDir && drag.names.includes(t.name)) : panePath(t.side) !== drag.fromDir);
+  const ok = t && (t.addPlace || (t.side !== drag.side && canDropOn(t.side)) || sameOk) ? t : null;
+  setHint(ok);
+  armSpring(ok && !ok.addPlace ? ok : null);
 }
 
 function finish(e: PointerEvent, cancel: boolean) {
@@ -101,6 +134,7 @@ function finish(e: PointerEvent, cancel: boolean) {
   window.removeEventListener('pointerup', onUp, true);
   window.removeEventListener('keydown', onKey, true);
   d?.ghost?.remove();
+  clearSpring();
   document.body.classList.remove('is-dragging');
   const hint = getState().dropHint;
   setHint(null);
@@ -112,8 +146,12 @@ function finish(e: PointerEvent, cancel: boolean) {
     return;
   }
   const dir = dirOf(hint);
-  if (hint.side === 'remote') upload(d.names, dir);
-  else download(d.names, dir);
+  if (hint.side === d.side) {
+    moveIntoFolder(hint.side, d.names, dir, d.fromDir);
+    return;
+  }
+  if (hint.side === 'remote') upload(d.names, dir, d.fromDir);
+  else download(d.names, dir, d.fromDir);
 }
 
 function onUp(e: PointerEvent) {
@@ -130,7 +168,7 @@ function onKey(e: KeyboardEvent) {
 /** Called on pointerdown on a row; becomes a drag once the pointer moves. */
 export function beginRowDrag(e: React.PointerEvent, side: PaneSide, names: string[]) {
   if (e.button !== 0 || drag) return;
-  drag = { side, names, x: e.clientX, y: e.clientY, active: false, ghost: null };
+  drag = { side, fromDir: panePath(side), names, x: e.clientX, y: e.clientY, active: false, ghost: null };
   window.addEventListener('pointermove', onMove, true);
   window.addEventListener('pointerup', onUp, true);
   window.addEventListener('keydown', onKey, true);
