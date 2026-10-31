@@ -144,6 +144,14 @@ pub struct ConnectParams {
     /// SOCKS5 or HTTP proxy for the TCP connection.
     #[serde(default)]
     pub proxy: Option<crate::proxy::ProxyParams>,
+    /// Seconds to wait for the server when connecting (per server, default 15).
+    #[serde(default)]
+    pub timeout: Option<u64>,
+}
+
+/// Connect timeout of a server: its own setting, kept within 5 seconds and 5 minutes.
+pub fn connect_timeout(secs: Option<u64>) -> Duration {
+    Duration::from_secs(secs.unwrap_or(15).clamp(5, 300))
 }
 
 fn default_true() -> bool {
@@ -450,15 +458,15 @@ async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport:
 
     let connected = match transport {
         Transport::Direct => match &params.proxy {
-            None => tokio::time::timeout(Duration::from_secs(15), client::connect(config, (params.host.as_str(), params.port), handler)).await,
+            None => tokio::time::timeout(connect_timeout(params.timeout), client::connect(config, (params.host.as_str(), params.port), handler)).await,
             Some(proxy) => {
-                let stream = tokio::time::timeout(Duration::from_secs(15), crate::proxy::connect(proxy, &params.host, params.port))
+                let stream = tokio::time::timeout(connect_timeout(params.timeout), crate::proxy::connect(proxy, &params.host, params.port))
                     .await
                     .map_err(|_| AppError::new(ErrorKind::Unreachable, "Der Proxy antwortet nicht (Zeitüberschreitung)."))??;
-                tokio::time::timeout(Duration::from_secs(15), client::connect_stream(config, stream, handler)).await
+                tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler)).await
             }
         },
-        Transport::Through(stream) => tokio::time::timeout(Duration::from_secs(15), client::connect_stream(config, stream, handler)).await,
+        Transport::Through(stream) => tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler)).await,
     };
     let mut handle = match connected {
         Err(_) => return Err(AppError::new(ErrorKind::Unreachable, "Der Server antwortet nicht (Zeitüberschreitung).")),
@@ -1010,7 +1018,7 @@ mod integration {
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
-        ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None }
+        ConnectParams { host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
     }
 
     /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.

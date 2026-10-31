@@ -35,6 +35,8 @@ interface Listing {
   entries: FileEntry[];
   loading: boolean;
   error?: string;
+  /** The folder does not exist (offered "Ordner anlegen" while browsing synchronized). */
+  missing?: boolean;
 }
 
 const listings = new Map<string, Listing>();
@@ -51,9 +53,9 @@ export function cachedList(side: PaneSide, serverId: string, path: string): File
 }
 
 /** Loading and error state of a folder listing. */
-export function listingStatus(side: PaneSide, serverId: string, path: string): { loading: boolean; error?: string } {
+export function listingStatus(side: PaneSide, serverId: string, path: string): { loading: boolean; error?: string; missing?: boolean } {
   const l = listings.get(key(side, serverId, path));
-  return { loading: !l || l.loading, error: l?.error };
+  return { loading: !l || l.loading, error: l?.error, missing: l?.missing };
 }
 
 /** Entry of a path, looked up in the cached listing of its parent folder. */
@@ -81,7 +83,7 @@ async function load(side: PaneSide, serverId: string, path: string) {
     if (side === 'remote') addLog('debug', $t('Ordner gelesen: {0} ({1} Einträge, {2} ms)', path, entries.length, Date.now() - t0), serverId);
   } catch (e) {
     const err = toBackendError(e);
-    listings.set(k, { entries: [], loading: false, error: err.message });
+    listings.set(k, { entries: [], loading: false, error: err.message, missing: err.kind === 'notFound' });
     if (side === 'remote') handleRemoteError(serverId, err);
   }
   bump();
@@ -224,16 +226,17 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
       host: srv.host, port: srv.port, user: srv.user, password, trust, proxy,
       tls: srv.protocol === 'ftp' ? 'none' : srv.implicitTls ? 'implicit' : 'explicit',
       tls13Only: !!srv.tls13Only, encoding: srv.ftpEncoding ?? 'utf8', tzOffsetMin: srv.ftpTimezone ?? 0, mode: srv.ftpMode ?? 'binary',
+      timeout: srv.connectTimeout,
     });
   }
   if (srv.protocol === 'webdav') {
-    return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only });
+    return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only, timeout: srv.connectTimeout });
   }
   if (srv.protocol === 's3') {
     const port = srv.port && srv.port !== (srv.s3Http ? 80 : 443) ? `:${srv.port}` : '';
     return backend.connectS3(id, {
       endpoint: `${srv.s3Http ? 'http' : 'https'}://${srv.host}${port}`, region: srv.s3Region ?? '', bucket: srv.s3Bucket ?? '',
-      accessKey: srv.user, secret: password, pathStyle: !!srv.s3PathStyle, tls13Only: !!srv.tls13Only, trust, proxy,
+      accessKey: srv.user, secret: password, pathStyle: !!srv.s3PathStyle, tls13Only: !!srv.tls13Only, trust, proxy, timeout: srv.connectTimeout,
     });
   }
   if (srv.protocol === 'vault') {
@@ -245,7 +248,7 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     return backend.vaultOpen(id, srv.host, srv.vaultStorageId, password ?? '');
   }
   if (srv.protocol === 'smb') {
-    return backend.connectSmb(id, { host: srv.host, port: srv.port || 445, user: srv.user, password, share: srv.smbShare ?? '', encrypt: !!srv.smbEncrypt });
+    return backend.connectSmb(id, { host: srv.host, port: srv.port || 445, user: srv.user, password, share: srv.smbShare ?? '', encrypt: !!srv.smbEncrypt, timeout: srv.connectTimeout });
   }
   if (srv.protocol === 'dropbox') {
     // The sign-in from the browser, kept in the keychain (see addCloudService).
@@ -268,7 +271,7 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
     return backend.connectGDrive(id, { refreshToken, ...key });
   }
-  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy });
+  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout });
 }
 
 /**
@@ -909,7 +912,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
     }
     for (const f of walk) {
       if (skippedByRules(f.relative, f.size, serverId)) { skipped++; continue; }
-      const target = join(remoteDir, f.relative);
+      const target = join(remoteDir, remoteRel(serverId, f.relative));
       items.push({ id: uid('t'), name: basename(f.path), direction: 'up', serverId, folder: relFolder(remoteDir, target), source: f.path, target, size: f.size, done: 0, state: 'queued', manual: true });
     }
   }
@@ -927,6 +930,16 @@ export async function uploadNativePaths(serverId: string, nativePaths: string[],
     byParent.set(dir, [...(byParent.get(dir) ?? []), basename(ui)]);
   }
   for (const [dir, names] of byParent) await uploadNames(serverId, dir, remoteDir, names);
+}
+
+/**
+ * Path below an upload target folder as it is stored on the server: in the
+ * composed Unicode form (NFC) unless the server keeps names as they are. macOS
+ * hands out some names decomposed ("u" plus a combining diaeresis), which Linux
+ * and Windows servers treat as a different name than the same word typed there.
+ */
+export function remoteRel(serverId: string, rel: string): string {
+  return serverById(serverId)?.keepNameForm ? rel : rel.normalize('NFC');
 }
 
 /** Downloads remote files or folders (names in `remoteDir`) into `localDir`. */
@@ -970,7 +983,7 @@ export async function crossNames(fromServerId: string, fromDir: string, serverId
     }
     for (const f of walk) {
       if (skippedByRules(f.relative, f.size, serverId)) { skipped++; continue; }
-      const target = join(toDir, f.relative);
+      const target = join(toDir, remoteRel(serverId, f.relative));
       items.push({ id: uid('t'), name: basename(f.path), direction: 'cross', sourceServerId: fromServerId, serverId, folder: relFolder(toDir, target), source: f.path, target, size: f.size, done: 0, state: 'queued', manual: true });
     }
   }
@@ -1044,9 +1057,23 @@ export function pump() {
       }
     }
     let slots = Math.max(0, s.settings.parallel - active.size);
+    // Running transfers per server, for servers with their own limit ("Gleichzeitige Übertragungen").
+    const perServer = new Map<string, number>();
+    const count = (id: string) => perServer.set(id, (perServer.get(id) ?? 0) + 1);
+    for (const id of active) {
+      const tr = s.transfers.find((x) => x.id === id);
+      if (!tr) continue;
+      count(tr.serverId);
+      if (tr.sourceServerId) count(tr.sourceServerId);
+    }
+    const full = (id: string) => {
+      const max = serverById(id, s)?.maxTransfers;
+      return !!max && (perServer.get(id) ?? 0) >= max;
+    };
     for (const tr of s.transfers) {
       if (slots <= 0) break;
       if (tr.state !== 'queued' || s.offline[tr.serverId] || (tr.sourceServerId && s.offline[tr.sourceServerId])) continue;
+      if (full(tr.serverId) || (tr.sourceServerId && full(tr.sourceServerId))) continue;
       // Server to server needs both connections.
       const needed = tr.sourceServerId ? [tr.serverId, tr.sourceServerId] : [tr.serverId];
       const missing = needed.filter((id) => !connected.has(id));
@@ -1055,6 +1082,8 @@ export function pump() {
         continue;
       }
       slots--;
+      count(tr.serverId);
+      if (tr.sourceServerId) count(tr.sourceServerId);
       void start(tr);
     }
   });
@@ -1348,8 +1377,9 @@ function reconcileWatches(s: AppState) {
   }
 }
 
-function watchTransfer(w: Watch, source: string, size: number): Transfer {
-  const target = join(w.remotePath, relOf(w, source));
+function watchTransfer(w: Watch, source: string, size: number, existing?: string): Transfer {
+  // An existing file on the server keeps its exact name (also its Unicode form).
+  const target = existing ?? remoteOf(w, source);
   return { id: uid('t'), name: basename(source), direction: 'up', serverId: w.serverId, folder: relFolder(w.remotePath, target), source, target, size, done: 0, state: 'queued', watchId: w.id };
 }
 
@@ -1364,7 +1394,7 @@ function relOf(w: Watch, localPath: string) {
   const base = w.localPath.replace(/\/+$/, '');
   return localPath.startsWith(`${base}/`) ? localPath.slice(base.length + 1) : basename(localPath);
 }
-const remoteOf = (w: Watch, localPath: string) => join(w.remotePath, relOf(w, localPath));
+const remoteOf = (w: Watch, localPath: string) => join(w.remotePath, remoteRel(w.serverId, relOf(w, localPath)));
 
 async function onWatchBatch(b: { watchId: string; changed: string[]; removed: string[]; renamed?: Array<[string, string]> }) {
   const w = getState().watches.find((x) => x.id === b.watchId);
@@ -1441,14 +1471,15 @@ async function initialSync(w: Watch, manual = false) {
   synced.add(w.id);
   try {
     const [local, remote] = await Promise.all([backend.localWalk(w.localPath), backend.remoteWalk(w.serverId, w.remotePath).catch(() => [] as WalkItem[])]);
-    const remoteByRel = new Map(remote.map((r) => [r.path.slice(w.remotePath.length + 1), r] as const));
+    // Compared in NFC form, so a name decomposed on one side still meets its counterpart.
+    const remoteByRel = new Map(remote.map((r) => [r.path.slice(w.remotePath.length + 1).normalize('NFC'), r] as const));
     const items: Transfer[] = [];
     for (const f of local) {
       const rel = relOf(w, f.path);
       if (isExcluded(rel, watchExcludes(w)) || !inSelection(w, rel)) continue;
-      const r = remoteByRel.get(rel);
+      const r = remoteByRel.get(rel.normalize('NFC'));
       if (!r && w.options.onlyExisting) continue;
-      if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, f.path, f.size));
+      if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, f.path, f.size, r?.path));
     }
     if (items.length) {
       pendingCommand.add(w.id);

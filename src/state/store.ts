@@ -807,7 +807,8 @@ export function openServerIn(side: PaneSide, serverId: string) {
   // Without a start folder the server's home folder is used; it is known only once connected
   // (an already open connection, e.g. of a folder watch, does not report it again).
   const start = srv.remoteStart || (LIVE && live.isConnected(serverId) ? live.homeOf(serverId) ?? '' : '');
-  updateTab({ serverId, rightLocal: false, remotePath: start, back: [], forward: [], syncBrowse: undefined, serverList: { ...t.serverList, remote: false } });
+  const linked = linkedStart(srv, start);
+  updateTab({ serverId, rightLocal: false, remotePath: start, back: [], forward: [], syncBrowse: linked, ...(linked ? { localPath: linked.local } : {}), serverList: { ...t.serverList, remote: false } });
   setState((s) => ({ selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } }, expanded: { ...s.expanded, remote: [] }, focusSide: 'remote' }));
   if (LIVE) {
     if (!live.isConnected(serverId)) live.connectNow(serverId);
@@ -815,6 +816,15 @@ export function openServerIn(side: PaneSide, serverId: string) {
     setState((s) => ({ servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: true } : x)) }));
     showToast($t('Verbunden mit {0}', srv.name), 'ok');
   }
+}
+
+/**
+ * "Beim Öffnen synchron blättern" (Transmit: folder linking): the server's local and
+ * server start folders as the linked pair, when both are set.
+ */
+function linkedStart(srv: Server, remoteStart: string): Tab['syncBrowse'] {
+  if (!srv.syncBrowseOnOpen || !srv.localStart || !remoteStart) return undefined;
+  return { local: srv.localStart, remote: remoteStart };
 }
 
 /** True when the pane shows a server (the right half, or the left one in server-to-server mode). */
@@ -857,7 +867,7 @@ export function isDirEntry(side: PaneSide, serverId: string, path: string): bool
 }
 
 /** Loading / error / connection state of a pane (live mode only). */
-export function paneStatus(side: PaneSide, s: AppState = state): { loading: boolean; error?: string; notConnected?: boolean; connecting?: boolean } {
+export function paneStatus(side: PaneSide, s: AppState = state): { loading: boolean; error?: string; missing?: boolean; notConnected?: boolean; connecting?: boolean } {
   if (!LIVE) return { loading: false };
   const t = activeTab(s);
   if (!t) return { loading: false };
@@ -1100,7 +1110,7 @@ export function openServerInNewTab(serverId: string) {
     void import('./terminal').then((m) => m.openServerTerminal(serverId));
     return;
   }
-  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [] };
+  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [], syncBrowse: linkedStart(srv, srv.remoteStart) };
   setState((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), firstRun: false, contextMenu: null }));
   if (LIVE && !live.isConnected(serverId)) live.connectNow(serverId);
 }
@@ -1149,7 +1159,7 @@ export function openServer(serverId: string, files = false) {
   }
   const srv = serverById(serverId);
   if (!srv) return;
-  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [] };
+  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [], syncBrowse: linkedStart(srv, srv.remoteStart) };
   if (LIVE) {
     setState({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), expanded: { local: [], remote: [] }, firstRun: false });
     if (!live.isConnected(serverId)) live.connectNow(serverId);
@@ -1567,8 +1577,13 @@ export function addBookmark() {
 /** One line of "Ordner abgleichen" the user ticked; `rel` is relative to the tab's folders. */
 export interface SyncAction {
   kind: 'upload' | 'download' | 'deleteRemote' | 'deleteLocal';
+  /** Path relative to the two folders (in NFC form, see walkPlace). */
   rel: string;
   size: number;
+  /** Real path of the source file (copies) or of the file to delete; may differ from `rel` in its Unicode form. */
+  from?: string;
+  /** Real path of the existing target file, if there is one. */
+  to?: string;
 }
 
 /** Carries out the ticked lines of "Ordner abgleichen". */
@@ -1595,8 +1610,8 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
     if (a.kind !== 'upload' && a.kind !== 'download') continue;
     const toRight = a.kind === 'upload';
     const [from, to] = toRight ? [L, R] : [R, L];
-    const source = paths.join(toRight ? t.localPath : t.remotePath, a.rel);
-    const target = paths.join(toRight ? t.remotePath : t.localPath, a.rel);
+    const source = a.from ?? paths.join(toRight ? t.localPath : t.remotePath, a.rel);
+    const target = a.to ?? paths.join(toRight ? t.remotePath : t.localPath, a.rel);
     const base = { id: uid('t'), name: paths.basename(a.rel), folder: relFolder(toRight ? t.remotePath : t.localPath, target), source, target, size: a.size, done: 0, state: 'queued' as const, decided: true };
     if (!from && !to) localPairs.push([source, target]);
     else if (!from) items.push({ ...base, direction: 'up', serverId: to });
@@ -1610,7 +1625,7 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
     if (a.kind !== 'deleteRemote' && a.kind !== 'deleteLocal') continue;
     const right = a.kind === 'deleteRemote';
     const place = right ? R : L;
-    deletes.set(place, [...(deletes.get(place) ?? []), paths.join(right ? t.remotePath : t.localPath, a.rel)]);
+    deletes.set(place, [...(deletes.get(place) ?? []), a.from ?? paths.join(right ? t.remotePath : t.localPath, a.rel)]);
   }
   const deleteCount = [...deletes.values()].reduce((n, l) => n + l.length, 0);
   if (LIVE) {
@@ -2167,6 +2182,25 @@ export function newFolder(side: PaneSide = state.focusSide) {
   setState((s) => ({ fsRev: s.fsRev + 1, focusSide: side, contextMenu: null }));
   const idx = paneEntries(side).findIndex((e) => e.name === name);
   setState((s) => ({ selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } }, renaming: { side, name } }));
+}
+
+/**
+ * "Synchron blättern" reached a folder that does not exist on this side yet:
+ * creates it (Transmit asks the same), then shows it.
+ */
+export function createMissingFolder(side: PaneSide) {
+  const t = activeTab();
+  if (!t) return;
+  const loc = paneLoc(side, t);
+  const path = panePath(side);
+  if (!LIVE) {
+    fs.makeDir(...loc, path);
+    setState((s) => ({ fsRev: s.fsRev + 1 }));
+    return;
+  }
+  void live.makeFolder(...loc, paths.parent(path), paths.basename(path)).then((ok) => {
+    if (ok) live.refreshVisible();
+  });
 }
 
 /** "Neue Datei" (ForkLift): an empty text file, named right away. */

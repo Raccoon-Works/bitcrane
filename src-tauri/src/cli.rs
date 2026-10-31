@@ -239,7 +239,7 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
     let conn = match protocol {
         "ftp" | "ftps" => {
             let tls = if protocol == "ftp" { "none" } else if s.get("implicitTls").and_then(Value::as_bool).unwrap_or(false) { "implicit" } else { "explicit" };
-            let params = crate::ftp::FtpParams {
+            let params = crate::ftp::FtpParams { timeout: None,
                 host: host.clone(),
                 port,
                 user: user.clone(),
@@ -263,13 +263,13 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
                 p => format!("/{p}"),
             };
             let url = format!("{}://{host}{port_part}{path}", if https { "https" } else { "http" });
-            let params = crate::dav::DavParams { url, user: user.clone(), password: password(), tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false), trust: None, proxy: proxy(s) };
+            let params = crate::dav::DavParams { timeout: None, url, user: user.clone(), password: password(), tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false), trust: None, proxy: proxy(s) };
             Remote::Dav(crate::dav::DavConn::connect(params, ctx.known.clone()).await?)
         }
         "s3" => {
             let http = s.get("s3Http").and_then(Value::as_bool).unwrap_or(false);
             let port_part = if port == 0 || port == if http { 80 } else { 443 } { String::new() } else { format!(":{port}") };
-            let params = crate::s3::S3Params {
+            let params = crate::s3::S3Params { timeout: None,
                 endpoint: format!("{}://{host}{port_part}", if http { "http" } else { "https" }),
                 region: str_of(s, "s3Region").to_string(),
                 bucket: str_of(s, "s3Bucket").to_string(),
@@ -283,7 +283,7 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             Remote::S3(Arc::new(crate::s3::S3Conn::connect(params, ctx.known.clone()).await?))
         }
         "smb" => {
-            let params = crate::smb::SmbParams {
+            let params = crate::smb::SmbParams { timeout: None,
                 host: host.clone(),
                 port: if port == 0 { 445 } else { port },
                 user: user.clone(),

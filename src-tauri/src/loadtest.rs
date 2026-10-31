@@ -188,7 +188,7 @@ async fn load_sftp() {
     let (host, port) = target.split_once(':').unwrap();
     let dir = tempfile::tempdir().unwrap();
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-    let p = |trust: Option<String>| ConnectParams {
+    let p = |trust: Option<String>| ConnectParams { timeout: None,
         host: host.into(), port: port.parse().unwrap(), user: "test".into(),
         auth: AuthParams::Key { path: std::env::var("BITCRANE_TEST_KEY").unwrap(), passphrase: None },
         trust, keepalive: true, scp: false, jump: None, proxy: None,
@@ -210,7 +210,7 @@ async fn load_ftp() {
     let port: u16 = ports.split(',').next().unwrap().parse().unwrap();
     let dir = tempfile::tempdir().unwrap();
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-    let p = crate::ftp::FtpParams {
+    let p = crate::ftp::FtpParams { timeout: None,
         host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: "none".into(), tls13_only: false,
         encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
     };
@@ -229,13 +229,13 @@ async fn load_dav_and_s3() {
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
     if let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") {
         let url = urls.split(',').next().unwrap();
-        let p = crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None };
+        let p = crate::dav::DavParams { timeout: None, url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None };
         let c = crate::dav::DavConn::connect(p, known.clone()).await.unwrap();
         let home = c.home.clone();
         run(Remote::Dav(c), &home, env_num("BITCRANE_LOAD_DAV_FILES", 1_000) as usize, env_num("BITCRANE_LOAD_DAV_GB", 1)).await;
     }
     if let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") {
-        let params = |bucket: &str| crate::s3::S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+        let params = |bucket: &str| crate::s3::S3Params { timeout: None, endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
         let bucket = format!("bitcrane-last-{}", uuid::Uuid::new_v4().simple());
         crate::s3::S3Conn::connect(params(""), known.clone()).await.unwrap().mkdir(&format!("/{bucket}")).await.unwrap();
         let c = crate::s3::S3Conn::connect(params(&bucket), known.clone()).await.unwrap();

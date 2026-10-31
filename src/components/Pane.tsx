@@ -15,7 +15,7 @@ import { isVaultListing, unlockVault } from '../state/vault';
 import { ArrowElbowLeftUp, GitBranch, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, Columns, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { activeTab, canGoUp, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage, LIVE } from '../state/store';
+import { activeTab, canGoUp, createMissingFolder, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage, LIVE } from '../state/store';
 import { PlacesBar } from './PlacesBar';
 import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
@@ -661,7 +661,14 @@ export function Pane({ side }: { side: PaneSide }) {
           </div>
         )}
         {!status.notConnected && status.error && (
-          <div className="empty-list">{status.error}<span className="small muted">{path}</span></div>
+          <div className="empty-list">{status.error}<span className="small muted">{path}</span>
+            {tab.syncBrowse && status.missing && (
+              <span className="row-buttons">
+                <Button variant="primary" onClick={() => createMissingFolder(side)}>{$t('Ordner anlegen')}</Button>
+                <Button onClick={toggleSyncBrowse}>{$t('Synchron blättern beenden')}</Button>
+              </span>
+            )}
+          </div>
         )}
         {!status.notConnected && !status.error && status.loading && entries.length === 0 && (
           <div className="empty-list"><span className="row-inline"><Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />{$t('Wird gelesen …')}</span></div>

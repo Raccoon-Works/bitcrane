@@ -74,6 +74,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Third-party notices (Settings › About › Licenses) always match the shipped packages.
+      - name: Collect third-party licenses
+        run: node scripts/licenses.mjs
+
       # Stops the build on type errors and on broken hook order (black window in 0.2.64).
       - name: Check the interface code
         run: |
