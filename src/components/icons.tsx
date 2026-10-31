@@ -159,3 +159,13 @@ export function FileGlyph({ size = 16, name }: { size?: number; name?: string })
     </svg>
   );
 }
+
+/**
+ * Symbol of a Mac package (an app, a Photos library …): its own Finder icon,
+ * read from the system; the file symbol where that is not available.
+ */
+export function PackageGlyph({ size = 16, path, name }: { size?: number; path: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!LIVE || failed) return <FileGlyph size={size} name={name} />;
+  return <img className="glyph-system" src={convertFileSrc(path, 'itemicon')} width={size} height={size} alt="" aria-hidden="true" draggable={false} loading="lazy" onError={() => setFailed(true)} />;
+}

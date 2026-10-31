@@ -18,7 +18,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t, LOCALE } from '../i18n';
-import { LIVE, activeTab, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
+import { LIVE, activeTab, editLocalPlaces, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
 import { BrandLogo, isBrandService } from './BrandLogo';
 import { placeLabel } from './PlacesBar';
@@ -145,6 +145,39 @@ export function Sidebar() {
   const others = netHosts.filter((h) => !mounted.some((m) => m.name.toLowerCase() === h.name.toLowerCase()));
   // Recent folders that are not favourites already, newest first.
   const recent = (recentAll ?? []).filter((p) => !places.some((x) => x.path === p) && p !== '~').slice(0, 5);
+  // Favourite drag (reordering): which favourite and before which one it would go.
+  const [favDrag, setFavDrag] = useState<{ path: string; before: string | null } | null>(null);
+  const favMoved = useRef(false);
+  const beginFavDrag = (e: React.PointerEvent, path: string) => {
+    if (e.button !== 0) return;
+    const y0 = e.clientY;
+    favMoved.current = false;
+    let current: { path: string; before: string | null } | null = null;
+    const move = (ev: PointerEvent) => {
+      if (!favMoved.current && Math.abs(ev.clientY - y0) < 5) return;
+      favMoved.current = true;
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-fav-path]');
+      let before: string | null = current?.before ?? null;
+      if (el) {
+        const target = el.dataset.favPath!;
+        const r = el.getBoundingClientRect();
+        const list = places.map((p) => p.path).filter((p) => p !== path);
+        before = ev.clientY < r.top + r.height / 2 ? target : (list[list.indexOf(target) + 1] ?? null);
+        if (target === path) before = current?.before ?? null;
+      }
+      current = { path, before };
+      setFavDrag(current);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', up, true);
+      if (favMoved.current && current) editLocalPlaces(current.path, { before: current.before });
+      setFavDrag(null);
+    };
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', up, true);
+  };
+
   // Section drag: which section is moved and where it would go.
   const [drag, setDrag] = useState<{ id: SidebarSection; before: SidebarSection | null; moved: boolean } | null>(null);
   const dragRef = useRef(drag);
@@ -224,9 +257,13 @@ export function Sidebar() {
 
   const sections: Record<SidebarSection, React.ReactNode> = {
     favorites: section('favorites', <>
-      {shown.map(({ place: p, label }) => item(`p:${p.path}`, <PlaceIcon place={p} />, label, p.path, () => open(p.path), {
+      {shown.map(({ place: p, label }) => item(`p:${p.path}`, <PlaceIcon place={p} />, label, p.path, () => { if (!favMoved.current) open(p.path); favMoved.current = false; }, {
         onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarPlace', place: p.path } }); },
+        onPointerDown: (e) => beginFavDrag(e, p.path),
+        ...({ 'data-fav-path': p.path } as object),
+        className: `side-item${activeLocal === p.path ? ' is-active' : ''}${favDrag && favDrag.before === p.path && favDrag.path !== p.path ? ' is-drop-before' : ''}${favDrag?.path === p.path ? ' is-dragged' : ''}`,
       }))}
+      {favDrag && favDrag.before === null && <div className="side-drop-end" />}
       {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
     </>, { 'data-sidebar-favs': '' } as Partial<React.HTMLAttributes<HTMLDivElement>>),
     recent: recent.length > 0 ? section('recent', recent.map((p) => item(`r:${p}`, <ClockCounterClockwise {...ICON} />, paths.basename(p) || p, p, () => open(p)))) : null,

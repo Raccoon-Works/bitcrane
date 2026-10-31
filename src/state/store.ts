@@ -142,6 +142,8 @@ export interface Settings {
   recentDirs?: string[];
   /** Built-in editor: font size, line wrapping, tab width (CodeEditor.tsx). */
   editorPrefs?: { fontSize: number; wrap: boolean; tabSize: number };
+  /** Files open in the built-in editor, reopened when it is first shown after a start. */
+  editorDocs?: Array<{ serverId: string; path: string }>;
   /** "Im Editor öffnen": the built-in editor (standard) or a program of the system. */
   editorMode?: 'builtin' | 'external';
   /** Sidebar sections in the user's order, folded ones, and hidden ones. */

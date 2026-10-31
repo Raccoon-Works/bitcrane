@@ -2145,5 +2145,19 @@
   "„{0}“ gesichert.": "« {0} » enregistré.",
   "„{0}“ hat Änderungen, die noch nicht gesichert sind.": "« {0} » contient des modifications non enregistrées.",
   "„{0}“ schließen": "Fermer « {0} »",
-  "„{0}“ wurde inzwischen woanders geändert.": "« {0} » a été modifié ailleurs entre-temps."
+  "„{0}“ wurde inzwischen woanders geändert.": "« {0} » a été modifié ailleurs entre-temps.",
+  "Auf GitHub": "Sur GitHub",
+  "Neues SSH-Terminal": "Nouveau terminal SSH",
+  "Problem melden": "Signaler un problème",
+  "Quellcode": "Code source",
+  "SSH-Terminal": "Terminal SSH",
+  "Terminal (SSH)": "Terminal (SSH)",
+  "Update {0} bereit": "Mise à jour {0} prête",
+  "Version {0}": "Version {0}",
+  "Verwendete Bausteine": "Composants utilisés",
+  "Was ist neu?": "Quoi de neuf ?",
+  "Zurücksetzen": "Réinitialiser",
+  "Änderungen der Versionen": "Notes de version",
+  "Server": "Serveur",
+  "Windows-Installer": "Programme d’installation Windows"
 }

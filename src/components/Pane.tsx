@@ -21,7 +21,7 @@ import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
 import { beginRowDrag } from '../util/dragDrop';
 import { crumbs as crumbsFor } from '../util/paths';
-import { FileGlyph, FolderGlyph, typeIconFor } from './icons';
+import { FileGlyph, FolderGlyph, PackageGlyph, typeIconFor } from './icons';
 import { Thumb } from './Thumb';
 import * as paths from '../util/paths';
 import { LocalTile, ServerTile } from './ServerTile';
@@ -91,6 +91,10 @@ function PathInput({ side, path }: { side: PaneSide; path: string }) {
     />
   );
 }
+
+/** Lists longer than this draw only the visible rows; the margin keeps fast scrolling free of gaps. */
+const VIRTUAL_MIN = 300;
+const VIRTUAL_MARGIN = 20;
 
 /** Free space of the disk that holds a folder of this computer, refreshed when files change. */
 function useFreeSpace(path: string, enabled: boolean, rev: number): number | null {
@@ -226,11 +230,54 @@ export function Pane({ side }: { side: PaneSide }) {
     return () => ro.disconnect();
   }, [showServers]);
 
-  // Keep the keyboard cursor row visible.
+  // Long lists draw only the rows in view (plus a margin), like the Finder and the Explorer:
+  // a folder with 20 000 files scrolls as smoothly as one with 20.
+  const virtual = viewMode === 'list' && !deep && entries.length > VIRTUAL_MIN;
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const [rowH, setRowH] = useState(34);
+  const [view, setView] = useState({ top: 0, height: 900 });
+  const measureView = () => {
+    const el = listRef.current;
+    const rows = rowsRef.current;
+    if (!el) return;
+    const top = Math.max(0, el.scrollTop - (rows ? rows.offsetTop : 0));
+    setView((v) => (Math.abs(v.top - top) < 2 && v.height === el.clientHeight ? v : { top, height: el.clientHeight }));
+  };
+  useLayoutEffect(() => {
+    if (!virtual) return;
+    const first = rowsRef.current?.querySelector<HTMLElement>('.row');
+    if (first && first.offsetHeight) setRowH(first.offsetHeight);
+    measureView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtual, entries.length]);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!virtual || !el) return;
+    let frame = 0;
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; measureView(); }); };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onScroll) : null;
+    ro?.observe(el);
+    return () => { el.removeEventListener('scroll', onScroll); ro?.disconnect(); if (frame) cancelAnimationFrame(frame); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtual]);
+  const firstRow = virtual ? Math.max(0, Math.floor(view.top / rowH) - VIRTUAL_MARGIN) : 0;
+  const lastRow = virtual ? Math.min(entries.length, Math.ceil((view.top + view.height) / rowH) + VIRTUAL_MARGIN) : entries.length;
+
+  // Keep the keyboard cursor row visible (a row outside the drawn part is scrolled to by its position).
   useEffect(() => {
     if (sel.cursor < 0) return;
     const row = listRef.current?.querySelector<HTMLElement>(`[data-index="${sel.cursor}"]`);
+    const el = listRef.current;
+    if (virtual && el) {
+      const offset = rowsRef.current?.offsetTop ?? 0;
+      const y = offset + sel.cursor * rowH;
+      if (y < el.scrollTop) el.scrollTop = y;
+      else if (y + rowH > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH - el.clientHeight;
+      return;
+    }
     row?.scrollIntoView({ block: 'nearest' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel.cursor]);
 
   // "Verzeichnisse vergleichen" (WinSCP): marks for what differs from the other half.
@@ -426,7 +473,7 @@ export function Pane({ side }: { side: PaneSide }) {
       return (
         <div key={entry.name} {...props} className={`${rowClass(entry, index).replace('row', 'tile')}`}>
           <span className="tile-icon">
-            {dirLike ? <FolderGlyph size={ICON_PX[iconStep]} /> : <Thumb side={ls} path={paths.join(path, entry.name)} name={label} size={ICON_PX[iconStep]} />}
+            {dirLike ? <FolderGlyph size={ICON_PX[iconStep]} /> : entry.kind === 'dir' ? <PackageGlyph size={ICON_PX[iconStep]} path={paths.join(path, entry.name)} name={label} /> : <Thumb side={ls} path={paths.join(path, entry.name)} name={label} size={ICON_PX[iconStep]} />}
             {ext && <span className="tile-ext" aria-hidden="true">{ext}</span>}
             {link}
           </span>
@@ -444,7 +491,7 @@ export function Pane({ side }: { side: PaneSide }) {
             <CaretRight size={13} weight="bold" aria-hidden="true" />
           </button>
         ) : <span />}
-        {dirLike ? <FolderGlyph size={20} /> : <FileGlyph size={20} name={label} />}
+        {dirLike ? <FolderGlyph size={20} /> : entry.kind === 'dir' ? <PackageGlyph size={20} path={paths.join(path, entry.name)} name={label} /> : <FileGlyph size={20} name={label} />}
         <span className="row-name">
           {nameEl}
           {link}
@@ -658,7 +705,15 @@ export function Pane({ side }: { side: PaneSide }) {
             </div>
           </div>
         )}
-        {!deep && !colView && (icons ? <div className="icon-grid">{entries.map((entry, index) => item(entry, index))}</div> : entries.map((entry, index) => item(entry, index)))}
+        {!deep && !colView && icons && <div className="icon-grid">{entries.map((entry, index) => item(entry, index))}</div>}
+        {!deep && !colView && !icons && !virtual && entries.map((entry, index) => item(entry, index))}
+        {virtual && (
+          <div ref={rowsRef} className="rows-virtual" style={{ height: entries.length * rowH }}>
+            <div style={{ transform: `translateY(${firstRow * rowH}px)` }}>
+              {entries.slice(firstRow, lastRow).map((entry, i) => item(entry, firstRow + i))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="pane-foot">

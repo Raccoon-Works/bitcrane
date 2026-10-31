@@ -55,7 +55,7 @@ export function MainWindow() {
   const sideWidth = useStore((s) => s.settings.sidebarWidth ?? 200);
   const panesRef = useRef<HTMLDivElement>(null);
   const settingsTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.settings);
-  const showSide = sidebar && !settingsTab;
+  const showSide = sidebar;
   // The built-in editor takes the place of the two halves while it is shown.
   const editorOpen = useEditor().open;
   const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));

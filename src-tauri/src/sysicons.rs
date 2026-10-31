@@ -44,6 +44,24 @@ fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// PNG of the Finder symbol of one item (an app's own icon, a library's icon …),
+/// cached per path. Mac only; elsewhere None.
+pub fn png_for_path(uri_path: &str) -> Option<Vec<u8>> {
+    let decoded = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()?.into_owned();
+    let key = format!("path:{decoded}");
+    if let Some(hit) = cache().lock().ok()?.get(&key) {
+        return hit.clone();
+    }
+    #[cfg(target_os = "macos")]
+    let png = mac_icon::lookup_path(&crate::paths::to_native(&decoded).to_string_lossy());
+    #[cfg(not(target_os = "macos"))]
+    let png: Option<Vec<u8>> = None;
+    if let Ok(mut c) = cache().lock() {
+        c.insert(key, png.clone());
+    }
+    png
+}
+
 #[cfg(windows)]
 fn lookup(ext: &str) -> Option<Vec<u8>> {
     windows_icon::lookup(ext)
@@ -179,6 +197,17 @@ mod mac_icon {
         let ws = NSWorkspace::sharedWorkspace();
         #[allow(deprecated)]
         let image = ws.iconForFileType(&NSString::from_str(ext));
+        to_png(&image)
+    }
+
+    /// The Finder symbol of one file or package (apps show their own icon).
+    pub fn lookup_path(path: &str) -> Option<Vec<u8>> {
+        let ws = NSWorkspace::sharedWorkspace();
+        let image = ws.iconForFile(&NSString::from_str(path));
+        to_png(&image)
+    }
+
+    fn to_png(image: &objc2_app_kit::NSImage) -> Option<Vec<u8>> {
         let side = super::SIZE as f64;
         let mut rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(side, side));
         // SAFETY: `rect` is a valid pointer for the duration of the call; no context or hints.
