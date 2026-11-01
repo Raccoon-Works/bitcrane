@@ -1986,7 +1986,9 @@ button.disclosure { width: 16px; height: 20px; }
 .resize-handle::after { content: ''; position: absolute; border-radius: 2px; background: transparent; transition: background-color 120ms ease; }
 .resize-handle.is-vertical::after { top: 25%; bottom: 25%; left: 3px; width: 2px; }
 .resize-handle.is-horizontal::after { left: 45%; right: 45%; top: 3px; height: 2px; }
-.resize-handle:hover::after, .resize-handle:focus-visible::after { background: var(--accent-text); }
+/* Hovering shows a quiet grey grip; the accent is kept for the keyboard focus and while dragging. */
+.resize-handle:hover::after { background: var(--line-strong, var(--line)); }
+.resize-handle:focus-visible::after, body.is-resizing .resize-handle:hover::after { background: var(--accent-text); }
 .resize-handle:focus-visible { outline: none; }
 body.is-resizing { user-select: none; }
 body.is-resizing-v, body.is-resizing-v * { cursor: col-resize !important; }
@@ -2497,7 +2499,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 [data-platform='mac'] .side-top { height: 38px; }
 [data-platform='mac'] .side-top > .traffic { padding: 0 0 0 16px; height: auto; }
 [data-platform='win'] .side-top { height: 44px; padding-left: var(--space-2); }
-.side-handle { border-left: 0 !important; }
+/* The sidebar's grip lies over the edge instead of taking 8 px of its own: a strip in the window colour
+   there showed as a lighter sliver between the sidebar and the title bar. */
+.side-handle { border-left: 0 !important; width: 8px; margin: 0 -4px; background: transparent; }
 /* The title bar beside the sidebar starts with a fine line instead of the window buttons. */
 .window-row:has(> .side-col) .mac-titlebar { box-shadow: inset 1px 0 0 var(--line), inset 0 -1px 0 var(--line-strong, var(--line)); }
 /* Windows: no line under the title bar (Explorer in Windows 11); the selected tab alone joins the toolbar,
@@ -2617,3 +2621,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .watch-btn.tb-iconsText .watch-lamp { right: auto; left: 24px; top: 4px; }
 .watch-btn.tb-text .watch-lamp { position: static; box-shadow: none; }
 .toolbar.labels-iconsBelow .tool-group { background: none; gap: 0; }
+/* Windows beside the sidebar: the first tab starts right at the sidebar's edge, flush with the toolbar below. */
+.window-row:has(> .side-col) .win-titlebar { padding-left: 0; }
+.window-row:has(> .side-col) .win-tabs > .tip-anchor:first-child .win-tab { border-top-left-radius: 0; }
+.window-row:has(> .side-col) .win-tabs > .tip-anchor:first-child .win-tab.is-sel { box-shadow: 0 -1px 0 var(--line-strong, var(--line)), 1px 0 0 var(--line-strong, var(--line)); }
