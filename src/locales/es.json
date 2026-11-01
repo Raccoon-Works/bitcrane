@@ -2255,5 +2255,14 @@
   "„{0}“ wird im Finder bzw. Explorer gezeigt.": "«{0}» se muestra en el Finder o el Explorador.",
   "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} cortado. Pégalo en otra carpeta para moverlo allí.",
   "Die Objekte liegen schon in diesem Ordner.": "Los elementos ya están en esta carpeta.",
-  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Entre el equipo y el servidor se copia; el original se conserva."
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Entre el equipo y el servidor se copia; el original se conserva.",
+  "Versteckte": "Ocultos",
+  "Synchron": "Sincronizar",
+  "Vergleichen": "Comparar",
+  "Info": "Info",
+  "Werkzeugleiste": "Barra de herramientas",
+  "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Con etiquetas, aparecen nombres cortos bajo los símbolos. Qué símbolos aparecen se elige en «Personalizar».",
+  "Anpassen …": "Personalizar …",
+  "Symbole mit Beschriftung": "Símbolos con etiquetas",
+  "Symbole und Text daneben": "Símbolos con texto al lado"
 }

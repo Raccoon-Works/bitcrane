@@ -35,7 +35,7 @@ export function useKey() {
  * pill): green while watches run, orange while one waits for its server,
  * grey when all are paused. A click opens the overview with all details.
  */
-function WatchButton() {
+function WatchButton({ mode }: { mode: LabelMode }) {
   const watches = useStore((s) => s.watches);
   const open = useStore((s) => s.popoverOpen);
   const now = useStore((s) => s.now);
@@ -61,13 +61,35 @@ function WatchButton() {
   return (
     <div className="pill-anchor watch-anchor">
       <Tooltip text={`${$t('Überwachungen')}: ${text}`} shortcut={sk('watchOverview')}>
-        <button type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={`${$t('Überwachungen')}: ${text}`} className={`icon-btn watch-btn is-${tone}${open ? ' is-on' : ''}`} onClick={togglePopover}>
-          <Broadcast size={20} weight="duotone" />
+        <button type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={`${$t('Überwachungen')}: ${text}`} className={`icon-btn watch-btn is-${tone}${mode !== 'icons' ? ` tb-${mode}` : ''}${open ? ' is-on' : ''}`} onClick={togglePopover}>
+          {mode !== 'text' && <Broadcast size={20} weight="duotone" />}
           <span className={`watch-lamp tone-${tone}`} aria-hidden="true" />
+          {mode !== 'icons' && <span className="tb-name">{$t('Überwachung')}</span>}
         </button>
       </Tooltip>
       {open && <WatchPopover />}
     </div>
+  );
+}
+
+type LabelMode = 'icons' | 'iconsBelow' | 'iconsText' | 'text';
+
+/**
+ * One toolbar button in the chosen look: symbol only (name in the tooltip),
+ * symbol with a short name below or beside it, or the name alone.
+ */
+function ToolButton({ mode, label, short, shortcut, icon, active, disabled, onClick, className = '', tool }: {
+  mode: LabelMode; label: string; short?: string; shortcut?: string; icon: ReactNode; active?: boolean; disabled?: boolean; onClick: () => void; className?: string; tool?: string;
+}) {
+  if (mode === 'icons') return <IconButton label={label} shortcut={shortcut} active={active} disabled={disabled} onClick={onClick} className={className} data-tool={tool}>{icon}</IconButton>;
+  const name = mode === 'iconsText' ? label : short ?? label;
+  return (
+    <Tooltip text={label} shortcut={shortcut}>
+      <button type="button" aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick} data-tool={tool}
+        className={`icon-btn tb-${mode}${active ? ' is-on' : ''} ${className}`}>
+        {mode !== 'text' && icon}<span className="tb-name">{name}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -89,7 +111,7 @@ function toolRuns(tools: ToolId[]): ToolId[][] {
 }
 
 /** Icon and action for each customisable tool. */
-export function useToolDefs(): Record<ToolId, { label: string; key?: string; icon: ReactNode; run: () => void; active?: boolean; disabled?: boolean }> {
+export function useToolDefs(): Record<ToolId, { label: string; short?: string; key?: string; icon: ReactNode; run: () => void; active?: boolean; disabled?: boolean }> {
   const sk = useKeyLabel();
   const key = useKey();
   const inspector = useStore((s) => s.inspectorOpen);
@@ -108,24 +130,24 @@ export function useToolDefs(): Record<ToolId, { label: string; key?: string; ico
     nav: { label: $t('Zurück'), key: sk('back'), icon: ic(<CaretLeft size={19} />), run: goBack, disabled: !tab?.back.length },
     newFolder: { label: $t('Neuer Ordner'), key: sk('newFolder'), icon: ic(<FolderSimplePlus size={19} />), run: () => newFolder() },
     refresh: { label: $t('Aktualisieren'), key: sk('refresh'), icon: ic(<ArrowClockwise size={19} />), run: refresh },
-    info: { label: $t('Informationen'), key: sk('inspector'), icon: ic(<Info size={19} />), run: toggleInspector, active: inspector },
+    info: { label: $t('Informationen'), short: $t('Info'), key: sk('inspector'), icon: ic(<Info size={19} />), run: toggleInspector, active: inspector },
     activity: { label: $t('Aktivität'), key: sk('activity'), icon: ic(<SquareHalfBottom size={19} />), run: toggleActivity, active: activity },
     upload: { label: $t('Hochladen'), icon: ic(<UploadSimple size={19} />), run: () => upload(), disabled: !selLocal },
     download: { label: $t('Herunterladen'), key: sk('download'), icon: ic(<DownloadSimple size={19} />), run: () => download(), disabled: !selRemote },
     delete: { label: $t('Löschen'), key: key('⌘⌫', $t('Entf')), icon: ic(<Trash size={19} />), run: () => askDelete(focus), disabled: !sel },
     rename: { label: $t('Umbenennen'), key: key('↩', 'F2'), icon: ic(<PencilSimple size={19} />), run: () => startRename(focus), disabled: !sel },
     perms: { label: $t('Rechte'), icon: ic(<LockSimple size={19} />), run: () => toggleInspector(), disabled: false },
-    hidden: { label: showHidden ? $t('Versteckte Dateien ausblenden') : $t('Versteckte Dateien zeigen'), key: sk('hidden'), icon: ic(<EyeSlash size={19} />), run: toggleHidden, active: !showHidden },
+    hidden: { label: showHidden ? $t('Versteckte Dateien ausblenden') : $t('Versteckte Dateien zeigen'), short: $t('Versteckte'), key: sk('hidden'), icon: ic(<EyeSlash size={19} />), run: toggleHidden, active: !showHidden },
     terminal: { label: $t('Terminal'), key: sk('terminal'), icon: ic(<TerminalWindow size={19} />), run: () => toggleTerminal(), active: terminalOpen },
     disconnect: { label: $t('Trennen'), icon: ic(<Plugs size={19} />), run: () => disconnect() },
-    copyPath: { label: $t('Pfad kopieren'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
-    editor: { label: $t('Im Editor öffnen'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },
+    copyPath: { label: $t('Pfad kopieren'), short: $t('Pfad'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
+    editor: { label: $t('Im Editor öffnen'), short: $t('Bearbeiten'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },
     codeEditor: { label: $t('Editor'), key: sk('codeEditor'), icon: ic(<Code size={19} />), run: toggleEditor, active: editorOpen },
-    sync: { label: $t('Ordner abgleichen'), icon: ic(<ArrowsClockwise size={19} />), run: () => openDialog({ type: 'compare' }) },
-    syncBrowse: { label: $t('Synchron blättern'), key: sk('syncBrowse'), icon: ic(<LinkSimple size={19} />), run: toggleSyncBrowse, active: !!tab?.syncBrowse },
+    sync: { label: $t('Ordner abgleichen'), short: $t('Abgleichen'), icon: ic(<ArrowsClockwise size={19} />), run: () => openDialog({ type: 'compare' }) },
+    syncBrowse: { label: $t('Synchron blättern'), short: $t('Synchron'), key: sk('syncBrowse'), icon: ic(<LinkSimple size={19} />), run: toggleSyncBrowse, active: !!tab?.syncBrowse },
     palette: { label: $t('Befehle'), key: sk('palette'), icon: ic(<Command size={19} />), run: () => openDialog({ type: 'palette' }) },
-    compareDirs: { label: $t('Verzeichnisse vergleichen'), key: sk('compareDirs'), icon: ic(<Columns size={19} />), run: toggleCompareDirs, active: compareOn },
-    selectMask: { label: $t('Auswählen nach Muster'), key: sk('selectMask'), icon: ic(<Checks size={19} />), run: () => openDialog({ type: 'selectMask', side: focus }) },
+    compareDirs: { label: $t('Verzeichnisse vergleichen'), short: $t('Vergleichen'), key: sk('compareDirs'), icon: ic(<Columns size={19} />), run: toggleCompareDirs, active: compareOn },
+    selectMask: { label: $t('Auswählen nach Muster'), short: $t('Auswählen'), key: sk('selectMask'), icon: ic(<Checks size={19} />), run: () => openDialog({ type: 'selectMask', side: focus }) },
   };
 }
 
@@ -152,7 +174,7 @@ export function Toolbar() {
   const [termMenu, setTermMenu] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <header className="toolbar" data-tauri-drag-region onContextMenu={(e) => {
+    <header className={`toolbar labels-${labels}`} data-tauri-drag-region onContextMenu={(e) => {
       e.preventDefault();
       // Right click on the terminal button: which terminal to open (this computer, an SSH server, a new SSH connection).
       if ((e.target as HTMLElement).closest('[data-tool="terminal"]')) setTermMenu({ x: e.clientX, y: e.clientY });
@@ -161,31 +183,23 @@ export function Toolbar() {
       {termMenu && <TermNewMenu x={termMenu.x} y={termMenu.y} onClose={() => setTermMenu(null)} />}
       {/* Sidebar on or off (Finder: the button left of the back arrow). */}
       <div className="tool-group">
-        <IconButton label={sidebarOn ? $t('Seitenleiste ausblenden') : $t('Seitenleiste einblenden')} shortcut={sk('sidebar')} active={sidebarOn} className="sidebar-btn"
-          onClick={() => updateSettings({ sidebar: !sidebarOn })}><SidebarSimple size={19} /></IconButton>
+        <ToolButton mode={labels} label={sidebarOn ? $t('Seitenleiste ausblenden') : $t('Seitenleiste einblenden')} short={$t('Seitenleiste')} shortcut={sk('sidebar')} active={sidebarOn} className="sidebar-btn"
+          onClick={() => updateSettings({ sidebar: !sidebarOn })} icon={<SidebarSimple size={19} />} />
       </div>
       {toolbar.includes('nav') && (
         <div className="tool-group">
-          <IconButton label={$t('Zurück')} shortcut={defs.nav.key} disabled={!tab?.back.length} onClick={goBack}><CaretLeft size={19} /></IconButton>
-          <IconButton label={$t('Vor')} shortcut={sk('forward')} disabled={!tab?.forward.length} onClick={goForward}><CaretRight size={19} /></IconButton>
+          <ToolButton mode={labels} label={$t('Zurück')} shortcut={defs.nav.key} disabled={!tab?.back.length} onClick={goBack} icon={<CaretLeft size={19} />} />
+          <ToolButton mode={labels} label={$t('Vor')} shortcut={sk('forward')} disabled={!tab?.forward.length} onClick={goForward} icon={<CaretRight size={19} />} />
         </div>
       )}
       {/* The tabs live in their own row (Mac, see MainWindow) or in the title bar (Windows). */}
       <span className="flex-1" data-tauri-drag-region />
-      <div className="tool-group"><WatchButton /></div>
+      <div className="tool-group"><WatchButton mode={labels} /></div>
       {toolRuns(groupTools).map((run) => (
-        <div key={run.join()} className={`tool-group${labels === 'iconsText' ? ' with-text' : ''}`}>
+        <div key={run.join()} className="tool-group">
           {run.map((id) => {
             const d = defs[id];
-            return labels === 'iconsText' ? (
-              <Tooltip key={id} text={d.label} shortcut={d.key}>
-                <button type="button" className={`icon-btn with-text${d.active ? ' is-on' : ''}`} aria-pressed={d.active} disabled={d.disabled} onClick={d.run} data-tool={id}>
-                  {d.icon}<span>{d.label}</span>
-                </button>
-              </Tooltip>
-            ) : (
-              <IconButton key={id} label={d.label} shortcut={d.key} active={d.active} disabled={d.disabled} onClick={d.run} data-tool={id}>{d.icon}</IconButton>
-            );
+            return <ToolButton key={id} mode={labels} label={d.label} short={d.short} shortcut={d.key} active={d.active} disabled={d.disabled} onClick={d.run} icon={d.icon} tool={id} />;
           })}
         </div>
       ))}

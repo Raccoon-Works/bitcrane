@@ -2478,24 +2478,31 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
    (Windows) at its top; tabs and toolbar start right of it. */
 .window-row { flex: 1; min-height: 0; display: flex; }
 .window-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.side-col {
-  flex: none; display: flex; flex-direction: column; min-height: 0;
-  background: #0d0d0d; color: var(--text);
+.side-col { flex: none; display: flex; flex-direction: column; min-height: 0; color: var(--text); }
+.page:not([data-theme='light']) .side-col {
+  background: #0d0d0d;
   --text: #ececee; --text-2: #cfd0d4; --text-muted: #9a9ba1; --text-faint: #75767c; --accent-text: #5fb0ff;
   --bg-hover: rgba(255, 255, 255, 0.05); --bg-sidebar-sel: rgba(255, 255, 255, 0.09);
   --line: rgba(255, 255, 255, 0.07); --accent-tint: rgba(95, 176, 255, 0.12);
   color-scheme: dark;
 }
-.page[data-theme='light'] .side-col { background: #26272b; }
+/* Light mode: a light column like the Finder and Explorer, in the title bar's tone, set off by a fine line. */
+.page[data-theme='light'] .side-col {
+  background: var(--bg-titlebar, var(--bg-window));
+  box-shadow: inset -1px 0 0 var(--line-strong);
+  --bg-hover: rgba(0, 0, 0, 0.045); --bg-sidebar-sel: rgba(0, 0, 0, 0.07);
+  color-scheme: light;
+}
 .side-top { flex: none; display: flex; align-items: center; }
 [data-platform='mac'] .side-top { height: 38px; }
 [data-platform='mac'] .side-top > .traffic { padding: 0 0 0 16px; height: auto; }
 [data-platform='win'] .side-top { height: 44px; padding-left: var(--space-2); }
 .side-handle { border-left: 0 !important; }
 /* The title bar beside the sidebar starts with a fine line instead of the window buttons. */
-.window-row:has(> .side-col) .mac-titlebar { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 var(--line-strong, var(--line)); }
-/* Windows: the sidebar already draws the edge; a second line there made a notch before the first tab. */
-.window-row:has(> .side-col) .win-titlebar { box-shadow: inset 0 -1px 0 var(--line-strong, var(--line)); }
+.window-row:has(> .side-col) .mac-titlebar { box-shadow: inset 1px 0 0 var(--line), inset 0 -1px 0 var(--line-strong, var(--line)); }
+/* Windows: no line under the title bar (Explorer in Windows 11); the selected tab alone joins the toolbar,
+   so no ledge is left between the sidebar and the first tab. */
+.window-row:has(> .side-col) .win-titlebar { box-shadow: none; }
 [data-platform='mac'] .window-row:has(> .side-col) .mac-tabs { border-left: 0; }
 
 /* Zoom picker (Settings > Darstellung): points on a line, like Spotify. */
@@ -2588,3 +2595,25 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .mac-tab.has-srv-color::before, .win-tab.has-srv-color::before { content: ''; position: absolute; left: 10px; right: 10px; bottom: 2px; height: 2px; border-radius: 2px; background: var(--srv-color); pointer-events: none; }
 .result-line { font-variant-numeric: tabular-nums; }
 .row-name:has(.result-line) > .ellipsis:first-child { flex-shrink: 0; max-width: 55%; }
+
+/* Settings tab: its areas take the sidebar's place instead of a second column beside it. */
+.side-settings { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.side-settings .set-nav { width: auto; flex: 1; padding: var(--space-1) var(--space-2) var(--space-3); border-right: 0; background: none; }
+.side-settings .set-nav-title { padding: 0 var(--space-2) var(--space-2); font-size: var(--text-body); }
+.side-settings .set-tab { height: 30px; gap: var(--space-2); padding: 0 var(--space-2); border-radius: var(--radius-row); color: var(--text-2); }
+.side-settings .set-tab.is-sel { background: var(--bg-sidebar-sel); color: var(--text); }
+.side-settings .set-tab.is-sel .set-tab-icon { color: var(--accent-text) !important; }
+
+/* Toolbar looks (Werkzeugleiste anpassen > Anzeigen als). */
+.toolbar.labels-iconsBelow { height: 66px; }
+.icon-btn.tb-iconsBelow { width: auto; min-width: 50px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 var(--space-2); }
+.tb-iconsBelow .tb-name { font-size: 11px; line-height: 1; white-space: nowrap; }
+.icon-btn.tb-iconsText { width: auto; display: inline-flex; gap: 6px; padding: 0 var(--space-3); font-size: var(--text-small); }
+.icon-btn.tb-text { width: auto; display: inline-flex; gap: 6px; padding: 0 var(--space-3); font-size: var(--text-small); }
+.tb-name { white-space: nowrap; }
+.icon-btn:not(:disabled) .tb-name { color: var(--text-2); }
+.icon-btn.is-on .tb-name { color: var(--text); }
+.watch-btn.tb-iconsBelow .watch-lamp { right: auto; left: calc(50% + 5px); top: 7px; }
+.watch-btn.tb-iconsText .watch-lamp { right: auto; left: 24px; top: 4px; }
+.watch-btn.tb-text .watch-lamp { position: static; box-shadow: none; }
+.toolbar.labels-iconsBelow .tool-group { background: none; gap: 0; }

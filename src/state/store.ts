@@ -450,7 +450,8 @@ export interface AppState {
   /** Results of the search in subfolders of the focused side. */
   deepSearch: DeepSearch | null;
   toolbar: ToolId[];
-  toolbarLabels: 'icons' | 'iconsText';
+  /** Toolbar look: symbols only, with the name below (Transmit, Finder), with the name beside, or names only. */
+  toolbarLabels: 'icons' | 'iconsBelow' | 'iconsText' | 'text';
   settings: Settings;
   /** Connection drop simulation: server id -> next retry time. */
   offline: Record<string, { attempt: number; nextRetry: number }>;
@@ -3262,6 +3263,20 @@ export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key
 }
 
 /** Passphrase or password typed by the user in the login prompt. */
+/**
+ * "Abbrechen" in the password prompt: when the server was just being opened
+ * and never connected, its half goes back to the server list instead of
+ * staying on "Nicht verbunden" with a tab named after the server.
+ */
+export function cancelSecret(serverId: string) {
+  setState({ dialog: null });
+  const t = activeTab();
+  const srv = serverById(serverId);
+  if (!t || !srv || srv.online) return;
+  if (t.serverId === serverId) closePaneServer('remote');
+  else if (t.leftServerId === serverId) closePaneServer('local');
+}
+
 export function submitSecret(serverId: string, secret: string, save: boolean, kind: 'passphrase' | 'password') {
   setState({ dialog: null });
   live.submitSecret(serverId, secret, save, kind);

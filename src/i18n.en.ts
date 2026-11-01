@@ -2257,4 +2257,13 @@ export const EN: Record<string, string> = {
   "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} cut. Paste in another folder to move it there.",
   "Die Objekte liegen schon in diesem Ordner.": "The items are already in this folder.",
   "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Between computer and server a copy is made; the original stays.",
+  "Versteckte": "Hidden",
+  "Synchron": "In sync",
+  "Vergleichen": "Compare",
+  "Info": "Info",
+  "Werkzeugleiste": "Toolbar",
+  "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "With labels, short names appear below the symbols. Which symbols appear is set under “Customize”.",
+  "Anpassen …": "Customize …",
+  "Symbole mit Beschriftung": "Symbols with labels",
+  "Symbole und Text daneben": "Symbols with text beside",
 };

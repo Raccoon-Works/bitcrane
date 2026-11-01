@@ -2255,5 +2255,14 @@
   "„{0}“ wird im Finder bzw. Explorer gezeigt.": "‘{0}’ wordt getoond in Finder of Verkenner.",
   "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} geknipt. Plak in een andere map om het daarheen te verplaatsen.",
   "Die Objekte liegen schon in diesem Ordner.": "De items staan al in deze map.",
-  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Tussen computer en server wordt gekopieerd; het origineel blijft."
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Tussen computer en server wordt gekopieerd; het origineel blijft.",
+  "Versteckte": "Verborgen",
+  "Synchron": "Synchroon",
+  "Vergleichen": "Vergelijken",
+  "Info": "Info",
+  "Werkzeugleiste": "Werkbalk",
+  "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Met labels staan korte namen onder de symbolen. Welke symbolen verschijnen, stel je in onder ‘Aanpassen’.",
+  "Anpassen …": "Aanpassen …",
+  "Symbole mit Beschriftung": "Symbolen met labels",
+  "Symbole und Text daneben": "Symbolen met tekst ernaast"
 }

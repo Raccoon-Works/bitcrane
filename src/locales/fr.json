@@ -2255,5 +2255,14 @@
   "„{0}“ wird im Finder bzw. Explorer gezeigt.": "« {0} » est affiché dans le Finder ou l’Explorateur.",
   "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} coupé. Collez dans un autre dossier pour l’y déplacer.",
   "Die Objekte liegen schon in diesem Ordner.": "Les éléments sont déjà dans ce dossier.",
-  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Entre l’ordinateur et le serveur, une copie est faite ; l’original reste."
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Entre l’ordinateur et le serveur, une copie est faite ; l’original reste.",
+  "Versteckte": "Masqués",
+  "Synchron": "Synchro",
+  "Vergleichen": "Comparer",
+  "Info": "Infos",
+  "Werkzeugleiste": "Barre d’outils",
+  "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Avec libellés, des noms courts s’affichent sous les symboles. Les symboles affichés se choisissent dans « Personnaliser ».",
+  "Anpassen …": "Personnaliser …",
+  "Symbole mit Beschriftung": "Symboles avec libellés",
+  "Symbole und Text daneben": "Symboles avec texte à côté"
 }
