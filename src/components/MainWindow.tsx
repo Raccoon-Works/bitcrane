@@ -71,7 +71,8 @@ export function MainWindow() {
               <div className="side-top" data-tauri-drag-region>
                 {platform === 'mac' ? <TrafficLights /> : <WinSystemMenu />}
               </div>
-              <Sidebar />
+              {/* The settings show their areas here, so there is no second column beside the sidebar. */}
+              {settingsTab ? <div className="side-settings" id="side-settings-slot" /> : <Sidebar />}
             </div>
             <ResizeHandle orientation="vertical" label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')} value={sideWidth} min={150} max={340} step={10}
               toValue={(start, d) => start + d} onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })} onReset={() => updateSettings({ sidebarWidth: 200 })} className="side-handle" />

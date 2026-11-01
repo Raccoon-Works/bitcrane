@@ -2255,5 +2255,14 @@
   "„{0}“ wird im Finder bzw. Explorer gezeigt.": "„{0}” jest pokazywany w Finderze lub Eksploratorze.",
   "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} wycięto. Wklej w innym folderze, aby przenieść.",
   "Die Objekte liegen schon in diesem Ordner.": "Elementy są już w tym folderze.",
-  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Między komputerem a serwerem tworzona jest kopia; oryginał pozostaje."
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Między komputerem a serwerem tworzona jest kopia; oryginał pozostaje.",
+  "Versteckte": "Ukryte",
+  "Synchron": "Synchronicznie",
+  "Vergleichen": "Porównaj",
+  "Info": "Info",
+  "Werkzeugleiste": "Pasek narzędzi",
+  "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Z podpisami pod symbolami pojawiają się krótkie nazwy. Które symbole są widoczne, ustawisz w „Dostosuj”.",
+  "Anpassen …": "Dostosuj …",
+  "Symbole mit Beschriftung": "Symbole z podpisami",
+  "Symbole und Text daneben": "Symbole z tekstem obok"
 }

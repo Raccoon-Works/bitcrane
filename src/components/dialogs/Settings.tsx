@@ -4,13 +4,15 @@
  */
 import { ArrowUpDown, Eye, Radio, Settings as Gear, Shield, SlidersHorizontal, SunMoon, X, Plus, Keyboard } from '../glyphs';
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { TOOLBAR_LOOKS } from './ToolbarCustomize';
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
-import { getState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, currentZoom, defaultZoom, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { getState, setState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, currentZoom, defaultZoom, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { Bug, GithubLogo, ListChecks, MagnifyingGlass, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
 import { terminalSettings, type TerminalSettings } from '../../state/terminal';
@@ -534,6 +536,7 @@ function ZoomPicker({ value, standard }: { value: number; standard: number }) {
 
 export function SettingsPage({ section }: { section: SettingsTab }) {
   const current = section;
+  const toolbarLabels = useStore((st) => st.toolbarLabels);
   const setCurrent = setSettingsSection;
   // Another area starts at its top, not where the last one was scrolled to.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -791,6 +794,10 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Spalte „Geändert“')} note={$t('Spalten lassen sich auch mit einem Rechtsklick auf die Spaltenköpfe ein- und ausblenden.')}><Switch checked={s.columns.mtime} onChange={(v) => updateSettings({ columns: { ...s.columns, mtime: v } })} label={$t('Spalte Geändert')} /></Row>
             <Row label={$t('Spalte „Rechte“')}><Switch checked={s.showPerms} onChange={(v) => updateSettings({ showPerms: v })} label={$t('Spalte Rechte')} /></Row>
             <Row label={$t('Spalte „Größe“')}><Switch checked={s.columns.size} onChange={(v) => updateSettings({ columns: { ...s.columns, size: v } })} label={$t('Spalte Größe')} /></Row>
+            <Row label={$t('Werkzeugleiste')} note={$t('Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.')}>
+              <Select value={toolbarLabels} onChange={(v) => setState({ toolbarLabels: v })} label={$t('Werkzeugleiste')} options={TOOLBAR_LOOKS()} />
+              <Button small onClick={() => openDialog({ type: 'toolbar' })}>{$t('Anpassen …')}</Button>
+            </Row>
             <Row label={$t('Seitenleiste')} note={$t('Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.')}><Switch checked={s.sidebar !== false} onChange={(v) => updateSettings({ sidebar: v })} label={$t('Seitenleiste')} /></Row>
             <Row label={$t('Hälften untereinander')} note={$t('Für schmale Fenster: die beiden Hälften übereinander statt nebeneinander.')}><Switch checked={!!s.stackHalves} onChange={(v) => updateSettings({ stackHalves: v })} label={$t('Hälften untereinander')} /></Row>
             <Row label={$t('Git-Status in Ordnern dieses Computers')} note={$t('Zeigt in Git-Projekten geänderte Dateien und den Zweig mit Commit, Pull und Push. Braucht ein installiertes Git.')}><Switch checked={s.gitStatus !== false} onChange={(v) => updateSettings({ gitStatus: v })} label={$t('Git-Status')} /></Row>
@@ -827,9 +834,12 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
     </>
   );
   const searching = query.trim().length > 0;
-
-  return (
-    <div className="settings-page">
+  // With the sidebar shown, the list of areas moves into it (see MainWindow); otherwise it stays here.
+  const sideOn = useStore((st) => st.settings.sidebar !== false);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const inFront = useStore((st) => !!st.tabs.find((t) => t.id === st.activeTabId)?.settings);
+  useLayoutEffect(() => { setSlot(sideOn && inFront ? document.getElementById('side-settings-slot') : null); }, [sideOn, inFront]);
+  const nav = (
       <nav role="tablist" aria-orientation="vertical" aria-label={$t('Bereiche')} className="set-nav">
         <span className="set-nav-title">{$t('Einstellungen')}</span>
         <label className="set-search">
@@ -844,6 +854,11 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
           </button>
         ))}
       </nav>
+  );
+
+  return (
+    <div className="settings-page">
+      {slot ? createPortal(nav, slot) : nav}
       <div className="set-scroll" ref={scrollRef}>
       {searching ? (
         <div className="set-body set-search-results" ref={resultsRef} aria-label={$t('Suchergebnisse')}>

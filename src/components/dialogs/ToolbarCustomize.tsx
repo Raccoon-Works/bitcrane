@@ -12,6 +12,14 @@ import { Button, Select } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/** The four looks of the toolbar, shared with Settings > Darstellung. */
+export const TOOLBAR_LOOKS = () => [
+  { value: 'icons' as const, label: $t('Nur Symbole') },
+  { value: 'iconsBelow' as const, label: $t('Symbole mit Beschriftung') },
+  { value: 'iconsText' as const, label: $t('Symbole und Text daneben') },
+  { value: 'text' as const, label: $t('Nur Text') },
+];
+
 export function ToolbarCustomize() {
   const toolbar = useStore((s) => s.toolbar);
   const labels = useStore((s) => s.toolbarLabels);
@@ -35,7 +43,7 @@ export function ToolbarCustomize() {
       footer={
         <>
           <span className="muted">{$t('Anzeigen als')}</span>
-          <Select value={labels} onChange={(v) => setState({ toolbarLabels: v })} label={$t('Anzeigen als')} options={[{ value: 'icons', label: $t('Nur Symbole') }, { value: 'iconsText', label: $t('Symbole und Text') }]} />
+          <Select value={labels} onChange={(v) => setState({ toolbarLabels: v })} label={$t('Anzeigen als')} options={TOOLBAR_LOOKS()} />
           <span className="flex-1" />
           <Button onClick={() => setToolbar([...defaultToolbar])}>{$t('Standard wiederherstellen')}</Button>
           <Button variant="primary" onClick={closeDialog}>{$t('Fertig')}</Button>

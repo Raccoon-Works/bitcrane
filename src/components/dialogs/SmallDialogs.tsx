@@ -2,11 +2,12 @@
  * Smaller dialogs: quick connect, host key (fingerprint) checks, conflict,
  * permissions, delete confirmation, about and the shortcut overview.
  */
+import { addressOf } from '../ServerList';
 import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 import type { CloudPlace, ConflictChoice, HostKey, PaneSide, Server } from '../../backend/types';
-import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, openExternal, openServer, quickConnect, rejectHostKey, resolveConflict, savePerms, serverById, statEntry, submitSecret, trustHostKey, useStore, paneLoc, paneOnServer } from '../../state/store';
+import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, openExternal, openServer, quickConnect, rejectHostKey, resolveConflict, savePerms, serverById, statEntry, submitSecret, cancelSecret, trustHostKey, useStore, paneLoc, paneOnServer } from '../../state/store';
 import { formatAgo, formatDate, formatSize, permsToText } from '../../util/format';
 import { ServerTile } from '../ServerTile';
 import { BMark, FileGlyph, FolderGlyph } from '../icons';
@@ -33,7 +34,7 @@ export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
   const used = servers.filter((x) => x.lastUsed).sort((a, b) => (b.lastUsed ?? 0) - (a.lastUsed ?? 0)).slice(0, 5);
   const addr = (x: Server) => `${x.user ? `${x.user}@` : ''}${x.host}${x.port !== 22 ? `:${x.port}` : ''}`;
   const recent = [
-    ...used.map((x) => ({ key: x.id, server: x, label: x.name, sub: addr(x), when: formatAgo(x.lastUsed!, now), run: () => { closeDialog(); if (as === 'terminal' && (!x.protocol || x.protocol === 'sftp')) void import('../../state/terminal').then((m) => m.openServerTerminal(x.id)); else openServer(x.id); } })),
+    ...used.map((x) => ({ key: x.id, server: x, label: x.name, sub: addressOf(x), when: formatAgo(x.lastUsed!, now), run: () => { closeDialog(); if (as === 'terminal' && (!x.protocol || x.protocol === 'sftp')) void import('../../state/terminal').then((m) => m.openServerTerminal(x.id)); else openServer(x.id); } })),
     ...addresses.filter((a) => !used.some((x) => addr(x) === a.replace(/\/.*$/, ''))).slice(0, 8 - used.length)
       .map((a) => ({ key: `a:${a}`, server: undefined, label: a, sub: $t('Adresse'), when: '', run: () => setAddress(a) })),
   ];
@@ -154,8 +155,8 @@ export function SecretPrompt({ serverId, kind, wrong }: { serverId: string; kind
         : srv.protocol === 'vault' ? $t('Cryptomator-Tresor in {0}', srv.host) : $t('{0} meldet sich mit Passwort an.', srv.name)}
       icon={<span className="icon-tile tone-accent"><KeyRound size={18} strokeWidth={1.75} /></span>}
       width={520}
-      onClose={closeDialog}
-      footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={submit} disabled={!value}>{srv.protocol === 'vault' ? $t('Entsperren') : $t('Verbinden')}</Button></>}
+      onClose={() => cancelSecret(serverId)}
+      footer={<><span className="flex-1" /><Button onClick={() => cancelSecret(serverId)}>{$t('Abbrechen')}</Button><Button variant="primary" onClick={submit} disabled={!value}>{srv.protocol === 'vault' ? $t('Entsperren') : $t('Verbinden')}</Button></>}
     >
       <div className="form-stack">
         {wrong && (
