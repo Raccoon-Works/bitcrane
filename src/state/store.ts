@@ -2650,6 +2650,47 @@ function askMoveAcross(from: string, fromDir: string, names: string[], to: strin
   });
 }
 
+/** ⌥⌘V (Finder "Objekt hierher bewegen"): what ⌘C remembered is moved here instead of copied. */
+export function pasteMove(side: PaneSide = state.focusSide) {
+  const c = state.clipboard;
+  if (!c) return;
+  setState({ clipboard: { ...c, cut: true } });
+  pasteClipboard(side);
+}
+
+/** "Gehe zu > Schreibtisch, Downloads …": a folder of this computer, in the focused half when it shows this computer. */
+export function goLocal(path: string) {
+  const t = activeTab();
+  if (!t) return;
+  const sides: PaneSide[] = state.focusSide === 'local' ? ['local', 'remote'] : ['remote', 'local'];
+  const side = sides.find((x) => !placeOf(x, t) && !paneShowsServers(x, t));
+  if (!side) { showToast($t('Keine Hälfte zeigt gerade diesen Computer.')); return; }
+  setState({ focusSide: side });
+  navigate(side, path);
+}
+
+/** "In der anderen Hälfte öffnen" (ForkLift): the selected folder, or this folder, in the other half of the same place. */
+export function openInOtherHalf(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  if (!t) return;
+  const other: PaneSide = side === 'local' ? 'remote' : 'local';
+  if (placeOf(side, t) !== placeOf(other, t) || paneShowsServers(other, t)) {
+    showToast($t('Das geht, wenn beide Hälften denselben Computer oder Server zeigen.'));
+    return;
+  }
+  const pick = selectedNames(side).find((n) => isDirEntry(...paneLoc(side, t), paths.join(panePath(side), n)));
+  navigate(other, pick ? paths.join(panePath(side), pick) : panePath(side));
+}
+
+/** "Im Finder / Explorer zeigen" from the menu: the selected entry, or the folder itself. */
+export function revealSelection(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  if (!t || placeOf(side, t)) { showToast($t('Das geht nur mit Ordnern dieses Computers.')); return; }
+  const n = selectedNames(side)[0];
+  if (n) revealEntry(side, n);
+  else if (LIVE) live.revealLocal(panePath(side));
+}
+
 /** F5 in the Commander keys: the selection goes into the folder of the other half (copy, upload or download). */
 export function copyToOtherHalf(side: PaneSide = state.focusSide) {
   const t = activeTab();

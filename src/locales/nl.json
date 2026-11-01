@@ -2312,5 +2312,13 @@
   "Einfg": "Insert",
   "+ (Ziffernblock)": "+ (numpad)",
   "− (Ziffernblock)": "− (numpad)",
-  "* (Ziffernblock)": "* (numpad)"
+  "* (Ziffernblock)": "* (numpad)",
+  "Im Terminal öffnen": "Openen in Terminal",
+  "Hierher bewegen": "Hierheen verplaatsen",
+  "In der anderen Hälfte öffnen": "Openen in de andere helft",
+  "Downloads": "Downloads",
+  "Programme": "Apps",
+  "Keine Hälfte zeigt gerade diesen Computer.": "Geen van beide helften toont nu deze computer.",
+  "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Dit werkt als beide helften dezelfde computer of server tonen.",
+  "Das geht nur mit Ordnern dieses Computers.": "Dit werkt alleen met mappen op deze computer."
 }

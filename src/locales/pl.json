@@ -2312,5 +2312,13 @@
   "Einfg": "Insert",
   "+ (Ziffernblock)": "+ (klaw. num.)",
   "− (Ziffernblock)": "− (klaw. num.)",
-  "* (Ziffernblock)": "* (klaw. num.)"
+  "* (Ziffernblock)": "* (klaw. num.)",
+  "Im Terminal öffnen": "Otwórz w Terminalu",
+  "Hierher bewegen": "Przenieś tutaj",
+  "In der anderen Hälfte öffnen": "Otwórz w drugiej połowie",
+  "Downloads": "Pobrane",
+  "Programme": "Aplikacje",
+  "Keine Hälfte zeigt gerade diesen Computer.": "Żadna połowa nie pokazuje teraz tego komputera.",
+  "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Działa, gdy obie połowy pokazują ten sam komputer lub serwer.",
+  "Das geht nur mit Ordnern dieses Computers.": "Działa tylko z folderami tego komputera."
 }

@@ -2312,5 +2312,13 @@
   "Einfg": "Insert",
   "+ (Ziffernblock)": "+ (teclado num.)",
   "− (Ziffernblock)": "− (teclado num.)",
-  "* (Ziffernblock)": "* (teclado num.)"
+  "* (Ziffernblock)": "* (teclado num.)",
+  "Im Terminal öffnen": "Abrir en el Terminal",
+  "Hierher bewegen": "Mover aquí",
+  "In der anderen Hälfte öffnen": "Abrir en la otra mitad",
+  "Downloads": "Descargas",
+  "Programme": "Aplicaciones",
+  "Keine Hälfte zeigt gerade diesen Computer.": "Ninguna mitad muestra ahora este equipo.",
+  "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Funciona cuando ambas mitades muestran el mismo equipo o servidor.",
+  "Das geht nur mit Ordnern dieses Computers.": "Solo funciona con carpetas de este equipo."
 }
