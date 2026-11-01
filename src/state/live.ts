@@ -660,8 +660,37 @@ export function makeFile(side: PaneSide, serverId: string, dir: string, name: st
   return run(side, serverId, dir, () => (side === 'local' ? backend.localNewFile(path) : backend.remoteNewFile(serverId, path)));
 }
 
+/** Folder of the server's recycle bin (absolute), or undefined when the server has none. */
+export function serverTrash(serverId: string): string | undefined {
+  const rel = serverById(serverId)?.trashDir?.trim();
+  if (!rel) return undefined;
+  return rel.startsWith('/') ? rel.replace(/\/+$/, '') : join(homeOf(serverId) ?? '/', rel);
+}
+
+/** Moves entries into the server's recycle bin; a name already there gets the date and time added. */
+async function trashOnServer(serverId: string, dir: string, names: string[], trash: string) {
+  await backend.remoteMkdir(serverId, trash).catch(() => undefined);
+  const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-');
+  for (const n of names) {
+    const name = basename(n);
+    let target = join(trash, name);
+    if (await backend.remoteStat(serverId, target).then(() => true, () => false)) {
+      const dot = name.lastIndexOf('.');
+      target = join(trash, dot > 0 ? `${name.slice(0, dot)} (${stamp})${name.slice(dot)}` : `${name} (${stamp})`);
+    }
+    await backend.remoteMove(serverId, join(dir, n), target);
+  }
+  invalidate('remote', serverId, trash);
+}
+
 export function removeEntries(side: PaneSide, serverId: string, dir: string, names: string[]) {
   const paths = names.map((n) => join(dir, n));
+  const trash = side === 'remote' ? serverTrash(serverId) : undefined;
+  // Inside the recycle bin itself, deleting removes for good.
+  if (trash && dir !== trash && !dir.startsWith(trash + '/')) {
+    const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
+    return run(side, serverId, dir, () => trashOnServer(serverId, dir, names, trash), $t('{0} in den Papierkorb auf dem Server gelegt.', what));
+  }
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
   return run(
     side, serverId, dir,
@@ -823,7 +852,7 @@ const editSessions = new Map<string, EditSession>();
  * Downloads a server file into a working folder, opens it in the editor and
  * uploads it again every time it is saved.
  */
-export async function editRemote(serverId: string, remotePath: string) {
+export async function editRemote(serverId: string, remotePath: string, app?: string) {
   try {
     const localPath = await backend.editTempPath(serverId, remotePath);
     const st = await backend.remoteStat(serverId, remotePath);
@@ -839,7 +868,7 @@ export async function editRemote(serverId: string, remotePath: string) {
       });
     }
     publishEdits();
-    backend.localOpen(localPath, editorFor(localPath)).catch((e) => showToast(toBackendError(e).message, 'error'));
+    backend.localOpen(localPath, app ?? editorFor(localPath)).catch((e) => showToast(toBackendError(e).message, 'error'));
     addLog('info', $t('Im Editor geöffnet: {0}', remotePath), serverId);
     showToast($t('„{0}“ ist im Editor geöffnet. Beim Sichern lädt Bitcrane die Datei wieder hoch.', basename(remotePath)));
   } catch (e) {
@@ -923,7 +952,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
       return uploadNames(serverId, dir, remoteDir, extracted);
     } catch (e) {
       showToast(toBackendError(e).message, 'error');
-      return;
+      return { ids: [] as string[], skipped: 0 };
     }
   }
   const items: Transfer[] = [];
@@ -945,6 +974,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
   enqueue(items);
   if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
   reportSkipped(skipped, serverId);
+  return { ids: items.map((x) => x.id), skipped };
 }
 
 /** Uploads files and folders given as native paths (dropped from the Finder / Explorer). */
@@ -998,6 +1028,7 @@ export async function downloadNames(serverId: string, remoteDir: string, localDi
   enqueue(items);
   if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
   reportSkipped(skipped, serverId);
+  return { ids: items.map((x) => x.id), skipped };
 }
 
 /** Server to server: copies files or folders (names in `fromDir` on one server) into `toDir` on another. */
@@ -1023,6 +1054,40 @@ export async function crossNames(fromServerId: string, fromDir: string, serverId
   enqueue(items);
   if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
   reportSkipped(skipped, serverId);
+  return { ids: items.map((x) => x.id), skipped };
+}
+
+/**
+ * "Verschieben" between this computer and a server, or between two servers:
+ * the files are transferred first and the originals removed only once every
+ * file arrived without an error (on this computer into the recycle bin).
+ */
+export async function moveAcross(from: string, fromDir: string, names: string[], to: string, toDir: string) {
+  const queued = !from ? await uploadNames(to, fromDir, toDir, names)
+    : !to ? await downloadNames(from, fromDir, toDir, names)
+      : await crossNames(from, fromDir, to, toDir, names);
+  if (!queued.ids.length) return;
+  if (queued.skipped) {
+    showToast($t('Einige Dateien werden nach den Regeln ausgelassen; die Originale bleiben deshalb erhalten.'));
+    return;
+  }
+  const ids = new Set(queued.ids);
+  const arrived = new Set<string>();
+  const stop = subscribeStore(() => {
+    const mine = getState().transfers.filter((t) => ids.has(t.id));
+    for (const t of mine) if (t.state === 'done' && !t.error) arrived.add(t.id);
+    const failed = mine.some((t) => t.state === 'error' || (t.state === 'done' && t.error));
+    // A transfer removed from the list before it arrived was cancelled.
+    const gone = [...ids].some((id) => !arrived.has(id) && !mine.some((t) => t.id === id));
+    if (failed || gone) {
+      stop();
+      showToast($t('Nicht alle Dateien sind angekommen; die Originale bleiben erhalten.'), 'error');
+      return;
+    }
+    if (arrived.size < ids.size) return;
+    stop();
+    void removeEntries(from ? 'remote' : 'local', from, fromDir, names);
+  });
 }
 
 /** Transfers currently handled by the backend. */

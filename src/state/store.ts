@@ -37,6 +37,7 @@ export type DialogState =
   | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'presign'; side: PaneSide; name: string }
+  | { type: 'editWith'; side: PaneSide; name: string }
   | { type: 'symlink'; target: string }
   | { type: 'palette' }
   | { type: 'edits' }
@@ -65,7 +66,7 @@ export type DialogState =
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
-  | { type: 'selectMask'; side: PaneSide }
+  | { type: 'selectMask'; side: PaneSide; mode?: 'add' | 'remove' }
   | { type: 'afterQueue'; action: AfterQueue }
   | { type: 'workspaces' }
   | { type: 'cloudSignIn'; service: Protocol; serverId?: string }
@@ -139,6 +140,8 @@ export interface Settings {
   stackHalves?: boolean;
   /** Sidebar with favourites, recent folders, devices, shares and tags (on unless switched off). */
   sidebar?: boolean;
+  /** Keys: Explorer / Finder style, or the F keys of WinSCP and Total Commander (F5 copy, F6 move …). */
+  keyScheme?: 'standard' | 'commander';
   /** Row height of the lists: standard, or compact for small windows. */
   density?: 'standard' | 'compact';
   /** Width of the sidebar in pixels. */
@@ -1933,6 +1936,17 @@ export function moveCursor(side: PaneSide, delta: number, extend: boolean) {
   }
 }
 
+/** Einfg (Commander keys): selects or deselects the entry under the cursor and moves on to the next. */
+export function toggleAtCursor(side: PaneSide = state.focusSide) {
+  const entries = paneEntries(side);
+  const sel = state.selection[side];
+  const entry = entries[sel.cursor];
+  if (!entry) return;
+  const names = sel.names.includes(entry.name) ? sel.names.filter((n) => n !== entry.name) : [...sel.names, entry.name];
+  const cursor = Math.min(entries.length - 1, sel.cursor + 1);
+  setState((s) => ({ selection: { ...s.selection, [side]: { names, cursor, anchor: cursor } } }));
+}
+
 export function selectAll(side: PaneSide) {
   const entries = paneEntries(side);
   setState((s) => ({ selection: { ...s.selection, [side]: { names: entries.map((e) => e.name), cursor: s.selection[side].cursor, anchor: 0 } } }));
@@ -2599,9 +2613,10 @@ export function pasteClipboard(side: PaneSide) {
     return;
   }
   if (c.cut) {
-    // Between computer and server Bitcrane transfers a copy; the original stays (no delete without asking).
+    // Between computer and server: a move with a question first (transfer, then remove the originals).
     setState({ clipboard: null });
-    showToast($t('Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.'));
+    askMoveAcross(c.serverId, c.dir, c.names, to, toDir);
+    return;
   }
   if (c.serverId === to) {
     // Same computer or same server: a plain copy there.
@@ -2614,6 +2629,66 @@ export function pasteClipboard(side: PaneSide) {
     return;
   }
   transferNames(c.serverId, c.dir, c.names, to, toDir);
+}
+
+/**
+ * Moving between this computer and a server (or two servers), after a question:
+ * the files are transferred, then the originals are removed once all arrived.
+ */
+function askMoveAcross(from: string, fromDir: string, names: string[], to: string, toDir: string) {
+  if (!names.length) return;
+  const what = names.length === 1 ? `„${paths.basename(names[0])}“` : $t('{0} Objekte', names.length);
+  openDialog({
+    type: 'confirm', title: $t('{0} verschieben?', what), confirm: $t('Verschieben'),
+    text: `${$t('Bitcrane überträgt die Dateien und löscht sie danach an der alten Stelle.')} ${!from ? $t('Auf diesem Computer kommen die Originale in den Papierkorb. Gelöscht wird nur, wenn alle Dateien angekommen sind.')
+      : $t('Gelöscht wird nur, wenn alle Dateien angekommen sind.')}`,
+    run: () => {
+      setState({ dialog: null });
+      if (LIVE) void live.moveAcross(from, fromDir, names, to, toDir);
+      else showToast($t('{0} wird verschoben (Prototyp).', what));
+    },
+  });
+}
+
+/** F5 in the Commander keys: the selection goes into the folder of the other half (copy, upload or download). */
+export function copyToOtherHalf(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  if (!t) return;
+  const other: PaneSide = side === 'local' ? 'remote' : 'local';
+  if (paneShowsServers(other)) { showToast($t('Die andere Hälfte zeigt gerade die Serverliste.')); return; }
+  transferNames(placeOf(side, t), panePath(side), selectedNames(side), placeOf(other, t), panePath(other));
+}
+
+/** "Verschieben in die andere Hälfte" (F6 in the Commander keys). */
+export function moveToOtherSide(side: PaneSide = state.focusSide) {
+  const t = activeTab();
+  if (!t) return;
+  const names = selectedNames(side);
+  if (!names.length) return;
+  const other: PaneSide = side === 'local' ? 'remote' : 'local';
+  if (paneShowsServers(other)) { showToast($t('Die andere Hälfte zeigt gerade die Serverliste.')); return; }
+  const from = placeOf(side, t);
+  const to = placeOf(other, t);
+  if (from === to) {
+    if (!from) copyOrMoveLocal(panePath(side), names, panePath(other), true);
+    else moveIntoFolder(side, names, panePath(other));
+    return;
+  }
+  askMoveAcross(from, panePath(side), names, to, panePath(other));
+}
+
+/** "Bearbeiten mit …": opens the file with a chosen program instead of the usual editor. */
+export function editWith(side: PaneSide, name: string, app: string | null) {
+  const t = activeTab();
+  if (!t) return;
+  setState({ dialog: null, contextMenu: null });
+  const path = paths.join(panePath(side), name);
+  const [ls, sid] = paneLoc(side, t);
+  // null: the built-in editor of Bitcrane.
+  if (app === null) { void import('./editor').then((m) => m.openFile(ls === 'local' ? '' : sid, path)); return; }
+  if (!LIVE) { showToast($t('„{0}“ wird mit {1} geöffnet.', name, app || $t('dem Standardprogramm'))); return; }
+  if (ls === 'local') live.openLocal(path, app);
+  else void live.editRemote(sid, path, app);
 }
 
 export function copyPath(side: PaneSide, name?: string) {

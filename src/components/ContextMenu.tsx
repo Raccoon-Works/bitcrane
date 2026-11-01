@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -62,6 +62,13 @@ export function ContextMenu() {
   const isDir = folder && !pkg;
   const leftServer = tab?.leftServerId ? getState().servers.find((x) => x.id === tab.leftServerId) : undefined;
   const otherName = (side: 'local' | 'remote') => (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
+  /** The other half for "verschieben": its server, or its folder on this computer. */
+  const otherPlace = (side: 'local' | 'remote') => {
+    const o = side === 'local' ? 'remote' : 'local';
+    const [ls, sid] = paneLoc(o, tab);
+    const dir = panePath(o);
+    return ls === 'remote' ? getState().servers.find((x) => x.id === sid)?.name ?? '' : dir.split('/').filter(Boolean).pop() ?? dir;
+  };
   const groups: Item[][] = [];
   // Own commands (Einstellungen › Erweitert) run on SFTP servers only (they need SSH).
   const commands = onServer && sftpTab && !!paneServer ? (getState().settings.customCommands ?? []).filter((c) => c.name.trim() && c.command.trim()) : [];
@@ -220,11 +227,14 @@ export function ContextMenu() {
     if (one) first.push({ label: isDir ? $t('Öffnen') : onServer ? $t('Im Editor öffnen') : $t('Öffnen'), key: k('⌘↓', 'Enter'), run: () => (pkg ? openWithDefaultApp(menu.side, one) : openEntry(menu.side, one)) });
     if (pkg && one) first.push({ label: $t('Paketinhalt zeigen'), run: () => showPackageContents(menu.side, one) });
     if (one && !isDir && !pkg && !onServer) first.push({ label: $t('Im Editor öffnen'), run: () => openInEditor(menu.side, one) });
+    if (one && !isDir && !pkg) first.push({ label: $t('Bearbeiten mit …'), run: () => { setState({ contextMenu: null }); openDialog({ type: 'editWith', side: menu.side, name: one }); } });
     if (one && !isDir && !pkg) first.push({ label: $t('Vorschau'), key: k($t('Leertaste'), $t('Leertaste')), run: () => { setState({ contextMenu: null }); openDialog({ type: 'preview', side: menu.side }); } });
     if (leftServer) first.push({ label: $t('Zu „{0}“ übertragen', otherName(menu.side)), key: sk(menu.side === 'remote' ? 'download' : 'upload'), run: () => (menu.side === 'remote' ? download(menu.names) : upload(menu.names)) });
     else if (menu.side === 'remote') first.push({ label: $t('Herunterladen'), key: sk('download'), run: () => download(menu.names) });
     // Upload only when the other half shows a server (not with the server list or two local halves).
     else if (tab?.serverId) first.push({ label: $t('Hochladen'), key: sk('upload'), run: () => upload(menu.names) });
+    // Moving into the other half: on one computer or server a plain move, between them transfer and remove (after a question).
+    if (!paneShowsServers(menu.side === 'local' ? 'remote' : 'local')) first.push({ label: $t('Nach „{0}“ verschieben …', otherPlace(menu.side)), key: sk('moveToOther'), run: () => { setState({ contextMenu: null }); moveToOtherSide(menu.side); } });
     groups.push(first);
     const second: Item[] = [
       { label: $t('Kopieren'), key: sk('copy'), run: () => copySelection(menu.side) },

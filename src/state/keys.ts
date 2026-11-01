@@ -9,10 +9,11 @@
  */
 import type { Platform } from '../backend/types';
 import {
-  activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
+  activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, copyToOtherHalf, moveToOtherSide, toggleAtCursor, askDelete, openInEditor, panePath, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
   computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
+import { join as joinPath } from '../util/paths';
 
 export interface ShortcutAction {
   id: string;
@@ -78,6 +79,17 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'selectMask', group: $t('Dateien'), label: $t('Auswählen nach Muster'), mac: ['Mod+Alt+S'], win: ['Mod+Alt+S'], run: () => openDialog({ type: 'selectMask', side: focus() }) },
   { id: 'invertSelection', group: $t('Dateien'), label: $t('Auswahl umkehren'), mac: ['Mod+Shift+I'], win: ['Mod+Shift+I'], run: () => void import('./tools').then((m) => m.invertSelection(focus())), notInText: true },
 
+  // Without keys by default; the Commander keys (WinSCP, Total Commander) put them on F3 … F9.
+  { id: 'copyToOther', group: $t('Dateien'), label: $t('In die andere Hälfte kopieren'), mac: [], win: [], run: () => copyToOtherHalf(), notInText: true },
+  { id: 'moveToOther', group: $t('Dateien'), label: $t('In die andere Hälfte verschieben'), mac: [], win: [], run: () => moveToOtherSide(), notInText: true },
+  { id: 'deleteSel', group: $t('Dateien'), label: $t('Löschen'), mac: [], win: [], run: () => askDelete(focus()), notInText: true },
+  { id: 'editSel', group: $t('Dateien'), label: $t('Bearbeiten'), mac: [], win: [], run: () => { const n = selectedNames(focus())[0]; if (n) openInEditor(focus(), n); }, notInText: true },
+  { id: 'previewSel', group: $t('Dateien'), label: $t('Vorschau'), mac: [], win: [], run: () => { if (selectedNames(focus()).length) openDialog({ type: 'preview', side: focus() }); }, notInText: true },
+  { id: 'propsSel', group: $t('Dateien'), label: $t('Informationen und Rechte'), mac: [], win: [], run: () => { const n = selectedNames(focus())[0]; if (n) openDialog({ type: 'perms', side: focus(), path: joinPath(panePath(focus()), n) }); }, notInText: true },
+  { id: 'toggleSel', group: $t('Dateien'), label: $t('Auswahl umschalten und weiter'), mac: [], win: [], run: () => toggleAtCursor(), notInText: true },
+  { id: 'selectAdd', group: $t('Dateien'), label: $t('Nach Muster hinzufügen'), mac: [], win: [], run: () => openDialog({ type: 'selectMask', side: focus(), mode: 'add' }), notInText: true },
+  { id: 'selectRemove', group: $t('Dateien'), label: $t('Nach Muster abwählen'), mac: [], win: [], run: () => openDialog({ type: 'selectMask', side: focus(), mode: 'remove' }), notInText: true },
+
   { id: 'newWatch', group: $t('Überwachung'), label: $t('Neue Überwachung'), mac: ['Mod+U'], win: ['Mod+U'], run: () => openDialog({ type: 'watchSetup' }) },
   { id: 'watchTab', group: $t('Überwachung'), label: $t('Überwachung für diesen Tab starten'), mac: ['Mod+Shift+U'], win: ['Mod+Shift+U'], run: () => openDialog({ type: 'watchSetup' }) },
   { id: 'watchOverview', group: $t('Überwachung'), label: $t('Übersicht der Überwachungen'), mac: ['Mod+Alt+U'], win: ['Mod+Alt+U'], run: togglePopover },
@@ -97,16 +109,27 @@ export const FIXED: Array<{ label: string; mac: string; win: string }> = [
   { label: $t('Dialog schließen'), mac: 'esc', win: 'Esc' },
 ];
 
-/** Current keys of an action (user setting, else the default). */
+/**
+ * The F keys of WinSCP and Total Commander (Settings > Tastenkürzel > Belegung).
+ * They take the place of the defaults; the user's own keys still come first.
+ */
+const COMMANDER: Record<string, string[]> = {
+  previewSel: ['F3'], editSel: ['F4'], copyToOther: ['F5'], moveToOther: ['F6'], newFolder: ['F7', 'Mod+Shift+N'], deleteSel: ['F8'], propsSel: ['F9'],
+  refresh: ['Mod+R'], toggleSel: ['Insert'], selectAdd: ['NumpadAdd'], selectRemove: ['NumpadSubtract'], invertSelection: ['NumpadMultiply', 'Mod+Shift+I'],
+};
+
+/** Current keys of an action (user setting, else the chosen key layout, else the default). */
 export function keysFor(id: string, platform: Platform = getState().platform): string[] {
   const own = getState().settings.shortcuts[id];
   if (own !== undefined) return own ? [own] : [];
+  if (getState().settings.keyScheme === 'commander' && COMMANDER[id]) return COMMANDER[id];
   const a = ACTIONS.find((x) => x.id === id);
   return a ? (platform === 'mac' ? a.mac : a.win) : [];
 }
 
 const NAMED: Record<string, [string, string]> = {
   ArrowUp: ['↑', '↑'], ArrowDown: ['↓', '↓'], ArrowLeft: ['←', '←'], ArrowRight: ['→', '→'],
+  Insert: ['Einfg', $t('Einfg')], NumpadAdd: ['+ (Ziffernblock)', $t('+ (Ziffernblock)')], NumpadSubtract: ['− (Ziffernblock)', $t('− (Ziffernblock)')], NumpadMultiply: ['* (Ziffernblock)', $t('* (Ziffernblock)')],
   Enter: ['↩', 'Enter'], Backspace: ['⌫', $t('Rücktaste')], Delete: ['⌦', $t('Entf')], Escape: ['esc', $t('Esc')], Tab: ['⇥', 'Tab'], Space: [$t('Leertaste'), $t('Leertaste')],
 };
 
@@ -151,6 +174,8 @@ function keyCandidates(e: KeyboardEvent): string[] {
   // Dvorak the physical position would trigger the wrong shortcut.
   if (/^Key[A-Z]$/.test(e.code) && !/^[a-z]$/i.test(e.key)) out.push(e.code.slice(3));
   if (/^Digit\d$/.test(e.code)) out.push(e.code.slice(5));
+  // Number pad + - * have names of their own (Commander keys), apart from the keys of the main block.
+  if (e.code === 'NumpadAdd' || e.code === 'NumpadSubtract' || e.code === 'NumpadMultiply') out.push(e.code);
   if (/^F\d{1,2}$/.test(e.key) || NAMED[e.key]) out.push(e.key);
   if (e.key === ' ') out.push('Space');
   if (e.key.length === 1 && !/^[a-z0-9 ]$/i.test(e.key)) out.push(e.key);

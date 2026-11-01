@@ -118,6 +118,11 @@ export interface Server {
   termStart?: string;
   /** Built-in terminal: pass the local SSH agent on to the server (ssh -A). */
   forwardAgent?: boolean;
+  /**
+   * Recycle bin on the server (SFTP, SCP, FTP): deleted entries are moved into this
+   * folder instead of being removed. Relative paths start in the home folder. Empty: off.
+   */
+  trashDir?: string;
   /** Windows: show the server as a folder in the Explorer (Cloud Files API, see mount_win.rs). */
   mountExplorer?: boolean;
   /** SSH tunnels of the server (forward.rs, state/forward.ts). */
