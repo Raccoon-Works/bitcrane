@@ -9,7 +9,7 @@
  */
 import type { Platform } from '../backend/types';
 import {
-  activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, copyToOtherHalf, moveToOtherSide, toggleAtCursor, askDelete, openInEditor, panePath, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
+  activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, copyToOtherHalf, moveToOtherSide, toggleAtCursor, askDelete, openInEditor, panePath, pasteMove, goLocal, openInOtherHalf, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
   computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
@@ -48,7 +48,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'codeEditor', group: $t('Darstellung'), label: $t('Editor ein/aus'), mac: ['Mod+Shift+E'], win: ['Mod+Shift+E'], run: () => void import('./editor').then((m) => m.toggleEditor()) },
   { id: 'sidebar', group: $t('Darstellung'), label: $t('Seitenleiste ein/aus'), mac: ['Mod+Ctrl+S'], win: ['Mod+B'], run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
-  { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
+  { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+Shift+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
   { id: 'deepSearch', group: $t('Darstellung'), label: $t('Suche in Unterordnern ein/aus'), mac: ['Mod+Shift+F'], win: ['Mod+Shift+F'], run: () => setDeepSearch(!getState().deepSearchOn) },
   { id: 'contentSearch', group: $t('Darstellung'), label: $t('Suche im Inhalt ein/aus'), mac: ['Mod+Alt+F'], win: ['Mod+Alt+F'], run: () => setSearchContent(!getState().searchContent) },
   { id: 'zoomIn', group: $t('Darstellung'), label: $t('Vergrößern'), mac: ['Mod++', 'Mod+='], win: ['Mod++', 'Mod+='], run: () => stepZoom(1) },
@@ -61,6 +61,11 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'back', group: $t('Gehe zu'), label: $t('Zurück'), mac: ['Mod+['], win: ['Alt+ArrowLeft'], run: goBack, notInText: true },
   { id: 'forward', group: $t('Gehe zu'), label: $t('Vor'), mac: ['Mod+]'], win: ['Alt+ArrowRight'], run: goForward, notInText: true },
   { id: 'editPath', group: $t('Gehe zu'), label: $t('Pfad eingeben'), mac: ['Mod+L'], win: ['Mod+L'], run: () => editPath(focus()) },
+  { id: 'goHome', group: $t('Gehe zu'), label: $t('Startordner'), mac: ['Mod+Shift+H'], win: [], run: () => goLocal('~') },
+  { id: 'goDesktop', group: $t('Gehe zu'), label: $t('Schreibtisch'), mac: ['Mod+Shift+D'], win: [], run: () => goLocal('~/Desktop') },
+  { id: 'goDocuments', group: $t('Gehe zu'), label: $t('Dokumente'), mac: ['Mod+Shift+O'], win: [], run: () => goLocal('~/Documents') },
+  { id: 'goDownloads', group: $t('Gehe zu'), label: $t('Downloads'), mac: ['Mod+Alt+L'], win: [], run: () => goLocal('~/Downloads') },
+  { id: 'openOther', group: $t('Gehe zu'), label: $t('In der anderen Hälfte öffnen'), mac: [], win: [], run: () => openInOtherHalf(focus()) },
   { id: 'bookmark', group: $t('Gehe zu'), label: $t('Ordner zu den Orten hinzufügen'), mac: ['Mod+D'], win: ['Mod+D'], run: addBookmark },
 
   { id: 'upload', group: $t('Dateien'), label: $t('Hochladen'), mac: ['Mod+Alt+ArrowUp'], win: ['Mod+Alt+ArrowUp'], run: () => upload() },
@@ -68,6 +73,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'copy', group: $t('Dateien'), label: $t('Kopieren'), mac: ['Mod+C'], win: ['Mod+C'], run: () => copySelection(focus()), notInText: true },
   { id: 'cut', group: $t('Dateien'), label: $t('Ausschneiden'), mac: ['Mod+X'], win: ['Mod+X'], run: () => cutSelection(focus()), notInText: true },
   { id: 'paste', group: $t('Dateien'), label: $t('In die andere Hälfte einfügen'), mac: ['Mod+V'], win: ['Mod+V'], run: () => pasteClipboard(focus()), notInText: true },
+  { id: 'pasteMove', group: $t('Dateien'), label: $t('Hierher bewegen'), mac: ['Mod+Alt+V'], win: [], run: () => pasteMove(focus()), notInText: true },
   { id: 'copyPath', group: $t('Dateien'), label: $t('Pfad kopieren'), mac: ['Mod+Alt+C'], win: ['Mod+Shift+C'], run: () => copyPath(focus()), notInText: true },
   { id: 'newFolder', group: $t('Dateien'), label: $t('Neuer Ordner'), mac: ['Mod+Shift+N'], win: ['Mod+Shift+N'], run: () => newFolder() },
   { id: 'copyTo', group: $t('Dateien'), label: $t('Kopieren nach …'), mac: [], win: [], run: () => { const side = getState().focusSide; const names = selectedNames(side); if (names.length) openDialog({ type: 'copyTo', side, names }); } },

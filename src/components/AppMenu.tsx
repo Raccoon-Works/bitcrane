@@ -12,7 +12,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
-  computeFolderSizes, newFolderWithSelection, selectedNames, setSearchContent, showToast,
+  computeFolderSizes, newFolderWithSelection, selectedNames, setSearchContent, showToast, pasteMove, goLocal, openInOtherHalf, revealSelection, openTerminal,
   activeTab, askDelete, stepZoom, closeTab, copySelection, cutSelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
@@ -58,6 +58,8 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Hochladen'), ...sc('upload'), run: () => upload() },
         { label: $t('Herunterladen'), ...sc('download'), run: () => download() },
         sep,
+        { label: getState().platform === 'mac' ? $t('Im Finder zeigen') : $t('Im Explorer zeigen'), run: () => revealSelection(focus()) },
+        { label: $t('Im Terminal öffnen'), run: () => openTerminal(focus()) },
         { label: $t('Prüfsumme …'), ...sc('checksum'), run: () => { const side = focus(); const n = selectedNames(side); if (n.length === 1) openDialog({ type: 'checksum', side, name: n[0] }); else showToast($t('Bitte genau eine Datei auswählen.')); } },
         { label: $t('Ordnergrößen berechnen'), ...sc('folderSizes'), run: () => void computeFolderSizes(focus(), selectedNames(focus()).length ? selectedNames(focus()) : undefined) },
         sep,
@@ -75,6 +77,7 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Ausschneiden'), ...sc('cut'), run: () => cutSelection(focus()) },
         { label: $t('Kopieren'), ...sc('copy'), run: () => copySelection(focus()) },
         { label: $t('Einfügen'), ...sc('paste'), run: () => pasteClipboard(focus()) },
+        { label: $t('Hierher bewegen'), ...sc('pasteMove'), run: () => pasteMove(focus()) },
         { label: $t('Pfad kopieren'), ...sc('copyPath'), run: () => copyPath(focus()) },
         { label: $t('Alles auswählen'), mac: '⌘A', win: 'Strg+A', run: () => selectAll(focus()) },
         { label: $t('Auswählen nach Muster …'), ...sc('selectMask'), run: () => openDialog({ type: 'selectMask', side: focus() }) },
@@ -115,6 +118,14 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Zurück'), ...sc('back'), run: goBack },
         { label: $t('Vor'), ...sc('forward'), run: goForward },
         { label: $t('Übergeordneter Ordner'), mac: '⌘↑', win: 'Alt+↑', run: () => goUp(focus()) },
+        sep,
+        { label: $t('In der anderen Hälfte öffnen'), ...sc('openOther'), run: () => openInOtherHalf(focus()) },
+        sep,
+        { label: $t('Startordner'), ...sc('goHome'), run: () => goLocal('~') },
+        { label: $t('Schreibtisch'), ...sc('goDesktop'), run: () => goLocal('~/Desktop') },
+        { label: $t('Dokumente'), ...sc('goDocuments'), run: () => goLocal('~/Documents') },
+        { label: $t('Downloads'), ...sc('goDownloads'), run: () => goLocal('~/Downloads') },
+        ...(getState().platform === 'mac' ? [{ label: $t('Programme'), run: () => goLocal('/Applications') }] : []),
         sep,
         { label: $t('Pfad eingeben …'), ...sc('editPath'), run: () => editPath(focus()) },
         sep,

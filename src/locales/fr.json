@@ -2312,5 +2312,13 @@
   "Einfg": "Inser",
   "+ (Ziffernblock)": "+ (pavé num.)",
   "− (Ziffernblock)": "− (pavé num.)",
-  "* (Ziffernblock)": "* (pavé num.)"
+  "* (Ziffernblock)": "* (pavé num.)",
+  "Im Terminal öffnen": "Ouvrir dans le Terminal",
+  "Hierher bewegen": "Déplacer ici",
+  "In der anderen Hälfte öffnen": "Ouvrir dans l’autre moitié",
+  "Downloads": "Téléchargements",
+  "Programme": "Applications",
+  "Keine Hälfte zeigt gerade diesen Computer.": "Aucune moitié n’affiche cet ordinateur pour l’instant.",
+  "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Cela fonctionne lorsque les deux moitiés affichent le même ordinateur ou serveur.",
+  "Das geht nur mit Ordnern dieses Computers.": "Cela ne fonctionne qu’avec les dossiers de cet ordinateur."
 }

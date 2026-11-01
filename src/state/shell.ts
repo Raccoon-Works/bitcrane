@@ -115,7 +115,7 @@ async function installMacMenu() {
     await PredefinedMenuItem.new({ item: 'SelectAll', text: menuText($t('Alles auswählen')) }),
     await sep(),
     // "Alles auswählen" is the standard entry above; it also selects all files in a list.
-    ...(await custom('edit', [$t('Widerrufen'), $t('Alles auswählen'), $t('Kopieren'), $t('Einfügen')])),
+    ...(await custom('edit', [$t('Widerrufen'), $t('Alles auswählen'), $t('Ausschneiden'), $t('Kopieren'), $t('Einfügen')])),
   ]);
   const windowMenu = await sub('window', $t('Fenster'), [
     await PredefinedMenuItem.new({ item: 'Minimize', text: menuText($t('Im Dock ablegen')) }),
