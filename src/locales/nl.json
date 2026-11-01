@@ -2264,5 +2264,8 @@
   "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Met labels staan korte namen onder de symbolen. Welke symbolen verschijnen, stel je in onder ‘Aanpassen’.",
   "Anpassen …": "Aanpassen …",
   "Symbole mit Beschriftung": "Symbolen met labels",
-  "Symbole und Text daneben": "Symbolen met tekst ernaast"
+  "Symbole und Text daneben": "Symbolen met tekst ernaast",
+  "Zeilenhöhe": "Rijhoogte",
+  "Kompakt": "Compact",
+  "„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.": "‘Compact’ toont meer bestanden tegelijk en past beter in kleine vensters."
 }

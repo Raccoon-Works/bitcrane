@@ -2264,5 +2264,8 @@
   "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Avec libellés, des noms courts s’affichent sous les symboles. Les symboles affichés se choisissent dans « Personnaliser ».",
   "Anpassen …": "Personnaliser …",
   "Symbole mit Beschriftung": "Symboles avec libellés",
-  "Symbole und Text daneben": "Symboles avec texte à côté"
+  "Symbole und Text daneben": "Symboles avec texte à côté",
+  "Zeilenhöhe": "Hauteur des lignes",
+  "Kompakt": "Compacte",
+  "„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.": "« Compacte » affiche plus de fichiers à la fois et convient mieux aux petites fenêtres."
 }

@@ -64,7 +64,7 @@
   --radius-window: 16px;
   --radius-box: 4px;
   --radius-tip: 6px;
-  --row-h: 34px;
+  --row-h: 28px;
   --toolbar-h: 56px;
   --switch-w: 32px;
 }
@@ -96,7 +96,7 @@
   --text: #ededef;
   --text-2: #d2d2d7;
   --text-muted: #a1a1a8;
-  --text-faint: #5e5e64;
+  --text-faint: #84848a;
   --control-edge: #7c7c84;
   --icon: #c4c4ca;
   --icon-off: #5e5e64;
@@ -154,7 +154,7 @@
   --text: #1d1d1f;
   --text-2: #3a3a3f;
   --text-muted: #5f5f66;
-  --text-faint: #b4b4ba;
+  --text-faint: #86868b;
   --control-edge: #8e8e93;
   --icon: #4a4a50;
   --icon-off: #b4b4ba;
@@ -195,7 +195,7 @@
   --radius-window: 8px;
   --radius-box: 3px;
   --radius-tip: 4px;
-  --row-h: 36px;
+  --row-h: 30px;
   --toolbar-h: 52px;
   --switch-w: 40px;
 }
@@ -228,7 +228,7 @@
   --text: #ffffff;
   --text-2: #e0e0e0;
   --text-muted: #ababab;
-  --text-faint: #6e6e6e;
+  --text-faint: #8a8a8a;
   --control-edge: #8a8a8a;
   --icon: #d0d0d0;
   --icon-off: #6e6e6e;
@@ -285,7 +285,7 @@
   --text: #1a1a1a;
   --text-2: #3a3a3a;
   --text-muted: #5f5f5f;
-  --text-faint: #b0b0b0;
+  --text-faint: #8a8a8a;
   --control-edge: #8a8a8a;
   --icon: #444444;
   --icon-off: #b0b0b0;
@@ -313,3 +313,7 @@
   --scrim: rgba(0, 0, 0, 0.12);
   --switch-off: transparent;
 }
+
+/* Kompakt (Darstellung > Zeilenhöhe): closer rows and a lower toolbar, for small windows (WinSCP, Total Commander). */
+.page[data-density='compact'][data-platform='mac'] { --row-h: 22px; --toolbar-h: 48px; }
+.page[data-density='compact'][data-platform='win'] { --row-h: 24px; --toolbar-h: 44px; }

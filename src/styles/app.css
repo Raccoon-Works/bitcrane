@@ -1778,7 +1778,7 @@ button.disclosure:hover { color: var(--text); }
 .server-group.is-extra { margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--line); }
 .server-row {
   position: relative;
-  height: 34px;
+  height: calc(var(--row-h) + 4px);
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) minmax(0, auto) 8px auto;
   align-items: center;
@@ -2036,8 +2036,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .crumb.is-last { color: var(--accent-text); display: inline-flex; align-items: center; gap: 4px; }
 .crumb.is-last:disabled { opacity: 1; cursor: default; }
 
-/* The connection panel is a dark card in both themes (Transmit), set apart from the file views. */
-.pane.is-servers {
+/* Dark mode: the connection panel is a card of its own (Transmit), set apart from the file views.
+   Light mode: it follows the light theme like every other surface (Finder, Explorer). */
+.page:not([data-theme='light']) .pane.is-servers {
   --bg-card: #1c1f27; --bg-pane-head: #20232c; --bg-section: #252935;
   --text: #ececf1; --text-2: #d3d6de; --text-muted: #9ea4b0; --text-faint: #7d8390;
   --line: rgba(255, 255, 255, 0.07); --line-strong: rgba(255, 255, 255, 0.11); --bg-hover: rgba(255, 255, 255, 0.05);
@@ -2048,14 +2049,8 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 .pane.is-servers .server-panel-head, .pane.is-servers .server-sources, .pane.is-servers .server-foot { background: var(--bg-pane-head); }
-.pane.is-servers { --bg-second: #343946; --bg-second-hover: #3d4352; --bg-second-pressed: #2c303b; }
-/* Light theme: the card stays dark, but in a softer grey-blue, so it does not weigh on the light file views. */
-.page[data-theme='light'] .pane.is-servers {
-  --bg-card: #2a3240; --bg-pane-head: #2f3846; --bg-section: #343e4d;
-  --bg-control: #3a4554; --bg-control-on: #414c5d; --bg-field: #323b49; --field-line: #475163;
-  --bg-second: #3d4859; --bg-second-hover: #465264; --bg-second-pressed: #36404f;
-  background: var(--bg-card);
-}
+.page:not([data-theme='light']) .pane.is-servers { --bg-second: #343946; --bg-second-hover: #3d4352; --bg-second-pressed: #2c303b; }
+.page[data-theme='light'] .pane.is-servers { --bg-pane-head: #f6f6f8; background: var(--bg-card); }
 
 /* Calm toolbar: every symbol in the normal icon colour; colour only shows a state
    (watches running or waiting, a panel or view that is switched on). */
@@ -2483,7 +2478,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .side-col { flex: none; display: flex; flex-direction: column; min-height: 0; color: var(--text); }
 .page:not([data-theme='light']) .side-col {
   background: #0d0d0d;
-  --text: #ececee; --text-2: #cfd0d4; --text-muted: #9a9ba1; --text-faint: #75767c; --accent-text: #5fb0ff;
+  --text: #ececee; --text-2: #cfd0d4; --text-muted: #9a9ba1; --text-faint: #8a8b91; --accent-text: #5fb0ff;
   --bg-hover: rgba(255, 255, 255, 0.05); --bg-sidebar-sel: rgba(255, 255, 255, 0.09);
   --line: rgba(255, 255, 255, 0.07); --accent-tint: rgba(95, 176, 255, 0.12);
   color-scheme: dark;
@@ -2625,3 +2620,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .window-row:has(> .side-col) .win-titlebar { padding-left: 0; }
 .window-row:has(> .side-col) .win-tabs > .tip-anchor:first-child .win-tab { border-top-left-radius: 0; }
 .window-row:has(> .side-col) .win-tabs > .tip-anchor:first-child .win-tab.is-sel { box-shadow: 0 -1px 0 var(--line-strong, var(--line)), 1px 0 0 var(--line-strong, var(--line)); }
+
+/* Windows: tools stand free and groups are set apart by space (Explorer, Windows 11); the Mac keeps
+   its capsules as in macOS toolbars. */
+[data-platform='win'] .toolbar .tool-group { background: none; gap: 0; }
+[data-platform='win'] .toolbar { gap: var(--space-3); }
+.page[data-density='compact'] .sidebar .side-item { height: 24px; }

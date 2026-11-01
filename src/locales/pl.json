@@ -2264,5 +2264,8 @@
   "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Z podpisami pod symbolami pojawiają się krótkie nazwy. Które symbole są widoczne, ustawisz w „Dostosuj”.",
   "Anpassen …": "Dostosuj …",
   "Symbole mit Beschriftung": "Symbole z podpisami",
-  "Symbole und Text daneben": "Symbole z tekstem obok"
+  "Symbole und Text daneben": "Symbole z tekstem obok",
+  "Zeilenhöhe": "Wysokość wierszy",
+  "Kompakt": "Kompaktowa",
+  "„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.": "„Kompaktowa” pokazuje więcej plików naraz i lepiej pasuje do małych okien."
 }
