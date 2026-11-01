@@ -439,7 +439,7 @@ export interface AppState {
   /** Calculated folder sizes ("Größe berechnen"), key: side|server|path. */
   folderSizes: Record<string, number>;
   /** Entries copied with ⌘C; ⌘V in the other half transfers them. */
-  clipboard: { side: PaneSide; serverId: string; dir: string; names: string[] } | null;
+  clipboard: { side: PaneSide; serverId: string; dir: string; names: string[]; cut?: boolean } | null;
   search: string;
   /** The half the search filters: the focused one when typing started (Transmit searches the active browser). */
   searchSide: PaneSide;
@@ -2378,6 +2378,13 @@ export function copyShareLink(side: PaneSide, name: string) {
 }
 
 /** Opens a local file with its default program (archives otherwise open like a folder). */
+/** "Im Finder/Explorer zeigen" (this computer only). */
+export function revealEntry(side: PaneSide, name: string) {
+  setState({ contextMenu: null });
+  if (LIVE) live.revealLocal(paths.join(panePath(side), name));
+  else showToast($t('„{0}“ wird im Finder bzw. Explorer gezeigt.', name));
+}
+
 export function openWithDefaultApp(side: PaneSide, name: string) {
   setState({ contextMenu: null });
   if (LIVE) live.openLocal(paths.join(panePath(side), name));
@@ -2565,12 +2572,34 @@ export function copySelection(side: PaneSide) {
       : $t('{0} kopiert. In der anderen Hälfte einfügen, um es dorthin zu übertragen.', what));
 }
 
+/** ⌘X / Strg+X on files: remembered for moving; pasting in a folder of the same computer or server moves them. */
+export function cutSelection(side: PaneSide) {
+  const t = activeTab();
+  const names = selectedNames(side);
+  if (!t || !names.length) return;
+  setState({ clipboard: { side, serverId: placeOf(side, t), dir: panePath(side), names, cut: true } });
+  const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
+  showToast($t('{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.', what));
+}
+
 export function pasteClipboard(side: PaneSide) {
   const c = state.clipboard;
   const t = activeTab();
   if (!c || !t) return;
   const to = placeOf(side, t);
   const toDir = panePath(side);
+  if (c.cut && c.serverId === to) {
+    // Moving within one computer or server; the clipboard is used up.
+    if (toDir === c.dir) { showToast($t('Die Objekte liegen schon in diesem Ordner.')); return; }
+    setState({ clipboard: null });
+    moveIntoFolder(side, c.names, toDir, c.dir);
+    return;
+  }
+  if (c.cut) {
+    // Between computer and server Bitcrane transfers a copy; the original stays (no delete without asking).
+    setState({ clipboard: null });
+    showToast($t('Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.'));
+  }
   if (c.serverId === to) {
     // Same computer or same server: a plain copy there.
     if (!LIVE) {

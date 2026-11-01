@@ -44,11 +44,20 @@ function DriveIcon({ drive, first }: { drive: Place; first: boolean }) {
   return <HardDrives {...ICON} />;
 }
 
+/**
+ * A Windows drive with its label, the letter first so it stays visible in a
+ * narrow sidebar: "F: GAMES - DATEN", "C: Lokaler Datenträger".
+ */
+function driveName(d: Place, mac: boolean): string {
+  if (mac || d.network || !/^[A-Z]:$/.test(d.name)) return d.name;
+  return `${d.name} ${d.label || $t('Lokaler Datenträger')}`;
+}
+
 /** Typical drives for the browser prototype, which has no real ones. */
 function mockDrives(mac: boolean): Place[] {
   return mac
     ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }, { name: 'iMac von Elna', path: '~/Projekte/newsbot', network: true }]
-    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads' }, { name: 'Z: (NAS)', path: '~/Projekte/newsbot', network: true }];
+    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads', label: 'Daten' }, { name: 'Z: (NAS)', path: '~/Projekte/newsbot', network: true }];
 }
 
 /** Account part of a cloud folder's name ("GoogleDrive-name@example.com" → "name"). */
@@ -274,7 +283,7 @@ export function Sidebar() {
       const where = paths.parent(p);
       return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p));
     })) : null,
-    devices: section('devices', devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, d.name, d.path, () => open(d.path), {},
+    devices: section('devices', devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, driveName(d, mac), d.path, () => open(d.path), {},
       d.free !== undefined ? <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>{shortSize(d.free)}</span> : undefined))),
     shares: mounted.length + others.length > 0 ? section('shares', <>
       {mounted.map((d) => item(`n:${d.path}:${d.name}`, <Network {...ICON} />, d.name, d.path, () => open(d.path)))}

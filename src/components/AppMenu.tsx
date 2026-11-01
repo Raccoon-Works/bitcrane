@@ -13,7 +13,7 @@ import { GearSix, List } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import {
   computeFolderSizes, newFolderWithSelection, selectedNames, setSearchContent, showToast,
-  activeTab, askDelete, stepZoom, closeTab, copySelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
+  activeTab, askDelete, stepZoom, closeTab, copySelection, cutSelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
   addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
 } from '../state/store';
 import { closeWindow, minimizeWindow, quitApp, toggleMaximizeWindow } from '../util/appWindow';
@@ -72,6 +72,7 @@ export function menuDefs(): MenuDef[] {
       id: 'edit', label: $t('Bearbeiten'), items: [
         { label: $t('Widerrufen'), ...sc('undo'), run: undoLast },
         sep,
+        { label: $t('Ausschneiden'), ...sc('cut'), run: () => cutSelection(focus()) },
         { label: $t('Kopieren'), ...sc('copy'), run: () => copySelection(focus()) },
         { label: $t('Einfügen'), ...sc('paste'), run: () => pasteClipboard(focus()) },
         { label: $t('Pfad kopieren'), ...sc('copyPath'), run: () => copyPath(focus()) },

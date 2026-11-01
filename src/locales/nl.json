@@ -2250,5 +2250,10 @@
   "„{0}“ in den Finder gezogen (Prototyp).": "‘{0}’ naar de Finder gesleept (prototype).",
   "{0} Objekte herausgezogen (Prototyp).": "{0} items naar buiten gesleept (prototype).",
   "Suche im Inhalt an: einen Text ins Suchfeld tippen.": "Zoeken in inhoud aan: typ een tekst in het zoekveld.",
-  "Suche im Inhalt ein/aus": "Zoeken in inhoud aan/uit"
+  "Suche im Inhalt ein/aus": "Zoeken in inhoud aan/uit",
+  "Lokaler Datenträger": "Lokale schijf",
+  "„{0}“ wird im Finder bzw. Explorer gezeigt.": "‘{0}’ wordt getoond in Finder of Verkenner.",
+  "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} geknipt. Plak in een andere map om het daarheen te verplaatsen.",
+  "Die Objekte liegen schon in diesem Ordner.": "De items staan al in deze map.",
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Tussen computer en server wordt gekopieerd; het origineel blijft."
 }

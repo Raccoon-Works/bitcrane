@@ -509,7 +509,7 @@ pub fn places() -> Vec<Place> {
     let mut push = |name: &str, p: Option<std::path::PathBuf>| {
         if let Some(p) = p {
             if p.is_dir() {
-                out.push(Place { name: name.into(), path: to_ui(&p), network: false, free: None });
+                out.push(Place { name: name.into(), path: to_ui(&p), network: false, free: None, label: None });
             }
         }
     };
@@ -533,6 +533,23 @@ fn is_remote_drive(letter: char) -> bool {
     let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
     // DRIVE_REMOTE = 4.
     unsafe { GetDriveTypeW(root.as_ptr()) == 4 }
+}
+
+/// Volume label of a local drive ("GAMES - DATEN"); None when it has none.
+#[cfg(windows)]
+fn volume_label(letter: char) -> Option<String> {
+    use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationW;
+    let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
+    let mut name = [0u16; 261];
+    let ok = unsafe {
+        GetVolumeInformationW(root.as_ptr(), name.as_mut_ptr(), name.len() as u32, std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), 0)
+    };
+    if ok == 0 {
+        return None;
+    }
+    let len = name.iter().position(|&c| c == 0).unwrap_or(name.len());
+    let label = String::from_utf16_lossy(&name[..len]).trim().to_string();
+    (!label.is_empty()).then_some(label)
 }
 
 /// Mount points of network shares on the Mac (smbfs, afpfs, nfs, webdav), from `mount`.
@@ -570,7 +587,10 @@ fn drives_list() -> Vec<Place> {
         // DVD drive reports "not a folder" and is left out as well.
         let l = letter as char;
         if Path::new(&format!("{l}:\\")).is_dir() {
-            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network: is_remote_drive(l), free: None });
+            let network = is_remote_drive(l);
+            // Network drives keep the bare letter: asking a slow server for its label would hold up the list.
+            let label = if network { None } else { volume_label(l) };
+            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network, free: None, label });
         }
     }
     #[cfg(target_os = "macos")]
@@ -585,20 +605,20 @@ fn drives_list() -> Vec<Place> {
             let target = fs::canonicalize(e.path()).unwrap_or_else(|_| e.path());
             if target.is_dir() {
                 let network = shares.iter().any(|m| Path::new(m) == target.as_path());
-                out.push(Place { name, path: to_ui(&target), network, free: None });
+                out.push(Place { name, path: to_ui(&target), network, free: None, label: None });
             }
         }
         out.sort_by(|a, b| (a.path != "/").cmp(&(b.path != "/")).then(a.name.cmp(&b.name)));
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        out.push(Place { name: "/".into(), path: "/".into(), network: false, free: None });
+        out.push(Place { name: "/".into(), path: "/".into(), network: false, free: None, label: None });
         let user = std::env::var("USER").unwrap_or_default();
         for base in [format!("/media/{user}"), format!("/run/media/{user}"), "/mnt".to_string()] {
             if let Ok(rd) = fs::read_dir(&base) {
                 for e in rd.flatten() {
                     if e.path().is_dir() {
-                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false, free: None });
+                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false, free: None, label: None });
                     }
                 }
             }

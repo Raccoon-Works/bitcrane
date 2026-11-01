@@ -758,6 +758,11 @@ export function openUrl(url: string) {
   backend.openUrl(url).catch((e) => showToast(toBackendError(e).message, 'error'));
 }
 
+/** Shows a file of this computer selected in the Finder or Explorer. */
+export function revealLocal(path: string) {
+  backend.localReveal(path).catch((e) => showToast(toBackendError(e).message, 'error'));
+}
+
 export function openLocal(path: string, app?: string) {
   backend.localOpen(path, app).catch((e) => showToast(toBackendError(e).message, 'error'));
 }

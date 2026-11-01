@@ -2250,5 +2250,10 @@
   "„{0}“ in den Finder gezogen (Prototyp).": "„{0}” przeciągnięto do Findera (prototyp).",
   "{0} Objekte herausgezogen (Prototyp).": "{0} elementów przeciągnięto na zewnątrz (prototyp).",
   "Suche im Inhalt an: einen Text ins Suchfeld tippen.": "Wyszukiwanie w treści włączone: wpisz tekst w polu wyszukiwania.",
-  "Suche im Inhalt ein/aus": "Wyszukiwanie w treści wł./wył."
+  "Suche im Inhalt ein/aus": "Wyszukiwanie w treści wł./wył.",
+  "Lokaler Datenträger": "Dysk lokalny",
+  "„{0}“ wird im Finder bzw. Explorer gezeigt.": "„{0}” jest pokazywany w Finderze lub Eksploratorze.",
+  "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} wycięto. Wklej w innym folderze, aby przenieść.",
+  "Die Objekte liegen schon in diesem Ordner.": "Elementy są już w tym folderze.",
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Między komputerem a serwerem tworzona jest kopia; oryginał pozostaje."
 }

@@ -9,7 +9,7 @@
  */
 import type { Platform } from '../backend/types';
 import {
-  activeTab, addBookmark, closeTab, copyPath, copySelection, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
+  activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
   computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
 } from './store';
 import { $t, LANG } from '../i18n';
@@ -65,6 +65,7 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'upload', group: $t('Dateien'), label: $t('Hochladen'), mac: ['Mod+Alt+ArrowUp'], win: ['Mod+Alt+ArrowUp'], run: () => upload() },
   { id: 'download', group: $t('Dateien'), label: $t('Herunterladen'), mac: ['Mod+Alt+ArrowDown'], win: ['Mod+Alt+ArrowDown'], run: () => download() },
   { id: 'copy', group: $t('Dateien'), label: $t('Kopieren'), mac: ['Mod+C'], win: ['Mod+C'], run: () => copySelection(focus()), notInText: true },
+  { id: 'cut', group: $t('Dateien'), label: $t('Ausschneiden'), mac: ['Mod+X'], win: ['Mod+X'], run: () => cutSelection(focus()), notInText: true },
   { id: 'paste', group: $t('Dateien'), label: $t('In die andere Hälfte einfügen'), mac: ['Mod+V'], win: ['Mod+V'], run: () => pasteClipboard(focus()), notInText: true },
   { id: 'copyPath', group: $t('Dateien'), label: $t('Pfad kopieren'), mac: ['Mod+Alt+C'], win: ['Mod+Shift+C'], run: () => copyPath(focus()), notInText: true },
   { id: 'newFolder', group: $t('Dateien'), label: $t('Neuer Ordner'), mac: ['Mod+Shift+N'], win: ['Mod+Shift+N'], run: () => newFolder() },

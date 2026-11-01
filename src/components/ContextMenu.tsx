@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -228,9 +228,11 @@ export function ContextMenu() {
     groups.push(first);
     const second: Item[] = [
       { label: $t('Kopieren'), key: sk('copy'), run: () => copySelection(menu.side) },
+      { label: $t('Ausschneiden'), key: sk('cut'), run: () => { setState({ contextMenu: null }); cutSelection(menu.side); } },
       { label: $t('Kopieren nach …'), key: sk('copyTo'), run: () => openDialog({ type: 'copyTo', side: menu.side, names: menu.names }) },
       { label: $t('Pfad kopieren'), key: sk('copyPath'), run: () => copyPath(menu.side, one) },
     ];
+    if (one && !onServer) second.push({ label: platform === 'mac' ? $t('Im Finder zeigen') : $t('Im Explorer zeigen'), run: () => revealEntry(menu.side, one) });
     const web = one && tab && onServer ? webUrlFor(sid, join(panePath(menu.side), one)) : undefined;
     if (web && tab && one) {
       second.push({ label: $t('Web-Adresse kopieren'), run: () => copyWebUrl(sid, join(panePath(menu.side), one)) });
