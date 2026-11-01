@@ -2252,4 +2252,9 @@ export const EN: Record<string, string> = {
   "{0} Objekte herausgezogen (Prototyp).": "{0} items dragged out (prototype).",
   "Suche im Inhalt an: einen Text ins Suchfeld tippen.": "Content search on: type a text into the search field.",
   "Suche im Inhalt ein/aus": "Toggle content search",
+  "Lokaler Datenträger": "Local Disk",
+  "„{0}“ wird im Finder bzw. Explorer gezeigt.": "“{0}” is shown in the Finder or Explorer.",
+  "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} cut. Paste in another folder to move it there.",
+  "Die Objekte liegen schon in diesem Ordner.": "The items are already in this folder.",
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Between computer and server a copy is made; the original stays.",
 };

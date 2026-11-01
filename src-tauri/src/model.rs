@@ -53,6 +53,9 @@ pub struct Place {
     /// Drives only: free space in bytes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub free: Option<u64>,
+    /// Windows drives only: the volume label ("GAMES - DATEN"), shown as "GAMES - DATEN (F:)" like Explorer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 /// Formats Unix mode bits as three octal digits.

@@ -2250,5 +2250,10 @@
   "„{0}“ in den Finder gezogen (Prototyp).": "«{0}» arrastrado al Finder (prototipo).",
   "{0} Objekte herausgezogen (Prototyp).": "{0} elementos arrastrados fuera (prototipo).",
   "Suche im Inhalt an: einen Text ins Suchfeld tippen.": "Búsqueda en el contenido activada: escribe un texto en el campo de búsqueda.",
-  "Suche im Inhalt ein/aus": "Activar/desactivar la búsqueda en el contenido"
+  "Suche im Inhalt ein/aus": "Activar/desactivar la búsqueda en el contenido",
+  "Lokaler Datenträger": "Disco local",
+  "„{0}“ wird im Finder bzw. Explorer gezeigt.": "«{0}» se muestra en el Finder o el Explorador.",
+  "{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.": "{0} cortado. Pégalo en otra carpeta para moverlo allí.",
+  "Die Objekte liegen schon in diesem Ordner.": "Los elementos ya están en esta carpeta.",
+  "Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.": "Entre el equipo y el servidor se copia; el original se conserva."
 }

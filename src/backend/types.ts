@@ -184,6 +184,8 @@ export interface Place {
   network?: boolean;
   /** Drives only: free space in bytes. */
   free?: number;
+  /** Windows drives only: the volume label ("GAMES - DATEN"). */
+  label?: string;
 }
 
 /** A cloud storage folder found on this computer (first start, like Transmit). */
