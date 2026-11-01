@@ -179,6 +179,7 @@ export default function App() {
   const platform = useStore((s) => s.platform);
   const theme = useStore((s) => s.theme);
   // "Dunkle Farben" in Settings › Darstellung; the prototype bar can still try every palette.
+  const density = useStore((s) => s.settings.density ?? 'standard');
   const palette = useStore((s) => (s.palette !== 'auto' ? s.palette : s.settings.darkPalette !== 'system' ? 'midnight' : s.platform === 'win' ? 'explorer' : 'transmit'));
   const { w, h, scale } = useStageSize(platform);
   useShortcuts();
@@ -205,7 +206,7 @@ export default function App() {
   }, [theme, platform]);
 
   return (
-    <div className={`page${LIVE ? ' is-app' : ''}`} data-platform={platform} data-theme={theme} data-palette={palette}>
+    <div className={`page${LIVE ? ' is-app' : ''}`} data-platform={platform} data-theme={theme} data-palette={palette} data-density={density}>
       <div className="stage-wrap" style={{ height: `calc(100vh - ${BAR_H}px)` }}>
         <div id={STAGE_ID} data-scale={scale} className="stage" style={{ width: w, height: h, transform: `scale(${scale})` }}>
           {platform === 'mac' && !LIVE && <MacMenuBar />}

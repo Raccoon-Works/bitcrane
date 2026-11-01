@@ -2264,5 +2264,8 @@
   "Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.": "Con etiquetas, aparecen nombres cortos bajo los símbolos. Qué símbolos aparecen se elige en «Personalizar».",
   "Anpassen …": "Personalizar …",
   "Symbole mit Beschriftung": "Símbolos con etiquetas",
-  "Symbole und Text daneben": "Símbolos con texto al lado"
+  "Symbole und Text daneben": "Símbolos con texto al lado",
+  "Zeilenhöhe": "Altura de fila",
+  "Kompakt": "Compacta",
+  "„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.": "«Compacta» muestra más archivos a la vez y encaja mejor en ventanas pequeñas."
 }

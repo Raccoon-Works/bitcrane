@@ -139,6 +139,8 @@ export interface Settings {
   stackHalves?: boolean;
   /** Sidebar with favourites, recent folders, devices, shares and tags (on unless switched off). */
   sidebar?: boolean;
+  /** Row height of the lists: standard, or compact for small windows. */
+  density?: 'standard' | 'compact';
   /** Width of the sidebar in pixels. */
   sidebarWidth?: number;
   /** Folders of this computer opened last (sidebar). */

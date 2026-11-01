@@ -2266,4 +2266,7 @@ export const EN: Record<string, string> = {
   "Anpassen …": "Customize …",
   "Symbole mit Beschriftung": "Symbols with labels",
   "Symbole und Text daneben": "Symbols with text beside",
+  "Zeilenhöhe": "Row height",
+  "Kompakt": "Compact",
+  "„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.": "“Compact” shows more files at once and fits small windows better.",
 };

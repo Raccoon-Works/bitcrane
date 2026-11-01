@@ -235,6 +235,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const virtual = viewMode === 'list' && !deep && entries.length > VIRTUAL_MIN;
   const rowsRef = useRef<HTMLDivElement>(null);
   const [rowH, setRowH] = useState(34);
+  const density = useStore((st) => st.settings.density);
   const [view, setView] = useState({ top: 0, height: 900 });
   const measureView = () => {
     const el = listRef.current;
@@ -249,7 +250,7 @@ export function Pane({ side }: { side: PaneSide }) {
     if (first && first.offsetHeight) setRowH(first.offsetHeight);
     measureView();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [virtual, entries.length]);
+  }, [virtual, entries.length, density]);
   useEffect(() => {
     const el = listRef.current;
     if (!virtual || !el) return;

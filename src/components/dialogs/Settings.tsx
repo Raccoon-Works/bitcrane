@@ -21,7 +21,7 @@ import { newCommandId } from '../../state/tools';
 import { clearHistory, historyCount } from '../../state/termSuggest';
 import { ACTIONS, conflictsWith, formatCombo, keysFor, recordCombo } from '../../state/keys';
 import { WatchIcon } from '../icons';
-import { Button, IconButton, Select, Switch, TextField, Wordmark } from '../ui';
+import { Button, IconButton, Segmented, Select, Switch, TextField, Wordmark } from '../ui';
 import { $t, LANGUAGES, LOCALE } from '../../i18n';
 import { SnippetSettings } from './SnippetSettings';
 import { SchemePicker } from '../SchemePicker';
@@ -794,6 +794,9 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Spalte „Geändert“')} note={$t('Spalten lassen sich auch mit einem Rechtsklick auf die Spaltenköpfe ein- und ausblenden.')}><Switch checked={s.columns.mtime} onChange={(v) => updateSettings({ columns: { ...s.columns, mtime: v } })} label={$t('Spalte Geändert')} /></Row>
             <Row label={$t('Spalte „Rechte“')}><Switch checked={s.showPerms} onChange={(v) => updateSettings({ showPerms: v })} label={$t('Spalte Rechte')} /></Row>
             <Row label={$t('Spalte „Größe“')}><Switch checked={s.columns.size} onChange={(v) => updateSettings({ columns: { ...s.columns, size: v } })} label={$t('Spalte Größe')} /></Row>
+            <Row label={$t('Zeilenhöhe')} note={$t('„Kompakt“ zeigt mehr Dateien auf einmal und passt besser in kleine Fenster.')}>
+              <Segmented<'standard' | 'compact'> label={$t('Zeilenhöhe')} value={s.density ?? 'standard'} onChange={(v) => updateSettings({ density: v })} options={[{ value: 'standard', label: $t('Standard') }, { value: 'compact', label: $t('Kompakt') }]} />
+            </Row>
             <Row label={$t('Werkzeugleiste')} note={$t('Mit Beschriftung stehen kurze Namen unter den Symbolen. Welche Symbole erscheinen, legst du unter „Anpassen“ fest.')}>
               <Select value={toolbarLabels} onChange={(v) => setState({ toolbarLabels: v })} label={$t('Werkzeugleiste')} options={TOOLBAR_LOOKS()} />
               <Button small onClick={() => openDialog({ type: 'toolbar' })}>{$t('Anpassen …')}</Button>
