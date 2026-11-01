@@ -19,9 +19,9 @@ let lastMask = '';
 let lastFolders = false;
 
 /** "Auswählen nach Muster": select or deselect entries whose names match a pattern. */
-export function SelectMaskDialog({ side }: { side: PaneSide }) {
+export function SelectMaskDialog({ side, initialMode }: { side: PaneSide; initialMode?: 'add' | 'remove' }) {
   const [mask, setMask] = useState(lastMask);
-  const [mode, setMode] = useState<'replace' | 'add' | 'remove'>('replace');
+  const [mode, setMode] = useState<'replace' | 'add' | 'remove'>(initialMode ?? 'replace');
   const [folders, setFolders] = useState(lastFolders);
   const count = useMemo(() => matchingNames(side, mask, folders).length, [side, mask, folders]);
   const apply = () => {

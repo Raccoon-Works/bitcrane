@@ -9,10 +9,12 @@ import { toBackendError, type ChecksumAlgo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { PaneSide } from '../../backend/types';
 import { reopenEditing, stopEditing, uploadEditingNow } from '../../state/live';
-import { activeTab, closeDialog, getState, invalidateRemote, LIVE, listEntries, panePath, showToast, updateSettings, useStore, paneLoc, serverById } from '../../state/store';
+import { activeTab, closeDialog, getState, invalidateRemote, LIVE, listEntries, panePath, showToast, updateSettings, useStore, paneLoc, serverById, editWith } from '../../state/store';
 import { formatAgo } from '../../util/format';
 import { basename, join, parent } from '../../util/paths';
-import { Button, Segmented, TextField } from '../ui';
+import { Button, Checkbox, Segmented, TextField } from '../ui';
+import { invoke } from '@tauri-apps/api/core';
+import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -215,6 +217,60 @@ export function EditsDialog() {
           ))}
         </div>
       )}
+    </Dialog>
+  );
+}
+
+/**
+ * "Bearbeiten mit …" (WinSCP "Edit with"): the built-in editor, the programs
+ * already chosen in the settings, the system's default program, or another
+ * one. The choice can be kept for files of this kind.
+ */
+export function EditWithDialog({ side, name }: { side: PaneSide; name: string }) {
+  const s = useStore((st) => st.settings);
+  const mac = useStore((st) => st.platform) === 'mac';
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';
+  const [remember, setRemember] = useState(false);
+  const appName = (p: string) => p.split('/').pop()?.replace(/\.(app|exe)$/i, '') ?? p;
+  const known = [...new Set([s.editorApp, ...Object.values(s.editorByExt)].filter(Boolean))];
+  const choose = (app: string | null) => {
+    if (remember && ext) {
+      const next = { ...s.editorByExt };
+      if (app) next[ext] = app; else delete next[ext];
+      updateSettings({ editorByExt: next });
+    }
+    editWith(side, name, app);
+  };
+  const other = async () => {
+    if (!LIVE) { choose(mac ? '/Applications/Visual Studio Code.app' : 'C:/Program Files/Microsoft VS Code/Code.exe'); return; }
+    const picked = await openDialogPicker({
+      multiple: false, directory: false, title: $t('Programm wählen'), defaultPath: mac ? '/Applications' : undefined,
+      filters: mac ? [{ name: 'Programme', extensions: ['app'] }] : [{ name: 'Programme', extensions: ['exe'] }],
+    }).catch(() => null);
+    if (typeof picked === 'string') choose(await invoke<string>('path_to_ui', { path: picked }));
+  };
+  const options: Array<{ key: string; label: string; sub?: string; run: () => void }> = [
+    { key: 'builtin', label: $t('Editor von Bitcrane'), run: () => choose(null) },
+    ...known.map((p) => ({ key: p, label: appName(p), sub: p, run: () => choose(p) })),
+    { key: 'system', label: $t('Standardprogramm des Systems'), run: () => choose('') },
+  ];
+  return (
+    <Dialog label={$t('Bearbeiten mit')} title={$t('„{0}“ bearbeiten mit …', name)} width={460}
+      footer={<><Button onClick={() => void other()}>{$t('Anderes Programm …')}</Button><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button></>}>
+      <div className="form-stack">
+        <div className="recent-list">
+          {options.map((o) => (
+            <button key={o.key} type="button" className="recent-item" onClick={o.run}>
+              <span className="col-text min-w-0 flex-1">
+                <span className="ellipsis">{o.label}</span>
+                {o.sub && <span className="small muted mono ellipsis">{o.sub}</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+        {ext && <Checkbox checked={remember} onChange={setRemember} label={$t('Für {0}-Dateien merken', ext)} />}
+      </div>
     </Dialog>
   );
 }

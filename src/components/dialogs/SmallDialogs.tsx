@@ -3,11 +3,12 @@
  * permissions, delete confirmation, about and the shortcut overview.
  */
 import { addressOf } from '../ServerList';
+import { serverTrash } from '../../state/live';
 import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 import type { CloudPlace, ConflictChoice, HostKey, PaneSide, Server } from '../../backend/types';
-import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, openExternal, openServer, quickConnect, rejectHostKey, resolveConflict, savePerms, serverById, statEntry, submitSecret, cancelSecret, trustHostKey, useStore, paneLoc, paneOnServer } from '../../state/store';
+import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, openExternal, openServer, quickConnect, rejectHostKey, resolveConflict, savePerms, serverById, statEntry, submitSecret, cancelSecret, trustHostKey, useStore, paneLoc, paneOnServer, panePath } from '../../state/store';
 import { formatAgo, formatDate, formatSize, permsToText } from '../../util/format';
 import { ServerTile } from '../ServerTile';
 import { BMark, FileGlyph, FolderGlyph } from '../icons';
@@ -379,14 +380,19 @@ export function ConfirmDelete({ side, names }: { side: PaneSide; names: string[]
   const remote = ls === 'remote';
   const srv = remote ? serverById(sid) : undefined;
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
+  // A server with its own recycle bin (WinSCP): the entries are moved there, unless they already are in it.
+  const trash = remote ? (LIVE ? serverTrash(sid) : srv?.trashDir) : undefined;
+  const dir = panePath(side);
+  const toTrash = !!trash && dir !== trash && !dir.startsWith(trash + '/');
   return (
     <Dialog
       label={$t('Löschen bestätigen')}
-      title={remote ? $t('{0} vom Server löschen?', what) : $t('{0} in den Papierkorb legen?', what)}
-      subtitle={remote ? $t('Auf {0} gibt es keinen Papierkorb. Gelöschte Dateien sind dort endgültig weg.', srv?.name ?? $t('dem Server')) : $t('Du kannst sie aus dem Papierkorb wiederherstellen.')}
+      title={toTrash ? $t('{0} in den Papierkorb auf dem Server legen?', what) : remote ? $t('{0} vom Server löschen?', what) : $t('{0} in den Papierkorb legen?', what)}
+      subtitle={toTrash ? $t('Sie kommen in den Ordner {0} auf {1} und lassen sich von dort zurückholen.', trash, srv?.name ?? $t('dem Server'))
+        : remote ? $t('Auf {0} gibt es keinen Papierkorb. Gelöschte Dateien sind dort endgültig weg.', srv?.name ?? $t('dem Server')) : $t('Du kannst sie aus dem Papierkorb wiederherstellen.')}
       icon={<span className="icon-tile tone-danger"><Trash2 size={20} strokeWidth={1.75} /></span>}
       width={480}
-      footer={<><span className="flex-1" /><Button autoFocus onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{remote ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
+      footer={<><span className="flex-1" /><Button autoFocus onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{remote && !toTrash ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
     >
       {names.length > 1 && <ul className="delete-list small">{names.slice(0, 6).map((n) => <li key={n}>{n}</li>)}{names.length > 6 && <li>{$t('… und')}{' '}{names.length - 6} {$t('weitere')}</li>}</ul>}
     </Dialog>

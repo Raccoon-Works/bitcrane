@@ -549,6 +549,21 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                     </div>
                   </>
                 )}
+                {(family === 'sftp' || family === 'ftp') && (
+                  <>
+                    <span>{$t('Papierkorb')}</span>
+                    <div className="col-text">
+                      <span className="row-inline">
+                        <Switch checked={draft.trashDir !== undefined} onChange={(v) => set('trashDir', v ? '.bitcrane-papierkorb' : undefined)} label={$t('Papierkorb auf dem Server')} />
+                        <span>{$t('Papierkorb auf dem Server')}</span>
+                      </span>
+                      {draft.trashDir !== undefined && (
+                        <TextField label={$t('Ordner des Papierkorbs')} value={draft.trashDir} onChange={(v) => set('trashDir', v)} mono placeholder=".bitcrane-papierkorb" />
+                      )}
+                      <span className="small muted">{$t('Gelöschtes wird in diesen Ordner verschoben statt sofort entfernt. Ohne / am Anfang liegt er im Startordner. Im Papierkorb selbst löscht Bitcrane endgültig.')}</span>
+                    </div>
+                  </>
+                )}
                 {family === 'sftp' && (
                   <>
                     <label htmlFor="s-termscheme">{$t('Terminal')}</label>

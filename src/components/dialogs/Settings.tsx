@@ -171,6 +171,7 @@ function Chips({ values, onChange, placeholder }: { values: string[]; onChange: 
 function KeysSettings() {
   const platform = useStore((st) => st.platform);
   const own = useStore((st) => st.settings.shortcuts);
+  const scheme = useStore((st) => st.settings.keyScheme ?? 'standard');
   const [recording, setRecording] = useState<string | null>(null);
   const [warn, setWarn] = useState('');
   useEffect(() => {
@@ -187,7 +188,7 @@ function KeysSettings() {
       const combo = recordCombo(e, platform);
       if (!combo) return;
       // Without ⌘/Strg/Alt only function keys make sense (letters are for jumping to files).
-      if (!/^(Mod|Ctrl|Alt)\+/.test(combo) && !/^F\d/.test(combo)) { setWarn($t('Bitte mit ⌘, ⌥ oder ⌃ kombinieren (unter Windows mit Strg oder Alt).')); return; }
+      if (!/^(Mod|Ctrl|Alt)\+/.test(combo) && !/^(F\d|Insert$|Numpad)/.test(combo)) { setWarn($t('Bitte mit ⌘, ⌥ oder ⌃ kombinieren (unter Windows mit Strg oder Alt).')); return; }
       const clash = conflictsWith(recording, combo, platform);
       const next = { ...getState().settings.shortcuts, [recording]: combo };
       // The other action loses the combination.
@@ -203,6 +204,14 @@ function KeysSettings() {
   const reset = (id: string) => { const n = { ...own }; delete n[id]; updateSettings({ shortcuts: n }); };
   return (
     <>
+      <Group title={$t('Belegung')}>
+        <Row label={$t('Tastenbelegung')} note={scheme === 'commander'
+          ? $t('Wie WinSCP und Total Commander: F3 Vorschau, F4 Bearbeiten, F5 Kopieren in die andere Hälfte, F6 Verschieben, F7 Neuer Ordner, F8 Löschen, F9 Eigenschaften, Einfg markiert. Aktualisieren mit {0}.', formatCombo('Mod+R', platform))
+          : platform === 'mac' ? $t('Wie im Finder.') : $t('Wie im Explorer: F2 Umbenennen, F5 Aktualisieren, Entf Löschen.')}>
+          <Segmented<'standard' | 'commander'> label={$t('Tastenbelegung')} value={scheme} onChange={(v) => updateSettings({ keyScheme: v })}
+            options={[{ value: 'standard', label: platform === 'mac' ? $t('Finder') : $t('Explorer') }, { value: 'commander', label: $t('WinSCP / Total Commander') }]} />
+        </Row>
+      </Group>
       <p className="small muted">{$t('Auf „Ändern“ klicken und die neue Tastenkombination drücken. Entf entfernt das Kürzel, Esc bricht ab.')}{warn && <span className="tone-warn"> {warn}</span>}</p>
       {groups.map((g) => (
         <Group key={g} title={g}>
@@ -686,7 +695,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             <Row label={$t('Doppelklick auf eine Datei')} note={mac ? $t('Ordner öffnen sich immer. ⌘↓ macht dasselbe wie der Doppelklick.') : $t('Ordner öffnen sich immer. Enter macht dasselbe wie der Doppelklick.')}>
               <Select value={s.fileDoubleClick} onChange={(v) => updateSettings({ fileDoubleClick: v })} label={$t('Doppelklick auf eine Datei')} options={[{ value: 'open', label: $t('Öffnen') }, { value: 'edit', label: $t('Im Editor öffnen') }, { value: 'transfer', label: $t('In die andere Hälfte übertragen') }]} />
             </Row>
-            <Row label={$t('Vor dem Löschen nachfragen')} note={$t('Auf dem Server wird immer nachgefragt, dort gibt es keinen Papierkorb.')}><Switch checked={s.confirmDelete} onChange={(v) => updateSettings({ confirmDelete: v })} label={$t('Vor dem Löschen nachfragen')} /></Row>
+            <Row label={$t('Vor dem Löschen nachfragen')} note={$t('Auf dem Server wird immer nachgefragt. Einen Papierkorb auf dem Server richtest du beim Server ein (bearbeiten).')}><Switch checked={s.confirmDelete} onChange={(v) => updateSettings({ confirmDelete: v })} label={$t('Vor dem Löschen nachfragen')} /></Row>
             <Row label={$t('Editor für „Im Editor öffnen“')} note={s.editorMode === 'external' ? (s.editorApp ? s.editorApp : $t('Das Programm, das das System für die Dateiart vorsieht.')) : $t('Der Editor von Bitcrane: Dateien vom Server und von diesem Computer, Speichern lädt direkt hoch.')}>
               <span className="row-inline">
                 {s.editorMode === 'external' && s.editorApp && <Button small variant="ghost" onClick={() => updateSettings({ editorApp: '' })}>{$t('Standard')}</Button>}

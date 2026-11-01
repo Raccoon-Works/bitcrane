@@ -10,7 +10,7 @@ import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
 import { AuthPrompt, CloudPlacesDialog, ConfirmDialog, ConflictDialog, About, Licenses, UpdateDialog, ConfirmDelete, Fingerprint, PermsDialog, QuickConnect, SecretPrompt, Shortcuts } from './components/dialogs/SmallDialogs';
 import { DiffDialog, CompareFilesDialog } from './components/dialogs/DiffDialog';
-import { ChecksumDialog, PresignDialog, EditsDialog, SymlinkDialog } from './components/dialogs/FileTools';
+import { ChecksumDialog, PresignDialog, EditWithDialog, EditsDialog, SymlinkDialog } from './components/dialogs/FileTools';
 import { Palette } from './components/dialogs/Palette';
 import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportDialogs';
 import { LogDialog } from './components/dialogs/LogDialog';
@@ -59,6 +59,7 @@ function Dialogs() {
     case 'shortcuts': return <Shortcuts />;
     case 'checksum': return <ChecksumDialog side={dialog.side} name={dialog.name} />;
     case 'presign': return <PresignDialog side={dialog.side} name={dialog.name} />;
+    case 'editWith': return <EditWithDialog side={dialog.side} name={dialog.name} />;
     case 'symlink': return <SymlinkDialog target={dialog.target} />;
     case 'palette': return <Palette />;
     case 'edits': return <EditsDialog />;
@@ -72,7 +73,7 @@ function Dialogs() {
     case 'log': return <LogDialog />;
     case 'preview': return <PreviewDialog side={dialog.side} />;
     case 'batchRename': return <BatchRename side={dialog.side} names={dialog.names} />;
-    case 'selectMask': return <SelectMaskDialog side={dialog.side} />;
+    case 'selectMask': return <SelectMaskDialog side={dialog.side} initialMode={dialog.mode} />;
     case 'afterQueue': return <AfterQueueDialog action={dialog.action} />;
     case 'workspaces': return <WorkspacesDialog />;
     case 'cloudSignIn': return <CloudSignInDialog service={dialog.service} serverId={dialog.serverId} />;
