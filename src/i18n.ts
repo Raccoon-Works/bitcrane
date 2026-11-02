@@ -6,6 +6,7 @@
  * the next start. A text missing in a language falls back to English, then
  * to the German original.
  */
+import { DEMO_LANG } from './util/demo';
 import { EN } from './i18n.en';
 
 export type Lang = 'de' | 'en' | 'fr' | 'es' | 'it' | 'nl' | 'pl';
@@ -25,6 +26,8 @@ const STORE_KEY = 'bitcrane.language';
 const isLang = (v: unknown): v is Lang => LANGUAGES.some((l) => l.id === v);
 
 function initial(): Lang {
+  // Website demo: the page chooses the language.
+  if (isLang(DEMO_LANG)) return DEMO_LANG;
   try {
     const saved = localStorage.getItem(STORE_KEY);
     if (isLang(saved)) return saved;

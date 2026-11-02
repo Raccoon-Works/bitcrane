@@ -12,7 +12,7 @@ function Preview({ theme }: { theme: ITheme }) {
   const c = (k: keyof ITheme, fallback = theme.foreground) => (theme[k] as string | undefined) ?? fallback;
   return (
     <span className="scheme-preview mono" style={{ background: theme.background, color: theme.foreground }} aria-hidden="true">
-      <span><span style={{ color: c('green') }}>ubuntu@bot</span>:<span style={{ color: c('blue') }}>~</span>$ ls</span>
+      <span><span style={{ color: c('green') }}>deploy@shop</span>:<span style={{ color: c('blue') }}>~</span>$ ls</span>
       <span><span style={{ color: c('blue') }}>logs</span> <span style={{ color: c('green') }}>start.sh</span> <span style={{ color: c('red') }}>dump.zip</span></span>
       <span><span style={{ color: c('yellow') }}>warn</span> <span style={{ color: c('magenta') }}>pm2</span> <span style={{ color: c('cyan') }}>online</span><span className="scheme-cursor" style={{ background: c('cursor') }} /></span>
     </span>

@@ -56,8 +56,8 @@ function driveName(d: Place, mac: boolean): string {
 /** Typical drives for the browser prototype, which has no real ones. */
 function mockDrives(mac: boolean): Place[] {
   return mac
-    ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }, { name: 'iMac von Elna', path: '~/Projekte/newsbot', network: true }]
-    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads', label: 'Daten' }, { name: 'Z: (NAS)', path: '~/Projekte/newsbot', network: true }];
+    ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }, { name: 'iMac im Studio', path: '~/Projekte/blog', network: true }]
+    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads', label: 'Daten' }, { name: 'Z: (NAS)', path: '~/Projekte/blog', network: true }];
 }
 
 /** Account part of a cloud folder's name ("GoogleDrive-name@example.com" → "name"). */

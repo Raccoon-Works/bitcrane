@@ -27,3 +27,4 @@ dist-single
 # Rust build output
 src-tauri/target
 src-tauri/gen/schemas
+website/demo/

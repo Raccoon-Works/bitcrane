@@ -423,7 +423,6 @@
   "Neue Gruppe": "Nouveau groupe",
   "Gruppe: im Feld „Gruppe“ einen Namen eintragen": "Groupe : saisissez un nom dans le champ « Groupe »",
   "Importieren …": "Importer…",
-  "Name, z. B. Cloud · Bots": "Nom, p. ex. Cloud · Bots",
   "Farbe": "Couleur",
   "Verschlüsselung": "Chiffrement",
   "FTPS: TLS anfordern (empfohlen)": "FTPS : demander TLS (recommandé)",
@@ -461,7 +460,6 @@
   "Keiner, direkt verbinden": "Aucun (connexion directe)",
   "Über {0}": "Via {0}",
   "Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).": "Pour les serveurs accessibles uniquement via un autre serveur (comme ProxyJump dans la configuration SSH).",
-  "z. B. Bots": "p. ex. Bots",
   "Weitere Einstellungen": "Plus de réglages",
   "Notiz": "Remarque",
   "Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz": "Proxy, version TLS, noms de fichiers, fuseau horaire, mode de transfert, remarque",
@@ -2363,5 +2361,9 @@
   "{0} weitere": "{0} de plus",
   "{0} löschen?": "Supprimer {0} ?",
   "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserve les fichiers supprimés pendant un certain temps ; ils peuvent être restaurés sur le site du service.",
-  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Espace ou Échap ferme, les flèches font défiler."
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Espace ou Échap ferme, les flèches font défiler.",
+  "Name, z. B. Webshop · Live": "Nom, p. ex. Webshop · Live",
+  "z. B. Kunden": "p. ex. Clients",
+  "z. B. Webshop": "p. ex. Webshop",
+  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminal (aperçu)"
 }

@@ -13,7 +13,7 @@ import type { PaneSide } from '../backend/types';
 import { LIVE } from '../state/store';
 import { $t } from '../i18n';
 
-const DEMO_TEXT = 'import discord\nfrom discord.ext import commands\n\nPREFIX = "!"\nDEBUG = False\n\nbot = commands.Bot(command_prefix=PREFIX)\n\n@bot.event\nasync def on_ready():\n    print("Taskbot online")\n';
+const DEMO_TEXT = 'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
 
 /** Loads a preview; `null` while loading. */
 /** MIME type of PDF, audio and video files (the same list as local::media_mime). */

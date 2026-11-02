@@ -9,13 +9,13 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct NetHost {
-    /// Name the computer announces ("iMac von Elna").
+    /// Name the computer announces ("iMac im Studio").
     pub name: String,
-    /// Host name to connect to ("iMac-von-Elna.local").
+    /// Host name to connect to ("iMac-im-Studio.local").
     pub host: String,
 }
 
-/// Instance name from a full service name ("iMac von Elna._smb._tcp.local." → "iMac von Elna").
+/// Instance name from a full service name ("iMac im Studio._smb._tcp.local." → "iMac im Studio").
 fn instance_name(fullname: &str, ty: &str) -> String {
     let name = fullname.strip_suffix(ty).unwrap_or(fullname).trim_end_matches('.');
     // DNS-SD escapes spaces and dots as "\032" / "\." in some responders.
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn instance_names() {
-        assert_eq!(instance_name("iMac von Elna._smb._tcp.local.", "_smb._tcp.local."), "iMac von Elna");
+        assert_eq!(instance_name("iMac im Studio._smb._tcp.local.", "_smb._tcp.local."), "iMac im Studio");
         assert_eq!(instance_name("NAS\\032Keller._smb._tcp.local.", "_smb._tcp.local."), "NAS Keller");
     }
 }

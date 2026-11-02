@@ -244,7 +244,7 @@ export class Suggester {
     return c.row > this.anchor.row || (c.row === this.anchor.row && c.col >= this.anchor.col);
   }
 
-  /** Folder the shell is in, read from the prompt ("user@host:~/bots$ ", "PS C:\Users\x> "). */
+  /** Folder the shell is in, read from the prompt ("user@host:~/apps$ ", "PS C:\Users\x> "). */
   private promptDir(): string {
     if (!this.anchor) return this.opts.startDir();
     const prompt = this.term.buffer.active.getLine(this.anchor.row)?.translateToString(false, 0, this.anchor.col) ?? '';
@@ -278,7 +278,7 @@ export class Suggester {
     if (hit && Date.now() - hit.at < 60_000) return hit.names;
     if (!hit) {
       dirCache.set(key, { at: 0, names: [] });
-      const read = !LIVE ? Promise.resolve([{ name: 'logs', kind: 'dir' }, { name: 'cogs', kind: 'dir' }, { name: 'bot.py', kind: 'file' }, { name: 'config.py', kind: 'file' }])
+      const read = !LIVE ? Promise.resolve([{ name: 'logs', kind: 'dir' }, { name: 'routes', kind: 'dir' }, { name: 'app.py', kind: 'file' }, { name: 'config.py', kind: 'file' }])
         : this.serverId ? backend.remoteList(this.serverId, dir) : backend.localList(dir);
       void read.then((entries) => {
         dirCache.set(key, { at: Date.now(), names: entries.map((e) => (e.kind === 'dir' ? `${e.name}/` : e.name)).sort((a, b) => Number(b.endsWith('/')) - Number(a.endsWith('/')) || a.localeCompare(b)) });

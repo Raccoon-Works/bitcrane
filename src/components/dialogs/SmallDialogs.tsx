@@ -22,7 +22,7 @@ import { PROTOTYPE_VERSION } from '../../state/store';
 /* ----------------------------------------------------------- Quick connect */
 
 export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
-  const [address, setAddress] = useState(LIVE ? '' : 'ubuntu@bots.example:22');
+  const [address, setAddress] = useState(LIVE ? '' : 'deploy@shop.example:22');
   const [as, setAs] = useState<'files' | 'terminal'>(terminal ? 'terminal' : 'files');
   // FTP, WebDAV and SMB have no terminal; the choice only shows for SSH addresses.
   const sshAddress = !/^(ftps?|davs?|https?|smb):\/\//i.test(address.trim());

@@ -423,7 +423,6 @@
   "Neue Gruppe": "Nieuwe groep",
   "Gruppe: im Feld „Gruppe“ einen Namen eintragen": "Groep: vul een naam in bij het veld “Groep”",
   "Importieren …": "Importeer …",
-  "Name, z. B. Cloud · Bots": "Naam, bijv. Cloud · Bots",
   "Farbe": "Kleur",
   "Verschlüsselung": "Versleuteling",
   "FTPS: TLS anfordern (empfohlen)": "FTPS: TLS aanvragen (aanbevolen)",
@@ -461,7 +460,6 @@
   "Keiner, direkt verbinden": "Geen (direct verbinden)",
   "Über {0}": "Via {0}",
   "Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).": "Voor servers die alleen via een andere server bereikbaar zijn (zoals ProxyJump in de SSH-configuratie).",
-  "z. B. Bots": "bijv. Bots",
   "Weitere Einstellungen": "Meer instellingen",
   "Notiz": "Notitie",
   "Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz": "Proxy, TLS-versie, bestandsnamen, tijdzone, overdrachtsmodus, notitie",
@@ -2363,5 +2361,9 @@
   "{0} weitere": "{0} meer",
   "{0} löschen?": "{0} verwijderen?",
   "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} bewaart verwijderde bestanden een tijdje; ze zijn te herstellen op de website van de dienst.",
-  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Spatie of Esc sluit, pijltjestoetsen bladeren."
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Spatie of Esc sluit, pijltjestoetsen bladeren.",
+  "Name, z. B. Webshop · Live": "Naam, bijv. Webshop · Live",
+  "z. B. Kunden": "bijv. Klanten",
+  "z. B. Webshop": "bijv. Webshop",
+  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminal (voorbeeld)"
 }
