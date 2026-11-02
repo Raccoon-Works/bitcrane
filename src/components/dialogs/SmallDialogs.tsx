@@ -17,6 +17,7 @@ import { Dialog } from './Dialog';
 import { installUpdate } from '../../state/updates';
 import { ACTIONS, FIXED, formatCombo, keysFor } from '../../state/keys';
 import { $t } from '../../i18n';
+import { PROTOTYPE_VERSION } from '../../state/store';
 
 /* ----------------------------------------------------------- Quick connect */
 
@@ -407,7 +408,7 @@ export function ConfirmDelete({ side, names }: { side: PaneSide; names: string[]
 
 export function About() {
   const platform = useStore((s) => s.platform);
-  const [version, setVersion] = useState(LIVE ? '' : $t('0.1.0 (Prototyp)'));
+  const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
   useEffect(() => {
     if (LIVE) invoke<{ version: string }>('app_info').then((i) => setVersion(i.version)).catch(() => undefined);
   }, []);

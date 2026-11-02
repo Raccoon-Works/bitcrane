@@ -70,7 +70,11 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
       <g transform={tf}>
         <g transform={relief ? 'translate(0.80 -2.60)' : undefined}>
           {relief && EDGE.map(([x, y], i) => shape(fill('sb'), fill('sa'), i, `translate(${x.toFixed(3)} ${y.toFixed(3)})`))}
-          {shape(fill('b'), fill('a'), undefined, undefined, rim)}
+          {/* Small and flat on a light background (Windows title bar): the light blue
+              face would almost vanish, so the darker edge colours carry the mark. */}
+          {!relief && light && !mono && !tile
+            ? shape(fill('sb'), fill('sa'))
+            : shape(fill('b'), fill('a'), undefined, undefined, rim)}
         </g>
       </g>
     </svg>

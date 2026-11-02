@@ -2364,4 +2364,5 @@ export const EN: Record<string, string> = {
   "{0} weitere": "{0} more",
   "{0} löschen?": "Delete {0}?",
   "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} keeps deleted files for a while; they can be restored on the service’s website.",
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Space or Esc closes, arrow keys step through.",
 };

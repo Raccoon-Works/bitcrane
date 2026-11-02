@@ -2362,5 +2362,6 @@
   "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "To, co już przesłano, zostaje. Pozostałe pliki nie zostaną przesłane.",
   "{0} weitere": "{0} więcej",
   "{0} löschen?": "Usunąć {0}?",
-  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} przechowuje usunięte pliki przez pewien czas; można je przywrócić na stronie usługi."
+  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} przechowuje usunięte pliki przez pewien czas; można je przywrócić na stronie usługi.",
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Spacja lub Esc zamyka, strzałki przewijają."
 }

@@ -4,7 +4,7 @@
  */
 import { placeLabel } from './PlacesBar';
 import { Check } from './glyphs';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
@@ -25,6 +25,15 @@ export function ContextMenu() {
   const menu = useStore((s) => s.contextMenu);
   const platform = useStore((s) => s.platform);
   const ref = useRef<HTMLDivElement>(null);
+  // Final position, from the menu's real size (set right after it is laid out).
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    setPos(null);
+    const el = ref.current;
+    if (!menu || !el) return;
+    const p = stagePoint(menu.x, menu.y);
+    setPos({ left: Math.max(8, Math.min(p.x, p.w - el.offsetWidth - 8)), top: Math.max(8, Math.min(p.y, p.h - el.offsetHeight - 8)) });
+  }, [menu]);
 
   useEffect(() => {
     if (!menu) return;
@@ -344,14 +353,14 @@ export function ContextMenu() {
   for (let i = groups.length - 1; i >= 0; i--) if (!groups[i].length) groups.splice(i, 1);
 
   const anyCheck = groups.flat().some((it) => it.checked !== undefined);
-  // Convert to stage coordinates and keep the menu inside the window.
+  // Convert to stage coordinates and keep the menu inside the window. The first
+  // frame places it at the click; the real size (rows are taller on Windows)
+  // then moves it up or left as far as needed, and a menu taller than the window
+  // scrolls (max-height in app.css), like the system menus.
   const pt = stagePoint(menu.x, menu.y);
-  const height = 16 + groups.flat().length * 26 + groups.length * 9;
-  const x = Math.min(pt.x, pt.w - 290);
-  const y = Math.min(pt.y, pt.h - height - 8);
 
   return (
-    <div ref={ref} role="menu" aria-label={$t('Kontextmenü')} className="menu context-menu" style={{ left: x, top: Math.max(8, y) }}>
+    <div ref={ref} role="menu" aria-label={$t('Kontextmenü')} className="menu context-menu" style={{ left: pos?.left ?? pt.x, top: pos?.top ?? pt.y, visibility: pos ? undefined : 'hidden' }}>
       {groups.map((g, gi) => (
         <div key={gi}>
           {gi > 0 && <div className="menu-sep" role="separator" />}

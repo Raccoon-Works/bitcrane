@@ -12,7 +12,7 @@ import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import type { CloudPlace, KnownHost } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
-import { getState, setState, LIVE, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, currentZoom, defaultZoom, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
+import { getState, setState, LIVE, PROTOTYPE_VERSION, newRuleId, openExternal, offerCloudPlaces, openDialog, removeRule, setSettingsSection, saveRule, setThemeSetting, updateSettings, useStore, ZOOM_STEPS, currentZoom, defaultZoom, type CustomCommand, type ExistingRule, type SettingsTab, type TransferRule } from '../../state/store';
 import { Bug, GithubLogo, ListChecks, MagnifyingGlass, Scroll, Sparkle, TerminalWindow } from '@phosphor-icons/react';
 import { BMark } from '../icons';
 import { terminalSettings, type TerminalSettings } from '../../state/terminal';
@@ -439,7 +439,7 @@ const GITHUB_URL = 'https://github.com/Raccoon-Works/bitcrane';
 
 /** Top of "Allgemein": the app symbol with name and version, update check and links. */
 function AboutHeader() {
-  const [version, setVersion] = useState(LIVE ? '' : '0.2.50');
+  const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
   const update = useStore((st) => st.update);
   useEffect(() => {
     if (LIVE) invoke<{ version: string }>('app_info').then((i) => setVersion(i.version)).catch(() => undefined);

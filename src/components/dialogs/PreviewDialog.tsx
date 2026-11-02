@@ -10,6 +10,7 @@ import { formatDate, formatSize } from '../../util/format';
 import { join } from '../../util/paths';
 import { PreviewView, usePreview } from '../preview';
 import { Dialog } from './Dialog';
+import { Button } from '../ui';
 import { $t } from '../../i18n';
 
 export function PreviewDialog({ side }: { side: PaneSide }) {
@@ -34,7 +35,8 @@ export function PreviewDialog({ side }: { side: PaneSide }) {
   }, [side]);
 
   return (
-    <Dialog label={$t('Vorschau')} title={entry?.name ?? $t('Vorschau')} subtitle={entry ? `${formatSize(entry.size)} · ${formatDate(entry.mtime)}` : undefined} width={860} maxHeight={720} className="preview-dialog">
+    <Dialog label={$t('Vorschau')} title={entry?.name ?? $t('Vorschau')} subtitle={entry ? `${formatSize(entry.size)} · ${formatDate(entry.mtime)}` : undefined} width={860} maxHeight={720} className="preview-dialog"
+      footer={<><span className="small muted">{$t('Leertaste oder Esc schließt, Pfeiltasten blättern.')}</span><span className="flex-1" /><Button variant="primary" autoFocus onClick={closeDialog}>{$t('Fertig')}</Button></>}>
       <div className="preview-body">
         {!path && <p className="muted">{entry?.kind === 'dir' ? $t('Ordner haben keine Vorschau.') : $t('Keine Datei ausgewählt.')}</p>}
         {path && !preview && !error && <span className="row-inline muted"><Loader2 size={14} className="spin" aria-hidden="true" />{$t('Wird geladen …')}</span>}
