@@ -169,7 +169,7 @@ export function Activity() {
         {line}
         <span className="flex-1" />
         <span className="small muted nowrap">
-          {[restCount > 0 ? `${restCount} weitere` : '', running.length ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : '', chosenName ? $t('Regel: {0}', chosenName) : ''].filter(Boolean).join(' · ')}
+          {[restCount > 0 ? $t('{0} weitere', restCount) : '', running.length && speed >= 1 ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : '', chosenName ? $t('Regel: {0}', chosenName) : ''].filter(Boolean).join(' · ')}
         </span>
         <IconButton label={$t('Aktivität aufklappen')} shortcut={key} onClick={toggleActivity} tipBelow={false}><ChevronUp size={14} strokeWidth={2} /></IconButton>
       </section>
@@ -197,7 +197,7 @@ export function Activity() {
           <button type="button" role="tab" aria-selected={filter === 'log'} className={filter === 'log' ? 'is-on' : ''} onClick={() => setActivityFilter('log')}>{$t('Protokoll')}</button>
         </div>
         <span className="flex-1" />
-        {running.length > 0 && <span className="small muted">↑ {formatSpeed(speed)}</span>}
+        {running.length > 0 && speed >= 1 && <span className="small muted">↑ {formatSpeed(speed)}</span>}
         {/* WinSCP "Transfer settings": a rule for the next transfers by hand, instead of the server's. */}
         {!!rules?.length && <Select value={chosenRule} onChange={(v) => setState({ transferRule: v })} options={ruleOptions} label={$t('Regel für Übertragungen von Hand')} />}
         {/* WinSCP "Once empty": what happens when everything is transferred. */}

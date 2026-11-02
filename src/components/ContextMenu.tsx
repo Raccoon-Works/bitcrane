@@ -67,7 +67,10 @@ export function ContextMenu() {
     const o = side === 'local' ? 'remote' : 'local';
     const [ls, sid] = paneLoc(o, tab);
     const dir = panePath(o);
-    return ls === 'remote' ? getState().servers.find((x) => x.id === sid)?.name ?? '' : dir.split('/').filter(Boolean).pop() ?? dir;
+    if (ls === 'remote') return getState().servers.find((x) => x.id === sid)?.name ?? '';
+    // The home folder by its name ("chris"), not "~".
+    if (dir === '~') return getState().homeName;
+    return dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
   };
   const groups: Item[][] = [];
   // Own commands (Einstellungen › Erweitert) run on SFTP servers only (they need SSH).

@@ -7,7 +7,7 @@ import { serverTrash } from '../../state/live';
 import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
-import type { CloudPlace, ConflictChoice, HostKey, PaneSide, Server } from '../../backend/types';
+import { isCloudProtocol, type CloudPlace, type ConflictChoice, type HostKey, type PaneSide, type Server } from '../../backend/types';
 import { activeTab, addCloudPlaces, closeDialog, deleteNames, LIVE, openDialog, openExternal, openServer, quickConnect, rejectHostKey, resolveConflict, savePerms, serverById, statEntry, submitSecret, cancelSecret, trustHostKey, useStore, paneLoc, paneOnServer, panePath } from '../../state/store';
 import { formatAgo, formatDate, formatSize, permsToText } from '../../util/format';
 import { ServerTile } from '../ServerTile';
@@ -385,15 +385,18 @@ export function ConfirmDelete({ side, names }: { side: PaneSide; names: string[]
   const dir = panePath(side);
   const holdsTrash = !!trash && names.some((n) => { const p = `${dir.replace(/\/$/, '')}/${n}`; return trash === p || trash.startsWith(p + '/'); });
   const toTrash = !!trash && !holdsTrash && dir !== trash && !dir.startsWith(trash + '/');
+  // Dropbox, Google Drive and OneDrive keep deleted files for a while (restorable on their website).
+  const cloud = remote && isCloudProtocol(srv?.protocol);
   return (
     <Dialog
       label={$t('Löschen bestätigen')}
-      title={toTrash ? $t('{0} in den Papierkorb auf dem Server legen?', what) : remote ? $t('{0} vom Server löschen?', what) : $t('{0} in den Papierkorb legen?', what)}
+      title={toTrash ? $t('{0} in den Papierkorb auf dem Server legen?', what) : cloud ? $t('{0} löschen?', what) : remote ? $t('{0} vom Server löschen?', what) : $t('{0} in den Papierkorb legen?', what)}
       subtitle={toTrash ? $t('Sie kommen in den Ordner {0} auf {1} und lassen sich von dort zurückholen.', trash, srv?.name ?? $t('dem Server'))
-        : remote ? $t('Auf {0} gibt es keinen Papierkorb. Gelöschte Dateien sind dort endgültig weg.', srv?.name ?? $t('dem Server')) : $t('Du kannst sie aus dem Papierkorb wiederherstellen.')}
+        : cloud ? $t('{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.', srv?.name ?? '')
+          : remote ? $t('Auf {0} gibt es keinen Papierkorb. Gelöschte Dateien sind dort endgültig weg.', srv?.name ?? $t('dem Server')) : $t('Du kannst sie aus dem Papierkorb wiederherstellen.')}
       icon={<span className="icon-tile tone-danger"><Trash2 size={20} strokeWidth={1.75} /></span>}
       width={480}
-      footer={<><span className="flex-1" /><Button autoFocus onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{remote && !toTrash ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
+      footer={<><span className="flex-1" /><Button autoFocus onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="danger" onClick={() => deleteNames(side, names)}>{cloud ? $t('Löschen') : remote && !toTrash ? $t('Endgültig löschen') : $t('In den Papierkorb')}</Button></>}
     >
       {names.length > 1 && <ul className="delete-list small">{names.slice(0, 6).map((n) => <li key={n}>{n}</li>)}{names.length > 6 && <li>{$t('… und')}{' '}{names.length - 6} {$t('weitere')}</li>}</ul>}
     </Dialog>
