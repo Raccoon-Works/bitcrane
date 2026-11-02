@@ -112,7 +112,7 @@ function TerminalSettingsPage() {
       <Group title={$t('Snippets')}>
         <SnippetSettings />
       </Group>
-      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnest du mit dem Terminal-Knopf oben oder {1}; ein Rechtsklick auf den Knopf zeigt die Auswahl (Shell, SSH-Server).', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+Umschalt+C / V'), formatCombo(keysFor('terminal', getState().platform)[0] ?? '', getState().platform))}</span>
+      <span className="small muted">{$t('Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnest du mit dem Terminal-Knopf oben oder {1}; ein Rechtsklick auf den Knopf zeigt die Auswahl (Shell, SSH-Server).', getState().platform === 'mac' ? '⌘C / ⌘V' : $t('Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)'), formatCombo(keysFor('terminal', getState().platform)[0] ?? '', getState().platform))}</span>
     </>
   );
 }

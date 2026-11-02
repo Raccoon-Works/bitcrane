@@ -18,14 +18,14 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, toggleComment } f
 import { bracketMatching, foldGutter, foldKeymap, HighlightStyle, indentOnInput, indentUnit, LanguageDescription, syntaxHighlighting } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap, selectNextOccurrence } from '@codemirror/search';
-import { Compartment, EditorState, type Extension, type Text } from '@codemirror/state';
+import { Compartment, EditorState, Text, type Extension } from '@codemirror/state';
 import { crosshairCursor, drawSelection, dropCursor, EditorView, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, keymap, lineNumbers, rectangularSelection } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { ArrowLeft, FilePlus, FloppyDisk, FolderOpen, MagnifyingGlass, TextAlignLeft, X } from '@phosphor-icons/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { $t } from '../i18n';
-import { setMenuKeyHandler, cancelClose, closeDoc, closeNow, docPlace, hideEditor, markDirty, newDocument, openFile, registerText, reloadDoc, saveAs, saveDoc, setActive, setEol, useEditor } from '../state/editor';
+import { setMenuKeyHandler, cancelClose, closeDoc, closeNow, docPlace, hideEditor, keepTexts, markDirty, newDocument, openFile, registerText, reloadDoc, saveAs, saveDoc, setActive, setEol, useEditor } from '../state/editor';
 import { LIVE, updateSettings, useStore } from '../state/store';
 import { FileGlyph } from './icons';
 import { Button, IconButton } from './ui';
@@ -171,17 +171,33 @@ export function CodeEditor() {
       }),
     ];
     const state = EditorState.create({ doc: text, extensions });
-    saved.current.set(id, state.doc);
+    // The reference for "unsaved changes" is the text as read or last saved, not edits kept from before.
+    const ref = ed.docs.find((d) => d.id === id)?.initial;
+    saved.current.set(id, ref !== undefined && ref !== text ? Text.of(ref.split(/\r?\n/)) : state.doc);
     setIndentText(unit === '\t' ? $t('Tabs') : $t('{0} Leerzeichen', unit.length));
     return state;
   };
+
+  // Closing the editor keeps what was typed: the texts go into the documents and come back when it opens again.
+  useEffect(() => () => {
+    const texts = new Map<string, string>();
+    for (const [id, st] of states.current) texts.set(id, st.doc.toString());
+    keepTexts(texts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // One EditorView; documents swap their states in and out of it.
   useEffect(() => {
     if (!host.current) return;
     const v = new EditorView({ parent: host.current });
     view.current = v;
-    return () => { v.destroy(); view.current = null; };
+    return () => {
+      // The shown document's latest state is kept before the view goes (closing the editor).
+      const a = activeRef.current;
+      if (a && states.current.has(a)) states.current.set(a, v.state);
+      v.destroy();
+      view.current = null;
+    };
   }, []);
 
   // ⌘ shortcuts that the Mac menu bar would otherwise take (state/editor.ts editorMenuKey).
@@ -213,7 +229,7 @@ export function CodeEditor() {
     let s = states.current.get(doc.id);
     const isNew = !s;
     if (!s) {
-      s = makeState(doc.id, doc.initial);
+      s = makeState(doc.id, doc.text ?? doc.initial);
       states.current.set(doc.id, s);
       registerText(doc.id, () => (ed.active === doc.id && view.current ? view.current.state.doc.toString() : (states.current.get(doc.id)?.doc.toString() ?? '')));
     }

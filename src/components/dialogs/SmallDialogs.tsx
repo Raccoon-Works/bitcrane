@@ -383,7 +383,8 @@ export function ConfirmDelete({ side, names }: { side: PaneSide; names: string[]
   // A server with its own recycle bin (WinSCP): the entries are moved there, unless they already are in it.
   const trash = remote ? (LIVE ? serverTrash(sid) : srv?.trashDir) : undefined;
   const dir = panePath(side);
-  const toTrash = !!trash && dir !== trash && !dir.startsWith(trash + '/');
+  const holdsTrash = !!trash && names.some((n) => { const p = `${dir.replace(/\/$/, '')}/${n}`; return trash === p || trash.startsWith(p + '/'); });
+  const toTrash = !!trash && !holdsTrash && dir !== trash && !dir.startsWith(trash + '/');
   return (
     <Dialog
       label={$t('Löschen bestätigen')}

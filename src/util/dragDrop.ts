@@ -56,7 +56,8 @@ function armSpring(t: Target | null) {
       spring = null;
       if (!drag?.active) return;
       navigate(t.side, join(panePath(t.side), t.name));
-      setState({ dropHint: null });
+      // The folder now shown is the target until the pointer moves on (letting go right away drops into it).
+      setState({ dropHint: { side: t.side, name: '' } });
     }, SPRING_MS),
   };
 }

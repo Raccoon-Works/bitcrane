@@ -107,7 +107,8 @@ export function WatchSetup({ editId }: { editId?: string }) {
   };
 
   const set = <K extends keyof WatchOptions>(k: K, v: WatchOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
-  const effectiveName = name.trim() || localPath.split('/').filter(Boolean).slice(-2).join(' ');
+  // The last two folder names, without the home sign or a drive letter ("~ bitcrane-test" read oddly).
+  const effectiveName = name.trim() || localPath.split('/').filter((x) => x && x !== '~' && !/^[a-z]:$/i.test(x)).slice(-2).join(' ');
   const invalidRemote = tried && !remotePath.trim().startsWith('/');
   const changedCount = (['continueOnError', 'onlyExisting', 'onlySelectedSubfolders', 'setPermissions', 'mirrorDeletes', 'keepOldVersion', 'commandEnabled'] as const)
     .filter((k) => opts[k] !== defaultWatchOptions[k]).length + (opts.delay !== defaultWatchOptions.delay ? 1 : 0);

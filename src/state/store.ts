@@ -2052,8 +2052,13 @@ export function setDeepSearch(on: boolean) {
  * files below the folder, on this computer and on SSH servers. Turns on the
  * search in subfolders as well.
  */
+/** The subfolder setting before the content search turned it on. */
+let deepBeforeContent = false;
+
 export function setSearchContent(on: boolean) {
-  setState({ searchContent: on, ...(on ? { deepSearchOn: true } : {}), deepSearch: null });
+  // Content search turns on the subfolders; turning it off restores what was set before.
+  if (on && !state.searchContent) deepBeforeContent = state.deepSearchOn;
+  setState({ searchContent: on, deepSearchOn: on ? true : deepBeforeContent, deepSearch: null });
   if (on && !state.search.trim()) showToast($t('Suche im Inhalt an: einen Text ins Suchfeld tippen.'));
   scheduleDeepSearch();
 }

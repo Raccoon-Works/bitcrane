@@ -18,7 +18,7 @@ import { $t } from '../i18n';
 import * as paths from '../util/paths';
 import { addLog } from './log';
 import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
-import { isConnected } from './live';
+import { isConnected, refreshVisible } from './live';
 
 export interface EditorDoc {
   id: string;
@@ -26,8 +26,10 @@ export interface EditorDoc {
   serverId: string | null;
   path: string;
   name: string;
-  /** Text as read (CodeMirror takes it over when the document is first shown). */
+  /** Text as read or last saved: the reference for "unsaved changes". */
   initial: string;
+  /** The text as edited, kept while the editor is closed (the editor view keeps it otherwise). */
+  text?: string;
   mtime: number;
   eol: '\n' | '\r\n';
   bom: boolean;
@@ -125,6 +127,11 @@ export async function openFile(serverId: string, path: string) {
   const known = st.docs.find((d) => d.serverId === serverId && d.path === path);
   if (known) {
     set({ active: known.id, open: true });
+    // Without own changes the file is read again if it changed in the meantime (another program, a watch, a download).
+    if (LIVE && !known.dirty && known.mtime) {
+      const now = await invoke<number>('editor_mtime', { serverId: serverId || null, path }).catch(() => known.mtime);
+      if (Math.abs(now - known.mtime) > 1500) await reloadDoc(known.id);
+    }
     return;
   }
   const doc: EditorDoc = { id: newId(), serverId, path, name: paths.basename(path) || path, initial: '', mtime: 0, eol: '\n', bom: false, dirty: false, loading: true };
@@ -186,12 +193,15 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
         return false;
       }
     }
-    const mtime = await invoke<number>('editor_write', { serverId, path: d.path, text: get(), eol: d.eol, bom: d.bom });
-    patchDoc(id, { dirty: false, conflict: false, mtime });
+    const text = get();
+    const mtime = await invoke<number>('editor_write', { serverId, path: d.path, text, eol: d.eol, bom: d.bom });
+    // The saved text is the new reference; the editor shows it again after being closed and reopened.
+    patchDoc(id, { dirty: false, conflict: false, mtime, initial: text, text: undefined });
     if (serverId) addLog('ok', $t('Gesichert und hochgeladen: {0}', d.path), serverId);
     showToast(serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name), 'ok');
     // The file lists show the new size and time.
     setState((s) => ({ fsRev: s.fsRev + 1 }));
+    refreshVisible();
     return true;
   } catch (e) {
     showToast((e as { message?: string }).message ?? String(e), 'error');
@@ -214,14 +224,23 @@ export async function saveAs(id: string): Promise<boolean> {
   if (!picked) return false;
   const path = await invoke<string>('path_to_ui', { path: picked });
   try {
-    const mtime = await invoke<number>('editor_write', { serverId: null, path, text: get(), eol: d.eol, bom: d.bom });
-    patchDoc(id, { serverId: '', path, name: paths.basename(path) || path, dirty: false, conflict: false, mtime });
+    const text = get();
+    const mtime = await invoke<number>('editor_write', { serverId: null, path, text, eol: d.eol, bom: d.bom });
+    patchDoc(id, { serverId: '', path, name: paths.basename(path) || path, dirty: false, conflict: false, mtime, initial: text, text: undefined });
     showToast($t('„{0}“ gesichert.', paths.basename(path)), 'ok');
     setState((s) => ({ fsRev: s.fsRev + 1 }));
     return true;
   } catch (e) {
     showToast((e as { message?: string }).message ?? String(e), 'error');
     return false;
+  }
+}
+
+/** Keeps the edited text of documents while the editor view is closed (called when it unmounts). */
+export function keepTexts(texts: Map<string, string>) {
+  for (const [id, text] of texts) {
+    const d = st.docs.find((x) => x.id === id);
+    if (d) patchDoc(id, { text: text !== d.initial ? text : undefined });
   }
 }
 

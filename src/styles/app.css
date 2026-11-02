@@ -2636,3 +2636,9 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .win-tabs .tab-new { width: 28px; height: 28px; margin-left: 4px; border-radius: 6px; }
 .win-tabs .tab-new:hover:not(:disabled) { background: var(--bg-hover); }
 .page:not([data-theme='light']) .win-tabs .tab-new:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+/* The search field widens while it is used, so the typed text stays readable next to its place and buttons. */
+.toolbar .search { transition: width 160ms var(--ease-out, ease-out); }
+.toolbar .search:focus-within, .toolbar .search:has(input:not(:placeholder-shown)) { width: 300px; }
+/* Labels beside a block with an explanation line up with its first line, not with its middle. */
+.form-grid > :is(label, span):has(+ .col-text) { align-self: start; padding-top: 7px; }
+.form-grid > :is(label, span):has(+ .col-text > .row-inline:first-child) { padding-top: 2px; }

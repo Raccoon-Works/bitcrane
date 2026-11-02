@@ -2320,5 +2320,6 @@
   "Programme": "Aplikacje",
   "Keine Hälfte zeigt gerade diesen Computer.": "Żadna połowa nie pokazuje teraz tego komputera.",
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Działa, gdy obie połowy pokazują ten sam komputer lub serwer.",
-  "Das geht nur mit Ordnern dieses Computers.": "Działa tylko z folderami tego komputera."
+  "Das geht nur mit Ordnern dieses Computers.": "Działa tylko z folderami tego komputera.",
+  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C bez zaznaczenia przerywa)"
 }
