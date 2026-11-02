@@ -627,17 +627,31 @@ async function retryOffline(now: number) {
 /* File operations                                                          */
 /* ------------------------------------------------------------------------ */
 
-async function run(side: PaneSide, serverId: string, dir: string, op: () => Promise<unknown>, okText?: string): Promise<boolean> {
+/** Paths for a log line: up to three, then "und N weitere". */
+function pathsText(paths: string[]): string {
+  if (paths.length <= 3) return paths.join(', ');
+  return $t('{0} und {1} weitere', paths.slice(0, 3).join(', '), paths.length - 3);
+}
+
+/**
+ * Runs a file operation, refreshes the folder and reports the outcome. With
+ * `logText` the operation is also written to the protocol (Ansicht > Protokoll),
+ * like WinSCP and FileZilla record every change made on a server.
+ */
+async function run(side: PaneSide, serverId: string, dir: string, op: () => Promise<unknown>, okText?: string, logText?: string): Promise<boolean> {
+  const sid = side === 'remote' ? serverId : undefined;
   try {
     await op();
     invalidate(side, serverId, dir);
     bump();
     if (okText) showToast(okText, 'ok');
+    if (logText) addLog('ok', logText, sid);
     return true;
   } catch (e) {
     const err = toBackendError(e);
     if (side === 'remote') handleRemoteError(serverId, err);
     showToast(err.message, 'error');
+    if (logText) addLog('error', `${logText}: ${err.message}`, sid, err.detail);
     invalidate(side, serverId, dir);
     bump();
     return false;
@@ -646,18 +660,21 @@ async function run(side: PaneSide, serverId: string, dir: string, op: () => Prom
 
 export function renameEntry(side: PaneSide, serverId: string, dir: string, oldName: string, newName: string) {
   const path = join(dir, oldName);
-  return run(side, serverId, dir, () => (side === 'local' ? backend.localRename(path, newName) : backend.remoteRename(serverId, path, newName)));
+  return run(side, serverId, dir, () => (side === 'local' ? backend.localRename(path, newName) : backend.remoteRename(serverId, path, newName)),
+    undefined, $t('Umbenannt: {0} → {1}', path, newName));
 }
 
 export function makeFolder(side: PaneSide, serverId: string, dir: string, name: string) {
   const path = join(dir, name);
-  return run(side, serverId, dir, () => (side === 'local' ? backend.localMkdir(path) : backend.remoteMkdir(serverId, path)));
+  return run(side, serverId, dir, () => (side === 'local' ? backend.localMkdir(path) : backend.remoteMkdir(serverId, path)),
+    undefined, $t('Ordner angelegt: {0}', path));
 }
 
 /** "Neue Datei": an empty file in the folder. */
 export function makeFile(side: PaneSide, serverId: string, dir: string, name: string) {
   const path = join(dir, name);
-  return run(side, serverId, dir, () => (side === 'local' ? backend.localNewFile(path) : backend.remoteNewFile(serverId, path)));
+  return run(side, serverId, dir, () => (side === 'local' ? backend.localNewFile(path) : backend.remoteNewFile(serverId, path)),
+    undefined, $t('Datei angelegt: {0}', path));
 }
 
 /** Folder of the server's recycle bin (absolute), or undefined when the server has none. */
@@ -690,13 +707,15 @@ export function removeEntries(side: PaneSide, serverId: string, dir: string, nam
   const holdsTrash = !!trash && paths.some((p) => trash === p || trash.startsWith(p + '/'));
   if (trash && !holdsTrash && dir !== trash && !dir.startsWith(trash + '/')) {
     const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
-    return run(side, serverId, dir, () => trashOnServer(serverId, dir, names, trash), $t('{0} in den Papierkorb auf dem Server gelegt.', what));
+    return run(side, serverId, dir, () => trashOnServer(serverId, dir, names, trash), $t('{0} in den Papierkorb auf dem Server gelegt.', what),
+      $t('In den Papierkorb auf dem Server gelegt: {0}', pathsText(paths)));
   }
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
   return run(
     side, serverId, dir,
     () => (side === 'local' ? backend.localTrash(paths) : backend.remoteRemove(serverId, paths)),
     side === 'local' ? $t('{0} in den Papierkorb gelegt.', what) : $t('{0} gelöscht.', what),
+    side === 'local' ? $t('In den Papierkorb gelegt: {0}', pathsText(paths)) : $t('Gelöscht: {0}', pathsText(paths)),
   ).then((ok) => {
     // Deleted folders of this computer leave "Zuletzt verwendet" too.
     const recent = getState().settings.recentDirs;
@@ -712,7 +731,8 @@ const copiedText = (names: string[]) => (names.length === 1 ? $t('Kopiert als �
 /** Copies on the server (⌘C, ⌘V in the same half). */
 export async function copyOnServer(serverId: string, fromDir: string, names: string[], toDir: string) {
   let made: string[] = [];
-  const ok = await run('remote', serverId, toDir, async () => { made = await backend.remoteCopy(serverId, names.map((n) => join(fromDir, n)), toDir); });
+  const ok = await run('remote', serverId, toDir, async () => { made = await backend.remoteCopy(serverId, names.map((n) => join(fromDir, n)), toDir); },
+    undefined, $t('Kopiert: {0} → {1}', pathsText(names.map((n) => join(fromDir, n))), toDir));
   if (ok) showToast(copiedText(made), 'ok');
 }
 
@@ -729,7 +749,7 @@ export async function moveInto(side: PaneSide, serverId: string, fromDir: string
       await backend.remoteMove(serverId, join(fromDir, n), join(toDir, basename(n)));
       moved++;
     }
-  });
+  }, undefined, $t('Verschoben: {0} → {1}', pathsText(names.map((n) => join(fromDir, n))), toDir));
   invalidate('remote', serverId, toDir);
   for (const n of names) if (n.includes('/')) invalidate('remote', serverId, parent(join(fromDir, n)));
   bump();
@@ -741,7 +761,8 @@ export async function moveInto(side: PaneSide, serverId: string, fromDir: string
 /** Moves files or folders between two folders of this computer (two local halves). */
 export async function moveLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
-  const ok = await run('local', '', toDir, async () => { made = await backend.localMove(names.map((n) => join(fromDir, n)), toDir, merge); });
+  const ok = await run('local', '', toDir, async () => { made = await backend.localMove(names.map((n) => join(fromDir, n)), toDir, merge); },
+    undefined, $t('Verschoben: {0} → {1}', pathsText(names.map((n) => join(fromDir, n))), toDir));
   invalidate('local', '', fromDir);
   bump();
   if (ok) showToast(made.length === 1 ? $t('„{0}“ verschoben.', made[0]) : $t('{0} Objekte verschoben.', made.length), 'ok');
@@ -751,7 +772,8 @@ export async function moveLocal(fromDir: string, names: string[], toDir: string,
 
 export async function copyLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
-  const ok = await run('local', '', toDir, async () => { made = await backend.localCopy(names.map((n) => join(fromDir, n)), toDir, merge); });
+  const ok = await run('local', '', toDir, async () => { made = await backend.localCopy(names.map((n) => join(fromDir, n)), toDir, merge); },
+    undefined, $t('Kopiert: {0} → {1}', pathsText(names.map((n) => join(fromDir, n))), toDir));
   if (ok && merge) invalidate('local', '', fromDir);
   if (ok) showToast(copiedText(made), 'ok');
 }
@@ -783,7 +805,8 @@ export async function unzipLocal(dir: string, name: string) {
 }
 
 export function changePerms(serverId: string, path: string, perms: string, recursive: boolean) {
-  return run('remote', serverId, parent(path), () => backend.remoteChmod(serverId, path, perms, recursive), $t('Rechte gesetzt: {0}{1}', perms, recursive ? $t(' (mit Unterordnern)') : ''));
+  const done = $t('Rechte gesetzt: {0}{1}', perms, recursive ? $t(' (mit Unterordnern)') : '');
+  return run('remote', serverId, parent(path), () => backend.remoteChmod(serverId, path, perms, recursive), done, `${done} – ${path}`);
 }
 
 /** All files below a folder (for folder sizes and searching). */

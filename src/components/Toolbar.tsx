@@ -5,9 +5,9 @@
  */
 import { toggleTerminal } from '../state/terminal';
 import {
-  ArrowClockwise, ArrowsClockwise, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, TextAa, UploadSimple,
+  ArrowClockwise, ArrowsClockwise, CaretDoubleRight, Check, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, TextAa, UploadSimple,
 } from '@phosphor-icons/react';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { TermNewMenu } from './TermNewMenu';
 import { toggleEditor, useEditor } from '../state/editor';
 import {
@@ -20,7 +20,7 @@ import { formatAgo } from '../util/format';
 import { useKeyLabel } from '../state/keys';
 import { IconButton, Tooltip } from './ui';
 import { WatchPopover } from './WatchPopover';
-import { WinMoreMenu } from './AppMenu';
+import { WinMoreMenu, useCloseOnOutside } from './AppMenu';
 import { toggleCompareDirs } from '../state/tools';
 import { $t } from '../i18n';
 
@@ -151,6 +151,98 @@ export function useToolDefs(): Record<ToolId, { label: string; short?: string; k
   };
 }
 
+/** Room the "»" button takes when tools overflow: its width plus the gap before it. */
+const OVERFLOW_W = 44;
+
+/**
+ * How many tools fit into the toolbar (Finder, Explorer and Office do the
+ * same: what does not fit moves behind a "»" button instead of wrapping into
+ * a second row, so the window never changes height). The tools are measured
+ * once with all of them shown; dropping tools from the end does not move the
+ * ones before, so their right edges stay valid while the window is resized.
+ */
+function useToolFit(tools: ToolId[], layoutKey: string, runsRef: React.RefObject<HTMLDivElement | null>, spacerRef: React.RefObject<HTMLSpanElement | null>) {
+  const [fit, setFit] = useState(tools.length);
+  const ends = useRef<{ key: string; list: number[] } | null>(null);
+  const recompute = useCallback(() => {
+    const runs = runsRef.current;
+    const spacer = spacerRef.current;
+    if (!runs || !spacer) return;
+    if (ends.current?.key !== layoutKey) {
+      // Measure only while every tool is rendered; otherwise show all first.
+      const buttons = Array.from(runs.querySelectorAll<HTMLElement>('[data-tool]'));
+      if (buttons.length < tools.length) { setFit(tools.length); return; }
+      const left = runs.getBoundingClientRect().left;
+      // Right edge of each tool including its capsule padding (the group's edge for the last one in a group).
+      const list = buttons.map((b) => {
+        const group = b.closest('.tool-group');
+        const last = !!group?.lastElementChild?.contains(b);
+        return (last && group ? group.getBoundingClientRect().right : b.getBoundingClientRect().right) - left;
+      });
+      ends.current = { key: layoutKey, list };
+    }
+    const list = ends.current.list;
+    const room = runs.getBoundingClientRect().width + spacer.getBoundingClientRect().width;
+    let n = list.length;
+    if (n && list[n - 1] > room + 0.5) {
+      n = 0;
+      while (n < list.length && list[n] <= room - OVERFLOW_W) n++;
+    }
+    setFit(n);
+  }, [layoutKey, tools.length, runsRef, spacerRef]);
+
+  useLayoutEffect(() => {
+    // A changed layout (labels, order, platform) is measured again with all tools shown.
+    if (ends.current?.key !== layoutKey) setFit(tools.length);
+  }, [layoutKey, tools.length]);
+  useLayoutEffect(() => { recompute(); });
+  useLayoutEffect(() => {
+    // The tools' own box and the free space before them change with the window
+    // and with the search field, which widens while it is in use.
+    const ro = new ResizeObserver(() => recompute());
+    if (runsRef.current) ro.observe(runsRef.current);
+    if (spacerRef.current) ro.observe(spacerRef.current);
+    return () => ro.disconnect();
+  }, [recompute, runsRef, spacerRef]);
+  return Math.min(fit, tools.length);
+}
+
+/** The "»" button with the tools that did not fit into the toolbar. */
+function ToolOverflow({ tools }: { tools: ToolId[] }) {
+  const defs = useToolDefs();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useCloseOnOutside(open, ref, close);
+  const anyCheck = tools.some((id) => defs[id].active !== undefined);
+  return (
+    <div className="more-anchor tool-overflow" ref={ref}>
+      <span className="tool-group">
+        <Tooltip text={$t('Weitere Werkzeuge')}>
+          <button type="button" className={`icon-btn${open ? ' is-on' : ''}`} aria-label={$t('Weitere Werkzeuge')} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <CaretDoubleRight size={17} />
+          </button>
+        </Tooltip>
+      </span>
+      {open && (
+        <div role="menu" className="menu more-menu">
+          {tools.map((id) => {
+            const d = defs[id];
+            return (
+              <button key={id} type="button" role="menuitem" className="menu-item" disabled={d.disabled} onClick={() => { close(); d.run(); }}>
+                {anyCheck && <span className="menu-check" aria-hidden="true">{d.active ? <Check size={13} weight="bold" /> : null}</span>}
+                <span className="menu-icon" aria-hidden="true">{d.icon}</span>
+                <span className="flex-1">{d.label}</span>
+                {d.key && <span className="menu-key">{d.key}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Toolbar() {
   const sidebarOn = useStore((s) => s.settings.sidebar !== false);
   const platform = useStore((s) => s.platform);
@@ -171,6 +263,11 @@ export function Toolbar() {
   const defs = useToolDefs();
   const sk = useKeyLabel();
   const groupTools = toolbar.filter((t) => t !== 'nav');
+  const spacerRef = useRef<HTMLSpanElement>(null);
+  const runsRef = useRef<HTMLDivElement>(null);
+  const fit = useToolFit(groupTools, `${labels}|${platform}|${groupTools.join()}`, runsRef, spacerRef);
+  const shown = groupTools.slice(0, fit);
+  const hidden = groupTools.slice(fit);
   const [termMenu, setTermMenu] = useState<{ x: number; y: number } | null>(null);
 
   return (
@@ -193,16 +290,19 @@ export function Toolbar() {
         </div>
       )}
       {/* The tabs live in their own row (Mac, see MainWindow) or in the title bar (Windows). */}
-      <span className="flex-1" data-tauri-drag-region />
+      <span className="flex-1" data-tauri-drag-region ref={spacerRef} />
       <div className="tool-group"><WatchButton mode={labels} /></div>
-      {toolRuns(groupTools).map((run) => (
-        <div key={run.join()} className="tool-group">
-          {run.map((id) => {
-            const d = defs[id];
-            return <ToolButton key={id} mode={labels} label={d.label} short={d.short} shortcut={d.key} active={d.active} disabled={d.disabled} onClick={d.run} icon={d.icon} tool={id} />;
-          })}
-        </div>
-      ))}
+      <div className="tool-runs" ref={runsRef}>
+        {toolRuns(shown).map((run) => (
+          <div key={run.join()} className="tool-group">
+            {run.map((id) => {
+              const d = defs[id];
+              return <ToolButton key={id} mode={labels} label={d.label} short={d.short} shortcut={d.key} active={d.active} disabled={d.disabled} onClick={d.run} icon={d.icon} tool={id} />;
+            })}
+          </div>
+        ))}
+      </div>
+      {hidden.length > 0 && <ToolOverflow tools={hidden} />}
       {/* Windows: the "…" menu sits with the tools, so the search field ends the bar (Explorer, Transmit). */}
       {platform === 'win' && <WinMoreMenu />}
       <label className="search">

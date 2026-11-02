@@ -2326,5 +2326,15 @@
   "Aus „Zuletzt verwendet“ entfernen": "Quitar de «Recientes»",
   "SFTP mit Root-Rechten (sudo)": "SFTP con permisos de root (sudo)",
   "SFTP-Befehl": "Comando SFTP",
-  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane inicia el servidor SFTP con sudo y puede hacer todo lo que puede root, también en /etc. El usuario debe poder ejecutar el comando sin contraseña (NOPASSWD en sudoers). Cuidado: los errores afectan también a archivos del sistema."
+  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane inicia el servidor SFTP con sudo y puede hacer todo lo que puede root, también en /etc. El usuario debe poder ejecutar el comando sin contraseña (NOPASSWD en sudoers). Cuidado: los errores afectan también a archivos del sistema.",
+  "{0} und {1} weitere": "{0} y {1} más",
+  "Ordner angelegt: {0}": "Carpeta creada: {0}",
+  "Datei angelegt: {0}": "Archivo creado: {0}",
+  "In den Papierkorb auf dem Server gelegt: {0}": "Movido a la papelera del servidor: {0}",
+  "In den Papierkorb gelegt: {0}": "Movido a la papelera: {0}",
+  "Gelöscht: {0}": "Eliminado: {0}",
+  "Kopiert: {0} → {1}": "Copiado: {0} → {1}",
+  "Verschoben: {0} → {1}": "Movido: {0} → {1}",
+  "Weitere Werkzeuge": "Más herramientas",
+  "Zu den Orten hinzufügen": "Añadir a lugares"
 }

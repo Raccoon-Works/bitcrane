@@ -2326,5 +2326,15 @@
   "Aus „Zuletzt verwendet“ entfernen": "Verwijderen uit ‘Recent gebruikt’",
   "SFTP mit Root-Rechten (sudo)": "SFTP met rootrechten (sudo)",
   "SFTP-Befehl": "SFTP-opdracht",
-  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane start de SFTP-server via sudo en mag dan alles wat root mag, ook in /etc. De gebruiker moet de opdracht zonder wachtwoord mogen uitvoeren (NOPASSWD in sudoers). Let op: fouten raken dan ook systeembestanden."
+  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane start de SFTP-server via sudo en mag dan alles wat root mag, ook in /etc. De gebruiker moet de opdracht zonder wachtwoord mogen uitvoeren (NOPASSWD in sudoers). Let op: fouten raken dan ook systeembestanden.",
+  "{0} und {1} weitere": "{0} en {1} meer",
+  "Ordner angelegt: {0}": "Map aangemaakt: {0}",
+  "Datei angelegt: {0}": "Bestand aangemaakt: {0}",
+  "In den Papierkorb auf dem Server gelegt: {0}": "Naar de prullenbak op de server verplaatst: {0}",
+  "In den Papierkorb gelegt: {0}": "Naar de prullenbak verplaatst: {0}",
+  "Gelöscht: {0}": "Verwijderd: {0}",
+  "Kopiert: {0} → {1}": "Gekopieerd: {0} → {1}",
+  "Verschoben: {0} → {1}": "Verplaatst: {0} → {1}",
+  "Weitere Werkzeuge": "Meer gereedschap",
+  "Zu den Orten hinzufügen": "Toevoegen aan plaatsen"
 }
