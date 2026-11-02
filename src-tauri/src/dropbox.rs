@@ -38,6 +38,9 @@ pub struct DropboxConn {
     key: &'static str,
     refresh: String,
     token: tokio::sync::Mutex<Token>,
+    /// One commit at a time: Dropbox locks the account while it writes, and
+    /// parallel commits mostly earn "too_many_write_operations" (HTTP 429).
+    write_lock: tokio::sync::Mutex<()>,
     pub home: String,
 }
 
@@ -133,7 +136,7 @@ pub async fn sign_in(open: impl FnOnce(&str) -> AppResult<()>) -> AppResult<oaut
     let client = oauth::http_client()?;
     let answer = oauth::token_request(&client, TOKEN_URL, &[("code", &code), ("grant_type", "authorization_code"), ("client_id", key), ("code_verifier", &verifier), ("redirect_uri", &redirect)]).await?;
     let refresh = answer.refresh_token.ok_or_else(|| AppError::other("Dropbox hat keine dauerhafte Anmeldung geschickt."))?;
-    let conn = DropboxConn { client, key, refresh: refresh.clone(), token: tokio::sync::Mutex::new(Token { access: answer.access_token, valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) }), home: "/".into() };
+    let conn = DropboxConn { client, key, refresh: refresh.clone(), token: tokio::sync::Mutex::new(Token { access: answer.access_token, valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) }), write_lock: tokio::sync::Mutex::new(()), home: "/".into() };
     let account = conn.account().await.unwrap_or_else(|_| "Dropbox".into());
     Ok(oauth::SignedIn { refresh_token: refresh, account })
 }
@@ -146,6 +149,7 @@ impl DropboxConn {
             key,
             refresh: params.refresh_token,
             token: tokio::sync::Mutex::new(Token { access: String::new(), valid_until: Instant::now() }),
+            write_lock: tokio::sync::Mutex::new(()),
             home: "/".into(),
         };
         // Renews the access token and checks the account at once.
@@ -187,9 +191,10 @@ impl DropboxConn {
             let text = resp.text().await.map_err(net)?;
             if status.as_u16() == 429 && attempt + 1 < TRIES {
                 let body_wait = serde_json::from_str::<Value>(&text).ok().and_then(|v| v.pointer("/error/retry_after").and_then(|r| r.as_u64()));
-                let asked = header_wait.or(body_wait).unwrap_or(0);
-                let wait = asked.max(1 + attempt as u64).min(30);
-                tokio::time::sleep(Duration::from_secs(wait)).await;
+                // Dropbox often says "retry_after: 0": then wait briefly and longer with each try.
+                let asked_ms = header_wait.or(body_wait).unwrap_or(0) * 1000;
+                let wait_ms = asked_ms.max(500 * (attempt as u64 + 1)).min(30_000);
+                tokio::time::sleep(Duration::from_millis(wait_ms)).await;
                 attempt += 1;
                 continue;
             }
@@ -398,6 +403,10 @@ impl DropboxConn {
 
     async fn content_call(&self, endpoint: &str, arg: Value, body: Vec<u8>, what: &str) -> AppResult<Value> {
         let headers = [("Dropbox-API-Arg", ascii_json(&arg)), ("Content-Type", "application/octet-stream".to_string())];
+        // Calls that commit a file are serialized (see `write_lock`); sending the
+        // data of a large file in pieces ("append") runs in parallel.
+        let commits = endpoint == "files/upload" || endpoint == "files/upload_session/finish";
+        let _guard = if commits { Some(self.write_lock.lock().await) } else { None };
         let (status, text) = self.post_retry(&format!("{CONTENT}/{endpoint}"), &headers, body).await?;
         if !status.is_success() {
             return Err(api_err(status, &text, what));
