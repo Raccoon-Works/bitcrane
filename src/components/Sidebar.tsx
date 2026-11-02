@@ -278,7 +278,9 @@ export function Sidebar() {
     </>, { 'data-sidebar-favs': '' } as Partial<React.HTMLAttributes<HTMLDivElement>>),
     recent: recent.length > 0 ? section('recent', recent.map((p) => {
       // Two recent folders with the same name ("Applications" and "~/Applications") show where they are.
-      const base = paths.basename(p) || p;
+      // A drive root shows the drive's name as under "Geräte" ("C: WINDOWS 11 PRO").
+      const drive = /^[A-Z]:\/?$/i.test(p) ? drives.find((d) => d.path.replace(/\/$/, '').toUpperCase() === p.replace(/\/$/, '').toUpperCase()) : undefined;
+      const base = drive ? driveName(drive, mac) : paths.basename(p) || p;
       const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
       const where = paths.parent(p);
       return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p));
