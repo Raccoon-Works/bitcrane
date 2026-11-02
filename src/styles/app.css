@@ -299,7 +299,7 @@ kbd,
 
 [data-platform='win'] .menu { border-radius: var(--radius-card); padding: var(--space-1); }
 
-.context-menu { position: absolute; min-width: 280px; }
+.context-menu { position: absolute; min-width: 280px; max-height: calc(100% - 16px); overflow-y: auto; overscroll-behavior: contain; }
 
 .menu-item {
   width: 100%;
@@ -637,7 +637,7 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 .btn-secondary { background: var(--bg-second); }
 .btn-secondary:hover:not(:disabled) { background: var(--bg-second-hover); }
 .btn-secondary:active:not(:disabled) { background: var(--bg-second-pressed); }
-[data-platform='win'][data-theme='light'] .btn-secondary { border: 1px solid var(--field-line); }
+[data-platform='win'][data-theme='light'] :is(.btn-secondary, .btn-danger) { border: 1px solid var(--field-line); }
 /* Destructive action: a calm button with red text instead of a red block (see the
    "Entfernen" window); Cancel keeps the focus so Enter never deletes by accident. */
 .btn-danger { background: var(--bg-second); color: var(--danger); font-weight: 600; }
@@ -1008,7 +1008,9 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 
 .insp-grid {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  /* Labels as wide as the longest one ("Überwachung"), so label and value never touch. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--space-3);
   row-gap: var(--space-2);
   margin: 0;
   font-size: var(--text-small);
@@ -1032,7 +1034,8 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 .toast {
   position: absolute;
   left: 50%;
-  bottom: 64px;
+  /* Above the status lines of both halves, so a message never covers them. */
+  bottom: 96px;
   z-index: 70;
   /* Informational only: clicks go through to what lies underneath. */
   pointer-events: none;
@@ -1726,6 +1729,16 @@ body.is-dragging-place, body.is-dragging-place * { cursor: grabbing !important; 
 .view-switch .icon-btn { width: 26px; height: 22px; border-radius: 6px; }
 .view-switch .icon-btn.is-on { background: var(--bg-card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 .pane-head > .tip-anchor .icon-btn { width: 28px; height: 28px; }
+@container pane (max-width: 420px) {
+  /* Narrow halves (e.g. with the info column): the file name keeps the room, the "nur Server" badge goes. */
+  .row-name .tag { display: none; }
+}
+/* The icon size slider gives way to the folder path in medium-width halves. */
+@container pane (max-width: 560px) {
+  .pane-head .icon-size { width: 52px; margin: 0 var(--space-1); }
+  /* With the size slider (icon view) the connection state stays as the coloured dot; the word goes. */
+  .pane-head:has(.icon-size) .pane-state-text { display: none; }
+}
 @container pane (max-width: 420px) { .pane-state-text { display: none; } }
 .pane { container: pane / inline-size; }
 
@@ -2323,7 +2336,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .term-snippet-item { min-height: 40px; }
 .menu-head { padding: 6px 12px 2px; font-size: var(--text-caption); font-weight: 600; color: var(--text-muted); }
 .snippet-name { width: 160px; flex-shrink: 0; }
-.term-font-field { width: 280px; }
+.term-font-field { width: 360px; max-width: 100%; }
 /* xterm.js paints unused space black; the area takes the scheme's background instead. */
 .term-host .xterm, .term-host .xterm-viewport, .term-host .xterm-scrollable-element { background-color: var(--term-bg, var(--bg-terminal)) !important; }
 .tab-gear { display: grid; place-items: center; width: 18px; color: var(--accent-text); }

@@ -12,6 +12,14 @@ import { closeDialog, useStore } from '../../state/store';
 import { TrafficLights } from '../TrafficLights';
 import { $t } from '../../i18n';
 
+
+/** Whether a dialog has body content (false, null and empty arrays render nothing). */
+function hasContent(c: ReactNode): boolean {
+  if (c === null || c === undefined || c === false || c === '') return false;
+  if (Array.isArray(c)) return c.some(hasContent);
+  return true;
+}
+
 export function Dialog({
   label, title, subtitle, icon, children, footer, width = 560, onClose = closeDialog, windowLike, windowTitle, className = '', maxHeight,
 }: {
@@ -104,7 +112,8 @@ export function Dialog({
             </div>
           </div>
         )}
-        <div className="dialog-body">{children}</div>
+        {/* No empty body (a question with only a title and a sentence): no blank band above the buttons. */}
+        {hasContent(children) && <div className="dialog-body">{children}</div>}
         {footer && <div className="dialog-foot">{footer}</div>}
       </div>
     </div>

@@ -2362,5 +2362,6 @@
   "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Ciò che è già stato trasferito resta. I file rimanenti non verranno trasferiti.",
   "{0} weitere": "altri {0}",
   "{0} löschen?": "Eliminare {0}?",
-  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserva per un po’ i file eliminati; si possono ripristinare sul sito del servizio."
+  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserva per un po’ i file eliminati; si possono ripristinare sul sito del servizio.",
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Spazio o Esc chiude, le frecce scorrono."
 }

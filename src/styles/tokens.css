@@ -310,7 +310,7 @@
   --paper-line: #a0a0a0;
   --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.16);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.22);
-  --scrim: rgba(0, 0, 0, 0.12);
+  --scrim: rgba(0, 0, 0, 0.3);  /* Windows 11 "smoke" behind dialogs (SmokeFillColorDefault, 30 % black). */
   --switch-off: transparent;
 }
 

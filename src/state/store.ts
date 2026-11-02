@@ -3534,6 +3534,9 @@ export function setToolbar(toolbar: ToolId[]) {
 /* Prototype scenarios                                                      */
 /* ------------------------------------------------------------------------ */
 
+/** Version shown by the prototype (About, Settings): the one the screenshots stand for. */
+export const PROTOTYPE_VERSION = '0.3.0';
+
 /** Shows the first-start screen as if no server was saved yet. */
 export function showFirstRun() {
   fs.resetAll();

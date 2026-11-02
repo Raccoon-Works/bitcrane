@@ -2362,5 +2362,6 @@
   "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Lo ya transferido se conserva. Los archivos restantes no se transferirán.",
   "{0} weitere": "{0} más",
   "{0} löschen?": "¿Eliminar {0}?",
-  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserva los archivos eliminados durante un tiempo; se pueden restaurar en la web del servicio."
+  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserva los archivos eliminados durante un tiempo; se pueden restaurar en la web del servicio.",
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Espacio o Esc cierra, las flechas pasan de un archivo a otro."
 }
