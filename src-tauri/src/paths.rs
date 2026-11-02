@@ -1,7 +1,7 @@
 //! Conversion between UI paths and native paths.
 //!
 //! The user interface always uses forward slashes. Local paths below the
-//! user's home folder start with `~` (e.g. `~/Projekte/taskbot`); other local
+//! user's home folder start with `~` (e.g. `~/Projekte/webshop`); other local
 //! paths are absolute (`/Volumes/Data` on macOS, `D:/Daten` on Windows).
 //! Remote paths are plain POSIX paths.
 
@@ -82,8 +82,8 @@ mod tests {
 
     #[test]
     fn home_round_trip() {
-        let p = to_native("~/Projekte/taskbot");
-        assert_eq!(to_ui(&p), "~/Projekte/taskbot");
+        let p = to_native("~/Projekte/webshop");
+        assert_eq!(to_ui(&p), "~/Projekte/webshop");
         assert_eq!(to_ui(&home()), "~");
     }
 }

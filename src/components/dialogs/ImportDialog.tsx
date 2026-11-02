@@ -14,8 +14,8 @@ import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
 const DEMO: ImportedServer[] = [
-  { source: 'SSH-Konfiguration', name: 'bots', group: '', host: 'bots.example', port: 22, user: 'ubuntu', protocol: 'sftp', implicitTls: false, auth: 'key', keyPath: '~/.ssh/cloud_ed25519' },
-  { source: 'FileZilla', name: 'Webseite', group: 'Community', host: 'web.community.example', port: 21, user: 'web', protocol: 'ftps', implicitTls: false, auth: 'password' },
+  { source: 'SSH-Konfiguration', name: 'shop', group: '', host: 'shop.example', port: 22, user: 'deploy', protocol: 'sftp', implicitTls: false, auth: 'key', keyPath: '~/.ssh/shop_ed25519' },
+  { source: 'FileZilla', name: 'Portfolio', group: 'Websites', host: 'portfolio.example', port: 21, user: 'web', protocol: 'ftps', implicitTls: false, auth: 'password' },
   { source: 'WinSCP', name: 'NAS', group: 'Privat', host: 'nas.local', port: 22, user: 'admin', protocol: 'sftp', implicitTls: false, auth: 'password' },
 ];
 

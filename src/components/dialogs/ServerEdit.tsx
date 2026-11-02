@@ -289,7 +289,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pictureFromFile(f).then((url) => set('image', url)).catch(() => showToast($t('Das Bild ließ sich nicht lesen.'), 'error')); }} />
             </label>
             <div className="detail-head-fields">
-              <TextField value={draft.name} onChange={(v) => set('name', v)} placeholder={$t('Name, z. B. Cloud · Bots')} className="name-field" />
+              <TextField value={draft.name} onChange={(v) => set('name', v)} placeholder={$t('Name, z. B. Webshop · Live')} className="name-field" />
               <div className="swatches" role="radiogroup" aria-label={$t('Farbe')}>
                 <span className="small muted" title={$t('Die Farbe erscheint im Tab und über der Serverhälfte, z. B. Rot für den Produktivserver.')}>{$t('Farbe')}</span>
                 {colors.map((c) => (
@@ -505,7 +505,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
             </div>}
 
             <label htmlFor="s-group">{$t('Gruppe')}</label>
-            <TextField id="s-group" value={draft.group} onChange={(v) => set('group', v)} placeholder={$t('z. B. Bots')} className="group-field" />
+            <TextField id="s-group" value={draft.group} onChange={(v) => set('group', v)} placeholder={$t('z. B. Kunden')} className="group-field" />
 
             {/* Transfer rule for this server's manual transfers and watches (settings > Regeln). */}
             <label htmlFor="s-rule">{$t('Regel')}</label>

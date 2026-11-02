@@ -256,7 +256,7 @@ export interface Watch {
   serverId: string;
   remotePath: string;
   state: 'active' | 'paused' | 'waiting';
-  /** Human readable description of the last event, e.g. "welcome.py". */
+  /** Human readable description of the last event, e.g. "cart.py". */
   lastFile: string;
   lastTime: number;
   excludes: string[];

@@ -23,6 +23,7 @@ import { isCloudProtocol } from '../backend/types';
 import { describeFile, formatSize, matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
+import { DEMO_PLATFORM, DEMO_THEME, listenForDemoMessages } from '../util/demo';
 import { $t, LANG, rememberLanguage, type Lang } from '../i18n';
 
 /** True inside the desktop app: real files and real servers instead of the demo data. */
@@ -521,11 +522,11 @@ export const defaultWatchOptions: WatchOptions = {
 function sampleServers(): Server[] {
   const base = { port: 22, auth: 'key' as const, keyPath: '~/.ssh/id_ed25519', online: false };
   return [
-    { ...base, id: 'ob', name: 'Cloud · Bots', mono: 'CB', color: 'gray', ruleId: 'rule-bot', host: 'bots.example', user: 'ubuntu', keyPath: '~/.ssh/cloud_bots_ed25519', group: 'Bots', localStart: '~/Projekte/taskbot/live', remoteStart: '/home/ubuntu/bots/taskbot', online: true, lastUsed: Date.now() - 5 * 60000,
-      places: [{ name: 'ubuntu', path: '/home/ubuntu' }, { name: 'taskbot', path: '/home/ubuntu/bots/taskbot' }, { name: 'newsbot', path: '/home/ubuntu/bots/newsbot' }] },
-    { ...base, id: 'cw', name: 'Community Web', mono: 'CW', color: 'gray', host: 'web.community.example', user: 'web', group: 'Community', localStart: '~/Projekte/community-web', remoteStart: '/var/www/community', online: true, lastUsed: Date.now() - 26 * 3600000,
-      places: [{ name: 'community', path: '/var/www/community' }] },
-    { ...base, id: 'ts', name: 'Testserver', mono: 'TS', color: 'green', host: 'test.community.example', user: 'test', group: 'Community', localStart: '~', remoteStart: '/home/test' },
+    { ...base, id: 'ob', name: 'Webshop · Live', mono: 'WL', color: 'gray', ruleId: 'rule-app', host: 'shop.example', user: 'deploy', keyPath: '~/.ssh/shop_ed25519', group: 'Webshop', localStart: '~/Projekte/webshop/live', remoteStart: '/home/deploy/apps/webshop', online: true, lastUsed: Date.now() - 5 * 60000,
+      places: [{ name: 'deploy', path: '/home/deploy' }, { name: 'webshop', path: '/home/deploy/apps/webshop' }, { name: 'blog', path: '/home/deploy/apps/blog' }] },
+    { ...base, id: 'cw', name: 'Portfolio', mono: 'PF', color: 'gray', host: 'portfolio.example', user: 'web', group: 'Websites', localStart: '~/Projekte/portfolio', remoteStart: '/var/www/portfolio', online: true, lastUsed: Date.now() - 26 * 3600000,
+      places: [{ name: 'portfolio', path: '/var/www/portfolio' }] },
+    { ...base, id: 'ts', name: 'Testserver', mono: 'TS', color: 'green', host: 'test.portfolio.example', user: 'test', group: 'Websites', localStart: '~', remoteStart: '/home/test' },
     { ...base, id: 'nas', name: 'Backup NAS', mono: 'NA', color: 'gray', host: 'nas.local', user: 'admin', auth: 'password', group: 'Privat', localStart: '~/Downloads', remoteStart: '/volume1/backups' },
   ];
 }
@@ -533,16 +534,16 @@ function sampleServers(): Server[] {
 function sampleWatches(): Watch[] {
   return [
     {
-      id: 'w1', name: 'taskbot live', localPath: '~/Projekte/taskbot/live', serverId: 'ob', remotePath: '/home/ubuntu/bots/taskbot',
-      state: 'active', lastFile: 'welcome.py', lastTime: Date.now() - 12000,
+      id: 'w1', name: 'webshop live', localPath: '~/Projekte/webshop/live', serverId: 'ob', remotePath: '/home/deploy/apps/webshop',
+      state: 'active', lastFile: 'cart.py', lastTime: Date.now() - 12000,
       excludes: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp', '.venv'],
-      options: { ...defaultWatchOptions, commandEnabled: true, command: 'pm2 restart taskbot' },
+      options: { ...defaultWatchOptions, commandEnabled: true, command: 'pm2 restart webshop' },
     },
     {
-      id: 'w2', name: 'newsbot live', localPath: '~/Projekte/newsbot', serverId: 'ob', remotePath: '/home/ubuntu/bots/newsbot',
+      id: 'w2', name: 'blog live', localPath: '~/Projekte/blog', serverId: 'ob', remotePath: '/home/deploy/apps/blog',
       state: 'paused', lastFile: '', lastTime: Date.now() - 2 * 3600 * 1000,
       excludes: ['.git', '__pycache__', '.DS_Store'],
-      options: { ...defaultWatchOptions, command: 'pm2 restart newsbot' },
+      options: { ...defaultWatchOptions, command: 'pm2 restart blog' },
     },
   ];
 }
@@ -550,9 +551,9 @@ function sampleWatches(): Watch[] {
 function sampleTransfers(): Transfer[] {
   const now = Date.now();
   return [
-    { id: 't-welcome', name: 'welcome.py', direction: 'up', serverId: 'ob', folder: 'cogs', source: '~/Projekte/taskbot/live/cogs/welcome.py', target: '/home/ubuntu/bots/taskbot/cogs/welcome.py', size: 8192, done: 8192, state: 'done', watchId: 'w1', finishedAt: now - 12000 },
-    { id: 't-cmd0', name: 'pm2 restart taskbot', direction: 'command', serverId: 'ob', folder: '', source: '', target: '', size: 1, done: 1, state: 'done', watchId: 'w1', finishedAt: now - 10000, output: '[PM2] Applying action restartProcessId on app [taskbot]\n[PM2] [taskbot](0) ✓' },
-    { id: 't-app', name: 'app.css', direction: 'up', serverId: 'ob', folder: 'dashboard/static', source: '~/Projekte/taskbot/live/dashboard/static/app.css', target: '/home/ubuntu/bots/taskbot/dashboard/static/app.css', size: 48 * 1024, done: 0, state: 'queued', watchId: 'w1' },
+    { id: 't-welcome', name: 'cart.py', direction: 'up', serverId: 'ob', folder: 'routes', source: '~/Projekte/webshop/live/routes/cart.py', target: '/home/deploy/apps/webshop/routes/cart.py', size: 8192, done: 8192, state: 'done', watchId: 'w1', finishedAt: now - 12000 },
+    { id: 't-cmd0', name: 'pm2 restart webshop', direction: 'command', serverId: 'ob', folder: '', source: '', target: '', size: 1, done: 1, state: 'done', watchId: 'w1', finishedAt: now - 10000, output: '[PM2] Applying action restartProcessId on app [webshop]\n[PM2] [webshop](0) ✓' },
+    { id: 't-app', name: 'app.css', direction: 'up', serverId: 'ob', folder: 'admin/static', source: '~/Projekte/webshop/live/admin/static/app.css', target: '/home/deploy/apps/webshop/admin/static/app.css', size: 48 * 1024, done: 0, state: 'queued', watchId: 'w1' },
   ];
 }
 
@@ -590,6 +591,7 @@ export const defaultToolbar: ToolId[] = ['nav', 'upload', 'download', 'newFolder
 export const oldDefaultToolbars: ToolId[][] = [['nav', 'newFolder', 'refresh', 'info', 'activity'], ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity']];
 
 function detectPlatform(): Platform {
+  if (DEMO_PLATFORM) return DEMO_PLATFORM;
   const p = (navigator.platform || '') + ' ' + navigator.userAgent;
   return /Win/i.test(p) ? 'win' : 'mac';
 }
@@ -602,6 +604,7 @@ function detectPlatform(): Platform {
 const HOST_THEME = typeof document !== 'undefined' ? document.documentElement.dataset.theme : undefined;
 
 function detectTheme(): Theme {
+  if (DEMO_THEME) return DEMO_THEME;
   if (HOST_THEME === 'dark' || HOST_THEME === 'light') return HOST_THEME;
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
@@ -641,7 +644,7 @@ function initialState(): AppState {
     transfers: LIVE ? [] : sampleTransfers(),
     selection: LIVE
       ? { local: { names: [], cursor: -1, anchor: -1 }, remote: { names: [], cursor: -1, anchor: -1 } }
-      : { local: { names: ['bot.py'], cursor: 3, anchor: 3 }, remote: { names: [], cursor: -1, anchor: -1 } },
+      : { local: { names: ['app.py'], cursor: 3, anchor: 3 }, remote: { names: [], cursor: -1, anchor: -1 } },
     focusSide: 'local',
     inspectorOpen: false,
     activityOpen: false,
@@ -676,8 +679,8 @@ function initialState(): AppState {
       showHidden: true, confirmDelete: true, parallel: 2,
       language: LANG, startLocal: '~', startServer: '', fileDoubleClick: 'open', uploadFilePerms: '', uploadDirPerms: '', cloudAsked: false, serverGroups: [], splitRatio: 0.5, serverSourcesWidth: 200, activityHeight: 240, uploadTempName: true, keepMtime: true, existingFiles: 'ask', existingDownload: 'ask', bandwidthLimit: 0,
       autoRetry: true, updateMode: 'auto', skipUnchanged: true, skipPatterns: ['.DS_Store', 'Thumbs.db', 'desktop.ini'], skipLargerMb: 0,
-      // The prototype shows one example rule, used by "Cloud · Bots".
-      rules: LIVE ? [] : [{ id: 'rule-bot', name: 'Bot', excludes: ['venv', '__pycache__', '*.log', '.git'], filePerms: '644', dirPerms: '755', existingUp: 'overwrite', keepOldVersion: true }],
+      // The prototype shows one example rule, used by "Webshop · Live".
+      rules: LIVE ? [] : [{ id: 'rule-app', name: 'Python-App', excludes: ['venv', '__pycache__', '*.log', '.git'], filePerms: '644', dirPerms: '755', existingUp: 'overwrite', keepOldVersion: true }],
       autoReconnect: true, keepAlive: true, readSshConfig: true, writeLog: false, watchTemplates: [],
       showPerms: false, sort: { local: { key: 'name', dir: 1 }, remote: { key: 'name', dir: 1 } }, swapSides: false, editorApp: '', editorByExt: {},
       shortcuts: {}, columns: { mtime: true, size: true }, logLevel: 'normal', recentAddresses: [], serverDefaults: {}, syncFavorites: [], sftpLinks: false,
@@ -908,7 +911,7 @@ export function paneStatus(side: PaneSide, s: AppState = state): { loading: bool
  * Rows of a pane: the folder's entries, sorted and filtered, and below each
  * opened folder (triangle in the list) its entries indented. Rows of opened
  * folders carry their path relative to the folder shown as `name` (e.g.
- * "cogs/welcome.py") and their nesting level as `depth`.
+ * "routes/cart.py") and their nesting level as `depth`.
  */
 export type ViewMode = 'list' | 'icons' | 'columns';
 
@@ -2813,7 +2816,7 @@ function transferNames(from: string, fromDir: string, names: string[], to: strin
   // Two local halves: a plain copy on this computer (Total Commander).
   if (!from && !to) { copyOrMoveLocal(fromDir, names, toDir, false); return; }
   if (from === to) return;
-  // Rows inside opened folders carry a relative path ("cogs/welcome.py"); like in
+  // Rows inside opened folders carry a relative path ("routes/cart.py"); like in
   // the Finder they land directly in the target folder, grouped by their source folder.
   if (names.some((n) => n.includes('/'))) {
     const groups = new Map<string, string[]>();
@@ -3001,7 +3004,7 @@ export function reorderTransfer(id: string, beforeId: string) {
 /** Fixes the demo permission problem so "Wiederholen" succeeds. */
 export function fixDemoPermissions() {
   if (LIVE) return;
-  fs.chmod('remote', 'ob', '/home/ubuntu/bots/taskbot/dashboard/static', '775', 'ubuntu', 'ubuntu');
+  fs.chmod('remote', 'ob', '/home/deploy/apps/webshop/admin/static', '775', 'deploy', 'deploy');
   setState((s) => ({ fsRev: s.fsRev + 1 }));
 }
 
@@ -3141,8 +3144,8 @@ export function simulateLocalChange(watchId?: string) {
 export function simulateConflict() {
   const w = state.watches[0];
   if (!w) return;
-  const path = paths.join(w.localPath, 'bot.py');
-  const target = paths.join(w.remotePath, 'bot.py');
+  const path = paths.join(w.localPath, 'app.py');
+  const target = paths.join(w.remotePath, 'app.py');
   // The user saved locally a moment ago, someone else changed the server copy afterwards.
   fs.touch('local', w.serverId, path, 120);
   window.setTimeout(() => {
@@ -3157,8 +3160,8 @@ export function simulateConflict() {
 export function simulateError() {
   const w = state.watches[0];
   if (!w) return;
-  fs.chmod('remote', w.serverId, paths.join(w.remotePath, 'dashboard/static'), '755', 'root', 'root');
-  const path = paths.join(w.localPath, 'dashboard/static/logo.png');
+  fs.chmod('remote', w.serverId, paths.join(w.remotePath, 'admin/static'), '755', 'root', 'root');
+  const path = paths.join(w.localPath, 'admin/static/logo.png');
   fs.touch('local', w.serverId, path, 200);
   setState((s) => ({ fsRev: s.fsRev + 1 }));
   enqueueWatchFiles(w, [path]);
@@ -3755,9 +3758,9 @@ let started = false;
 /** Prototype: a believable connection log, and one line per finished transfer. */
 function simulateLog(addLog: typeof import('./log').addLog) {
   addLog('info', $t('Bitcrane gestartet, {0} {1}, {2} Überwachungen', state.servers.length, $t('Server'), state.watches.length));
-  addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', 'ubuntu', 'bots.example', 22, $t('SSH-Schlüssel')), 'ob');
-  addLog('ok', $t('Verbunden, Startordner {0}', '/home/ubuntu'), 'ob');
-  addLog('info', $t('Überwachung „{0}“ gestartet', 'taskbot live'), 'ob');
+  addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', 'deploy', 'shop.example', 22, $t('SSH-Schlüssel')), 'ob');
+  addLog('ok', $t('Verbunden, Startordner {0}', '/home/deploy'), 'ob');
+  addLog('info', $t('Überwachung „{0}“ gestartet', 'webshop live'), 'ob');
   const seen = new Map<string, string>();
   subscribeStore(() => {
     for (const t of state.transfers) {
@@ -3782,6 +3785,7 @@ export function startSimulation() {
     void import('./log').then((m) => simulateLog(m.addLog));
   }
   window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change', () => {
-    if (state.settings.themeSetting === 'system') setState({ theme: detectTheme() });
+    if (state.settings.themeSetting === 'system' && !DEMO_THEME) setState({ theme: detectTheme() });
   });
+  listenForDemoMessages((patch) => setState(patch));
 }

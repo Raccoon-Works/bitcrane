@@ -286,10 +286,10 @@ export function unsavedDocs(): EditorDoc[] {
 
 /** Example text for the browser prototype, which reads no real files. */
 function sampleText(name: string): string {
-  if (/\.py$/i.test(name)) return 'import discord\nfrom discord.ext import commands\n\n\nclass Welcome(commands.Cog):\n    """Greets new members in the welcome channel."""\n\n    def __init__(self, bot: commands.Bot):\n        self.bot = bot\n\n    @commands.Cog.listener()\n    async def on_member_join(self, member: discord.Member):\n        channel = member.guild.system_channel\n        if channel is not None:\n            await channel.send(f"Willkommen, {member.mention}!")\n\n\nasync def setup(bot: commands.Bot):\n    await bot.add_cog(Welcome(bot))\n';
-  if (/\.(json)$/i.test(name)) return '{\n  "name": "taskbot",\n  "version": "1.4.2",\n  "prefix": "!",\n  "channels": {\n    "welcome": 1203948576612,\n    "log": 1203948576613\n  }\n}\n';
-  if (/\.(md)$/i.test(name)) return '# Taskbot\n\nEin kleiner Discord-Bot.\n\n## Start\n\n```bash\npython bot.py\n```\n';
-  if (/^\.env$|\.ini$|\.conf$/i.test(name)) return 'TOKEN=…\nGUILD_ID=1203948576600\nLOG_LEVEL=info\n';
+  if (/\.py$/i.test(name)) return 'from flask import Blueprint, jsonify, request\n\nfrom .models import Cart, Product\n\ncart = Blueprint("cart", __name__)\n\n\n@cart.post("/cart/items")\ndef add_item():\n    """Adds a product to the cart of the visitor."""\n    data = request.get_json()\n    product = Product.query.get_or_404(data["id"])\n    Cart.current().add(product, qty=data.get("qty", 1))\n    return jsonify(ok=True)\n';
+  if (/\.(json)$/i.test(name)) return '{\n  "name": "webshop",\n  "version": "1.4.2",\n  "currency": "EUR",\n  "shipping": {\n    "free_from": 50,\n    "countries": ["DE", "AT", "CH"]\n  }\n}\n';
+  if (/\.(md)$/i.test(name)) return '# Webshop\n\nEin kleiner Shop mit Flask.\n\n## Start\n\n```bash\nflask --app app run\n```\n';
+  if (/^\.env$|\.ini$|\.conf$/i.test(name)) return 'SECRET_KEY=…\nDATABASE_URL=sqlite:///data.db\nLOG_LEVEL=info\n';
   return `${name}\n`;
 }
 

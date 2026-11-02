@@ -30,12 +30,13 @@ import { STAGE_ID } from './components/stage';
 import { activeTab, copySelection, getState, goBack, goForward, LIVE, pasteClipboard, setState, startSimulation, useStore, currentZoom } from './state/store';
 import { actionFor } from './state/keys';
 import { startAfterQueueWatch } from './state/tools';
+import { DEMO } from './util/demo';
 
 /** Smallest size at which the window is laid out; smaller screens scale it down. */
 const MIN_W = LIVE ? 960 : 1100;
 const MIN_H = LIVE ? 600 : 680;
 /** Height of the prototype control bar (not shown in the app). */
-const BAR_H = LIVE ? 0 : 44;
+const BAR_H = LIVE || DEMO ? 0 : 44;
 
 function Dialogs() {
   const dialog = useStore((s) => s.dialog);
@@ -219,7 +220,7 @@ export default function App() {
           <MenuBarWindow />
         </div>
       </div>
-      {!LIVE && <PrototypeBar />}
+      {!LIVE && !DEMO && <PrototypeBar />}
     </div>
   );
 }

@@ -279,7 +279,7 @@ export function CodeEditor() {
   };
 
   const openLocal = async () => {
-    if (!LIVE) { void openFile('', '~/Projekte/taskbot/bot.py'); return; }
+    if (!LIVE) { void openFile('', '~/Projekte/webshop/live/app.py'); return; }
     const { open } = await import('@tauri-apps/plugin-dialog');
     const picked = await open({ multiple: true, directory: false, title: $t('Im Editor öffnen') }).catch(() => null);
     const list = Array.isArray(picked) ? picked : picked ? [picked] : [];

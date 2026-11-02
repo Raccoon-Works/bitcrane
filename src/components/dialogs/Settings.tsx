@@ -285,8 +285,8 @@ function MacPermissions() {
 /** Stored host key fingerprints with "Vergessen" (the next connection asks again). */
 function KnownHostsList() {
   const [hosts, setHosts] = useState<KnownHost[] | null>(LIVE ? null : [
-    { host: 'bots.example:22', fingerprint: 'SHA256:Qm9vdHMtZXhhbXBsZS1maW5nZXJwcmludA' },
-    { host: 'web.community.example:22', fingerprint: 'SHA256:V2ViLWNvbW11bml0eS1maW5nZXJwcmlu' },
+    { host: 'shop.example:22', fingerprint: 'SHA256:U2hvcC1leGFtcGxlLWZpbmdlcnByaW50AA' },
+    { host: 'portfolio.example:22', fingerprint: 'SHA256:UG9ydGZvbGlvLWV4YW1wbGUtZmluZ2Vy' },
   ]);
   const load = () => { if (LIVE) backend.knownHostsList().then(setHosts).catch(() => setHosts([])); };
   useEffect(load, []);

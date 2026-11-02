@@ -25,7 +25,7 @@ export interface TermSession {
   id: string;
   serverId: string;
   tabId: string;
-  /** Number shown in the panel's tab ("bot-host 2"). */
+  /** Number shown in the panel's tab ("Webshop 2"). */
   number: number;
   alive: boolean;
   /** Terminals on this computer: the shell chosen in the "+" menu; missing = the setting. */
@@ -40,7 +40,7 @@ export interface Snippet {
   command: string;
   /** Press Enter after inserting (otherwise the command waits for a look). */
   run: boolean;
-  /** Group in the snippet menu and the settings ("KRT Orbit"); none: at the top. */
+  /** Group in the snippet menu and the settings ("Webshop"); none: at the top. */
   group?: string;
   /** Kept in the settings but left out of the snippet menu. */
   hidden?: boolean;
@@ -393,8 +393,27 @@ export function attachTerminal(id: string, container: HTMLElement) {
         const stop = subscribeStore(() => { if (serverById(session.serverId)?.online) { stop(); start(); } });
       } else start();
     } else {
-      l.term.writeln('Bitcrane – Terminal (Vorschau)');
-      l.term.write('$ ');
+      // Browser prototype and website demo: a made-up session that shows what the panel is for.
+      const prompt = session.serverId
+        ? `\x1b[32m${srv?.user || 'deploy'}@${(srv?.host || 'server').split('.')[0]}\x1b[0m:\x1b[34m${(folder || '~').replace(/^\/home\/[^/]+/, '~')}\x1b[0m$ `
+        : `\x1b[32malex@MacBook\x1b[0m \x1b[34m${folder || '~'}\x1b[0m % `;
+      if (session.serverId) {
+        l.term.writeln(`\x1b[2m${$t('Bitcrane – Terminal (Vorschau)')}\x1b[0m`);
+        l.term.writeln(`${prompt}pm2 status`);
+        l.term.writeln('┌────┬──────────┬────────┬────┬──────────┬──────────┐');
+        l.term.writeln('│ id │ name     │ mode   │ ↺  │ status   │ memory   │');
+        l.term.writeln('├────┼──────────┼────────┼────┼──────────┼──────────┤');
+        l.term.writeln('│ 0  │ webshop  │ fork   │ 12 │ \x1b[32monline\x1b[0m   │ 84.2mb   │');
+        l.term.writeln('│ 1  │ blog     │ fork   │ 3  │ \x1b[32monline\x1b[0m   │ 41.7mb   │');
+        l.term.writeln('└────┴──────────┴────────┴────┴──────────┴──────────┘');
+        l.term.writeln(`${prompt}tail -n 3 logs/app.log`);
+        l.term.writeln('\x1b[2m[23:41:07]\x1b[0m GET /cart 200 12ms');
+        l.term.writeln('\x1b[2m[23:41:09]\x1b[0m POST /cart/items 200 31ms');
+        l.term.writeln('\x1b[2m[23:41:12]\x1b[0m GET /products/mug-blue 200 8ms');
+      } else {
+        l.term.writeln(`\x1b[2m${$t('Bitcrane – Terminal (Vorschau)')}\x1b[0m`);
+      }
+      l.term.write(prompt);
     }
   } else {
     l.fit.fit();
@@ -544,20 +563,20 @@ export async function importTabbySnippets(): Promise<number | null> {
 /** Sample for the prototype (no Tabby there). */
 const PREVIEW_TABBY = `qc:
   groups:
-    - name: KRT Orbit
+    - name: Webshop
   cmds:
-    - name: Bot neu starten
-      text: cd ~/krt-orbit-bot && bash restart.sh bot
+    - name: App neu starten
+      text: cd ~/apps/webshop && pm2 restart webshop
       appendCR: true
-      group: KRT Orbit
+      group: Webshop
     - name: Zustand ansehen
       text: pm2 status
       appendCR: true
-      group: KRT Orbit
-    - name: Letzte Log-Zeilen des Bots
-      text: pm2 logs krt-orbit-bot --lines 40
+      group: Webshop
+    - name: Letzte Log-Zeilen der App
+      text: pm2 logs webshop --lines 40
       appendCR: true
-      group: KRT Orbit
+      group: Webshop
 `;
 
 export function findInTerminal(id: string, text: string, back = false) {

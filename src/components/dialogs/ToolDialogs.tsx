@@ -89,7 +89,7 @@ export function WorkspacesDialog() {
       footer={<><span className="flex-1" /><Button onClick={closeDialog}>{$t('Fertig')}</Button></>}>
       <div className="form-stack">
         <span className="row-inline">
-          <TextField label={$t('Name des Arbeitsbereichs')} value={name} onChange={setName} placeholder={$t('z. B. Bots')} onEnter={() => { saveWorkspace(name); setName(''); }} className="flex-1" />
+          <TextField label={$t('Name des Arbeitsbereichs')} value={name} onChange={setName} placeholder={$t('z. B. Webshop')} onEnter={() => { saveWorkspace(name); setName(''); }} className="flex-1" />
           <Button disabled={!name.trim()} onClick={() => { saveWorkspace(name); setName(''); }}>{tabCount === 1 ? $t('1 Tab speichern') : $t('{0} Tabs speichern', tabCount)}</Button>
         </span>
         {!list.length && <p className="small muted">{$t('Noch kein Arbeitsbereich gespeichert.')}</p>}

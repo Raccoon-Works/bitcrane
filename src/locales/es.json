@@ -423,7 +423,6 @@
   "Neue Gruppe": "Nuevo grupo",
   "Gruppe: im Feld „Gruppe“ einen Namen eintragen": "Grupo: introduce un nombre en el campo “Grupo”",
   "Importieren …": "Importar …",
-  "Name, z. B. Cloud · Bots": "Nombre, p. ej., Cloud · Bots",
   "Farbe": "Color",
   "Verschlüsselung": "Cifrado",
   "FTPS: TLS anfordern (empfohlen)": "FTPS: solicitar TLS (recomendado)",
@@ -461,7 +460,6 @@
   "Keiner, direkt verbinden": "Ninguno (conectar directamente)",
   "Über {0}": "A través de {0}",
   "Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).": "Para servidores a los que solo se puede acceder a través de otro servidor (como ProxyJump en la configuración SSH).",
-  "z. B. Bots": "p. ej., Bots",
   "Weitere Einstellungen": "Más ajustes",
   "Notiz": "Nota",
   "Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz": "Proxy, versión de TLS, nombres de archivo, zona horaria, modo de transferencia, nota",
@@ -2363,5 +2361,9 @@
   "{0} weitere": "{0} más",
   "{0} löschen?": "¿Eliminar {0}?",
   "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserva los archivos eliminados durante un tiempo; se pueden restaurar en la web del servicio.",
-  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Espacio o Esc cierra, las flechas pasan de un archivo a otro."
+  "Leertaste oder Esc schließt, Pfeiltasten blättern.": "Espacio o Esc cierra, las flechas pasan de un archivo a otro.",
+  "Name, z. B. Webshop · Live": "Nombre, p. ej. Webshop · Live",
+  "z. B. Kunden": "p. ej. Clientes",
+  "z. B. Webshop": "p. ej. Webshop",
+  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminal (vista previa)"
 }

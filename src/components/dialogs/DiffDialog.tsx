@@ -15,8 +15,8 @@ import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
 /** Demo texts for the browser prototype. */
-const DEMO_SERVER = 'import discord\nfrom discord.ext import commands\n\nPREFIX = "!"\nDEBUG = True\n\nbot = commands.Bot(command_prefix=PREFIX)\n\n@bot.event\nasync def on_ready():\n    print("online")\n\nbot.run(TOKEN)\n';
-const DEMO_LOCAL = 'import discord\nfrom discord.ext import commands\n\nPREFIX = "!"\nDEBUG = False\nLOG_LEVEL = "info"\n\nbot = commands.Bot(command_prefix=PREFIX)\n\n@bot.event\nasync def on_ready():\n    print("Taskbot online")\n\nbot.run(TOKEN)\n';
+const DEMO_SERVER = 'from flask import Flask\n\nfrom .routes import cart, products\n\nDEBUG = True\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\n\n\n@app.get("/health")\ndef health():\n    return "ok"\n';
+const DEMO_LOCAL = 'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
 
 interface Loaded {
   server: string;

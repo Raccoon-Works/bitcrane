@@ -43,11 +43,11 @@ const onDay = (day: number, month: number, hour = 10, minute = 0) => {
   return d.getTime();
 };
 
-function file(size: number, mtime: number, perms = '644', owner = 'ubuntu', group = 'ubuntu'): FileNode {
+function file(size: number, mtime: number, perms = '644', owner = 'deploy', group = 'deploy'): FileNode {
   return { kind: 'file', size, mtime, perms, owner, group };
 }
 
-function dir(children: Record<string, Node>, mtime = ago(2 * DAY), perms = '755', owner = 'ubuntu', group = 'ubuntu'): DirNode {
+function dir(children: Record<string, Node>, mtime = ago(2 * DAY), perms = '755', owner = 'deploy', group = 'deploy'): DirNode {
   return { kind: 'dir', mtime, perms, owner, group, children };
 }
 
@@ -56,14 +56,14 @@ const lf = (size: number, mtime: number) => file(size, mtime, '644', 'alex', 'st
 const ld = (children: Record<string, Node>, mtime?: number) => dir(children, mtime, '755', 'alex', 'staff');
 
 /** Creates the sample project that appears both locally and on the server. */
-function taskbotLocal(): DirNode {
+function shopLocal(): DirNode {
   return ld({
-    cogs: ld({
-      'welcome.py': lf(8 * 1024, ago(3 * MIN)),
-      'moderation.py': lf(21 * 1024, ago(2 * DAY)),
-      'events.py': lf(12 * 1024, ago(5 * DAY)),
+    routes: ld({
+      'cart.py': lf(8 * 1024, ago(3 * MIN)),
+      'products.py': lf(21 * 1024, ago(2 * DAY)),
+      'checkout.py': lf(12 * 1024, ago(5 * DAY)),
     }, ago(1 * MIN)),
-    dashboard: ld({
+    admin: ld({
       static: ld({
         'app.css': lf(48 * 1024, ago(2 * MIN)),
         'logo.png': lf(96 * 1024, ago(2 * MIN)),
@@ -73,9 +73,9 @@ function taskbotLocal(): DirNode {
         'index.html': lf(9 * 1024, ago(4 * DAY)),
         'login.html': lf(4 * 1024, ago(9 * DAY)),
       }),
-      'server.py': lf(16 * 1024, ago(6 * DAY)),
+      'views.py': lf(16 * 1024, ago(6 * DAY)),
     }, ago(2 * MIN)),
-    'bot.py': lf(14 * 1024, ago(9 * MIN)),
+    'app.py': lf(14 * 1024, ago(9 * MIN)),
     'config.py': lf(3 * 1024, ago(1 * DAY + 4 * HOUR)),
     'requirements.txt': lf(1 * 1024, onDay(12, 10)),
     'README.md': lf(6 * 1024, onDay(8, 10)),
@@ -83,14 +83,14 @@ function taskbotLocal(): DirNode {
   }, ago(1 * MIN));
 }
 
-function taskbotRemote(): DirNode {
+function shopRemote(): DirNode {
   return dir({
-    cogs: dir({
-      'welcome.py': file(8 * 1024, ago(3 * MIN)),
-      'moderation.py': file(21 * 1024, ago(2 * DAY)),
-      'events.py': file(12 * 1024, ago(5 * DAY)),
+    routes: dir({
+      'cart.py': file(8 * 1024, ago(3 * MIN)),
+      'products.py': file(21 * 1024, ago(2 * DAY)),
+      'checkout.py': file(12 * 1024, ago(5 * DAY)),
     }, ago(1 * MIN)),
-    dashboard: dir({
+    admin: dir({
       static: dir({
         'app.css': file(47 * 1024, ago(1 * DAY)),
         'style.css': file(18 * 1024, ago(3 * DAY)),
@@ -99,27 +99,27 @@ function taskbotRemote(): DirNode {
         'index.html': file(9 * 1024, ago(4 * DAY)),
         'login.html': file(4 * 1024, ago(9 * DAY)),
       }),
-      'server.py': file(16 * 1024, ago(6 * DAY)),
+      'views.py': file(16 * 1024, ago(6 * DAY)),
     }, ago(55 * MIN)),
     logs: dir({
-      'bot.log': file(412 * 1024, ago(1 * MIN)),
+      'app.log': file(412 * 1024, ago(1 * MIN)),
       'error.log': file(18 * 1024, ago(2 * HOUR)),
       // A large folder (rotated hourly logs), to try long lists in the prototype.
-      archiv: dir(Object.fromEntries(Array.from({ length: 2400 }, (_, i) => [`bot-${String(Math.floor(i / 24) + 1).padStart(3, '0')}-${String(i % 24).padStart(2, '0')}h.log`, file(20 * 1024 + ((i * 7919) % 90000), ago((i + 1) * HOUR))]))),
+      archiv: dir(Object.fromEntries(Array.from({ length: 2400 }, (_, i) => [`app-${String(Math.floor(i / 24) + 1).padStart(3, '0')}-${String(i % 24).padStart(2, '0')}h.log`, file(20 * 1024 + ((i * 7919) % 90000), ago((i + 1) * HOUR))]))),
     }, ago(1 * MIN)),
-    'bot.py': file(14 * 1024, ago(9 * MIN)),
+    'app.py': file(14 * 1024, ago(9 * MIN)),
     'config.py': file(3 * 1024, ago(1 * DAY + 4 * HOUR)),
     'data.db': file(Math.round(2.4 * 1024 * 1024), ago(1 * MIN)),
     '.env': file(1 * 1024, onDay(2, 10), '600'),
   }, ago(1 * MIN));
 }
 
-function newsbot(local: boolean): DirNode {
+function blog(local: boolean): DirNode {
   const f = local ? lf : file;
   const d = local ? ld : dir;
   return d({
     'main.py': f(11 * 1024, ago(3 * DAY)),
-    'scanner.py': f(27 * 1024, ago(3 * DAY)),
+    'feed.py': f(27 * 1024, ago(3 * DAY)),
     'requirements.txt': f(1024, ago(20 * DAY)),
   }, ago(3 * DAY));
 }
@@ -130,9 +130,9 @@ let localRoot: DirNode = createLocal();
 function createLocal(): DirNode {
   return ld({
     Projekte: ld({
-      taskbot: ld({ live: taskbotLocal() }),
-      newsbot: newsbot(true),
-      'community-web': ld({
+      webshop: ld({ live: shopLocal() }),
+      blog: blog(true),
+      portfolio: ld({
         'index.php': lf(5 * 1024, ago(7 * DAY)),
         'style.css': lf(22 * 1024, ago(7 * DAY)),
       }),
@@ -157,8 +157,8 @@ function createRemote(serverId: string): DirNode {
     case 'ob':
       return dir({
         home: dir({
-          ubuntu: dir({
-            bots: dir({ taskbot: taskbotRemote(), newsbot: newsbot(false) }),
+          deploy: dir({
+            apps: dir({ webshop: shopRemote(), blog: blog(false) }),
             backups: dir({ 'export-2026-10.zip': file(172 * 1024 * 1024, ago(5 * DAY)) }),
             '.bashrc': file(3 * 1024, ago(90 * DAY)),
           }),
@@ -168,8 +168,8 @@ function createRemote(serverId: string): DirNode {
       return dir({
         var: dir({
           www: dir({
-            community: dir({
-              wcf: dir({ templates: dir({ 'index.php': file(5 * 1024, ago(7 * DAY)) }) }),
+            portfolio: dir({
+              assets: dir({ templates: dir({ 'index.php': file(5 * 1024, ago(7 * DAY)) }) }),
               'index.php': file(5 * 1024, ago(7 * DAY), '644', 'www-data', 'www-data'),
               'style.css': file(21 * 1024, ago(9 * DAY), '644', 'www-data', 'www-data'),
             }, ago(7 * DAY), '755', 'www-data', 'www-data'),
@@ -189,7 +189,7 @@ function rootFor(side: 'local' | 'remote', serverId: string): DirNode {
   return remoteRoots[serverId];
 }
 
-/** Splits a path like "~/Projekte/a" or "/home/ubuntu" into segments. */
+/** Splits a path like "~/Projekte/a" or "/home/deploy" into segments. */
 export function segments(path: string): string[] {
   return path.replace(/^~\/?/, '').split('/').filter(Boolean);
 }
@@ -286,7 +286,7 @@ function ensureDir(side: 'local' | 'remote', serverId: string, path: string, own
 
 /** Writes or replaces a file. Creates missing parent folders. */
 export function writeFile(side: 'local' | 'remote', serverId: string, path: string, size: number, mtime = Date.now()) {
-  const owner = side === 'local' ? 'alex' : 'ubuntu';
+  const owner = side === 'local' ? 'alex' : 'deploy';
   const d = ensureDir(side, serverId, parent(path), owner);
   const existing = d.children[basename(path)];
   const perms = existing && existing.kind === 'file' ? existing.perms : '644';
@@ -295,7 +295,7 @@ export function writeFile(side: 'local' | 'remote', serverId: string, path: stri
 }
 
 export function makeDir(side: 'local' | 'remote', serverId: string, path: string) {
-  ensureDir(side, serverId, path, side === 'local' ? 'alex' : 'ubuntu');
+  ensureDir(side, serverId, path, side === 'local' ? 'alex' : 'deploy');
 }
 
 export function remove(side: 'local' | 'remote', serverId: string, path: string) {
