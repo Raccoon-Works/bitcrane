@@ -2355,5 +2355,9 @@
   "Neuer Versuch in {0} Sek. ({1} von 10).": "Nuevo intento en {0} s ({1} de 10).",
   "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "La vigilancia sigue recopilando: los archivos en espera se subirán cuando vuelva la conexión.",
   "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Las transferencias en espera continuarán cuando vuelva la conexión.",
-  "{0} wird gelöscht …": "Eliminando {0} …"
+  "{0} wird gelöscht …": "Eliminando {0} …",
+  "Alle abbrechen": "Cancelar todo",
+  "Die Übertragung abbrechen?": "¿Cancelar la transferencia?",
+  "Alle {0} Übertragungen abbrechen?": "¿Cancelar las {0} transferencias?",
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Lo ya transferido se conserva. Los archivos restantes no se transferirán."
 }

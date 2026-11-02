@@ -2355,5 +2355,9 @@
   "Neuer Versuch in {0} Sek. ({1} von 10).": "Nuovo tentativo tra {0} s ({1} di 10).",
   "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "Il monitoraggio continua a raccogliere: i file in attesa verranno caricati appena torna la connessione.",
   "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "I trasferimenti in attesa riprenderanno appena torna la connessione.",
-  "{0} wird gelöscht …": "Eliminazione di {0} …"
+  "{0} wird gelöscht …": "Eliminazione di {0} …",
+  "Alle abbrechen": "Annulla tutto",
+  "Die Übertragung abbrechen?": "Annullare il trasferimento?",
+  "Alle {0} Übertragungen abbrechen?": "Annullare tutti i {0} trasferimenti?",
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Ciò che è già stato trasferito resta. I file rimanenti non verranno trasferiti."
 }

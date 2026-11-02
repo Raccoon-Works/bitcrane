@@ -5,7 +5,7 @@
 import { ChevronDown, ChevronRight, GripVertical, Pause, Play, X } from '../glyphs';
 import { useState } from 'react';
 import {
-  cancelTransfer, clearFinished, closeDialog, fixDemoPermissions, openDialog, pauseAllTransfers, reorderTransfer, retryTransfer, skipTransfer, toggleTransferPause, useStore,
+  askCancelAllTransfers, cancelTransfer, clearFinished, closeDialog, fixDemoPermissions, openDialog, pauseAllTransfers, reorderTransfer, retryTransfer, skipTransfer, toggleTransferPause, useStore,
 } from '../../state/store';
 import { formatDuration, formatSize, formatSpeed, formatTime } from '../../util/format';
 import { Progress, TransferIcon } from '../Activity';
@@ -34,7 +34,10 @@ export function TransfersDialog() {
   const pending = transfers.filter((t) => (t.state === 'running' || t.state === 'queued') && t.direction !== 'command');
   const totalBytes = pending.reduce((a, t) => a + t.size, 0);
   const doneBytes = pending.reduce((a, t) => a + Math.min(t.done, t.size), 0);
-  const remaining = speed > 0 ? (totalBytes - doneBytes) / speed : 0;
+  // Only an estimate worth showing: with a trickle of bytes (many tiny files, a stalled
+  // connection) the figure runs into thousands of hours, so a dash is shown instead.
+  const estimate = speed > 0 ? (totalBytes - doneBytes) / speed : 0;
+  const remaining = estimate > 0 && estimate < 100 * 3600 ? estimate : 0;
   const srvName = (id: string) => servers.find((x) => x.id === id)?.name ?? '';
 
   // Plain render functions (not components) so rows are not remounted on every progress tick.
@@ -108,6 +111,7 @@ export function TransfersDialog() {
         <span className="flex-1" />
         {/* Nothing running and nothing paused: no button (it would do nothing). */}
         {(anyActive || transfers.some((t) => t.state === 'paused')) && <Button small onClick={pauseAllTransfers}>{anyActive ? <><Pause size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle pausieren')}</> : <><Play size={12} strokeWidth={2} aria-hidden="true" />{$t('Alle fortsetzen')}</>}</Button>}
+        {transfers.some((t) => t.state !== 'done') && <Button small variant="danger" onClick={askCancelAllTransfers}>{$t('Alle abbrechen')}</Button>}
       </div>
       <div className="tr-stats">
         <div><span className={`stat${running.length ? ' tone-accent' : ''}`}>{running.length}</span><span className="small muted">{$t('laufen gerade')}</span></div>

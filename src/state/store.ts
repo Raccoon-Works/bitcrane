@@ -2966,6 +2966,21 @@ export function pauseAllTransfers() {
   setState((s) => ({ transfers: s.transfers.map((x) => (anyActive ? (x.state === 'running' || x.state === 'queued' ? { ...x, state: 'paused', hold: undefined } : x) : x.state === 'paused' ? { ...x, state: 'queued', hold: undefined } : x)) }));
 }
 
+/**
+ * "Alle abbrechen" (WinSCP, FileZilla: clear the queue): every transfer that has not
+ * finished is removed, after asking. Files already transferred stay where they are.
+ */
+export function askCancelAllTransfers() {
+  const open = state.transfers.filter((x) => x.state !== 'done');
+  if (!open.length) return;
+  openDialog({
+    type: 'confirm', danger: true, confirm: $t('Alle abbrechen'),
+    title: open.length === 1 ? $t('Die Übertragung abbrechen?') : $t('Alle {0} Übertragungen abbrechen?', open.length),
+    text: $t('Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.'),
+    run: () => setState((s) => ({ transfers: s.transfers.filter((x) => x.state === 'done'), dialog: { type: 'transfers' } })),
+  });
+}
+
 export function clearFinished() {
   setState((s) => ({ transfers: s.transfers.filter((x) => x.state !== 'done') }));
 }
