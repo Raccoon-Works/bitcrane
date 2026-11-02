@@ -225,7 +225,7 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
       {test === 'ok' && <span className="small tone-ok row-inline test-result"><Check size={13} strokeWidth={2.2} aria-hidden="true" />{testText}</span>}
       {test === 'fail' && <span className="small tone-danger test-result">{testText}</span>}
       <span className="flex-1" />
-      {!isNew && <Button variant="ghost" className="tone-danger-text" onClick={() => askRemoveServer(draft.id)}><Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />{$t('Entfernen')}</Button>}
+      {!isNew && <Button variant="danger" onClick={() => askRemoveServer(draft.id)}><Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />{$t('Entfernen')}</Button>}
       <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
       {cloud && isNew
         // A new cloud service is created by signing in (the browser gives Bitcrane the account).
