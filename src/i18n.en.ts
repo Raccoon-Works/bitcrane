@@ -2323,4 +2323,9 @@ export const EN: Record<string, string> = {
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "This works when both halves show the same computer or server.",
   "Das geht nur mit Ordnern dieses Computers.": "This only works with folders on this computer.",
   "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C without a selection interrupts)",
+  "Zu den Favoriten hinzufügen": "Add to Favorites",
+  "Aus „Zuletzt verwendet“ entfernen": "Remove from “Recently used”",
+  "SFTP mit Root-Rechten (sudo)": "SFTP with root rights (sudo)",
+  "SFTP-Befehl": "SFTP command",
+  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane starts the SFTP server through sudo and may then do anything root may, also in /etc. The user must be allowed to run the command without a password (NOPASSWD in sudoers). Careful: mistakes then hit system files too.",
 };

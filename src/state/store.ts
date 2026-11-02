@@ -97,7 +97,7 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git' | 'tab';
+  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarRecent' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git' | 'tab';
   /** Tab right-clicked in the tab bar ("tab"). */
   tabId?: string;
   /** Group right-clicked in the server list ("serverGroup"). */
@@ -2653,6 +2653,18 @@ function askMoveAcross(from: string, fromDir: string, names: string[], to: strin
       else showToast($t('{0} wird verschoben (Prototyp).', what));
     },
   });
+}
+
+/** Takes a folder off "Zuletzt verwendet" (the folder itself stays). */
+export function removeRecent(path: string) {
+  updateSettings({ recentDirs: (state.settings.recentDirs ?? []).filter((p) => p !== path) });
+  setState({ contextMenu: null });
+}
+
+/** Empties "Zuletzt verwendet". */
+export function clearRecent() {
+  updateSettings({ recentDirs: [] });
+  setState({ contextMenu: null });
 }
 
 /** ⌥⌘V (Finder "Objekt hierher bewegen"): what ⌘C remembered is moved here instead of copied. */

@@ -188,7 +188,7 @@ async fn load_sftp() {
     let (host, port) = target.split_once(':').unwrap();
     let dir = tempfile::tempdir().unwrap();
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-    let p = |trust: Option<String>| ConnectParams { timeout: None, forward_agent: false,
+    let p = |trust: Option<String>| ConnectParams { sftp_command: None, timeout: None, forward_agent: false,
         host: host.into(), port: port.parse().unwrap(), user: "test".into(),
         auth: AuthParams::Key { path: std::env::var("BITCRANE_TEST_KEY").unwrap(), passphrase: None },
         trust, keepalive: true, scp: false, jump: None, proxy: None,

@@ -13,12 +13,12 @@
  * - Right click on a favourite: open, copy path, move up or down, remove.
  * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
-import { CaretDown, ClockCounterClockwise, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, HardDrive, HardDrives, House, Usb, Network } from '@phosphor-icons/react';
+import { X, CaretDown, ClockCounterClockwise, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, HardDrive, HardDrives, House, Usb, Network } from '@phosphor-icons/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t, LOCALE } from '../i18n';
-import { LIVE, activeTab, editLocalPlaces, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
+import { LIVE, removeRecent, activeTab, editLocalPlaces, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
 import { BrandLogo, isBrandService } from './BrandLogo';
 import { placeLabel } from './PlacesBar';
@@ -283,7 +283,11 @@ export function Sidebar() {
       const base = drive ? driveName(drive, mac) : paths.basename(p) || p;
       const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
       const where = paths.parent(p);
-      return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p));
+      return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p),
+        { onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarRecent', place: p } }); } },
+        // A small × on hover takes the folder off the list (the folder itself stays).
+        <span className="side-remove" role="button" tabIndex={-1} aria-label={$t('Aus „Zuletzt verwendet“ entfernen')} title={$t('Aus „Zuletzt verwendet“ entfernen')}
+          onClick={(e) => { e.stopPropagation(); removeRecent(p); }}><X size={12} weight="bold" /></span>);
     })) : null,
     devices: section('devices', devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, driveName(d, mac), d.path, () => open(d.path), {},
       d.free !== undefined ? <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>{shortSize(d.free)}</span> : undefined))),
