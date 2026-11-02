@@ -372,7 +372,7 @@ kbd,
 .toolbar > :not(.tool-runs):not(.flex-1) { flex-shrink: 0; }
 .tool-overflow { flex-shrink: 0; }
 .tool-overflow .more-menu { min-width: 240px; }
-.menu-icon { width: 18px; display: inline-grid; place-items: center; color: var(--text-secondary); }
+.menu-icon { width: 18px; display: inline-grid; place-items: center; color: var(--text-muted); }
 .menu-icon svg { width: 16px; height: 16px; }
 .more-menu { position: absolute; top: 36px; right: 0; min-width: 260px; transform-origin: top right; }
 .submenu-anchor { position: relative; }
@@ -1049,7 +1049,9 @@ body.is-resizing * { cursor: col-resize !important; user-select: none !important
 
 /* The text stays in the normal colour; only the small symbol carries the kind of message. */
 .toast { display: flex; align-items: center; gap: var(--space-2); text-align: left; color: var(--text); font-size: var(--text-small); }
-.toast-icon { flex-shrink: 0; color: var(--text-muted); }
+.toast-icon { flex-shrink: 0; color: var(--text-muted); align-self: flex-start; margin-top: 1px; }
+.toast-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.toast-hint { color: var(--text-muted); font-size: var(--text-caption); }
 .toast.toast-ok .toast-icon { color: var(--success); }
 .toast.toast-update .toast-icon { color: var(--accent-text); }
 .toast.toast-error .toast-icon { color: var(--danger); }

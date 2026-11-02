@@ -113,12 +113,15 @@ export function MainWindow() {
       </div>
       {/* Neutral card in the normal text colour; only the small symbol shows the kind of message. */}
       {toast && (
-        <div className={`toast toast-${toast.tone}`} role="status">
+        <div className={`toast toast-${toast.tone}`} role={toast.tone === 'error' ? 'alert' : 'status'}>
           {toast.tone === 'ok' ? <CheckCircle size={18} className="toast-icon" aria-hidden="true" />
             : toast.tone === 'error' ? <WarningCircle size={18} className="toast-icon" aria-hidden="true" />
               : toast.tone === 'update' ? <DownloadSimple size={18} className="toast-icon" aria-hidden="true" />
                 : <Info size={18} className="toast-icon" aria-hidden="true" />}
-          <span>{toast.text}</span>
+          <span className="toast-body">
+            <span>{toast.text}</span>
+            {toast.hint && <span className="toast-hint">{toast.hint}</span>}
+          </span>
         </div>
       )}
     </div>

@@ -2336,5 +2336,20 @@
   "Kopiert: {0} → {1}": "Skopiowano: {0} → {1}",
   "Verschoben: {0} → {1}": "Przeniesiono: {0} → {1}",
   "Weitere Werkzeuge": "Więcej narzędzi",
-  "Zu den Orten hinzufügen": "Dodaj do miejsc"
+  "Zu den Orten hinzufügen": "Dodaj do miejsc",
+  "Beim nächsten Verbinden fragt Bitcrane wieder danach.": "Bitcrane zapyta o nie ponownie przy następnym połączeniu.",
+  "Bitcrane verbindet sich neu, sobald der Server wieder erreichbar ist.": "Bitcrane połączy się ponownie, gdy serwer znów będzie osiągalny.",
+  "Einzelheiten unter Übertragungen.": "Szczegóły w Transferach.",
+  "Nach dem Beheben die Überwachung wieder starten.": "Po usunięciu problemu uruchom obserwację ponownie.",
+  "Überwachung „{0}“": "Obserwacja „{0}”",
+  "Benutzer, Passwort oder Schlüssel in den Servereinstellungen prüfen.": "Sprawdź użytkownika, hasło lub klucz w ustawieniach serwera.",
+  "Adresse und Port prüfen und ob der Server läuft.": "Sprawdź adres i port oraz czy serwer działa.",
+  "Adresse, Port und Protokoll in den Servereinstellungen prüfen.": "Sprawdź adres, port i protokół w ustawieniach serwera.",
+  "Einen anderen Namen wählen oder das Vorhandene zuerst entfernen.": "Wybierz inną nazwę lub najpierw usuń istniejący element.",
+  "Einzelheiten im Protokoll.": "Szczegóły w dzienniku.",
+  "Auf diesem Computer sind Server aus anderen Programmen gespeichert. Die ausgewählten kommen in die Serverliste; Passwörter werden nicht übernommen, Bitcrane fragt beim ersten Verbinden danach.": "Na tym komputerze są serwery zapisane w innych programach. Wybrane trafią na listę serwerów; hasła nie są przenoszone, Bitcrane zapyta o nie przy pierwszym połączeniu.",
+  "Nicht übernehmen": "Nie importuj",
+  "Das geht später jederzeit unter Server > Server importieren …": "Możesz to zrobić później w Serwer > Importuj serwery …",
+  "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Być może właśnie przeniesiono lub usunięto. Odśwież przyciskiem „Odśwież”.",
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Sprawdź uprawnienia w „Informacje i uprawnienia”."
 }

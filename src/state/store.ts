@@ -9,6 +9,7 @@
  * drops and folder watch events. In the app (`LIVE`), actions delegate to
  * `live.ts`, which calls the Rust core and receives progress through events.
  */
+import { showError } from './errors';
 import type { Snippet, TermSession, TerminalSettings } from './terminal';
 import { useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -72,7 +73,7 @@ export type DialogState =
   | { type: 'cloudSignIn'; service: Protocol; serverId?: string }
   | { type: 'mergeFolders'; fromDir: string; names: string[]; toDir: string; move: boolean; clashes: string[] }
   | { type: 'compare'; favoriteId?: string }
-  | { type: 'import' }
+  | { type: 'import'; firstStart?: boolean }
   | { type: 'cloudPlaces'; found: CloudPlace[] }
   | { type: 'authPrompt'; id: string; serverId: string; host: string; name: string; instructions: string; prompts: Array<{ text: string; echo: boolean }> };
 
@@ -176,6 +177,8 @@ export interface Settings {
   uploadFilePerms: string;
   /** True once Bitcrane offered the cloud folders it found (first start). */
   cloudAsked: boolean;
+  /** True once Bitcrane offered the servers of other programs (first start without servers). */
+  importAsked?: boolean;
   /** Server groups without servers yet (created with "Neue Gruppe"); groups with servers come from the servers. */
   serverGroups: string[];
   /** Share of the left half in the window (0.2 … 0.8), set by dragging the line between the halves. */
@@ -466,7 +469,7 @@ export interface AppState {
   /** Clock used for "vor 12 Sek." texts; updated every second. */
   now: number;
   /** A short message shown at the bottom of the window. */
-  toast: { text: string; tone: 'info' | 'ok' | 'error' | 'update' } | null;
+  toast: { text: string; tone: 'info' | 'ok' | 'error' | 'update'; hint?: string } | null;
   speed: number;
   /** Local places in the sidebar. */
   places: Place[];
@@ -1085,10 +1088,12 @@ export function activityExpanded(s: AppState = state): boolean {
 /* ------------------------------------------------------------------------ */
 
 let toastTimer: number | undefined;
-export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info') {
-  setState({ toast: { text, tone } });
+export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info', hint?: string) {
+  setState({ toast: { text, tone, hint: hint || undefined } });
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => setState({ toast: null }), 2600);
+  // Errors stay long enough to read both lines (about 15 characters a second, at least 6 s).
+  const ms = tone === 'error' ? Math.min(12000, Math.max(6000, (text.length + (hint?.length ?? 0)) * 70)) : 2600;
+  toastTimer = window.setTimeout(() => setState({ toast: null }), ms);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1506,7 +1511,7 @@ export function openTerminal(side: PaneSide = state.focusSide) {
   const target = onServer && srv
     ? { host: srv.host, port: srv.port, user: srv.user, keyPath: srv.auth === 'key' ? srv.keyPath : undefined, remotePath: panePath(side), localPath: home, app: state.settings.externalTerminal }
     : { localPath: home, app: state.settings.externalTerminal };
-  void invoke('open_terminal', { target }).catch((e) => showToast(String((e as { message?: string }).message ?? e), 'error'));
+  void invoke('open_terminal', { target }).catch((e) => showError(e));
 }
 
 /* ------------------------------------------------------------- Places */
@@ -1794,7 +1799,7 @@ export async function writeExport(password: string, withSecrets: boolean): Promi
     showToast($t('Exportiert: {0} Server, {1} Überwachungen{2}.', servers.length, state.watches.length, password ? $t(', verschlüsselt{0}', secretCount ? $t(' mit {0} Passwörtern', secretCount) : '') : $t('. Passwörter sind nicht enthalten')), 'ok');
     return true;
   } catch (e) {
-    showToast(String((e as { message?: string }).message ?? e), 'error');
+    showError(e);
     return false;
   }
 }
@@ -1814,7 +1819,7 @@ export async function importConfig() {
     if (data.encrypted) openDialog({ type: 'importPassword', sealed: data.encrypted });
     else await applyImport(data);
   } catch (e) {
-    showToast((e as Error).message || String(e), 'error');
+    showError(e);
   }
 }
 
@@ -3517,8 +3522,11 @@ export function showFirstRun() {
   fs.resetAll();
   const tab = emptyTab('~');
   setState({ ...initialState(), platform: state.platform, theme: state.theme, servers: [], tabs: [tab], watches: [], transfers: [], activeTabId: tab.id });
-  // As on a real first start: offer the cloud folders (simulated here).
-  window.setTimeout(() => void offerCloudPlaces(false), 400);
+  // As on a real first start: offer the servers of other programs, then the cloud folders (simulated here).
+  window.setTimeout(() => {
+    openDialog({ type: 'import', firstStart: true });
+    const stop = subscribeStore(() => { if (state.dialog?.type !== 'import') { stop(); void offerCloudPlaces(false); } });
+  }, 400);
   setState((s) => ({ settings: { ...s.settings, syncFavorites: [], recentAddresses: [] } }));
 }
 
@@ -3563,10 +3571,12 @@ export function importServers(list: ImportedServer[]) {
     const j = all.find((x) => x.name === s.jump || x.host === s.jump);
     if (j && j.id !== created[i].id) created[i].jumpServerId = j.id;
   });
+  // Offered on the first start: the servers only go into the list; connecting stays the user's choice.
+  const firstStart = state.dialog?.type === 'import' && !!state.dialog.firstStart;
   setState((st) => ({ servers: [...st.servers, ...created], dialog: null, firstRun: false }));
   showToast(created.length === 1 ? $t('„{0}“ übernommen.', created[0].name) : $t('{0} Server übernommen.', created.length), 'ok');
   const t = activeTab();
-  if ((!t || !t.serverId) && created[0]) openServerIn('remote', created[0].id);
+  if (!firstStart && (!t || !t.serverId) && created[0]) openServerIn('remote', created[0].id);
 }
 
 /** Adds the SSH-config servers on the welcome screen. */

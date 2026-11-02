@@ -12,6 +12,7 @@
  * in the component (CodeEditor.tsx); this module keeps the list, the names
  * and whether a document has unsaved changes.
  */
+import { showError } from './errors';
 import { invoke } from '@tauri-apps/api/core';
 import { useSyncExternalStore } from 'react';
 import { $t } from '../i18n';
@@ -204,7 +205,7 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
     refreshVisible();
     return true;
   } catch (e) {
-    showToast((e as { message?: string }).message ?? String(e), 'error');
+    showError(e);
     return false;
   }
 }
@@ -231,7 +232,7 @@ export async function saveAs(id: string): Promise<boolean> {
     setState((s) => ({ fsRev: s.fsRev + 1 }));
     return true;
   } catch (e) {
-    showToast((e as { message?: string }).message ?? String(e), 'error');
+    showError(e);
     return false;
   }
 }

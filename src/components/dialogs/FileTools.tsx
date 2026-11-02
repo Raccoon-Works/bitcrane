@@ -3,6 +3,7 @@
  * the file of the same name in the other half and with a value pasted by the
  * user, e.g. from the download page) and creating a symbolic link on the server.
  */
+import { showError } from '../../state/errors';
 import { Check, Copy, Loader2, X } from '../glyphs';
 import { useEffect, useState } from 'react';
 import { toBackendError, type ChecksumAlgo } from '../../backend/api';
@@ -175,7 +176,7 @@ export function SymlinkDialog({ target: initial }: { target: string }) {
       showToast($t('Verknüpfung „{0}“ zeigt auf {1}.', name.trim(), target.trim()), 'ok');
       closeDialog();
     } catch (e) {
-      showToast(toBackendError(e).message, 'error');
+      showError(e);
       setBusy(false);
     }
   };

@@ -3,11 +3,12 @@
  * SSH configuration, plus those of an exported file (e.g. from Transmit); ticked ones are added to Bitcrane. Passwords are never
  * taken over (they are asked for on the first connection).
  */
+import { showError } from '../../state/errors';
 import { Loader2 } from '../glyphs';
 import { useEffect, useState } from 'react';
 import type { ImportedServer } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { closeDialog, getState, importServers, LIVE, showToast } from '../../state/store';
+import { closeDialog, getState, importServers, LIVE, useStore } from '../../state/store';
 import { Button, Checkbox } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
@@ -30,6 +31,8 @@ export function ImportDialog() {
   const [found, setFound] = useState<{ servers: ImportedServer[]; sources: string[] } | null>(LIVE ? null : { servers: DEMO, sources: ['SSH-Konfiguration', 'FileZilla', 'WinSCP'] });
   const existing = new Set(getState().servers.filter((x) => !x.temporary).map(keyOf));
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  // Offered by Bitcrane itself on the first start (not opened from the menu).
+  const firstStart = useStore((s) => s.dialog?.type === 'import' && !!s.dialog.firstStart);
 
   useEffect(() => {
     if (LIVE) backend.importFind().then(setFound).catch(() => setFound({ servers: [], sources: [] }));
@@ -59,7 +62,7 @@ export function ImportDialog() {
       setFileNote('');
       setFound((f) => ({ servers: [...(f?.servers ?? []), ...list.filter((s) => !(f?.servers ?? []).some((x) => x.source === s.source && keyOf(x) === keyOf(s)))], sources: f?.sources ?? [] }));
     } catch (e) {
-      showToast(String(e), 'error');
+      showError(e);
     }
   };
 
@@ -74,13 +77,16 @@ export function ImportDialog() {
     <Dialog
       label={$t('Server importieren')}
       title={$t('Server importieren')}
-      subtitle={$t('Aus FileZilla, WinSCP, Cyberduck, PuTTY und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.')}
+      subtitle={firstStart
+        ? $t('Auf diesem Computer sind Server aus anderen Programmen gespeichert. Die ausgewählten kommen in die Serverliste; Passwörter werden nicht übernommen, Bitcrane fragt beim ersten Verbinden danach.')
+        : $t('Aus FileZilla, WinSCP, Cyberduck, PuTTY und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.')}
       width={760}
       maxHeight={680}
-      footer={<><Button onClick={() => void fromFile()}>{$t('Aus Datei …')}</Button><span className="small muted">{picked.size ? $t('{0} ausgewählt', picked.size) : ''}</span><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button><Button variant="primary" disabled={!picked.size} onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}>{$t('Übernehmen')}</Button></>}
+      footer={<><Button onClick={() => void fromFile()}>{$t('Aus Datei …')}</Button><span className="small muted">{picked.size ? $t('{0} ausgewählt', picked.size) : ''}</span><span className="flex-1" /><Button onClick={closeDialog}>{firstStart ? $t('Nicht übernehmen') : $t('Abbrechen')}</Button><Button variant="primary" disabled={!picked.size} onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}>{$t('Übernehmen')}</Button></>}
     >
       {!found && <span className="row-inline muted"><Loader2 size={14} className="spin" aria-hidden="true" />{$t('Wird gesucht …')}</span>}
       {fileNote && <p className="muted">{fileNote}</p>}
+      {firstStart && <p className="small muted">{$t('Das geht später jederzeit unter Server > Server importieren …')}</p>}
       {found && !found.servers.length && (
         <p className="muted">{$t('Keine gespeicherten Server gefunden. Gesucht wurde in: FileZilla (sitemanager.xml), WinSCP (Registry bzw. WinSCP.ini), Cyberduck und Mountain Duck (Lesezeichen), PuTTY (Registry) und ~/.ssh/config.')}</p>
       )}

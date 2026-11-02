@@ -4,9 +4,9 @@
  * The passphrase is typed by the user and goes straight into the key file
  * (and, if wanted, into the system keychain); Bitcrane does not keep it.
  */
+import { showError } from '../state/errors';
 import { Check, Copy, KeyRound, Upload } from './glyphs';
 import { useState } from 'react';
-import { toBackendError } from '../backend/api';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
 import { installPublicKey } from '../state/live';
@@ -41,7 +41,7 @@ export function KeyPanel({ server, onCreated, onClose }: { server: Server; onCre
       onCreated(name);
       showToast($t('Neuer Schlüssel erzeugt.'), 'ok');
     } catch (e) {
-      showToast(toBackendError(e).message, 'error');
+      showError(e);
     } finally {
       setBusy(false);
     }

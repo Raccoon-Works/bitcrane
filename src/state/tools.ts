@@ -8,6 +8,7 @@
  * - "Arbeitsbereiche": named sets of tabs that can be opened again.
  * - "Nach Abschluss": disconnect, quit, sleep or shut down once all transfers are done.
  */
+import { showError } from './errors';
 import { invoke } from '@tauri-apps/api/core';
 import type { FileEntry, PaneSide, Tab } from '../backend/types';
 import * as live from './live';
@@ -164,7 +165,7 @@ export async function runCustomCommand(cmd: CustomCommand, side: PaneSide, names
   let failed = 0;
   for (const line of commands) {
     const r = await live.runRemoteCommand(sid, line);
-    if ('error' in r) { showToast(r.error, 'error'); return; }
+    if ('error' in r) { showError(r.error); return; }
     if (r.code !== 0) failed++;
   }
   addLog(failed ? 'error' : 'ok', $t('Eigener Befehl „{0}“: {1}', cmd.name, failed ? $t('{0} mit Fehler', failed) : $t('fertig')), sid);
@@ -282,7 +283,7 @@ export async function runAfterQueue(action: AfterQueue) {
     try {
       await invoke('system_power', { action });
     } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e), 'error');
+      showError(e);
     }
   }
 }
