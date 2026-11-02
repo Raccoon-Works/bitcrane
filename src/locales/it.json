@@ -2320,5 +2320,6 @@
   "Programme": "Applicazioni",
   "Keine Hälfte zeigt gerade diesen Computer.": "Nessuna metà mostra ora questo computer.",
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Funziona quando entrambe le metà mostrano lo stesso computer o server.",
-  "Das geht nur mit Ordnern dieses Computers.": "Funziona solo con cartelle di questo computer."
+  "Das geht nur mit Ordnern dieses Computers.": "Funziona solo con cartelle di questo computer.",
+  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C senza selezione interrompe)"
 }

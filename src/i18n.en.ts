@@ -2322,4 +2322,5 @@ export const EN: Record<string, string> = {
   "Keine Hälfte zeigt gerade diesen Computer.": "Neither half shows this computer right now.",
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "This works when both halves show the same computer or server.",
   "Das geht nur mit Ordnern dieses Computers.": "This only works with folders on this computer.",
+  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C without a selection interrupts)",
 };

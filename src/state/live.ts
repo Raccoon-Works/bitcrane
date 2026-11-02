@@ -686,8 +686,9 @@ async function trashOnServer(serverId: string, dir: string, names: string[], tra
 export function removeEntries(side: PaneSide, serverId: string, dir: string, names: string[]) {
   const paths = names.map((n) => join(dir, n));
   const trash = side === 'remote' ? serverTrash(serverId) : undefined;
-  // Inside the recycle bin itself, deleting removes for good.
-  if (trash && dir !== trash && !dir.startsWith(trash + '/')) {
+  // Inside the recycle bin itself, or for a folder that contains it, deleting removes for good.
+  const holdsTrash = !!trash && paths.some((p) => trash === p || trash.startsWith(p + '/'));
+  if (trash && !holdsTrash && dir !== trash && !dir.startsWith(trash + '/')) {
     const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
     return run(side, serverId, dir, () => trashOnServer(serverId, dir, names, trash), $t('{0} in den Papierkorb auf dem Server gelegt.', what));
   }
@@ -696,7 +697,14 @@ export function removeEntries(side: PaneSide, serverId: string, dir: string, nam
     side, serverId, dir,
     () => (side === 'local' ? backend.localTrash(paths) : backend.remoteRemove(serverId, paths)),
     side === 'local' ? $t('{0} in den Papierkorb gelegt.', what) : $t('{0} gelöscht.', what),
-  );
+  ).then((ok) => {
+    // Deleted folders of this computer leave "Zuletzt verwendet" too.
+    const recent = getState().settings.recentDirs;
+    if (ok && side === 'local' && recent?.some((r) => paths.some((p) => r === p || r.startsWith(p + '/')))) {
+      updateSettings({ recentDirs: recent.filter((r) => !paths.some((p) => r === p || r.startsWith(p + '/'))) });
+    }
+    return ok;
+  });
 }
 
 const copiedText = (names: string[]) => (names.length === 1 ? $t('Kopiert als „{0}“.', names[0]) : $t('{0} Objekte kopiert.', names.length));

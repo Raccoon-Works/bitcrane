@@ -2320,5 +2320,6 @@
   "Programme": "Applications",
   "Keine Hälfte zeigt gerade diesen Computer.": "Aucune moitié n’affiche cet ordinateur pour l’instant.",
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Cela fonctionne lorsque les deux moitiés affichent le même ordinateur ou serveur.",
-  "Das geht nur mit Ordnern dieses Computers.": "Cela ne fonctionne qu’avec les dossiers de cet ordinateur."
+  "Das geht nur mit Ordnern dieses Computers.": "Cela ne fonctionne qu’avec les dossiers de cet ordinateur.",
+  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C sans sélection interrompt)"
 }

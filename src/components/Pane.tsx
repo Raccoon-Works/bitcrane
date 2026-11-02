@@ -41,10 +41,13 @@ function RenameInput({ side, name: full }: { side: PaneSide; name: string }) {
   const name = full.slice(full.lastIndexOf('/') + 1);
   const [value, setValue] = useState(name);
   const ref = useRef<HTMLInputElement>(null);
+  // Set once Enter or Escape handled the name, so the blur that follows does not commit it again.
+  const done = useRef(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.focus();
+    done.current = false;
     // Select the name without the extension, like Finder and Explorer.
     const dot = name.lastIndexOf('.');
     el.setSelectionRange(0, dot > 0 ? dot : name.length);
@@ -60,10 +63,14 @@ function RenameInput({ side, name: full }: { side: PaneSide; name: string }) {
       onDoubleClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (e.key !== 'Enter' && e.key !== 'Escape') return;
+        // The keyboard goes back to the list, so Enter right after opens the folder (Finder, Explorer).
+        done.current = true;
+        (e.currentTarget.closest('.list') as HTMLElement | null)?.focus();
         if (e.key === 'Enter') commitRename(side, full, value);
-        if (e.key === 'Escape') setState({ renaming: null });
+        else setState({ renaming: null });
       }}
-      onBlur={() => commitRename(side, full, value)}
+      onBlur={() => { if (!done.current) commitRename(side, full, value); }}
     />
   );
 }

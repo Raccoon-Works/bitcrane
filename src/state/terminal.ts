@@ -229,16 +229,18 @@ function makeTerminal(session: TermSession): Live {
   term.onSelectionChange(() => {
     if (terminalSettings().copyOnSelect && term.hasSelection()) void navigator.clipboard?.writeText(term.getSelection());
   });
-  // Windows and Linux: Strg+C stays "interrupt"; copying and pasting is Strg+Umschalt+C/V.
+  // Windows and Linux: Strg+C without a selection stays "interrupt"; with one it copies, Strg+V pastes.
   term.attachCustomKeyEventHandler((e) => {
     if (e.type !== 'keydown') return true;
     // Arrow keys and Esc belong to the suggestion list while it is open.
     if (suggest.handleKey(e)) { e.preventDefault(); return false; }
     const mac = getState().platform === 'mac';
-    const copy = mac ? e.metaKey && e.key === 'c' : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c';
-    const paste = mac ? e.metaKey && e.key === 'v' : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'v';
+    // Windows as in Windows Terminal: Strg+V pastes, Strg+C copies while text is selected (else it interrupts).
+    const copy = mac ? e.metaKey && e.key === 'c' : e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'c';
+    const paste = mac ? e.metaKey && e.key === 'v' : e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'v';
     if (copy && term.hasSelection()) {
       void navigator.clipboard?.writeText(term.getSelection());
+      term.clearSelection();
       return false;
     }
     if (paste) {
