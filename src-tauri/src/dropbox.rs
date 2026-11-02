@@ -164,12 +164,42 @@ impl DropboxConn {
         Ok(t.access.clone())
     }
 
+    /// Sends a POST request and waits out Dropbox's rate limit (HTTP 429).
+    ///
+    /// Dropbox answers 429 when too many writes hit the same account at once
+    /// (`too_many_write_operations`, e.g. hundreds of small uploads) or when the
+    /// app exceeds its request rate. That is not a lost connection: the request
+    /// is repeated after the time Dropbox asks for (`Retry-After` header or
+    /// `retry_after` in the body, at least one second, growing with each try).
+    /// Only after several refusals the error goes up to the caller.
+    async fn post_retry(&self, url: &str, headers: &[(&str, String)], body: Vec<u8>) -> AppResult<(reqwest::StatusCode, String)> {
+        const TRIES: u32 = 6;
+        let mut attempt: u32 = 0;
+        loop {
+            let token = self.access().await?;
+            let mut req = self.client.post(url).bearer_auth(token);
+            for (name, value) in headers {
+                req = req.header(*name, value.as_str());
+            }
+            let resp = req.body(body.clone()).send().await.map_err(net)?;
+            let status = resp.status();
+            let header_wait = resp.headers().get("Retry-After").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<u64>().ok());
+            let text = resp.text().await.map_err(net)?;
+            if status.as_u16() == 429 && attempt + 1 < TRIES {
+                let body_wait = serde_json::from_str::<Value>(&text).ok().and_then(|v| v.pointer("/error/retry_after").and_then(|r| r.as_u64()));
+                let asked = header_wait.or(body_wait).unwrap_or(0);
+                let wait = asked.max(1 + attempt as u64).min(30);
+                tokio::time::sleep(Duration::from_secs(wait)).await;
+                attempt += 1;
+                continue;
+            }
+            return Ok((status, text));
+        }
+    }
+
     /// RPC call with a JSON body; returns the JSON answer.
     async fn rpc(&self, endpoint: &str, body: Value, what: &str) -> AppResult<Value> {
-        let token = self.access().await?;
-        let resp = self.client.post(format!("{API}/{endpoint}")).bearer_auth(token).header("Content-Type", "application/json").body(body.to_string()).send().await.map_err(net)?;
-        let status = resp.status();
-        let text = resp.text().await.map_err(net)?;
+        let (status, text) = self.post_retry(&format!("{API}/{endpoint}"), &[("Content-Type", "application/json".into())], body.to_string().into_bytes()).await?;
         if !status.is_success() {
             return Err(api_err(status, &text, what));
         }
@@ -367,19 +397,8 @@ impl DropboxConn {
     }
 
     async fn content_call(&self, endpoint: &str, arg: Value, body: Vec<u8>, what: &str) -> AppResult<Value> {
-        let token = self.access().await?;
-        let resp = self
-            .client
-            .post(format!("{CONTENT}/{endpoint}"))
-            .bearer_auth(token)
-            .header("Dropbox-API-Arg", ascii_json(&arg))
-            .header("Content-Type", "application/octet-stream")
-            .body(body)
-            .send()
-            .await
-            .map_err(net)?;
-        let status = resp.status();
-        let text = resp.text().await.map_err(net)?;
+        let headers = [("Dropbox-API-Arg", ascii_json(&arg)), ("Content-Type", "application/octet-stream".to_string())];
+        let (status, text) = self.post_retry(&format!("{CONTENT}/{endpoint}"), &headers, body).await?;
         if !status.is_success() {
             return Err(api_err(status, &text, what));
         }

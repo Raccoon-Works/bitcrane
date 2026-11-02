@@ -2351,5 +2351,9 @@
   "Nicht übernehmen": "Nie importuj",
   "Das geht später jederzeit unter Server > Server importieren …": "Możesz to zrobić później w Serwer > Importuj serwery …",
   "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Być może właśnie przeniesiono lub usunięto. Odśwież przyciskiem „Odśwież”.",
-  "Rechte mit „Informationen und Rechte“ prüfen.": "Sprawdź uprawnienia w „Informacje i uprawnienia”."
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Sprawdź uprawnienia w „Informacje i uprawnienia”.",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Kolejna próba za {0} s ({1} z 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "Obserwacja nadal zbiera zmiany: oczekujące pliki zostaną wysłane po przywróceniu połączenia.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Oczekujące transfery wznowią się po przywróceniu połączenia.",
+  "{0} wird gelöscht …": "Usuwanie {0} …"
 }

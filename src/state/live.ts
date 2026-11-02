@@ -9,7 +9,7 @@
  * - start and stop folder watchers and turn their events into uploads,
  * - persist servers, watches and settings in the app's config file.
  */
-import { showError } from './errors';
+import { explainError, showError } from './errors';
 import { startUpdateChecks } from './updates';
 import type { AuthParams, BackendError, ConnectParams, TransferOptions, WalkItem } from '../backend/api';
 import { toBackendError } from '../backend/api';
@@ -36,6 +36,8 @@ interface Listing {
   entries: FileEntry[];
   loading: boolean;
   error?: string;
+  /** What the user can do about the error (second line, see errors.ts). */
+  hint?: string;
   /** The folder does not exist (offered "Ordner anlegen" while browsing synchronized). */
   missing?: boolean;
 }
@@ -54,9 +56,9 @@ export function cachedList(side: PaneSide, serverId: string, path: string): File
 }
 
 /** Loading and error state of a folder listing. */
-export function listingStatus(side: PaneSide, serverId: string, path: string): { loading: boolean; error?: string; missing?: boolean } {
+export function listingStatus(side: PaneSide, serverId: string, path: string): { loading: boolean; error?: string; hint?: string; missing?: boolean } {
   const l = listings.get(key(side, serverId, path));
-  return { loading: !l || l.loading, error: l?.error, missing: l?.missing };
+  return { loading: !l || l.loading, error: l?.error, hint: l?.hint, missing: l?.missing };
 }
 
 /** Entry of a path, looked up in the cached listing of its parent folder. */
@@ -84,7 +86,9 @@ async function load(side: PaneSide, serverId: string, path: string) {
     if (side === 'remote') addLog('debug', $t('Ordner gelesen: {0} ({1} Einträge, {2} ms)', path, entries.length, Date.now() - t0), serverId);
   } catch (e) {
     const err = toBackendError(e);
-    listings.set(k, { entries: [], loading: false, error: err.message, missing: err.kind === 'notFound' });
+    // Same wording as the error messages: what happened, then what to do.
+    const { text, hint } = explainError(err);
+    listings.set(k, { entries: [], loading: false, error: text, hint, missing: err.kind === 'notFound' });
     if (side === 'remote') handleRemoteError(serverId, err);
   }
   bump();
@@ -734,6 +738,9 @@ export function removeEntries(side: PaneSide, serverId: string, dir: string, nam
       $t('In den Papierkorb auf dem Server gelegt: {0}', pathsText(paths)));
   }
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
+  // Deleting a folder on a server removes every file one by one and can take a while:
+  // say that it is running, the result replaces this message.
+  if (side === 'remote') showToast($t('{0} wird gelöscht …', what), 'info', undefined, true);
   return run(
     side, serverId, dir,
     () => (side === 'local' ? backend.localTrash(paths) : backend.remoteRemove(serverId, paths)),

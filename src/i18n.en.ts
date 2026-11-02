@@ -2353,4 +2353,8 @@ export const EN: Record<string, string> = {
   "Auf diesem Computer sind Server aus anderen Programmen gespeichert. Die ausgewählten kommen in die Serverliste; Passwörter werden nicht übernommen, Bitcrane fragt beim ersten Verbinden danach.": "This computer has servers saved in other programs. The selected ones go into the server list; passwords are not taken over, Bitcrane asks for them when you first connect.",
   "Nicht übernehmen": "Don’t import",
   "Das geht später jederzeit unter Server > Server importieren …": "You can do this any time later under Server > Import servers …",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Next try in {0} s ({1} of 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "The watch keeps collecting: waiting files are uploaded once the connection is back.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Waiting transfers continue once the connection is back.",
+  "{0} wird gelöscht …": "Deleting {0} …",
 };

@@ -2351,5 +2351,9 @@
   "Nicht übernehmen": "Ne pas importer",
   "Das geht später jederzeit unter Server > Server importieren …": "Vous pourrez le faire plus tard via Serveur > Importer des serveurs …",
   "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Il vient peut-être d’être déplacé ou supprimé. Rechargez avec « Actualiser ».",
-  "Rechte mit „Informationen und Rechte“ prüfen.": "Vérifiez les droits avec « Informations et droits »."
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Vérifiez les droits avec « Informations et droits ».",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Nouvel essai dans {0} s ({1} sur 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "La surveillance continue de collecter : les fichiers en attente seront envoyés dès le retour de la connexion.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Les transferts en attente reprendront dès le retour de la connexion.",
+  "{0} wird gelöscht …": "Suppression de {0} …"
 }

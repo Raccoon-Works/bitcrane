@@ -2351,5 +2351,9 @@
   "Nicht übernehmen": "No importar",
   "Das geht später jederzeit unter Server > Server importieren …": "Puedes hacerlo más tarde en Servidor > Importar servidores …",
   "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Puede que se haya movido o eliminado. Recarga con «Actualizar».",
-  "Rechte mit „Informationen und Rechte“ prüfen.": "Revisa los permisos en «Información y permisos»."
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Revisa los permisos en «Información y permisos».",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Nuevo intento en {0} s ({1} de 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "La vigilancia sigue recopilando: los archivos en espera se subirán cuando vuelva la conexión.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Las transferencias en espera continuarán cuando vuelva la conexión.",
+  "{0} wird gelöscht …": "Eliminando {0} …"
 }

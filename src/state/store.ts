@@ -894,7 +894,7 @@ export function isDirEntry(side: PaneSide, serverId: string, path: string): bool
 }
 
 /** Loading / error / connection state of a pane (live mode only). */
-export function paneStatus(side: PaneSide, s: AppState = state): { loading: boolean; error?: string; missing?: boolean; notConnected?: boolean; connecting?: boolean } {
+export function paneStatus(side: PaneSide, s: AppState = state): { loading: boolean; error?: string; hint?: string; missing?: boolean; notConnected?: boolean; connecting?: boolean } {
   if (!LIVE) return { loading: false };
   const t = activeTab(s);
   if (!t) return { loading: false };
@@ -1088,9 +1088,11 @@ export function activityExpanded(s: AppState = state): boolean {
 /* ------------------------------------------------------------------------ */
 
 let toastTimer: number | undefined;
-export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info', hint?: string) {
+export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info', hint?: string, sticky = false) {
   setState({ toast: { text, tone, hint: hint || undefined } });
   window.clearTimeout(toastTimer);
+  // Sticky: stays until the next message replaces it (a running operation reports its end).
+  if (sticky) return;
   // Errors stay long enough to read both lines (about 15 characters a second, at least 6 s).
   const ms = tone === 'error' ? Math.min(12000, Math.max(6000, (text.length + (hint?.length ?? 0)) * 70)) : 2600;
   toastTimer = window.setTimeout(() => setState({ toast: null }), ms);

@@ -2351,5 +2351,9 @@
   "Nicht übernehmen": "Niet overnemen",
   "Das geht später jederzeit unter Server > Server importieren …": "Dit kan later altijd via Server > Servers importeren …",
   "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Misschien is het net verplaatst of verwijderd. Vernieuw met ‘Vernieuwen’.",
-  "Rechte mit „Informationen und Rechte“ prüfen.": "Controleer de rechten met ‘Informatie en rechten’."
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Controleer de rechten met ‘Informatie en rechten’.",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Nieuwe poging over {0} s ({1} van 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "De bewaking verzamelt verder: wachtende bestanden worden geüpload zodra de verbinding er weer is.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Wachtende overdrachten gaan verder zodra de verbinding er weer is.",
+  "{0} wird gelöscht …": "{0} wordt verwijderd …"
 }
