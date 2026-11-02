@@ -116,7 +116,8 @@ impl From<russh_sftp::client::error::Error> for AppError {
             E::Status(status) => {
                 let (kind, message) = match status.status_code {
                     S::NoSuchFile => (ErrorKind::NotFound, "Datei oder Ordner nicht gefunden."),
-                    S::PermissionDenied => (ErrorKind::PermissionDenied, "Keine Schreibrechte"),
+                    // Reading and writing both end here, so the message must not say "write".
+                    S::PermissionDenied => (ErrorKind::PermissionDenied, "Keine Berechtigung."),
                     S::NoConnection | S::ConnectionLost => (ErrorKind::ConnectionLost, "Verbindung unterbrochen"),
                     _ => (ErrorKind::Other, "Der Server meldet einen Fehler."),
                 };

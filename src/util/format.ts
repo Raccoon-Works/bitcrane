@@ -21,6 +21,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 /** "Heute, 17:04", "Gestern, 21:10" or "12.10.2026". */
 export function formatDate(ms: number): string {
+  // No time known (folders on Dropbox and other cloud services): show a dash, not 1 January 1970.
+  if (!ms || !Number.isFinite(ms)) return '–';
   const d = new Date(ms);
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();

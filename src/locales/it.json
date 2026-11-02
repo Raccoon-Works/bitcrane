@@ -2351,5 +2351,9 @@
   "Nicht übernehmen": "Non importare",
   "Das geht später jederzeit unter Server > Server importieren …": "Puoi farlo in seguito da Server > Importa server …",
   "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Potrebbe essere stato appena spostato o eliminato. Ricarica con «Aggiorna».",
-  "Rechte mit „Informationen und Rechte“ prüfen.": "Controlla i permessi con «Informazioni e permessi»."
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Controlla i permessi con «Informazioni e permessi».",
+  "Neuer Versuch in {0} Sek. ({1} von 10).": "Nuovo tentativo tra {0} s ({1} di 10).",
+  "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "Il monitoraggio continua a raccogliere: i file in attesa verranno caricati appena torna la connessione.",
+  "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "I trasferimenti in attesa riprenderanno appena torna la connessione.",
+  "{0} wird gelöscht …": "Eliminazione di {0} …"
 }

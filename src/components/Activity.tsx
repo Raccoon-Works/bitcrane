@@ -19,6 +19,10 @@ import { Button, IconButton, Select } from './ui';
 import { afterQueueLabel, setAfterQueue } from '../state/tools';
 import { $t } from '../i18n';
 
+
+/** Permission errors (older versions said "Keine Schreibrechte"; reading and writing now share one message). */
+const isDenied = (e?: string) => !!e && [$t('Keine Schreibrechte'), $t('Keine Berechtigung.')].includes(e);
+
 export function TransferIcon({ t }: { t: Transfer }) {
   if (t.state === 'error') return <AlertTriangle size={14} strokeWidth={1.75} className="tone-danger" aria-label={$t('Fehler')} />;
   if (t.direction === 'command') return <SquareTerminal size={14} strokeWidth={1.75} className={t.state === 'done' ? 'tone-ok' : 'tone-accent'} aria-hidden="true" />;
@@ -51,12 +55,12 @@ function ActivityRow({ t }: { t: Transfer }) {
       <span className="act-name">
         <span className="strong-500">{t.name}</span>
         <span className={`small ${t.state === 'error' ? 'tone-danger' : 'muted'} ellipsis`}>
-          {t.state === 'error' ? (t.error === 'Keine Schreibrechte' ? $t('{0} im Server-Ordner {1}', t.error, t.folder) : `${t.error} (${t.folder})`) : t.direction === 'command' ? (t.state === 'done' ? $t('Befehl ausgeführt') : $t('Befehl läuft …')) : t.folder}
+          {t.state === 'error' ? (isDenied(t.error) ? $t('{0} im Server-Ordner {1}', t.error!.replace(/\.$/, ''), t.folder) : `${t.error} (${t.folder})`) : t.direction === 'command' ? (t.state === 'done' ? $t('Befehl ausgeführt') : $t('Befehl läuft …')) : t.folder}
         </span>
       </span>
       {t.state === 'error' ? (
         <span className="act-actions">
-          <Button small onClick={() => setState({ dialog: { type: 'transfers' } })}>{t.error === 'Keine Schreibrechte' ? $t('Rechte prüfen') : $t('Details')}</Button>
+          <Button small onClick={() => setState({ dialog: { type: 'transfers' } })}>{isDenied(t.error) ? $t('Rechte prüfen') : $t('Details')}</Button>
           <Button small onClick={() => skipTransfer(t.id)}>{$t('Überspringen')}</Button>
           <Button small variant="primary" onClick={onRetry}>{$t('Wiederholen')}</Button>
         </span>

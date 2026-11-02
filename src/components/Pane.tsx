@@ -127,6 +127,16 @@ function formatFree(bytes: number): string {
   return `${Math.round(bytes / 1e6).toLocaleString(LOCALE)} MB`;
 }
 
+
+/** What continues once the connection is back: a watch or queued transfers (said only when it applies). */
+function WaitingNote({ serverId }: { serverId: string }) {
+  const watching = useStore((st) => st.watches.some((w) => w.serverId === serverId && w.state !== 'paused'));
+  const queued = useStore((st) => st.transfers.some((t) => t.serverId === serverId && (t.state === 'queued' || t.state === 'running')));
+  if (watching) return <>{' '}{$t('Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.')}</>;
+  if (queued) return <>{' '}{$t('Wartende Übertragungen laufen weiter, sobald die Verbindung steht.')}</>;
+  return null;
+}
+
 export function Pane({ side }: { side: PaneSide }) {
   const tab = useStore((s) => activeTab(s));
   const platform = useStore((s) => s.platform);
@@ -618,7 +628,8 @@ export function Pane({ side }: { side: PaneSide }) {
         <div role="alert" className="offline-box">
           <span className="offline-title"><WifiOff size={16} strokeWidth={1.5} aria-hidden="true" />{$t('Verbindung unterbrochen')}</span>
           <span className="small text-2">
-            {$t('Neuer Versuch in {0} Sek. ({1} von 10). Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.', Math.max(1, Math.ceil((offlineInfo.nextRetry - now) / 1000)), offlineInfo.attempt)}
+            {$t('Neuer Versuch in {0} Sek. ({1} von 10).', Math.max(1, Math.ceil((offlineInfo.nextRetry - now) / 1000)), offlineInfo.attempt)}
+            <WaitingNote serverId={sid} />
           </span>
           <span className="row-buttons">
             <Button variant="primary" onClick={() => reconnect(sid)}>{$t('Jetzt verbinden')}</Button>
@@ -674,7 +685,7 @@ export function Pane({ side }: { side: PaneSide }) {
           </div>
         )}
         {!status.notConnected && status.error && (
-          <div className="empty-list">{status.error}<span className="small muted">{path}</span>
+          <div className="empty-list">{status.error}{status.hint && <span className="small muted">{status.hint}</span>}<span className="small muted mono">{path}</span>
             {tab.syncBrowse && status.missing && (
               <span className="row-buttons">
                 <Button variant="primary" onClick={() => createMissingFolder(side)}>{$t('Ordner anlegen')}</Button>
