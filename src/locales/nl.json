@@ -2359,5 +2359,8 @@
   "Alle abbrechen": "Alles annuleren",
   "Die Übertragung abbrechen?": "De overdracht annuleren?",
   "Alle {0} Übertragungen abbrechen?": "Alle {0} overdrachten annuleren?",
-  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Wat al is overgedragen blijft staan. De overige bestanden worden niet meer overgedragen."
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Wat al is overgedragen blijft staan. De overige bestanden worden niet meer overgedragen.",
+  "{0} weitere": "{0} meer",
+  "{0} löschen?": "{0} verwijderen?",
+  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} bewaart verwijderde bestanden een tijdje; ze zijn te herstellen op de website van de dienst."
 }

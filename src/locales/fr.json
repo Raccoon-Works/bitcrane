@@ -2359,5 +2359,8 @@
   "Alle abbrechen": "Tout annuler",
   "Die Übertragung abbrechen?": "Annuler le transfert ?",
   "Alle {0} Übertragungen abbrechen?": "Annuler les {0} transferts ?",
-  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Ce qui a déjà été transféré est conservé. Les fichiers restants ne seront pas transférés."
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Ce qui a déjà été transféré est conservé. Les fichiers restants ne seront pas transférés.",
+  "{0} weitere": "{0} de plus",
+  "{0} löschen?": "Supprimer {0} ?",
+  "{0} bewahrt gelöschte Dateien eine Zeit lang auf; auf der Website des Dienstes lassen sie sich wiederherstellen.": "{0} conserve les fichiers supprimés pendant un certain temps ; ils peuvent être restaurés sur le site du service."
 }

@@ -54,7 +54,9 @@ export function formatTime(ms: number): string {
 
 /** "1,2 MB/s". */
 export function formatSpeed(bytesPerSecond: number): string {
-  return `${formatSize(Math.max(1, Math.round(bytesPerSecond)))}/s`;
+  // Under one byte a second nothing really moves (waiting for the server): no figure.
+  if (!(bytesPerSecond >= 1)) return '–';
+  return `${formatSize(Math.round(bytesPerSecond))}/s`;
 }
 
 /** Describes a file by its extension, like Finder's "Art" column. */
