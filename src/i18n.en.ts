@@ -2357,4 +2357,8 @@ export const EN: Record<string, string> = {
   "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "The watch keeps collecting: waiting files are uploaded once the connection is back.",
   "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Waiting transfers continue once the connection is back.",
   "{0} wird gelöscht …": "Deleting {0} …",
+  "Alle abbrechen": "Cancel all",
+  "Die Übertragung abbrechen?": "Cancel the transfer?",
+  "Alle {0} Übertragungen abbrechen?": "Cancel all {0} transfers?",
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "What has been transferred stays. The remaining files are not transferred.",
 };

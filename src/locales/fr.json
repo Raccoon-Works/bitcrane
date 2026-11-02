@@ -2355,5 +2355,9 @@
   "Neuer Versuch in {0} Sek. ({1} von 10).": "Nouvel essai dans {0} s ({1} sur 10).",
   "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "La surveillance continue de collecter : les fichiers en attente seront envoyés dès le retour de la connexion.",
   "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Les transferts en attente reprendront dès le retour de la connexion.",
-  "{0} wird gelöscht …": "Suppression de {0} …"
+  "{0} wird gelöscht …": "Suppression de {0} …",
+  "Alle abbrechen": "Tout annuler",
+  "Die Übertragung abbrechen?": "Annuler le transfert ?",
+  "Alle {0} Übertragungen abbrechen?": "Annuler les {0} transferts ?",
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Ce qui a déjà été transféré est conservé. Les fichiers restants ne seront pas transférés."
 }

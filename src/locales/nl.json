@@ -2355,5 +2355,9 @@
   "Neuer Versuch in {0} Sek. ({1} von 10).": "Nieuwe poging over {0} s ({1} van 10).",
   "Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.": "De bewaking verzamelt verder: wachtende bestanden worden geüpload zodra de verbinding er weer is.",
   "Wartende Übertragungen laufen weiter, sobald die Verbindung steht.": "Wachtende overdrachten gaan verder zodra de verbinding er weer is.",
-  "{0} wird gelöscht …": "{0} wordt verwijderd …"
+  "{0} wird gelöscht …": "{0} wordt verwijderd …",
+  "Alle abbrechen": "Alles annuleren",
+  "Die Übertragung abbrechen?": "De overdracht annuleren?",
+  "Alle {0} Übertragungen abbrechen?": "Alle {0} overdrachten annuleren?",
+  "Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.": "Wat al is overgedragen blijft staan. De overige bestanden worden niet meer overgedragen."
 }
