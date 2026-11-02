@@ -1930,7 +1930,12 @@ body.is-dragging-server, body.is-dragging-server * { cursor: grabbing !important
 .quick-icon { width: 64px; height: 64px; border-radius: 16px; }
 
 /* A narrow half: the sources become a row above the servers. */
-@container serverpanel (max-width: 560px) {
+/* A medium half (the usual window size): the sources stay on the left in a narrower column. */
+@container serverpanel (max-width: 680px) {
+  .server-sources { width: 184px !important; padding: var(--space-2) 6px; }
+  .server-sources .source-item { gap: 8px; padding: 0 6px; }
+}
+@container serverpanel (max-width: 420px) {
   .server-split { flex-direction: column; }
   /* !important: the column's own width (set by dragging, inline) does not apply to the row. */
   .server-sources { width: auto !important; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -2626,3 +2631,8 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 [data-platform='win'] .toolbar .tool-group { background: none; gap: 0; }
 [data-platform='win'] .toolbar { gap: var(--space-3); }
 .page[data-density='compact'] .sidebar .side-item { height: 24px; }
+
+/* The + for a new tab (Windows): a small rounded button set a little apart from the tabs, as in Explorer. */
+.win-tabs .tab-new { width: 28px; height: 28px; margin-left: 4px; border-radius: 6px; }
+.win-tabs .tab-new:hover:not(:disabled) { background: var(--bg-hover); }
+.page:not([data-theme='light']) .win-tabs .tab-new:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
