@@ -2321,5 +2321,10 @@
   "Keine Hälfte zeigt gerade diesen Computer.": "Żadna połowa nie pokazuje teraz tego komputera.",
   "Das geht, wenn beide Hälften denselben Computer oder Server zeigen.": "Działa, gdy obie połowy pokazują ten sam komputer lub serwer.",
   "Das geht nur mit Ordnern dieses Computers.": "Działa tylko z folderami tego komputera.",
-  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C bez zaznaczenia przerywa)"
+  "Strg+C / Strg+V (Strg+C ohne Auswahl bricht ab)": "Ctrl+C / Ctrl+V (Ctrl+C bez zaznaczenia przerywa)",
+  "Zu den Favoriten hinzufügen": "Dodaj do ulubionych",
+  "Aus „Zuletzt verwendet“ entfernen": "Usuń z „Ostatnio używane”",
+  "SFTP mit Root-Rechten (sudo)": "SFTP z prawami roota (sudo)",
+  "SFTP-Befehl": "Polecenie SFTP",
+  "Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.": "Bitcrane uruchamia serwer SFTP przez sudo i może wtedy wszystko, co root, także w /etc. Użytkownik musi móc uruchomić polecenie bez hasła (NOPASSWD w sudoers). Uwaga: błędy dotykają wtedy także plików systemowych."
 }

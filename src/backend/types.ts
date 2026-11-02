@@ -118,6 +118,8 @@ export interface Server {
   termStart?: string;
   /** Built-in terminal: pass the local SSH agent on to the server (ssh -A). */
   forwardAgent?: boolean;
+  /** SFTP with root rights and the like: own command for the SFTP server instead of the subsystem (WinSCP "SFTP-Server"). */
+  sftpCommand?: string;
   /**
    * Recycle bin on the server (SFTP, SCP, FTP): deleted entries are moved into this
    * folder instead of being removed. Relative paths start in the home folder. Empty: off.

@@ -50,6 +50,8 @@ export interface ConnectParams {
   timeout?: number;
   /** Pass the local SSH agent on for the terminal (ssh -A). */
   forwardAgent?: boolean;
+  /** Own command for the SFTP server, e.g. "sudo -n /usr/lib/openssh/sftp-server". */
+  sftpCommand?: string;
 }
 
 type ProxyParams = NonNullable<ConnectParams['proxy']>;

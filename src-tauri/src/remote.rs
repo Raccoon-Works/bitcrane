@@ -935,8 +935,11 @@ pub async fn connect_ssh(params: &crate::ssh::ConnectParams, known: Arc<crate::s
     if params.scp {
         return Ok(Remote::Scp(Arc::new(ScpConn::new(session).await?)));
     }
+    let custom = params.sftp_command.as_deref().is_some_and(|c| !c.trim().is_empty());
     match session.into_sftp().await {
         Ok(c) => Ok(Remote::Sftp(c)),
+        // With an own SFTP command (sudo) its error counts; silently falling back to SCP without root would hide it.
+        Err((_, e)) if custom => Err(e),
         Err((session, e)) => match ScpConn::new(session).await {
             Ok(c) => Ok(Remote::Scp(Arc::new(c))),
             Err(_) => Err(e),

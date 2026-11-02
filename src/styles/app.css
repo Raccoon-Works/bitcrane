@@ -2642,3 +2642,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 /* Labels beside a block with an explanation line up with its first line, not with its middle. */
 .form-grid > :is(label, span):has(+ .col-text) { align-self: start; padding-top: 7px; }
 .form-grid > :is(label, span):has(+ .col-text > .row-inline:first-child) { padding-top: 2px; }
+/* "Zuletzt verwendet": a small × at the end of the row, shown while the pointer is on it. */
+.side-remove { margin-left: auto; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; color: var(--text-faint); opacity: 0; }
+.side-item:hover .side-remove, .side-item:focus-visible .side-remove { opacity: 1; }
+.side-remove:hover { background: var(--bg-hover); color: var(--text); }

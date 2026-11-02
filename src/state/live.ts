@@ -271,7 +271,7 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
     if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
     return backend.connectGDrive(id, { refreshToken, ...key, pdfExport: srv.gdocExport === 'pdf' });
   }
-  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout, forwardAgent: !!srv.forwardAgent });
+  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout, forwardAgent: !!srv.forwardAgent, sftpCommand: srv.sftpCommand?.trim() || undefined });
 }
 
 /**

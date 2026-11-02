@@ -78,6 +78,12 @@ function cloudDefaults(service: Protocol): Partial<Server> {
 
 /** Names of the server colours for screen readers and tooltips. */
 const COLOR_NAMES: Record<ServerColor, string> = { gray: $t('Keine Farbe'), blue: $t('Blau'), purple: $t('Lila'), green: $t('Grün'), yellow: $t('Gelb'), orange: $t('Orange'), red: $t('Rot') };
+/**
+ * SFTP with root rights: sudo starts the system's SFTP server (WinSCP "SFTP server").
+ * The places differ between Linux distributions, so the first one that exists is taken.
+ */
+const SUDO_SFTP = "sudo -n sh -c 'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server; do [ -x \"$p\" ] && exec \"$p\"; done; exit 127'";
+
 export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: { serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
@@ -543,9 +549,16 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                   <>
                     <label htmlFor="s-scp">{$t('Dateiübertragung')}</label>
                     <div className="col-text">
-                      <Select<'sftp' | 'scp'> id="s-scp" label={$t('Dateiübertragung')} value={draft.scp ? 'scp' : 'sftp'} onChange={(v) => set('scp', v === 'scp' || undefined)}
-                        options={[{ value: 'sftp', label: $t('SFTP (Standard)') }, { value: 'scp', label: $t('SCP über Shell-Befehle') }]} />
-                      <span className="small muted">{$t('Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.')}</span>
+                      <Select<'sftp' | 'sudo' | 'scp'> id="s-scp" label={$t('Dateiübertragung')}
+                        value={draft.scp ? 'scp' : draft.sftpCommand !== undefined ? 'sudo' : 'sftp'}
+                        onChange={(v) => { set('scp', v === 'scp' || undefined); set('sftpCommand', v === 'sudo' ? SUDO_SFTP : undefined); }}
+                        options={[{ value: 'sftp', label: $t('SFTP (Standard)') }, { value: 'sudo', label: $t('SFTP mit Root-Rechten (sudo)') }, { value: 'scp', label: $t('SCP über Shell-Befehle') }]} />
+                      {draft.sftpCommand !== undefined && !draft.scp && (
+                        <TextField label={$t('SFTP-Befehl')} value={draft.sftpCommand} onChange={(v) => set('sftpCommand', v)} mono />
+                      )}
+                      <span className="small muted">{draft.sftpCommand !== undefined && !draft.scp
+                        ? $t('Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.')
+                        : $t('Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.')}</span>
                     </div>
                   </>
                 )}

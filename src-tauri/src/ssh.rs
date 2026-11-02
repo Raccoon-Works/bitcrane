@@ -151,6 +151,10 @@ pub struct ConnectParams {
     /// Seconds to wait for the server when connecting (per server, default 15).
     #[serde(default)]
     pub timeout: Option<u64>,
+    /// Own command for the SFTP server instead of the "sftp" subsystem, e.g.
+    /// "sudo -n /usr/lib/openssh/sftp-server" to work with root rights (WinSCP "SFTP server").
+    #[serde(default)]
+    pub sftp_command: Option<String>,
 }
 
 /// Connect timeout of a server: its own setting, kept within 5 seconds and 5 minutes.
@@ -562,6 +566,7 @@ pub struct Session {
     pub(crate) jump: Option<client::Handle<Handler>>,
     pub(crate) forwards: RemoteForwards,
     pub(crate) forward_agent: bool,
+    pub(crate) sftp_command: Option<String>,
 }
 
 /// Opens the session: host key check and login (through the jump server if set).
@@ -583,7 +588,7 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
         }
     };
 
-    Ok(Session { handle, jump, forwards, forward_agent: params.forward_agent })
+    Ok(Session { handle, jump, forwards, forward_agent: params.forward_agent, sftp_command: params.sftp_command.clone().filter(|c| !c.trim().is_empty()) })
 }
 
 impl Session {
@@ -595,12 +600,25 @@ impl Session {
             Ok(c) => c,
             Err(e) => return Err((self, AppError::from(e))),
         };
-        if let Err(e) = channel.request_subsystem(true, "sftp").await {
+        // An own SFTP command (sudo) runs as a command; otherwise the server's "sftp" subsystem.
+        let custom = self.sftp_command.clone();
+        let started = match &custom {
+            Some(cmd) => channel.exec(true, cmd.as_str()).await,
+            None => channel.request_subsystem(true, "sftp").await,
+        };
+        if let Err(e) = started {
             return Err((self, no_sftp(e.to_string())));
         }
         let sftp = match SftpSession::new(channel.into_stream()).await {
             Ok(s) => s,
-            Err(e) => return Err((self, no_sftp(e.to_string()))),
+            Err(e) => {
+                let err = match &custom {
+                    // Usually sudo asks for a password, which a command without a terminal cannot answer.
+                    Some(cmd) => AppError::other("Der eigene SFTP-Befehl hat nicht als SFTP-Server geantwortet. Bei sudo muss der Benutzer ihn ohne Passwort ausführen dürfen (NOPASSWD in sudoers).").with_detail(format!("{cmd}: {e}")),
+                    None => no_sftp(e.to_string()),
+                };
+                return Err((self, err));
+            }
         };
         sftp.set_timeout(30);
         let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
@@ -1071,7 +1089,7 @@ mod integration {
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
-        ConnectParams { forward_agent: false, host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
+        ConnectParams { sftp_command: None, forward_agent: false, host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
     }
 
     /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.

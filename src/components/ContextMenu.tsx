@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, removeRecent, clearRecent, addLocalPlace, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -145,6 +145,18 @@ export function ContextMenu() {
     groups.push([
       { label: $t('Alle Bereiche aufklappen'), run: () => updateSettings({ sidebarCollapsed: [] }) },
       { label: $t('Reihenfolge zurücksetzen'), run: () => updateSettings({ sidebarOrder: [] }) },
+    ]);
+  } else if (menu.kind === 'sidebarRecent' && menu.place) {
+    // A recently used folder in the sidebar.
+    const path = menu.place;
+    groups.push([
+      { label: $t('Öffnen'), run: () => openPlace(path) },
+      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
+      { label: $t('Zu den Favoriten hinzufügen'), run: () => { addLocalPlace(path); setState({ contextMenu: null }); } },
+    ]);
+    groups.push([
+      { label: $t('Aus „Zuletzt verwendet“ entfernen'), run: () => removeRecent(path) },
+      { label: $t('Liste leeren'), run: () => clearRecent() },
     ]);
   } else if (menu.kind === 'sidebarPlace' && menu.place) {
     // A favourite in the sidebar.
