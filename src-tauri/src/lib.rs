@@ -350,6 +350,22 @@ fn start_info(info: State<'_, StartInfo>) -> bool {
     info.autostart
 }
 
+/// Marker written right before an update installs. The Windows installer starts the new
+/// version with the arguments of the old process; after a start at login those include
+/// "--autostart", which would keep the window hidden. The marker makes it a normal start.
+fn update_marker(app: &tauri::AppHandle) -> std::path::PathBuf {
+    app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane")).join("restart-after-update")
+}
+
+#[tauri::command]
+fn mark_update_restart(app: tauri::AppHandle) -> AppResult<()> {
+    let marker = update_marker(&app);
+    if let Some(dir) = marker.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    std::fs::write(&marker, b"1").map_err(|e| AppError::other("Update-Hinweis konnte nicht gespeichert werden.").with_detail(e.to_string()))
+}
+
 /// The interface has decided whether the window stays hidden (no fallback needed).
 #[tauri::command]
 fn start_decided(info: State<'_, StartInfo>) {
@@ -1915,7 +1931,9 @@ pub fn run() {
             // The window is created invisible (tauri.conf.json). A normal start shows it at once;
             // a start at login waits for the interface, which keeps it hidden when "Beim Start nur im
             // Infobereich" is set. If the interface does not answer, the window appears anyway.
-            let autostart = std::env::args().any(|a| a == "--autostart");
+            // A restart after an update is never a start at login, whatever the arguments say.
+            let after_update = std::fs::remove_file(update_marker(app.handle())).is_ok();
+            let autostart = !after_update && std::env::args().any(|a| a == "--autostart");
             app.manage(StartInfo { autostart, decided: Arc::new(std::sync::atomic::AtomicBool::new(!autostart)) });
             if !autostart {
                 tray::show_main_window(app.handle());
@@ -1934,6 +1952,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_info,
             start_decided,
+            mark_update_restart,
             local_list,
             local_stat,
             local_mkdir,

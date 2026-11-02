@@ -112,6 +112,14 @@ export async function installOnQuit(): Promise<boolean> {
   }
 }
 
+/** Tells the next start that it follows an update, so the window opens (see mark_update_restart). */
+async function markRestart() {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('mark_update_restart');
+  } catch { /* the window may then stay in the notification area; the update still runs */ }
+}
+
 /** Downloads (unless already done) and installs the update, then restarts Bitcrane. */
 export async function installUpdate() {
   if (!pending) return;
@@ -121,6 +129,7 @@ export async function installUpdate() {
     try {
       const { saveNow } = await import('./live');
       await saveNow();
+      await markRestart();
       await pending.install();
       addLog('ok', $t('Update auf {0} installiert, Bitcrane startet neu.', version));
       const { relaunch } = await import('@tauri-apps/plugin-process');
@@ -137,6 +146,7 @@ export async function installUpdate() {
     // Unfinished transfers are saved first and continue after the restart.
     const { saveNow } = await import('./live');
     await saveNow();
+    await markRestart();
     let done = 0;
     let total: number | undefined;
     await pending.downloadAndInstall((ev) => {
