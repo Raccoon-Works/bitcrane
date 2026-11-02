@@ -2336,5 +2336,20 @@
   "Kopiert: {0} → {1}": "Copié : {0} → {1}",
   "Verschoben: {0} → {1}": "Déplacé : {0} → {1}",
   "Weitere Werkzeuge": "Autres outils",
-  "Zu den Orten hinzufügen": "Ajouter aux emplacements"
+  "Zu den Orten hinzufügen": "Ajouter aux emplacements",
+  "Beim nächsten Verbinden fragt Bitcrane wieder danach.": "Bitcrane le redemandera à la prochaine connexion.",
+  "Bitcrane verbindet sich neu, sobald der Server wieder erreichbar ist.": "Bitcrane se reconnecte dès que le serveur est de nouveau joignable.",
+  "Einzelheiten unter Übertragungen.": "Détails sous Transferts.",
+  "Nach dem Beheben die Überwachung wieder starten.": "Relancez la surveillance une fois le problème réglé.",
+  "Überwachung „{0}“": "Surveillance « {0} »",
+  "Benutzer, Passwort oder Schlüssel in den Servereinstellungen prüfen.": "Vérifiez l’utilisateur, le mot de passe ou la clé dans les réglages du serveur.",
+  "Adresse und Port prüfen und ob der Server läuft.": "Vérifiez l’adresse, le port et que le serveur fonctionne.",
+  "Adresse, Port und Protokoll in den Servereinstellungen prüfen.": "Vérifiez l’adresse, le port et le protocole dans les réglages du serveur.",
+  "Einen anderen Namen wählen oder das Vorhandene zuerst entfernen.": "Choisissez un autre nom ou supprimez d’abord l’élément existant.",
+  "Einzelheiten im Protokoll.": "Détails dans le journal.",
+  "Auf diesem Computer sind Server aus anderen Programmen gespeichert. Die ausgewählten kommen in die Serverliste; Passwörter werden nicht übernommen, Bitcrane fragt beim ersten Verbinden danach.": "Des serveurs sont enregistrés dans d’autres programmes sur cet ordinateur. Ceux sélectionnés rejoignent la liste des serveurs ; les mots de passe ne sont pas repris, Bitcrane les demande à la première connexion.",
+  "Nicht übernehmen": "Ne pas importer",
+  "Das geht später jederzeit unter Server > Server importieren …": "Vous pourrez le faire plus tard via Serveur > Importer des serveurs …",
+  "Vielleicht wurde es gerade verschoben oder gelöscht. Mit „Aktualisieren“ neu laden.": "Il vient peut-être d’être déplacé ou supprimé. Rechargez avec « Actualiser ».",
+  "Rechte mit „Informationen und Rechte“ prüfen.": "Vérifiez les droits avec « Informations et droits »."
 }

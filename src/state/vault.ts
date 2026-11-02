@@ -4,6 +4,7 @@
  * works like any other server, the backend encrypts and decrypts on the fly.
  * The password prompt is the normal one; locking is closing the tab.
  */
+import { showError } from './errors';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
 import { $t } from '../i18n';
@@ -52,7 +53,7 @@ export async function createVault(side: PaneSide, name: string, password: string
   try {
     await backend.vaultCreate(location, storageOf(side), password);
   } catch (e) {
-    showToast((e as { message?: string }).message ?? String(e), 'error');
+    showError(e);
     return false;
   }
   closeDialog();

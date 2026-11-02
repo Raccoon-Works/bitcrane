@@ -4,6 +4,7 @@
  * commands. The state comes from the installed git (src-tauri/src/git.rs);
  * outside a repository, on servers and without git nothing is shown.
  */
+import { showError } from './errors';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 import { $t } from '../i18n';
@@ -90,7 +91,7 @@ export async function gitRun(root: string, what: 'add' | 'addAll' | 'commit' | '
   } catch (e) {
     const err = e as { message?: string; detail?: string };
     addLog('error', `Git ${label}: ${err.detail ?? err.message ?? String(e)}`);
-    showToast(err.message ?? String(e), 'error');
+    showError(e);
     return false;
   } finally {
     for (const dir of cache.keys()) void refreshGit(dir);

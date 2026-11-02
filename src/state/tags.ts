@@ -4,6 +4,7 @@
  * live in the files' extended attributes (src-tauri/src/tags.rs), so the
  * Finder shows the same ones.
  */
+import { showError } from './errors';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 import { $t, LANG } from '../i18n';
@@ -63,6 +64,6 @@ export async function toggleTag(dir: string, names: string[], color: (typeof TAG
   const name = tagName(color);
   const on = !names.every((n) => (have[n] ?? []).some((t) => t.color === color.color));
   const paths = names.map((n) => `${dir.replace(/\/$/, '')}/${n}`);
-  await invoke('local_tag', { paths, name, color: color.color, on }).catch((e) => showToast((e as { message?: string }).message ?? String(e), 'error'));
+  await invoke('local_tag', { paths, name, color: color.color, on }).catch((e) => showError(e));
   await refreshTags(dir);
 }

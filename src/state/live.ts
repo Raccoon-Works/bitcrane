@@ -9,6 +9,7 @@
  * - start and stop folder watchers and turn their events into uploads,
  * - persist servers, watches and settings in the app's config file.
  */
+import { showError } from './errors';
 import { startUpdateChecks } from './updates';
 import type { AuthParams, BackendError, ConnectParams, TransferOptions, WalkItem } from '../backend/api';
 import { toBackendError } from '../backend/api';
@@ -410,7 +411,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     if (opts.saveSecret && opts.secret !== undefined) {
       const kind = opts.secretKind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
       backend.secretSet(kind === 'passphrase' ? passphraseAccount(srv) : passwordAccount(srv), opts.secret).catch(() => {
-        showToast($t('Konnte das Kennwort nicht im Schlüsselbund sichern.'), 'error');
+        showToast($t('Konnte das Kennwort nicht im Schlüsselbund sichern.'), 'error', $t('Beim nächsten Verbinden fragt Bitcrane wieder danach.'));
       });
     }
     setState((s) => {
@@ -466,15 +467,37 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
         // A cloud service's sign-in was revoked or is missing: sign in again in the browser.
         if (isCloudProtocol(srv.protocol)) openDialog({ type: 'cloudSignIn', service: srv.protocol!, serverId });
         else if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined)) openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
-        else showToast(`${err.message}${err.detail ? ' ' + err.detail : ''}`, 'error');
+        else showError(err, { prefix: srv.name, serverId, connecting: true, log: 'done' });
         break;
       case 'cancelled':
         break;
       default:
-        showToast(`${srv.name}: ${err.message}`, 'error');
+        showError(err, { prefix: srv.name, serverId, connecting: true, log: 'done' });
     }
     return false;
   }
+}
+
+/**
+ * First start without servers: when WinSCP, FileZilla, Cyberduck, PuTTY or the
+ * SSH configuration hold saved servers, Bitcrane offers to take them over once
+ * (like Transmit and ForkLift on their first start). Afterwards, or right away
+ * when there is nothing to import, the cloud folders are offered as places.
+ */
+async function firstStartOffers() {
+  const s = getState();
+  if (!s.settings.importAsked && !s.servers.some((x) => !x.temporary)) {
+    updateSettings({ importAsked: true });
+    const found = await backend.importFind().catch(() => null);
+    if (found?.servers.length && !getState().dialog && !getState().servers.some((x) => !x.temporary)) {
+      openDialog({ type: 'import', firstStart: true });
+      // The cloud folders wait until this dialog is closed.
+      await new Promise<void>((done) => {
+        const stop = subscribeStore(() => { if (getState().dialog?.type !== 'import') { stop(); done(); } });
+      });
+    }
+  }
+  if (!getState().settings.cloudAsked) await offerCloudPlaces(false);
 }
 
 /** Whether a passphrase / password for this server is stored in the keychain. */
@@ -588,7 +611,7 @@ function markOffline(serverId: string) {
   if (!getState().settings.autoReconnect) {
     // No automatic reconnect: the pane shows "Nicht verbunden" with a button.
     failed.add(serverId);
-    showToast($t('Verbindung zu {0} unterbrochen.', serverById(serverId)?.name ?? $t('dem Server')), 'error');
+    showToast($t('Verbindung zu {0} unterbrochen.', serverById(serverId)?.name ?? $t('dem Server')), 'error', $t('Bitcrane verbindet sich neu, sobald der Server wieder erreichbar ist.'));
     setState((s) => ({
       servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: false } : x)),
       watches: s.watches.map((w) => (w.serverId === serverId && w.state === 'active' ? { ...w, state: 'waiting' } : w)),
@@ -650,8 +673,8 @@ async function run(side: PaneSide, serverId: string, dir: string, op: () => Prom
   } catch (e) {
     const err = toBackendError(e);
     if (side === 'remote') handleRemoteError(serverId, err);
-    showToast(err.message, 'error');
     if (logText) addLog('error', `${logText}: ${err.message}`, sid, err.detail);
+    showError(err, { serverId: sid, log: logText ? 'done' : true });
     invalidate(side, serverId, dir);
     bump();
     return false;
@@ -786,7 +809,7 @@ export async function copyShareLink(serverId: string, path: string) {
     await navigator.clipboard.writeText(url);
     showToast($t('Link kopiert.'), 'ok');
   } catch (e) {
-    showToast(toBackendError(e).message, 'error');
+    showError(e);
   }
 }
 
@@ -815,16 +838,16 @@ export function walkFiles(side: PaneSide, serverId: string, path: string): Promi
 }
 
 export function openUrl(url: string) {
-  backend.openUrl(url).catch((e) => showToast(toBackendError(e).message, 'error'));
+  backend.openUrl(url).catch((e) => showError(e));
 }
 
 /** Shows a file of this computer selected in the Finder or Explorer. */
 export function revealLocal(path: string) {
-  backend.localReveal(path).catch((e) => showToast(toBackendError(e).message, 'error'));
+  backend.localReveal(path).catch((e) => showError(e));
 }
 
 export function openLocal(path: string, app?: string) {
-  backend.localOpen(path, app).catch((e) => showToast(toBackendError(e).message, 'error'));
+  backend.localOpen(path, app).catch((e) => showError(e));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -865,7 +888,7 @@ export async function stopEditing(localPath: string) {
 
 /** Opens a working copy in the editor again. */
 export function reopenEditing(localPath: string) {
-  backend.localOpen(localPath, editorFor(localPath)).catch((e) => showToast(toBackendError(e).message, 'error'));
+  backend.localOpen(localPath, editorFor(localPath)).catch((e) => showError(e));
 }
 
 /** Uploads a working copy now, without waiting for the next save. */
@@ -899,13 +922,13 @@ export async function editRemote(serverId: string, remotePath: string, app?: str
       });
     }
     publishEdits();
-    backend.localOpen(localPath, app ?? editorFor(localPath)).catch((e) => showToast(toBackendError(e).message, 'error'));
+    backend.localOpen(localPath, app ?? editorFor(localPath)).catch((e) => showError(e));
     addLog('info', $t('Im Editor geöffnet: {0}', remotePath), serverId);
     showToast($t('„{0}“ ist im Editor geöffnet. Beim Sichern lädt Bitcrane die Datei wieder hoch.', basename(remotePath)));
   } catch (e) {
     const err = toBackendError(e);
     handleRemoteError(serverId, err);
-    showToast(err.message, 'error');
+    showError(err);
   }
 }
 
@@ -982,7 +1005,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
       const [dir, extracted] = await backend.archiveExtractTemp(names.map((n) => join(localDir, n)));
       return uploadNames(serverId, dir, remoteDir, extracted);
     } catch (e) {
-      showToast(toBackendError(e).message, 'error');
+      showError(e);
       return { ids: [] as string[], skipped: 0 };
     }
   }
@@ -993,7 +1016,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
     try {
       walk = await backend.localWalk(join(localDir, n));
     } catch (e) {
-      showToast(toBackendError(e).message, 'error');
+      showError(e);
       continue;
     }
     for (const f of walk) {
@@ -1047,7 +1070,7 @@ export async function downloadNames(serverId: string, remoteDir: string, localDi
     } catch (e) {
       const err = toBackendError(e);
       handleRemoteError(serverId, err);
-      showToast(err.message, 'error');
+      showError(err);
       continue;
     }
     for (const f of walk) {
@@ -1073,7 +1096,7 @@ export async function crossNames(fromServerId: string, fromDir: string, serverId
     } catch (e) {
       const err = toBackendError(e);
       handleRemoteError(fromServerId, err);
-      showToast(err.message, 'error');
+      showError(err);
       continue;
     }
     for (const f of walk) {
@@ -1112,7 +1135,7 @@ export async function moveAcross(from: string, fromDir: string, names: string[],
     const gone = [...ids].some((id) => !arrived.has(id) && !mine.some((t) => t.id === id));
     if (failed || gone) {
       stop();
-      showToast($t('Nicht alle Dateien sind angekommen; die Originale bleiben erhalten.'), 'error');
+      showToast($t('Nicht alle Dateien sind angekommen; die Originale bleiben erhalten.'), 'error', $t('Einzelheiten unter Übertragungen.'));
       return;
     }
     if (arrived.size < ids.size) return;
@@ -1354,7 +1377,7 @@ function stopWatchOnError(tr: Transfer, message: string) {
   const w = tr.watchId ? getState().watches.find((x) => x.id === tr.watchId) : undefined;
   if (!w || w.options.continueOnError || w.state === 'paused') return;
   setState((s) => ({ watches: s.watches.map((x) => (x.id === w.id ? { ...x, state: 'paused' } : x)) }));
-  showToast($t('Überwachung „{0}“ angehalten: {1}, {2}', w.name, tr.name, message), 'error');
+  showToast($t('Überwachung „{0}“ angehalten: {1}, {2}', w.name, tr.name, message), 'error', $t('Nach dem Beheben die Überwachung wieder starten.'));
   addLog('warn', $t('Überwachung „{0}“ nach einem Fehler angehalten.', w.name), w.serverId);
 }
 
@@ -1526,7 +1549,7 @@ function reconcileWatches(s: AppState) {
       })
       .catch((e) => {
         runningWatches.delete(id);
-        showToast($t('Überwachung „{0}“: {1}', w.name, toBackendError(e).message), 'error');
+        showError(e, { prefix: $t('Überwachung „{0}“', w.name), serverId: w.serverId });
         setState((st) => ({ watches: st.watches.map((x) => (x.id === id ? { ...x, state: 'paused' } : x)) }));
       });
   }
@@ -1644,7 +1667,7 @@ async function initialSync(w: Watch, manual = false) {
       showToast($t('„{0}“ ist auf dem Server aktuell.', w.name), 'ok');
     }
   } catch (e) {
-    showToast($t('Abgleich „{0}“: {1}', w.name, toBackendError(e).message), 'error');
+    showError(e, { prefix: $t('Abgleich „{0}“', w.name), serverId: w.serverId });
   }
 }
 
@@ -1677,7 +1700,7 @@ export async function copyLocalFiles(pairs: Array<[string, string]>) {
     bump();
     showToast(pairs.length === 1 ? $t('1 Datei kopiert.') : $t('{0} Dateien kopiert.', pairs.length), 'ok');
   } catch (e) {
-    showToast(toBackendError(e).message, 'error');
+    showError(e);
   }
 }
 
@@ -1693,7 +1716,7 @@ export async function syncDeletes(serverId: string, remote: string[], local: str
     }
     bump();
   } catch (e) {
-    showToast(toBackendError(e).message, 'error');
+    showError(e);
   }
 }
 
@@ -1735,7 +1758,7 @@ export async function testRun(localPath: string, excludes: string[]) {
     const files = (await backend.localWalk(localPath)).filter((f) => !isExcluded(f.path.slice(localPath.length + 1), excludes));
     showToast($t('Testlauf: {0} Dateien würden beobachtet. Es wurde nichts übertragen.', files.length));
   } catch (e) {
-    showToast(toBackendError(e).message, 'error');
+    showError(e);
   }
 }
 
@@ -1871,7 +1894,7 @@ async function loadConfig() {
     // The backend kept a copy of the broken file, so starting empty loses nothing.
     const err = toBackendError(e);
     cfg = null;
-    window.setTimeout(() => showToast(err.message, 'error'), 500);
+    window.setTimeout(() => showError(err, { log: 'done' }), 500);
     addLog('error', err.message, undefined, err.detail);
   }
   // Old bookmarks (folder pairs) become places of their server.
@@ -1929,8 +1952,8 @@ async function loadConfig() {
     // Keep the default places.
   }
   void loadDrives();
-  // First start: offer the cloud folders found on this computer as places (Transmit).
-  if (!getState().settings.cloudAsked) window.setTimeout(() => void offerCloudPlaces(false), 800);
+  // First start: offer the servers of other programs, then the cloud folders as places (Transmit).
+  window.setTimeout(() => void firstStartOffers(), 800);
   // A USB stick or network drive may come and go; look again when the window gets the focus.
   window.addEventListener('focus', () => void loadDrives());
   const activeTabNow = getState().tabs.find((t) => t.id === getState().activeTabId);

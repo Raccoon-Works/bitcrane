@@ -9,6 +9,7 @@
  * The current drop target lives in the store (`dropHint`) so both panes can
  * highlight it.
  */
+import { showError } from '../state/errors';
 import type { PaneSide } from '../backend/types';
 import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace, moveIntoFolder, navigate, listEntries } from '../state/store';
 import { invoke } from '@tauri-apps/api/core';
@@ -163,7 +164,7 @@ async function handOut(d: DragState) {
     handedOut = { names: new Set(files.map((f) => f.split(/[\\/]/).pop() ?? '')), until: Date.now() + 120000 };
     await invoke('drag_out', { paths: files });
   } catch (e) {
-    showToast((e as { message?: string })?.message ?? String(e), 'error');
+    showError(e);
   } finally {
     prepared = null;
   }
