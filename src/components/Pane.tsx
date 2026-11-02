@@ -15,7 +15,7 @@ import { isVaultListing, unlockVault } from '../state/vault';
 import { ArrowElbowLeftUp, GitBranch, CaretDown, CaretRight, CaretUp, CaretUpDown, EjectSimple, SlidersHorizontal, ListBullets, Plugs, SquaresFour, Columns, TerminalWindow } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { activeTab, canGoUp, createMissingFolder, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage, LIVE } from '../state/store';
+import { activeTab, placesFor, canGoUp, createMissingFolder, getState, hiddenCount, kindOf, moveToOtherHalf, setIconSize, paneLoc, askDelete, editPath, activateEntry, folderSizeKey, openDialog, revealSearchResult, toggleSyncBrowse, clearPaneSelection, clickRow, commitRename, download, goUp, submitPath, isOffline, jumpTo, listEntries, moveCursor, navigate, paneEntries, paneStatus, reconnect, selectAll, setSort, type SortKey, setFocusSide, setState, startRename, toggleInspector, upload, useStore, watchForLocal, paneOnServer, paneShowsServers, setViewMode, toggleExpand, closePaneServer, folderRows, loadFolder, isPackage, LIVE } from '../state/store';
 import { PlacesBar } from './PlacesBar';
 import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
@@ -294,6 +294,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const marks = useMemo(() => (compareOn ? compareMarks(side) : null), [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal]);
 
   const sidebarOn = useStore((s) => s.settings.sidebar !== false);
+  const hasPlaces = useStore((s) => placesFor(side, s, activeTab(s)).length > 0);
   const macLocal = useStore((s) => s.platform === 'mac') && !onServer;
   const freeSpace = useFreeSpace(path, !onServer && !!path, fsRev);
   // All hooks stay above the early returns below, so their order never changes.
@@ -532,8 +533,10 @@ export function Pane({ side }: { side: PaneSide }) {
       style={{ '--cols': [columns.mtime && '124px', columns.kind && '120px', showPerms && '84px', columns.owner && '84px', columns.size && '76px'].filter(Boolean).join(' ') || '0px', ...(srvColor ? { '--srv-color': srvColor } : {}) } as CSSProperties}
       aria-label={onServer ? $t('Server') : $t('Lokal')}
     >
-      {/* With the sidebar, only halves showing a server keep their own places (that server's folders). */}
-      {(!sidebarOn || onServer) && <PlacesBar side={side} />}
+      {/* With the sidebar, only halves showing a server keep their own places (that server's folders),
+          and only once there are some: an empty bar would push this half's list below the other one.
+          Places are added with the folder's context menu or Gehe zu > Ordner zu den Orten hinzufügen. */}
+      {(!sidebarOn || (onServer && hasPlaces)) && <PlacesBar side={side} />}
       <div className="pane-head">
         {/* Location button: this computer and its drives, or which server the half shows. */}
         <button type="button" className="pane-source" title={onServer ? `${server?.name ?? ''} · ${$t('Ort wechseln')}` : $t('Laufwerke und Server')} aria-label={$t('Ort wechseln')} aria-haspopup="menu"

@@ -1214,13 +1214,16 @@ export function closeTab(id: string) {
   if (!tabs.length) tabs = [emptyTab(s.tabs[idx].leftServerId ? '~' : s.tabs[idx].localPath)];
   const activeTabId = s.activeTabId === id ? tabs[Math.max(0, Math.min(idx - 1, tabs.length - 1))].id : s.activeTabId;
   setState({ tabs, activeTabId, selection: s.activeTabId === id ? clearSelection() : s.selection, expanded: s.activeTabId === id ? { local: [], remote: [] } : s.expanded });
+  releaseServers([s.tabs[idx]]);
 }
 
 /** "Andere Tabs schließen" (ForkLift): keeps only the given tab. */
 export function closeOtherTabs(id: string) {
   const keep = state.tabs.find((t) => t.id === id);
   if (!keep) return;
+  const closed = state.tabs.filter((t) => t.id !== id);
   setState((s) => ({ tabs: [keep], activeTabId: id, selection: s.activeTabId === id ? s.selection : clearSelection(), contextMenu: null }));
+  releaseServers(closed);
 }
 
 /** Closes the tabs to the right of the given one. */
@@ -1228,8 +1231,10 @@ export function closeTabsRight(id: string) {
   const idx = state.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
   const tabs = state.tabs.slice(0, idx + 1);
+  const closed = state.tabs.slice(idx + 1);
   const activeTabId = tabs.some((t) => t.id === state.activeTabId) ? state.activeTabId : id;
   setState((s) => ({ tabs, activeTabId, selection: activeTabId === s.activeTabId ? s.selection : clearSelection(), contextMenu: null }));
+  releaseServers(closed);
 }
 
 /** "Tab duplizieren": the same folders (and server) in a new tab next to it. */
@@ -3172,11 +3177,37 @@ export function reconnect(serverId = activeTab()?.serverId) {
   showToast($t('Wieder verbunden. Wartende Dateien werden hochgeladen.'), 'ok');
 }
 
-export function disconnect(serverId = activeTab()?.serverId) {
+export function disconnect(serverId = activeTab()?.serverId, quiet = false) {
   if (!serverId) return;
   if (LIVE) void live.disconnectServer(serverId);
   setState((s) => ({ servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: false } : x)) }));
-  showToast($t('Verbindung getrennt.'));
+  if (!quiet) showToast($t('Verbindung getrennt.'));
+}
+
+/**
+ * Whether a server connection is still needed: a tab shows it, a running
+ * folder watch uploads to it, a transfer is queued or running, or one of its
+ * SSH tunnels is open.
+ */
+function serverStillUsed(sid: string): boolean {
+  const s = state;
+  if (s.tabs.some((x) => x.serverId === sid || x.leftServerId === sid)) return true;
+  if (s.watches.some((w) => w.serverId === sid && w.state !== 'paused')) return true;
+  if (s.transfers.some((t) => (t.serverId === sid || t.sourceServerId === sid) && (t.state === 'queued' || t.state === 'running'))) return true;
+  const tunnels = s.servers.find((x) => x.id === sid)?.forwards?.map((f) => f.id) ?? [];
+  return tunnels.some((id) => s.tunnels.includes(id));
+}
+
+/**
+ * After tabs were closed (WinSCP, FileZilla): servers no longer used anywhere
+ * are disconnected quietly, so no connection stays open unnoticed.
+ */
+function releaseServers(closed: Tab[]) {
+  const ids = new Set(closed.flatMap((t) => [t.serverId, t.leftServerId]).filter((x): x is string => !!x));
+  for (const sid of ids) {
+    if (!state.servers.find((x) => x.id === sid)?.online) continue;
+    if (!serverStillUsed(sid)) disconnect(sid, true);
+  }
 }
 
 /**
@@ -3194,9 +3225,7 @@ export function closePaneServer(side: PaneSide) {
     updateTab({ serverId: '', remotePath: '', back: [], forward: [], syncBrowse: undefined, serverList: { ...t.serverList, remote: true } });
     setState((s) => ({ selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } }, expanded: { ...s.expanded, remote: [] } }));
   }
-  // A running folder watch keeps its connection too.
-  const stillUsed = state.tabs.some((x) => x.serverId === sid || x.leftServerId === sid) || state.watches.some((w) => w.serverId === sid && w.state !== 'paused');
-  if (!stillUsed) disconnect(sid);
+  if (!serverStillUsed(sid)) disconnect(sid);
 }
 
 /* ------------------------------------------------------------------------ */

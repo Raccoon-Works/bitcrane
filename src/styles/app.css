@@ -365,6 +365,15 @@ kbd,
 .win-logo-btn[aria-expanded='true'] { background: var(--bg-hover); }
 .win-system-menu { position: absolute; top: 36px; left: 0; min-width: 240px; }
 .more-anchor { position: relative; }
+/* Tools of the toolbar: may shrink below their content; what does not fit moves behind "»" (Toolbar.tsx). */
+.tool-runs { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.tool-runs > .tool-group { flex-shrink: 0; }
+/* Only the free space and the tools give way; buttons and search keep their size. */
+.toolbar > :not(.tool-runs):not(.flex-1) { flex-shrink: 0; }
+.tool-overflow { flex-shrink: 0; }
+.tool-overflow .more-menu { min-width: 240px; }
+.menu-icon { width: 18px; display: inline-grid; place-items: center; color: var(--text-secondary); }
+.menu-icon svg { width: 16px; height: 16px; }
 .more-menu { position: absolute; top: 36px; right: 0; min-width: 260px; transform-origin: top right; }
 .submenu-anchor { position: relative; }
 .submenu { position: absolute; top: -5px; right: calc(100% + 4px); min-width: 300px; animation: none; }

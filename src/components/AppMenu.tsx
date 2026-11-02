@@ -189,7 +189,7 @@ function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () => void }
   );
 }
 
-function useCloseOnOutside(open: boolean, ref: React.RefObject<HTMLElement | null>, close: () => void) {
+export function useCloseOnOutside(open: boolean, ref: React.RefObject<HTMLElement | null>, close: () => void) {
   useEffect(() => {
     if (!open) return;
     const down = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) close(); };

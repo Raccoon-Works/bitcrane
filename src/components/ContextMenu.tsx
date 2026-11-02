@@ -9,7 +9,7 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, removeRecent, clearRecent, addLocalPlace, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, removeRecent, clearRecent, addLocalPlace, addPlace, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -311,6 +311,13 @@ export function ContextMenu() {
     }
     const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neuer Ordner mit Auswahl'), key: sk('newFolderWithSelection'), run: () => void newFolderWithSelection(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) }];
     if (isDir && one) third.push({ label: $t('In neuem Tab öffnen'), run: () => { newTab(); setState({ contextMenu: null }); window.setTimeout(() => openEntry(menu.side, one), 0); } });
+    // Explorer "An Schnellzugriff anheften", Finder "Zur Seitenleiste hinzufügen".
+    if (isDir && one) {
+      const target = join(panePath(menu.side), one);
+      third.push(onServer
+        ? { label: $t('Zu den Orten hinzufügen'), run: () => { setState({ contextMenu: null }); addPlace(menu.side, target); } }
+        : { label: $t('Zu den Favoriten hinzufügen'), run: () => { setState({ contextMenu: null }); addLocalPlace(target); } });
+    }
     groups.push(third);
     if (commands.length) groups.push(commands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, menu.names) })));
     groups.push([{ label: onServer ? $t('Vom Server löschen …') : $t('In den Papierkorb …'), key: k('⌘⌫', $t('Entf')), run: () => askDelete(menu.side, menu.names), danger: true }]);
