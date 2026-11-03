@@ -175,12 +175,16 @@ footer { position: relative; background: var(--bg); }
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
   letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
 }
+@media (max-width: 560px) { .eyebrow .wide { display: none; } }
 .pill { background: var(--accent-soft); color: var(--accent); padding: 3px 10px; border-radius: 99px; letter-spacing: .04em; }
 .hero h1 { font-size: clamp(40px, 6.4vw, 74px); line-height: 1.04; font-weight: 700; letter-spacing: -0.035em; }
 .hero h1 em { font-style: normal; color: var(--accent); }
 .lede { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 640px; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .meta { font-size: 14px; color: var(--muted); }
+.gh-link { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.gh-link svg { width: 16px; height: 16px; }
+.gh-link:hover { color: var(--ink); text-decoration: none; }
 
 /* Platform switch */
 .switch-row { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-block: 52px 18px; }
@@ -198,7 +202,7 @@ footer { position: relative; background: var(--bg); }
 /* Product shots */
 .shot { margin: 0; position: relative; }
 .shot-frame {
-  position: relative; aspect-ratio: 1300 / 800; max-width: 100%;
+  position: relative; aspect-ratio: var(--ar, 1300 / 800); max-width: 100%;
   border-radius: var(--radius); overflow: hidden; background: var(--surface);
   box-shadow: var(--shadow); border: 1px solid var(--line);
   touch-action: pan-y;
@@ -206,6 +210,45 @@ footer { position: relative; background: var(--bg); }
 .shot-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; -webkit-user-drag: none; }
 .shot-over { opacity: 0; transition: opacity 260ms ease; }
 .shot:hover .shot-over, .shot.flipped .shot-over { opacity: 1; }
+[data-crop] .shot-tag { display: none; }
+@media (max-width: 760px) { .try-demo { display: none; } }
+.zoomable .shot-frame { cursor: zoom-in; transition: transform 300ms cubic-bezier(.23, 1, .32, 1), box-shadow 300ms ease; }
+.zoomable:hover .shot-frame { transform: translateY(-3px); }
+.shot-zoom {
+  position: absolute; top: 12px; right: 12px; z-index: 2; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; border: 0; cursor: zoom-in; color: #fff;
+  background: rgba(10, 14, 20, .62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  opacity: 0; transform: scale(.9); transition: opacity 180ms ease, transform 180ms cubic-bezier(.23, 1, .32, 1);
+}
+.shot-zoom svg { width: 17px; height: 17px; }
+.zoomable:hover .shot-zoom, .shot-zoom:focus-visible { opacity: 1; transform: none; }
+@media (hover: none) { .shot-zoom { opacity: 1; transform: none; } }
+
+/* Large view of a product shot */
+.lightbox {
+  border: 0; padding: 0; margin: auto; background: transparent; color: #fff;
+  width: min(1320px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 32px); overflow: visible;
+}
+.lightbox::backdrop { background: rgba(6, 9, 14, .78); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.lightbox[open] { animation: lb-in 260ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes lb-in { from { opacity: 0; transform: scale(.97); } }
+.lb-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.lb-title { font: 600 15px var(--font-body); margin-right: auto; }
+.lb-bar .seg { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .14); }
+.lb-bar .seg button { color: rgba(255, 255, 255, .7); }
+.lb-bar .seg button[aria-pressed="true"] { background: rgba(255, 255, 255, .16); color: #fff; }
+.lb-close {
+  width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .12); color: #fff;
+}
+.lb-close:hover { background: rgba(255, 255, 255, .2); }
+.lb-close svg { width: 16px; height: 16px; }
+.lb-img {
+  display: block; width: 100%; height: auto; max-height: calc(100vh - 110px); object-fit: contain;
+  border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+}
+@media (prefers-reduced-motion: reduce) { .lightbox[open] { animation: none; } .zoomable .shot-frame, .shot-zoom { transition: none; } }
+
 .shot-tag {
   position: absolute; right: 12px; bottom: 12px; z-index: 2;
   font: 600 11px var(--font-body); letter-spacing: .08em; text-transform: uppercase;
@@ -300,6 +343,8 @@ section { scroll-margin-top: 76px; }
   box-shadow: var(--shadow);
 }
 .demo-cover .inner p { color: var(--muted); font-size: 15px; }
+.demo-small { display: none; }
+@media (max-width: 760px) { #demo-start, .demo-cover .inner p:not(.demo-small) { display: none; } .demo-small { display: block; } }
 .demo-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .demo-note { font-size: 14px; color: var(--muted); }
 @media (max-width: 720px) { .demo-box { aspect-ratio: 4 / 5; } }
@@ -329,6 +374,15 @@ section { scroll-margin-top: 76px; }
   font: 500 13px var(--font-body); padding: 0 12px; cursor: pointer;
 }
 @media (max-width: 760px) { .dl-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* What's new */
+.news { padding-block: 96px 8px; }
+.news-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 48px; align-items: start; }
+.news-grid .section-head { margin-bottom: 0; position: sticky; top: 90px; }
+.news-list { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
+.news-list li { display: grid; gap: 4px; padding: 18px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 16px; }
+.news-list strong { color: var(--ink); font-weight: 600; font-size: 17px; }
+@media (max-width: 860px) { .news-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; } .news-grid .section-head { position: static; } }
 
 /* FAQ */
 .faq { padding-block: 96px 40px; }
@@ -377,7 +431,7 @@ footer a { color: var(--muted); }
   <section class="hero">
     <div class="wrap">
       <div class="hero-text">
-        <span class="eyebrow"><span class="pill">Beta</span><span class="de">Kostenlos · Open Source · macOS und Windows</span><span class="en">Free · Open source · macOS and Windows</span></span>
+        <span class="eyebrow"><span class="pill">Beta</span><span class="de">Kostenlos · Open Source<span class="wide"> · macOS und Windows</span></span><span class="en">Free · Open source<span class="wide"> · macOS and Windows</span></span></span>
         <h1><span class="de">Speichern. <em>Schon ist es auf dem Server.</em></span><span class="en">Save. <em>It’s already on the server.</em></span></h1>
         <p class="lede">
           <span class="de">Bitcrane überträgt Dateien per SFTP, FTP, WebDAV, SMB, S3 und in die Cloud. Ordner werden überwacht, geänderte Dateien gehen von selbst hoch. Terminal und Editor sind eingebaut.</span>
@@ -388,9 +442,10 @@ footer a { color: var(--muted); }
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></svg>
             <span id="cta-label"><span class="de">Bitcrane laden</span><span class="en">Download Bitcrane</span></span>
           </a>
-          <a class="btn btn-ghost" href="#demo"><span class="de">Im Browser ausprobieren</span><span class="en">Try it in the browser</span></a>
+          <a class="btn btn-ghost try-demo" href="#demo"><span class="de">Im Browser ausprobieren</span><span class="en">Try it in the browser</span></a>
         </div>
         <p class="meta"><span class="de">macOS 11 oder neuer (Apple Silicon und Intel) · Windows 10 und 11</span><span class="en">macOS 11 or later (Apple silicon and Intel) · Windows 10 and 11</span></p>
+        <a class="gh-link" href="https://github.com/Raccoon-Works/bitcrane" rel="noopener"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2"/></svg><span class="de">Quellcode auf GitHub</span><span class="en">Source code on GitHub</span></a>
       </div>
 
       <div class="switch-row">
@@ -441,7 +496,7 @@ footer a { color: var(--muted); }
           </ul>
           <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
-        <figure class="shot" data-view="watchsetup"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
+        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1552 / 1444"><img class="shot-base" alt="" loading="lazy" width="1552" height="1444"><img class="shot-over" alt="" loading="lazy" width="1552" height="1444"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -455,7 +510,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Tunnel für Datenbanken und Dienste</span><span class="en">Tunnels for databases and services</span></li>
           </ul>
         </div>
-        <figure class="shot" data-view="terminal"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
+        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 638"><img class="shot-base" alt="" loading="lazy" width="1600" height="638"><img class="shot-over" alt="" loading="lazy" width="1600" height="638"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -468,7 +523,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Suchen und Ersetzen</span><span class="en">Find and replace</span></li>
           </ul>
         </div>
-        <figure class="shot" data-view="editor"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
+        <figure class="shot zoomable" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 547"><img class="shot-base" alt="" loading="lazy" width="1600" height="547"><img class="shot-over" alt="" loading="lazy" width="1600" height="547"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -477,7 +532,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Sieh, was sich unterscheidet, bevor du etwas überschreibst.</span><span class="en">See what differs before you overwrite anything.</span></h2>
           <p><span class="de">Bitcrane vergleicht deinen Ordner mit dem Server und zeigt neue, geänderte und fehlende Dateien. Du entscheidest, in welche Richtung abgeglichen wird.</span><span class="en">Bitcrane compares your folder with the server and lists new, changed and missing files. You decide which way to bring them in line.</span></p>
         </div>
-        <figure class="shot" data-view="compare"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
+        <figure class="shot zoomable" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 838"><img class="shot-base" alt="" loading="lazy" width="1600" height="838"><img class="shot-over" alt="" loading="lazy" width="1600" height="838"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -486,7 +541,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Deine Server bringst du einfach mit.</span><span class="en">Bring your servers along.</span></h2>
           <p><span class="de">Beim ersten Start findet Bitcrane gespeicherte Server aus FileZilla, WinSCP, Transmit und deiner SSH-Konfiguration und übernimmt sie auf Wunsch.</span><span class="en">On first start, Bitcrane finds servers saved in FileZilla, WinSCP, Transmit and your SSH config, and takes them over if you like.</span></p>
         </div>
-        <figure class="shot" data-view="import"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
+        <figure class="shot zoomable" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1552 / 1012"><img class="shot-base" alt="" loading="lazy" width="1552" height="1012"><img class="shot-over" alt="" loading="lazy" width="1552" height="1012"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
     </div>
   </section>
@@ -569,6 +624,7 @@ footer a { color: var(--muted); }
             <strong><span class="de">Demo im Browser</span><span class="en">Demo in the browser</span></strong>
             <p><span class="de">Etwa 1,5 MB. Am besten auf einem Computer, die App ist für große Bildschirme gemacht.</span><span class="en">About 1.5 MB. Best on a computer; the app is made for large screens.</span></p>
             <button class="btn btn-primary" type="button" id="demo-start"><span class="de">Demo starten</span><span class="en">Start the demo</span></button>
+            <p class="demo-small"><span class="de">Die Demo ist für Computer gemacht. Schau gern am Mac oder PC vorbei.</span><span class="en">The demo is made for computers. Have a look on your Mac or PC.</span></p>
           </div>
         </div>
       </div>
@@ -614,6 +670,23 @@ footer a { color: var(--muted); }
     </div>
   </section>
 
+  <section class="news" id="neu" aria-labelledby="news-h">
+    <div class="wrap news-grid">
+      <div class="section-head">
+        <span class="kicker"><span class="de">Version 0.3</span><span class="en">Version 0.3</span></span>
+        <h2 id="news-h"><span class="de">Neu in dieser Version</span><span class="en">New in this version</span></h2>
+        <p><a href="https://github.com/Raccoon-Works/bitcrane/releases" rel="noopener"><span class="de">Alle Änderungen auf GitHub</span><span class="en">All changes on GitHub</span> →</a></p>
+      </div>
+      <ul class="news-list">
+        <li><strong><span class="de">Server übernehmen beim ersten Start</span><span class="en">Bring your servers on first start</span></strong><span class="de">Bitcrane findet Server aus FileZilla, WinSCP, Transmit und der SSH-Konfiguration.</span><span class="en">Bitcrane finds servers from FileZilla, WinSCP, Transmit and your SSH config.</span></li>
+        <li><strong><span class="de">Klare Fehlermeldungen</span><span class="en">Clear error messages</span></strong><span class="de">Jede Meldung sagt, was passiert ist und was du tun kannst. Einzelheiten stehen im Protokoll.</span><span class="en">Every message says what happened and what you can do. Details go to the log.</span></li>
+        <li><strong><span class="de">Schnellere Dropbox</span><span class="en">Faster Dropbox</span></strong><span class="de">Viele kleine Dateien gehen doppelt so schnell und ohne Abbrüche hoch.</span><span class="en">Many small files upload twice as fast and without interruptions.</span></li>
+        <li><strong><span class="de">Werkzeugleiste passt sich an</span><span class="en">Toolbar that adapts</span></strong><span class="de">Ist das Fenster schmal, wandern Werkzeuge in ein Menü statt abgeschnitten zu werden.</span><span class="en">In a narrow window, tools move into a menu instead of being cut off.</span></li>
+        <li><strong><span class="de">Aufgeräumte Verbindungen</span><span class="en">Tidy connections</span></strong><span class="de">Wird ein Tab geschlossen, trennt Bitcrane Server, die nichts mehr brauchen.</span><span class="en">When a tab closes, Bitcrane disconnects servers nothing else needs.</span></li>
+      </ul>
+    </div>
+  </section>
+
   <section class="faq" id="fragen" aria-labelledby="faq-h">
     <div class="wrap">
       <div class="section-head"><h2 id="faq-h"><span class="de">Kurz gefragt</span><span class="en">Quick questions</span></h2></div>
@@ -639,6 +712,18 @@ footer a { color: var(--muted); }
   </section>
   </div>
 </main>
+
+<dialog class="lightbox" id="lightbox" aria-labelledby="lb-title">
+  <div class="lb-bar">
+    <span class="lb-title" id="lb-title"></span>
+    <div class="seg" role="group" aria-label="Design">
+      <button type="button" data-lb-theme="light"><span class="de">Hell</span><span class="en">Light</span></button>
+      <button type="button" data-lb-theme="dark"><span class="de">Dunkel</span><span class="en">Dark</span></button>
+    </div>
+    <button type="button" class="lb-close" id="lb-close" aria-label="Schließen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
+  </div>
+  <img class="lb-img" id="lb-img" alt="">
+</dialog>
 
 <footer>
   <div class="wrap">
@@ -690,7 +775,8 @@ footer a { color: var(--muted); }
     document.querySelectorAll('.shot').forEach(function (fig) {
       var v = fig.dataset.view;
       var b = fig.querySelector('.shot-base'), o = fig.querySelector('.shot-over'), tag = fig.querySelector('.shot-tag');
-      b.src = src(v, platform, base); o.src = src(v, platform, other);
+      var crop = fig.dataset.crop ? '-c' : '';
+      b.src = src(v, platform, base).replace('.webp', crop + '.webp'); o.src = src(v, platform, other).replace('.webp', crop + '.webp');
       b.alt = ALT[lang][v] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][base] + ')';
       o.alt = '';
       if (tag) tag.textContent = ALT[lang][fig.classList.contains('flipped') || fig.matches(':hover') ? other : base];
@@ -699,8 +785,9 @@ footer a { color: var(--muted); }
       if (btn.closest('.demo-bar')) return;
       btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
     });
-    document.getElementById('hint-de').textContent = 'Mit der Maus über das Bild fahren, um das ' + (other === 'dark' ? 'dunkle' : 'helle') + ' Design zu sehen';
-    document.getElementById('hint-en').textContent = 'Move the mouse over the picture to see the ' + other + ' design';
+    var touch = window.matchMedia && matchMedia('(hover: none)').matches;
+    document.getElementById('hint-de').textContent = (touch ? 'Tippe auf das Bild, um das ' : 'Mit der Maus über das Bild fahren, um das ') + (other === 'dark' ? 'dunkle' : 'helle') + ' Design zu sehen';
+    document.getElementById('hint-en').textContent = (touch ? 'Tap the picture to see the ' : 'Move the mouse over the picture to see the ') + other + ' design';
     var poster = document.getElementById('demo-poster');
     poster.src = src('main', demoPf, demoTh);
     document.getElementById('dl-mac').classList.toggle('current', own === 'mac');
@@ -720,8 +807,25 @@ footer a { color: var(--muted); }
     function label() { var base = pageTheme(); var on = fig.classList.contains('flipped') || fig.matches(':hover'); tag.textContent = ALT[lang][on ? (base === 'dark' ? 'light' : 'dark') : base]; }
     fig.addEventListener('pointerenter', label);
     fig.addEventListener('pointerleave', function () { setTimeout(label, 0); });
-    fig.addEventListener('click', function (e) { if (e.pointerType !== 'mouse') { fig.classList.toggle('flipped'); label(); } });
+    fig.querySelector('.shot-frame').addEventListener('click', function () { openLightbox(fig.dataset.view); });
   });
+
+  /* Large view: the whole window of a feature shot, with its own light/dark switch. */
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lb-img'), lbView = '', lbTheme = 'light';
+  function lbShow() {
+    lbImg.src = src(lbView, platform, lbTheme);
+    lbImg.alt = ALT[lang][lbView] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][lbTheme] + ')';
+    document.getElementById('lb-title').textContent = ALT[lang][lbView];
+    lb.querySelectorAll('[data-lb-theme]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lbTheme === lbTheme)); });
+  }
+  function openLightbox(view) {
+    lbView = view; lbTheme = pageTheme();
+    lbShow();
+    if (typeof lb.showModal === 'function') lb.showModal(); else lb.setAttribute('open', '');
+  }
+  lb.querySelectorAll('[data-lb-theme]').forEach(function (b) { b.addEventListener('click', function () { lbTheme = b.dataset.lbTheme; lbShow(); }); });
+  document.getElementById('lb-close').addEventListener('click', function () { lb.close(); });
+  lb.addEventListener('click', function (e) { if (e.target === lb) lb.close(); });
 
   /* Hero shot: the other theme is revealed up to the pointer, with a seam. */
   var hero = document.querySelector('.hero-shot');
@@ -782,7 +886,7 @@ footer a { color: var(--muted); }
   /* Reading position shown as an upload of the page (right edge). */
   var STOPS = [
     ['top', 'Start', 'Start'], ['funktionen', 'Funktionen', 'Features'], ['mehr', 'Mehr', 'More'],
-    ['demo', 'Demo', 'Demo'], ['download', 'Download', 'Download'], ['fragen', 'Fragen', 'Questions']
+    ['demo', 'Demo', 'Demo'], ['download', 'Download', 'Download'], ['neu', 'Neu', 'New'], ['fragen', 'Fragen', 'Questions']
   ];
   var up = document.getElementById('upload'), upFill = document.getElementById('upload-fill');
   var upHead = document.getElementById('upload-head'), upText = document.getElementById('upload-text');
