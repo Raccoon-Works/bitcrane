@@ -398,7 +398,6 @@ export function attachTerminal(id: string, container: HTMLElement) {
         ? `\x1b[32m${srv?.user || 'deploy'}@${(srv?.host || 'server').split('.')[0]}\x1b[0m:\x1b[34m${(folder || '~').replace(/^\/home\/[^/]+/, '~')}\x1b[0m$ `
         : `\x1b[32malex@MacBook\x1b[0m \x1b[34m${folder || '~'}\x1b[0m % `;
       if (session.serverId) {
-        l.term.writeln(`\x1b[2m${$t('Bitcrane – Terminal (Vorschau)')}\x1b[0m`);
         l.term.writeln(`${prompt}pm2 status`);
         l.term.writeln('┌────┬──────────┬────────┬────┬──────────┬──────────┐');
         l.term.writeln('│ id │ name     │ mode   │ ↺  │ status   │ memory   │');

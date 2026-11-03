@@ -211,6 +211,11 @@ footer { position: relative; background: var(--bg); }
 .shot-over { opacity: 0; transition: opacity 260ms ease; }
 .shot:hover .shot-over, .shot.flipped .shot-over { opacity: 1; }
 [data-crop] .shot-tag { display: none; }
+/* Cut-out shots (a dialog or panel on a transparent background): no frame, a soft shadow of their own. */
+[data-crop] .shot-frame { background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
+[data-crop] .shot-frame img { object-fit: contain; filter: drop-shadow(0 18px 36px rgba(16, 32, 56, .22)) drop-shadow(0 1px 2px rgba(16, 32, 56, .12)); }
+:root[data-theme="dark"] [data-crop] .shot-frame img { filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .6)) drop-shadow(0 0 0 1px rgba(255, 255, 255, .06)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) [data-crop] .shot-frame img { filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .6)); } }
 @media (max-width: 760px) { .try-demo { display: none; } }
 .zoomable .shot-frame { cursor: zoom-in; transition: transform 300ms cubic-bezier(.23, 1, .32, 1), box-shadow 300ms ease; }
 .zoomable:hover .shot-frame { transform: translateY(-3px); }
@@ -515,7 +520,7 @@ footer a { color: var(--muted); }
           </ul>
           <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
-        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1552 / 1444"><img class="shot-base" alt="" loading="lazy" width="1552" height="1444"><img class="shot-over" alt="" loading="lazy" width="1552" height="1444"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 1440"><img class="shot-base" alt="" loading="lazy" width="1520" height="1440"><img class="shot-over" alt="" loading="lazy" width="1520" height="1440"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -529,7 +534,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Tunnel für Datenbanken und Dienste</span><span class="en">Tunnels for databases and services</span></li>
           </ul>
         </div>
-        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 638"><img class="shot-base" alt="" loading="lazy" width="1600" height="638"><img class="shot-over" alt="" loading="lazy" width="1600" height="638"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 396"><img class="shot-base" alt="" loading="lazy" width="1600" height="396"><img class="shot-over" alt="" loading="lazy" width="1600" height="396"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -542,7 +547,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Suchen und Ersetzen</span><span class="en">Find and replace</span></li>
           </ul>
         </div>
-        <figure class="shot zoomable" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 547"><img class="shot-base" alt="" loading="lazy" width="1600" height="547"><img class="shot-over" alt="" loading="lazy" width="1600" height="547"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 602"><img class="shot-base" alt="" loading="lazy" width="1600" height="602"><img class="shot-over" alt="" loading="lazy" width="1600" height="602"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -551,7 +556,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Sieh, was sich unterscheidet, bevor du etwas überschreibst.</span><span class="en">See what differs before you overwrite anything.</span></h2>
           <p><span class="de">Bitcrane vergleicht deinen Ordner mit dem Server und zeigt neue, geänderte und fehlende Dateien. Du entscheidest, in welche Richtung abgeglichen wird.</span><span class="en">Bitcrane compares your folder with the server and lists new, changed and missing files. You decide which way to bring them in line.</span></p>
         </div>
-        <figure class="shot zoomable" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 838"><img class="shot-base" alt="" loading="lazy" width="1600" height="838"><img class="shot-over" alt="" loading="lazy" width="1600" height="838"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 835"><img class="shot-base" alt="" loading="lazy" width="1600" height="835"><img class="shot-over" alt="" loading="lazy" width="1600" height="835"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
 
       <article class="feature">
@@ -560,7 +565,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Deine Server bringst du einfach mit.</span><span class="en">Bring your servers along.</span></h2>
           <p><span class="de">Beim ersten Start findet Bitcrane gespeicherte Server aus FileZilla, WinSCP, Transmit und deiner SSH-Konfiguration und übernimmt sie auf Wunsch.</span><span class="en">On first start, Bitcrane finds servers saved in FileZilla, WinSCP, Transmit and your SSH config, and takes them over if you like.</span></p>
         </div>
-        <figure class="shot zoomable" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1552 / 1012"><img class="shot-base" alt="" loading="lazy" width="1552" height="1012"><img class="shot-over" alt="" loading="lazy" width="1552" height="1012"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 992"><img class="shot-base" alt="" loading="lazy" width="1520" height="992"><img class="shot-over" alt="" loading="lazy" width="1520" height="992"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
       </article>
     </div>
   </section>
