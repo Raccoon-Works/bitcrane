@@ -21,6 +21,7 @@ const V = [
       if (process.argv[2] && !process.argv[2].split(',').includes(id)) continue;
       for (const plat of ['mac', 'win']) for (const th of ['light', 'dark']) {
         try {
+          await p.setViewportSize(id === 'terminal' ? { width: 1100, height: 800 } : { width: 1300, height: 800 });
           await p.goto(`http://localhost:5179/?demo&platform=${plat}&theme=${th}&lang=${lang}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
           await p.waitForTimeout(1300);
           await fn(p);
