@@ -25,7 +25,7 @@
   --radius: 14px;
   /* Data stream behind the hero, as "r,g,b" for the canvas: lanes, packets, files */
   --stream-lane: 42,109,186;
-  --stream-dot: 86,120,160;
+  --stream-dot: 52,98,158;
   --stream-file: 42,109,186;
 }
 @media (prefers-color-scheme: dark) {
@@ -956,12 +956,14 @@ footer a { color: var(--muted); }
     var cv = document.createElement('canvas'); host.appendChild(cv);
     var ctx = cv.getContext('2d'); if (!ctx) return;
     var slow = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.3 : 1;
-    var W = 0, H = 0, lanes = [], packets = [], col = {}, last = 0, running = true;
+    var W = 0, H = 0, lanes = [], packets = [], col = {}, last = 0, running = true, laneAlpha = 0.11, dotAlpha = 0.6;
     var seed = 11;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     function readColors() {
       var cs = getComputedStyle(root);
       ['lane', 'dot', 'file'].forEach(function (k) { col[k] = cs.getPropertyValue('--stream-' + k).trim(); });
+      var dark = pageTheme() === 'dark';
+      laneAlpha = dark ? 0.11 : 0.13; dotAlpha = dark ? 0.6 : 0.55;
     }
     /* A lane starts at y0 on the left and bends towards the server point on the right. */
     function laneY(l, x) {
@@ -969,7 +971,7 @@ footer a { color: var(--muted); }
       return l.y0 + (l.sy - l.y0) * Math.pow(ease, 1.6) + Math.sin(x * l.k + l.ph) * l.amp * (1 - ease);
     }
     function spawn(anywhere) {
-      var file = rnd() < 0.12;
+      var file = rnd() < 0.2;
       return { lane: lanes[(rnd() * lanes.length) | 0], x: anywhere ? rnd() * W : -40 - rnd() * 200,
         v: (file ? 70 : 40) + rnd() * 70, len: file ? 26 + rnd() * 18 : 6 + rnd() * 14, file: file };
     }
@@ -985,14 +987,14 @@ footer a { color: var(--muted); }
         lanes.push({ y0: H * (0.06 + 0.9 * (i + rnd() * 0.6) / n), sy: H * (0.34 + (rnd() - 0.5) * 0.08),
           k: 0.002 + rnd() * 0.003, ph: rnd() * 6.28, amp: 10 + rnd() * 26 });
       }
-      for (var j = 0; j < n * 4; j++) packets.push(spawn(true));
+      for (var j = 0; j < n * 5; j++) packets.push(spawn(true));
       readColors();
     }
     /* Quieter behind the headline and the buttons. */
     function calm(x, y) {
       var dx = (x - W / 2) / (Math.min(W, 1100) * 0.42), dy = (y - H * 0.36) / (H * 0.3);
       var d = Math.sqrt(dx * dx + dy * dy);
-      return Math.min(1, 0.25 + Math.max(0, d - 0.55) * 1.2);
+      return Math.min(1, 0.35 + Math.max(0, d - 0.5) * 1.4);
     }
     function draw(dt) {
       ctx.clearRect(0, 0, W, H);
@@ -1001,7 +1003,7 @@ footer a { color: var(--muted); }
       lanes.forEach(function (l) {
         ctx.beginPath();
         for (var x = 0; x <= W; x += 24) { var y = laneY(l, x); if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
-        ctx.strokeStyle = 'rgba(' + col.lane + ',0.07)';
+        ctx.strokeStyle = 'rgba(' + col.lane + ',' + laneAlpha + ')';
         ctx.stroke();
       });
       packets.forEach(function (p, i) {
@@ -1014,10 +1016,10 @@ footer a { color: var(--muted); }
         var c = p.file ? col.file : col.dot;
         var g = ctx.createLinearGradient(x0, y0, p.x, y1);
         g.addColorStop(0, 'rgba(' + c + ',0)');
-        g.addColorStop(1, 'rgba(' + c + ',' + ((p.file ? 0.85 : 0.38) * a) + ')');
+        g.addColorStop(1, 'rgba(' + c + ',' + ((p.file ? 1 : dotAlpha) * a) + ')');
         ctx.strokeStyle = g;
-        ctx.lineWidth = p.file ? 2.2 : 1.6;
-        if (p.file) { ctx.shadowColor = 'rgba(' + c + ',' + (0.7 * a) + ')'; ctx.shadowBlur = 10; }
+        ctx.lineWidth = p.file ? 2.6 : 1.8;
+        if (p.file) { ctx.shadowColor = 'rgba(' + c + ',' + (0.9 * a) + ')'; ctx.shadowBlur = 14; }
         ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(p.x, y1); ctx.stroke();
         ctx.shadowBlur = 0;
       });
