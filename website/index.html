@@ -84,6 +84,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font: 700 19px var(--font-display); letter-spacing: -0.01em; }
 .brand:hover { text-decoration: none; }
 .brand img { width: 30px; height: 30px; }
+/* Wordmark as in the app: "Bit" bold, "crane" light, read as one word. */
+.wm-bit { font-weight: 800; }
+.wm-crane { font-weight: 300; opacity: .92; }
 .nav { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
 .nav a { color: var(--muted); }
 .nav a:hover { color: var(--ink); text-decoration: none; }
@@ -250,10 +253,11 @@ section { scroll-margin-top: 76px; }
 .copy li::before { content: ""; width: 7px; height: 7px; margin-top: 10px; border-radius: 2px; background: var(--accent); transform: rotate(45deg); }
 .term-line {
   font: 400 13px/1.6 var(--font-mono); background: var(--code-bg); color: var(--code-ink);
-  padding: 12px 14px; border-radius: 10px; overflow-x: auto; white-space: nowrap;
+  padding: 12px 14px; border-radius: 10px; overflow-wrap: anywhere;
 }
 .term-line b { color: #7fd38a; font-weight: 500; }
 .term-line i { color: #6fb8ff; font-style: normal; }
+.term-line .cmd { opacity: .75; }
 @media (max-width: 860px) {
   .feature, .feature:nth-child(even) { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .feature:nth-child(even) .copy { order: 0; }
@@ -318,7 +322,7 @@ section { scroll-margin-top: 76px; }
 .copyline { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
 .copyline code {
   flex: 1; min-width: 0; font-size: 12.5px; background: var(--code-bg); color: var(--code-ink);
-  padding: 9px 11px; border-radius: 8px; overflow-x: auto; white-space: nowrap;
+  padding: 9px 11px; border-radius: 8px; overflow-wrap: anywhere; line-height: 1.5;
 }
 .copyline button {
   border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px;
@@ -341,7 +345,7 @@ footer a { color: var(--muted); }
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="img/icon-64.png" alt="" width="30" height="30">Bitcrane</a>
+    <a class="brand" href="#top"><img src="img/icon-64.png" alt="" width="30" height="30"><span class="wordmark" aria-label="Bitcrane"><span class="wm-bit" aria-hidden="true">Bit</span><span class="wm-crane" aria-hidden="true">crane</span></span></a>
     <nav class="nav" aria-label="Seiten">
       <a href="#funktionen"><span class="de">Funktionen</span><span class="en">Features</span></a>
       <a href="#demo">Demo</a>
@@ -435,7 +439,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Warnung, wenn die Datei auf dem Server neuer ist</span><span class="en">A warning when the server copy is newer</span></li>
             <li><span class="de">Läuft im Hintergrund weiter, auch bei geschlossenem Fenster</span><span class="en">Keeps running in the background with the window closed</span></li>
           </ul>
-          <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop &nbsp;·&nbsp; pm2 restart webshop</div>
+          <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
         <figure class="shot" data-view="watchsetup"><div class="shot-frame"><img class="shot-base" alt="" loading="lazy" width="2000" height="1231"><img class="shot-over" alt="" loading="lazy" width="2000" height="1231"><span class="shot-tag"></span></div></figure>
       </article>

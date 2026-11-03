@@ -28,3 +28,4 @@ dist-single
 src-tauri/target
 src-tauri/gen/schemas
 website/demo/
+website/dist/
