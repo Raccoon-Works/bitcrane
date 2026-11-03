@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/bitcrane-icon.png" width="128" height="128" alt="Bitcrane icon">
+  <img src="docs/ithub-social-preview.png" width="128" height="128" alt="Bitcrane icon">
 </p>
 
 <h1 align="center">Bitcrane</h1>
