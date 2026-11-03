@@ -271,15 +271,33 @@ footer { position: relative; background: var(--bg); }
 }
 
 /* Protocol strip */
-.protocols { padding-block: 44px 8px; }
-.protocols ul {
-  list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px;
+.protocols { padding-block: 48px 8px; }
+/* What Bitcrane connects to, as one quiet strip in two groups. */
+.proto {
+  display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap;
+  max-width: 940px; margin: 0 auto; padding: 16px 28px; border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line);
 }
-.protocols li {
-  font: 500 14px var(--font-mono); padding: 6px 12px; border-radius: 8px;
-  border: 1px solid var(--line); color: var(--muted); background: var(--surface);
+.proto-group { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; justify-content: center; min-width: 0; }
+.proto-label { font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.proto ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 0; }
+.proto li { font: 500 15px var(--font-body); color: var(--ink); white-space: nowrap; }
+.proto li + li::before { content: ""; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: var(--muted); opacity: .6; margin: 0 11px; vertical-align: middle; }
+.proto-cloud li { color: var(--accent); }
+.proto-sep { width: 1px; align-self: stretch; background: var(--line); }
+@media (max-width: 760px) {
+  .proto { flex-direction: column; gap: 12px; padding: 16px; }
+  .proto-sep { width: 40px; height: 1px; align-self: center; }
+  .proto-group { flex-direction: column; align-items: center; gap: 6px; }
+  .proto ul { gap: 6px 16px; }
+  .proto li + li::before { display: none; }
 }
-.protocols li.cloud { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+/* Fingers need larger targets than a mouse pointer. */
+@media (pointer: coarse) {
+  .langs button { padding: 10px 12px; }
+  .seg button { padding: 10px 16px; }
+  .gh-link, footer nav a, .nav a, .news-grid .section-head a { display: inline-block; padding-block: 10px; }
+}
 
 /* Feature rows */
 section { scroll-margin-top: 76px; }
@@ -475,10 +493,11 @@ footer a { color: var(--muted); }
   <div class="sheet">
   <section class="protocols" aria-label="Protokolle">
     <div class="wrap">
-      <ul>
-        <li>SFTP</li><li>SCP</li><li>FTP</li><li>FTPS</li><li>WebDAV</li><li>SMB 2/3</li><li>S3</li>
-        <li class="cloud">Dropbox</li><li class="cloud">OneDrive</li><li class="cloud">Google Drive</li>
-      </ul>
+      <div class="proto">
+        <div class="proto-group"><span class="proto-label">Server</span><ul><li>SFTP</li><li>SCP</li><li>FTP</li><li>FTPS</li><li>WebDAV</li><li>SMB</li><li>S3</li></ul></div>
+        <span class="proto-sep" aria-hidden="true"></span>
+        <div class="proto-group proto-cloud"><span class="proto-label">Cloud</span><ul><li>Dropbox</li><li>OneDrive</li><li>Google Drive</li></ul></div>
+      </div>
     </div>
   </section>
 
@@ -636,7 +655,7 @@ footer a { color: var(--muted); }
     <div class="wrap">
       <div class="section-head">
         <h2 id="dl-h">Download</h2>
-        <p><span class="de">Version 0.3, Beta. Installierte Kopien halten sich selbst aktuell.</span><span class="en">Version 0.3, beta. Installed copies keep themselves up to date.</span></p>
+        <p><span class="de">Version <span data-version>0.3</span>, Beta. Installierte Kopien halten sich selbst aktuell.</span><span class="en">Version <span data-version>0.3</span>, beta. Installed copies keep themselves up to date.</span></p>
       </div>
       <div class="dl-grid">
         <div class="dl" id="dl-mac">
@@ -673,7 +692,7 @@ footer a { color: var(--muted); }
   <section class="news" id="neu" aria-labelledby="news-h">
     <div class="wrap news-grid">
       <div class="section-head">
-        <span class="kicker"><span class="de">Version 0.3</span><span class="en">Version 0.3</span></span>
+        <span class="kicker">Version <span data-version>0.3</span></span>
         <h2 id="news-h"><span class="de">Neu in dieser Version</span><span class="en">New in this version</span></h2>
         <p><a href="https://github.com/Raccoon-Works/bitcrane/releases" rel="noopener"><span class="de">Alle Änderungen auf GitHub</span><span class="en">All changes on GitHub</span> →</a></p>
       </div>
