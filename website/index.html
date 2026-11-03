@@ -25,6 +25,10 @@
   --font-body: "Instrument Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
   --radius: 14px;
+  /* Hero mesh: facet colours from dark to light, as "r,g,b" for the canvas */
+  --mesh-lo: 214,229,246;
+  --mesh-hi: 246,250,255;
+  --mesh-glint: 42,109,186;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -32,6 +36,7 @@
     --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
     --code-bg: #05080d; --code-ink: #cfe0f2;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
+    --mesh-lo: 8,13,21; --mesh-hi: 27,44,68; --mesh-glint: 111,184,255;
     color-scheme: dark;
   }
 }
@@ -40,6 +45,7 @@
   --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
   --code-bg: #05080d; --code-ink: #cfe0f2;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
+  --mesh-lo: 8,13,21; --mesh-hi: 27,44,68; --mesh-glint: 111,184,255;
   color-scheme: dark;
 }
 
@@ -106,7 +112,40 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .btn svg { width: 18px; height: 18px; flex: none; }
 
 /* Hero */
-.hero { padding-block: 72px 32px; }
+.hero { padding-block: 72px 32px; position: relative; isolation: isolate; }
+/* Slowly drifting low-poly surface behind the hero text, fading into the page. */
+.hero-mesh {
+  position: absolute; inset: -60px 0 auto 0; height: min(820px, 100%); width: 100%; z-index: -1;
+  -webkit-mask-image: linear-gradient(#000 0%, #000 45%, transparent 92%);
+  mask-image: linear-gradient(#000 0%, #000 45%, transparent 92%);
+  pointer-events: none;
+}
+/* Reading progress along the right edge, with one stop per section. */
+.rail {
+  position: fixed; z-index: 8; top: 50%; transform: translateY(-50%);
+  right: max(18px, env(safe-area-inset-right, 0px));
+  height: min(52vh, 420px); width: 24px; display: flex; justify-content: center;
+}
+.rail-track { position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.rail-fill { position: absolute; inset: 0; background: var(--accent); transform-origin: top; transform: scaleY(0); }
+.rail ol { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
+.rail li { position: absolute; left: 50%; transform: translate(-50%, -50%); }
+.rail a {
+  display: block; width: 11px; height: 11px; border-radius: 50%; position: relative;
+  background: var(--bg); border: 2px solid var(--line); transition: border-color 200ms ease, background-color 200ms ease, transform 160ms ease-out;
+}
+.rail a:hover { transform: scale(1.25); text-decoration: none; }
+.rail a.passed { border-color: var(--accent); }
+.rail a.current { background: var(--accent); border-color: var(--accent); }
+.rail a span {
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%) translateX(4px); white-space: nowrap;
+  font: 500 13px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  padding: 3px 9px; border-radius: 7px; opacity: 0; pointer-events: none; transition: opacity 150ms ease, transform 150ms ease-out;
+  box-shadow: var(--shadow);
+}
+.rail a:hover span, .rail a:focus-visible span { opacity: 1; transform: translateY(-50%); }
+@media (max-width: 1100px) { .rail { display: none; } }
+@media (prefers-reduced-motion: reduce) { .rail a, .rail a span { transition: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
@@ -295,8 +334,14 @@ footer a { color: var(--muted); }
   </div>
 </header>
 
+<nav class="rail" aria-label="Abschnitte">
+  <div class="rail-track"><div class="rail-fill" id="rail-fill"></div></div>
+  <ol id="rail-stops"></ol>
+</nav>
+
 <main id="top">
   <section class="hero">
+    <canvas class="hero-mesh" id="mesh" aria-hidden="true"></canvas>
     <div class="wrap">
       <div class="hero-text">
         <span class="eyebrow"><span class="pill">Beta</span><span class="de">Kostenlos · Open Source · macOS und Windows</span><span class="en">Free · Open source · macOS and Windows</span></span>
@@ -412,7 +457,7 @@ footer a { color: var(--muted); }
     </div>
   </section>
 
-  <section class="facts" aria-labelledby="facts-h">
+  <section class="facts" id="mehr" aria-labelledby="facts-h">
     <div class="wrap">
       <div class="section-head">
         <h2 id="facts-h"><span class="de">Und was sonst noch dazugehört</span><span class="en">And everything else that belongs</span></h2>
@@ -501,7 +546,7 @@ footer a { color: var(--muted); }
     <div class="wrap">
       <div class="section-head">
         <h2 id="dl-h">Download</h2>
-        <p><span class="de">Version <strong id="ver">0.3</strong>, Beta. Installierte Kopien halten sich selbst aktuell.</span><span class="en">Version <strong id="ver-en">0.3</strong>, beta. Installed copies keep themselves up to date.</span></p>
+        <p><span class="de">Version 0.3, Beta. Installierte Kopien halten sich selbst aktuell.</span><span class="en">Version 0.3, beta. Installed copies keep themselves up to date.</span></p>
       </div>
       <div class="dl-grid">
         <div class="dl" id="dl-mac">
@@ -511,7 +556,7 @@ footer a { color: var(--muted); }
           </div>
           <p><span class="de">macOS 11 oder neuer, Apple Silicon und Intel in einer Datei.</span><span class="en">macOS 11 or later, Apple silicon and Intel in one file.</span></p>
           <div><a class="btn btn-primary" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a></div>
-          <span class="dl-file" id="file-mac">Bitcrane_universal.dmg</span>
+          <span class="dl-file" id="file-mac">Bitcrane-macOS.dmg · 33 MB</span>
           <div class="first">
             <strong><span class="de">Beim ersten Start</span><span class="en">On first start</span></strong>
             <p><span class="de">Bitcrane ist noch nicht von Apple beglaubigt. Nach dem Verschieben in „Programme“ einmal im Terminal ausführen, sonst meldet macOS die App als beschädigt:</span><span class="en">Bitcrane is not notarized by Apple yet. After moving it to Applications, run this once in Terminal, otherwise macOS reports the app as damaged:</span></p>
@@ -525,7 +570,7 @@ footer a { color: var(--muted); }
           </div>
           <p><span class="de">Windows 10 und 11, 64 Bit. Installation ohne Administratorrechte.</span><span class="en">Windows 10 and 11, 64-bit. Installs without administrator rights.</span></p>
           <div><a class="btn btn-primary" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a></div>
-          <span class="dl-file" id="file-win">Bitcrane_x64-setup.exe</span>
+          <span class="dl-file" id="file-win">Bitcrane-Windows-Setup.exe · 11 MB</span>
           <div class="first">
             <strong><span class="de">Beim ersten Start</span><span class="en">On first start</span></strong>
             <p><span class="de">Windows zeigt „Der Computer wurde durch Windows geschützt“. Auf „Weitere Informationen“ klicken, dann auf „Trotzdem ausführen“. Updates aus Bitcrane heraus brauchen diesen Schritt nicht.</span><span class="en">Windows shows “Windows protected your PC”. Click “More info”, then “Run anyway”. Updates installed from within Bitcrane skip this step.</span></p>
@@ -535,7 +580,7 @@ footer a { color: var(--muted); }
     </div>
   </section>
 
-  <section class="faq" aria-labelledby="faq-h">
+  <section class="faq" id="fragen" aria-labelledby="faq-h">
     <div class="wrap">
       <div class="section-head"><h2 id="faq-h"><span class="de">Kurz gefragt</span><span class="en">Quick questions</span></h2></div>
       <dl>
@@ -625,8 +670,7 @@ footer a { color: var(--muted); }
     poster.src = src('main', demoPf, demoTh);
     document.getElementById('dl-mac').classList.toggle('current', own === 'mac');
     document.getElementById('dl-win').classList.toggle('current', own === 'win');
-    document.getElementById('cta-main').href = '#download';
-  }
+      }
 
   document.querySelectorAll('.switch-row [data-platform]').forEach(function (btn) {
     btn.addEventListener('click', function () { platform = btn.dataset.platform; render(); });
@@ -691,25 +735,113 @@ footer a { color: var(--muted); }
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
   });
 
-  /* Direct download links and version from the latest GitHub release. */
-  fetch('https://api.github.com/repos/' + REPO + '/releases/latest').then(function (r) { return r.ok ? r.json() : null; }).then(function (rel) {
-    if (!rel || !rel.assets) return;
-    var v = String(rel.tag_name || '').replace(/^v/, '');
-    if (v) { document.getElementById('ver').textContent = v; document.getElementById('ver-en').textContent = v; }
-    rel.assets.forEach(function (a) {
-      var mb = ' · ' + (a.size / 1048576).toFixed(0) + ' MB';
-      if (/universal\.dmg$/.test(a.name)) { document.getElementById('link-mac').href = a.browser_download_url; document.getElementById('file-mac').textContent = a.name + mb; }
-      if (/x64-setup\.exe$/.test(a.name)) { document.getElementById('link-win').href = a.browser_download_url; document.getElementById('file-win').textContent = a.name + mb; }
-    });
-    var main = document.getElementById('cta-main');
-    main.href = document.getElementById(own === 'win' ? 'link-win' : 'link-mac').href;
-  }).catch(function () { /* offline or rate-limited: the release page links stay */ });
+  /* Download links: fixed file names of the latest release, so the page itself never contacts GitHub. */
+  var DL = 'https://github.com/' + REPO + '/releases/latest/download/';
+  document.getElementById('link-mac').href = DL + 'Bitcrane-macOS.dmg';
+  document.getElementById('link-win').href = DL + 'Bitcrane-Windows-Setup.exe';
+  document.getElementById('cta-main').href = DL + (own === 'win' ? 'Bitcrane-Windows-Setup.exe' : 'Bitcrane-macOS.dmg');
 
   if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   new MutationObserver(render).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 
+  /* Side rail: stops at each section, filled up to the reading position. */
+  var STOPS = [
+    ['top', 'Start', 'Start'], ['funktionen', 'Funktionen', 'Features'], ['mehr', 'Mehr', 'More'],
+    ['demo', 'Demo', 'Demo'], ['download', 'Download', 'Download'], ['fragen', 'Fragen', 'Questions']
+  ];
+  var railOl = document.getElementById('rail-stops'), railFill = document.getElementById('rail-fill');
+  var stopEls = STOPS.map(function (st) {
+    var li = document.createElement('li'), a = document.createElement('a');
+    a.href = '#' + st[0];
+    a.innerHTML = '<span class="de">' + st[1] + '</span><span class="en">' + st[2] + '</span>';
+    a.setAttribute('aria-label', st[1]);
+    li.appendChild(a); railOl.appendChild(li);
+    return { li: li, a: a, el: document.getElementById(st[0]) };
+  });
+  function scrollMax() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
+  function placeStops() {
+    var max = scrollMax();
+    stopEls.forEach(function (s) {
+      var y = s.el.getBoundingClientRect().top + scrollY - 80;
+      s.pos = Math.max(0, Math.min(1, y / max));
+      s.li.style.top = (s.pos * 100) + '%';
+    });
+  }
+  function onScroll() {
+    var p = Math.max(0, Math.min(1, scrollY / scrollMax()));
+    railFill.style.transform = 'scaleY(' + p + ')';
+    var cur = 0;
+    stopEls.forEach(function (s, i) { if (p + 0.002 >= s.pos) cur = i; });
+    stopEls.forEach(function (s, i) { s.a.classList.toggle('passed', i < cur); s.a.classList.toggle('current', i === cur); });
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', function () { placeStops(); onScroll(); });
+  addEventListener('load', function () { placeStops(); onScroll(); });
+
+  /* Hero mesh: a low-poly surface whose facets catch the light as it slowly moves. */
+  (function () {
+    var cv = document.getElementById('mesh'), ctx = cv.getContext('2d');
+    if (!ctx) return;
+    var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var pts = [], cols = 0, rows = 0, W = 0, H = 0, cell = 92, col = {}, visible = true, last = 0;
+    function readColors() {
+      var cs = getComputedStyle(root);
+      ['lo', 'hi', 'glint'].forEach(function (k) { col[k] = cs.getPropertyValue('--mesh-' + k).split(',').map(Number); });
+    }
+    function setup() {
+      var dpr = Math.min(2, devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cell = W < 600 ? 64 : 92;
+      cols = Math.ceil(W / cell) + 2; rows = Math.ceil(H / cell) + 2;
+      pts = [];
+      var seed = 7;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) {
+        pts.push({ x: (i - 1 + (rnd() - .5) * .7) * cell, y: (j - 1 + (rnd() - .5) * .7) * cell, ph: rnd() * 6.283, sp: .35 + rnd() * .5 });
+      }
+      readColors();
+    }
+    function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+      var z = pts.map(function (p) { return Math.sin(p.ph + t * p.sp) * .5 + Math.sin(p.x * .004 + p.y * .003 + t * .45) * .5; });
+      for (var j = 0; j < rows - 1; j++) for (var i = 0; i < cols - 1; i++) {
+        var a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
+        var tris = (i + j) % 2 ? [[a, b, c], [b, d, c]] : [[a, b, d], [a, d, c]];
+        for (var k = 0; k < 2; k++) {
+          var q = tris[k];
+          var h = (z[q[0]] + z[q[1]] + z[q[2]]) / 3;              /* -1 .. 1 */
+          var slope = (z[q[1]] - z[q[0]]) * .5 + .5;               /* fake light from the top left */
+          var light = Math.max(0, Math.min(1, slope * .7 + (h * .5 + .5) * .3));
+          var rgb = mix(col.lo, col.hi, light);
+          var g = Math.max(0, light - .82) * 1.6;                  /* a few facets glint in the accent */
+          if (g > 0) rgb = mix(rgb, col.glint, g);
+          ctx.fillStyle = 'rgb(' + (rgb[0] | 0) + ',' + (rgb[1] | 0) + ',' + (rgb[2] | 0) + ')';
+          ctx.beginPath();
+          ctx.moveTo(pts[q[0]].x, pts[q[0]].y); ctx.lineTo(pts[q[1]].x, pts[q[1]].y); ctx.lineTo(pts[q[2]].x, pts[q[2]].y);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();  /* hides hairline seams */
+        }
+      }
+    }
+    function frame(ms) {
+      if (visible && ms - last > 40) { last = ms; draw(ms / 1000 * .5); }
+      if (!still) requestAnimationFrame(frame);
+    }
+    setup(); draw(0);
+    if (!still) requestAnimationFrame(frame);
+    addEventListener('resize', function () { setup(); draw(last / 1000 * .5); });
+    if (window.IntersectionObserver) new IntersectionObserver(function (e) { visible = e[0].isIntersecting; }).observe(cv);
+    var recolor = function () { readColors(); draw(last / 1000 * .5); };
+    if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recolor);
+    new MutationObserver(recolor).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+
   setLang(lang);
   markDemo();
+  placeStops(); onScroll();
   document.getElementById('cta-label').querySelector('.de').textContent = own === 'win' ? 'Für Windows laden' : 'Für macOS laden';
   document.getElementById('cta-label').querySelector('.en').textContent = own === 'win' ? 'Download for Windows' : 'Download for macOS';
 })();
