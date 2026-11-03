@@ -862,7 +862,9 @@ footer a { color: var(--muted); }
     function waveColor() { return parseInt(getComputedStyle(root).getPropertyValue('--wave').trim().replace('#', ''), 16) || 0x0c2240; }
     function light() { return pageTheme() === 'light'; }
     function opts() {
-      return { color: waveColor(), shininess: light() ? 18 : 30, waveHeight: 14, waveSpeed: still ? 0 : 0.55, zoom: 0.9 };
+      /* With reduced motion (often just Windows' "animation effects" switched off) the surface
+         still drifts, but slowly and without following the mouse. */
+      return { color: waveColor(), shininess: light() ? 18 : 30, waveHeight: 14, waveSpeed: still ? 0.18 : 0.55, zoom: 0.9 };
     }
     function load(src) { return new Promise(function (ok, fail) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
     function start() {
