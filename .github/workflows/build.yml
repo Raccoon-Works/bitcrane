@@ -195,6 +195,10 @@ jobs:
           cp files/Bitcrane-mac/macos/*.app.tar.gz "out/Bitcrane_${V}_universal.app.tar.gz"
           cp files/Bitcrane-windows/nsis/*.exe "out/Bitcrane_${V}_x64-setup.exe"
           cp files/Bitcrane-windows/msi/*.msi "out/Bitcrane_${V}_x64.msi"
+          # Same installers under names without a version, so the website can link
+          # releases/latest/download/<name> without asking GitHub on every visit.
+          cp "out/Bitcrane_${V}_universal.dmg" out/Bitcrane-macOS.dmg
+          cp "out/Bitcrane_${V}_x64-setup.exe" out/Bitcrane-Windows-Setup.exe
           cat files/Bitcrane-mac/macos/*.app.tar.gz.sig > mac.sig
           cat files/Bitcrane-windows/nsis/*.exe.sig > win.sig
 
