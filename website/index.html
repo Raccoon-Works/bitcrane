@@ -25,10 +25,8 @@
   --font-body: "Instrument Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
   --radius: 14px;
-  /* Hero mesh: facet colours from dark to light, as "r,g,b" for the canvas */
-  --mesh-lo: 214,229,246;
-  --mesh-hi: 246,250,255;
-  --mesh-glint: 42,109,186;
+  /* Colour of the moving surface behind the hero (read by the script) */
+  --wave: #b9d1ef;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -36,7 +34,7 @@
     --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
     --code-bg: #05080d; --code-ink: #cfe0f2;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
-    --mesh-lo: 8,13,21; --mesh-hi: 27,44,68; --mesh-glint: 111,184,255;
+    --wave: #081a33;
     color-scheme: dark;
   }
 }
@@ -45,7 +43,7 @@
   --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
   --code-bg: #05080d; --code-ink: #cfe0f2;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
-  --mesh-lo: 8,13,21; --mesh-hi: 27,44,68; --mesh-glint: 111,184,255;
+  --wave: #081a33;
   color-scheme: dark;
 }
 
@@ -113,39 +111,75 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 /* Hero */
 .hero { padding-block: 72px 32px; position: relative; isolation: isolate; }
-/* Slowly drifting low-poly surface behind the hero text, fading into the page. */
-.hero-mesh {
-  position: absolute; inset: -60px 0 auto 0; height: min(820px, 100%); width: 100%; z-index: -1;
-  -webkit-mask-image: linear-gradient(#000 0%, #000 45%, transparent 92%);
-  mask-image: linear-gradient(#000 0%, #000 45%, transparent 92%);
-  pointer-events: none;
+/* Moving wave surface, fixed behind the page; everything below the hero slides over it. */
+.hero { z-index: 1; }
+.waves {
+  position: fixed; inset: 0 0 auto 0; height: 100vh; height: 100lvh; z-index: -1;
+  pointer-events: none; background: var(--bg);
 }
-/* Reading progress along the right edge, with one stop per section. */
-.rail {
-  position: fixed; z-index: 8; top: 50%; transform: translateY(-50%);
-  right: max(18px, env(safe-area-inset-right, 0px));
-  height: min(52vh, 420px); width: 24px; display: flex; justify-content: center;
+.waves canvas { display: block; }
+.sheet { position: relative; background: var(--bg); }
+.sheet::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 220px; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--bg));
 }
-.rail-track { position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.rail-fill { position: absolute; inset: 0; background: var(--accent); transform-origin: top; transform: scaleY(0); }
-.rail ol { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
-.rail li { position: absolute; left: 50%; transform: translate(-50%, -50%); }
-.rail a {
-  display: block; width: 11px; height: 11px; border-radius: 50%; position: relative;
-  background: var(--bg); border: 2px solid var(--line); transition: border-color 200ms ease, background-color 200ms ease, transform 160ms ease-out;
+footer { position: relative; background: var(--bg); }
+
+/* Page ruler on the right edge: ticks per percent, a glowing marker and a rolling counter. */
+.ruler {
+  position: fixed; top: 0; bottom: 0; right: 0; width: 60px; z-index: 8; overflow: hidden;
+  cursor: crosshair; touch-action: none;
 }
-.rail a:hover { transform: scale(1.25); text-decoration: none; }
-.rail a.passed { border-color: var(--accent); }
-.rail a.current { background: var(--accent); border-color: var(--accent); }
-.rail a span {
-  position: absolute; right: 20px; top: 50%; transform: translateY(-50%) translateX(4px); white-space: nowrap;
-  font: 500 13px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
-  padding: 3px 9px; border-radius: 7px; opacity: 0; pointer-events: none; transition: opacity 150ms ease, transform 150ms ease-out;
-  box-shadow: var(--shadow);
+.ruler-glass {
+  position: absolute; inset: 0;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-mask-image: linear-gradient(to left, #000 40%, transparent);
+  mask-image: linear-gradient(to left, #000 40%, transparent);
 }
-.rail a:hover span, .rail a:focus-visible span { opacity: 1; transform: translateY(-50%); }
-@media (max-width: 1100px) { .rail { display: none; } }
-@media (prefers-reduced-motion: reduce) { .rail a, .rail a span { transition: none; } }
+.ruler-tape { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+.ruler-tick { position: absolute; right: 0; height: 1px; width: 9px; background: var(--ink); opacity: .32; }
+.ruler-tick.major { width: 18px; opacity: .7; }
+.ruler-tick.section { width: 26px; background: var(--accent); opacity: .9; }
+.ruler-num {
+  position: absolute; right: 23px; transform: translateY(-50%);
+  font: 500 9px var(--font-mono); letter-spacing: .08em; color: var(--ink); opacity: .5;
+}
+.ruler-mark { position: absolute; left: 0; right: 0; top: 0; height: 0; will-change: transform; }
+.ruler-mark::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: var(--accent); box-shadow: 0 0 6px var(--accent);
+}
+.ruler-count {
+  position: absolute; right: 3px; top: 5px; display: flex; align-items: flex-start;
+  font: 600 9px/1 var(--font-mono); letter-spacing: .08em; color: var(--accent);
+}
+.digit { height: 1em; overflow: hidden; display: inline-block; }
+.digit > span { display: flex; flex-direction: column; transition: transform 260ms cubic-bezier(.23, 1, .32, 1); }
+.digit > span > span { height: 1em; }
+.ruler-count .pct { margin-left: 2px; }
+
+/* Section index, bottom right, as on a printed contents list. */
+.sections {
+  position: fixed; z-index: 8; bottom: 34px; right: 72px; text-align: right;
+}
+.sections::before {
+  content: ""; position: absolute; inset: -36px -56px; z-index: -1; pointer-events: none;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent);
+}
+.sections ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sections a {
+  font: 700 17px/1.15 var(--font-display); letter-spacing: .02em; text-transform: uppercase;
+  color: var(--muted); transition: color 200ms ease;
+}
+.sections a:hover { color: var(--ink); text-decoration: none; }
+.sections a.current { color: var(--accent); }
+@media (max-width: 1279px) { .ruler { display: none; } }
+@media (max-width: 1719px) { .sections { display: none; } }
+@media (prefers-reduced-motion: reduce) { .digit > span, .sections a { transition: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
@@ -334,14 +368,20 @@ footer a { color: var(--muted); }
   </div>
 </header>
 
-<nav class="rail" aria-label="Abschnitte">
-  <div class="rail-track"><div class="rail-fill" id="rail-fill"></div></div>
-  <ol id="rail-stops"></ol>
-</nav>
+<div class="waves" id="waves" aria-hidden="true"></div>
+
+<div class="ruler" id="ruler" role="scrollbar" aria-controls="top" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Position auf der Seite">
+  <div class="ruler-glass"></div>
+  <div class="ruler-tape" id="ruler-tape"></div>
+  <div class="ruler-mark" id="ruler-mark">
+    <span class="ruler-count"><span class="digit"><span id="d0"></span></span><span class="digit"><span id="d1"></span></span><span class="digit"><span id="d2"></span></span><span class="pct">%</span></span>
+  </div>
+</div>
+
+<nav class="sections" aria-label="Abschnitte"><ol id="section-list"></ol></nav>
 
 <main id="top">
   <section class="hero">
-    <canvas class="hero-mesh" id="mesh" aria-hidden="true"></canvas>
     <div class="wrap">
       <div class="hero-text">
         <span class="eyebrow"><span class="pill">Beta</span><span class="de">Kostenlos · Open Source · macOS und Windows</span><span class="en">Free · Open source · macOS and Windows</span></span>
@@ -384,6 +424,7 @@ footer a { color: var(--muted); }
     </div>
   </section>
 
+  <div class="sheet">
   <section class="protocols" aria-label="Protokolle">
     <div class="wrap">
       <ul>
@@ -603,6 +644,7 @@ footer a { color: var(--muted); }
       </dl>
     </div>
   </section>
+  </div>
 </main>
 
 <footer>
@@ -744,104 +786,103 @@ footer a { color: var(--muted); }
   if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   new MutationObserver(render).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 
-  /* Side rail: stops at each section, filled up to the reading position. */
+  /* Section index and page ruler (right edge). */
   var STOPS = [
     ['top', 'Start', 'Start'], ['funktionen', 'Funktionen', 'Features'], ['mehr', 'Mehr', 'More'],
     ['demo', 'Demo', 'Demo'], ['download', 'Download', 'Download'], ['fragen', 'Fragen', 'Questions']
   ];
-  var railOl = document.getElementById('rail-stops'), railFill = document.getElementById('rail-fill');
-  var stopEls = STOPS.map(function (st) {
+  var list = document.getElementById('section-list');
+  var stops = STOPS.map(function (st) {
     var li = document.createElement('li'), a = document.createElement('a');
     a.href = '#' + st[0];
     a.innerHTML = '<span class="de">' + st[1] + '</span><span class="en">' + st[2] + '</span>';
-    a.setAttribute('aria-label', st[1]);
-    li.appendChild(a); railOl.appendChild(li);
-    return { li: li, a: a, el: document.getElementById(st[0]) };
+    li.appendChild(a); list.appendChild(li);
+    return { a: a, el: document.getElementById(st[0]), p: 0 };
   });
-  function scrollMax() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
-  function placeStops() {
-    var max = scrollMax();
-    stopEls.forEach(function (s) {
-      var y = s.el.getBoundingClientRect().top + scrollY - 80;
-      s.pos = Math.max(0, Math.min(1, y / max));
-      s.li.style.top = (s.pos * 100) + '%';
+  var ruler = document.getElementById('ruler'), tape = document.getElementById('ruler-tape'), mark = document.getElementById('ruler-mark');
+  var STEP = 22;                      /* pixels per percent on the tape */
+  var MARGIN = 56;                    /* the marker travels between these edges */
+  function maxScroll() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
+  function buildTape() {
+    var html = '';
+    for (var i = 0; i <= 100; i++) {
+      html += '<span class="ruler-tick' + (i % 5 ? '' : ' major') + '" style="top:' + (i * STEP) + 'px"></span>';
+      if (i % 10 === 0) html += '<span class="ruler-num" style="top:' + (i * STEP) + 'px">' + i + '</span>';
+    }
+    var m = maxScroll();
+    stops.forEach(function (s) {
+      s.p = Math.max(0, Math.min(1, (s.el.getBoundingClientRect().top + scrollY - innerHeight * 0.4) / m));
+      html += '<span class="ruler-tick section" style="top:' + (s.p * 100 * STEP).toFixed(1) + 'px"></span>';
     });
+    tape.innerHTML = html;
+    tape.style.height = (100 * STEP) + 'px';
   }
-  function onScroll() {
-    var p = Math.max(0, Math.min(1, scrollY / scrollMax()));
-    railFill.style.transform = 'scaleY(' + p + ')';
+  var digits = [0, 1, 2].map(function (i) {
+    var col = document.getElementById('d' + i);
+    col.innerHTML = '<span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>';
+    return col;
+  });
+  function setCount(n) {
+    var t = String(n).padStart(3, '0');
+    digits.forEach(function (col, i) { col.style.transform = 'translateY(' + (-Number(t[i])) + 'em)'; });
+  }
+  function update() {
+    var p = Math.max(0, Math.min(1, scrollY / maxScroll()));
+    var y = MARGIN + p * (innerHeight - 2 * MARGIN);
+    mark.style.transform = 'translateY(' + y + 'px)';
+    tape.style.transform = 'translateY(' + (y - p * 100 * STEP) + 'px)';
+    var pct = Math.round(p * 100);
+    setCount(pct);
+    ruler.setAttribute('aria-valuenow', String(pct));
     var cur = 0;
-    stopEls.forEach(function (s, i) { if (p + 0.002 >= s.pos) cur = i; });
-    stopEls.forEach(function (s, i) { s.a.classList.toggle('passed', i < cur); s.a.classList.toggle('current', i === cur); });
+    stops.forEach(function (s, i) { if (p + 0.002 >= s.p) cur = i; });
+    stops.forEach(function (s, i) { s.a.classList.toggle('current', i === cur); });
   }
-  addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', function () { placeStops(); onScroll(); });
-  addEventListener('load', function () { placeStops(); onScroll(); });
+  /* Click or drag on the ruler to move through the page. */
+  function seek(e) {
+    var p = (e.clientY - MARGIN) / (innerHeight - 2 * MARGIN);
+    scrollTo({ top: Math.max(0, Math.min(1, p)) * maxScroll(), behavior: 'instant' in document.documentElement.style ? 'instant' : 'auto' });
+  }
+  ruler.addEventListener('pointerdown', function (e) {
+    ruler.setPointerCapture(e.pointerId); seek(e);
+    var move = function (ev) { seek(ev); };
+    ruler.addEventListener('pointermove', move);
+    ruler.addEventListener('pointerup', function up() { ruler.removeEventListener('pointermove', move); ruler.removeEventListener('pointerup', up); });
+  });
+  addEventListener('scroll', update, { passive: true });
+  addEventListener('resize', function () { buildTape(); update(); });
+  addEventListener('load', function () { buildTape(); update(); });
 
-  /* Hero mesh: a low-poly surface whose facets catch the light as it slowly moves. */
+  /* Wave surface behind the hero (Vanta "Waves" on three.js, both MIT). Loaded after the page,
+     still for reduced motion, and it follows the theme. */
   (function () {
-    var cv = document.getElementById('mesh'), ctx = cv.getContext('2d');
-    if (!ctx) return;
+    var host = document.getElementById('waves');
     var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var pts = [], cols = 0, rows = 0, W = 0, H = 0, cell = 92, col = {}, visible = true, last = 0;
-    function readColors() {
-      var cs = getComputedStyle(root);
-      ['lo', 'hi', 'glint'].forEach(function (k) { col[k] = cs.getPropertyValue('--mesh-' + k).split(',').map(Number); });
+    var effect = null;
+    function waveColor() { return parseInt(getComputedStyle(root).getPropertyValue('--wave').trim().replace('#', ''), 16) || 0x0c2240; }
+    function light() { return pageTheme() === 'light'; }
+    function opts() {
+      return { color: waveColor(), shininess: light() ? 18 : 30, waveHeight: 14, waveSpeed: still ? 0 : 0.55, zoom: 0.9 };
     }
-    function setup() {
-      var dpr = Math.min(2, devicePixelRatio || 1);
-      W = cv.clientWidth; H = cv.clientHeight;
-      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      cell = W < 600 ? 64 : 92;
-      cols = Math.ceil(W / cell) + 2; rows = Math.ceil(H / cell) + 2;
-      pts = [];
-      var seed = 7;
-      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-      for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) {
-        pts.push({ x: (i - 1 + (rnd() - .5) * .7) * cell, y: (j - 1 + (rnd() - .5) * .7) * cell, ph: rnd() * 6.283, sp: .35 + rnd() * .5 });
-      }
-      readColors();
+    function load(src) { return new Promise(function (ok, fail) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+    function start() {
+      load('js/three.min.js').then(function () { return load('js/vanta.waves.min.js'); }).then(function () {
+        if (!window.VANTA) return;
+        var o = opts();
+        o.el = host; o.mouseControls = !still; o.touchControls = false; o.gyroControls = false;
+        o.minHeight = 200; o.minWidth = 200; o.scale = 1; o.scaleMobile = 1;
+        effect = window.VANTA.WAVES(o);
+      }).catch(function () { /* no WebGL or blocked: the plain background stays */ });
     }
-    function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
-    function draw(t) {
-      ctx.clearRect(0, 0, W, H);
-      var z = pts.map(function (p) { return Math.sin(p.ph + t * p.sp) * .5 + Math.sin(p.x * .004 + p.y * .003 + t * .45) * .5; });
-      for (var j = 0; j < rows - 1; j++) for (var i = 0; i < cols - 1; i++) {
-        var a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
-        var tris = (i + j) % 2 ? [[a, b, c], [b, d, c]] : [[a, b, d], [a, d, c]];
-        for (var k = 0; k < 2; k++) {
-          var q = tris[k];
-          var h = (z[q[0]] + z[q[1]] + z[q[2]]) / 3;              /* -1 .. 1 */
-          var slope = (z[q[1]] - z[q[0]]) * .5 + .5;               /* fake light from the top left */
-          var light = Math.max(0, Math.min(1, slope * .7 + (h * .5 + .5) * .3));
-          var rgb = mix(col.lo, col.hi, light);
-          var g = Math.max(0, light - .82) * 1.6;                  /* a few facets glint in the accent */
-          if (g > 0) rgb = mix(rgb, col.glint, g);
-          ctx.fillStyle = 'rgb(' + (rgb[0] | 0) + ',' + (rgb[1] | 0) + ',' + (rgb[2] | 0) + ')';
-          ctx.beginPath();
-          ctx.moveTo(pts[q[0]].x, pts[q[0]].y); ctx.lineTo(pts[q[1]].x, pts[q[1]].y); ctx.lineTo(pts[q[2]].x, pts[q[2]].y);
-          ctx.closePath(); ctx.fill();
-          ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();  /* hides hairline seams */
-        }
-      }
-    }
-    function frame(ms) {
-      if (visible && ms - last > 40) { last = ms; draw(ms / 1000 * .5); }
-      if (!still) requestAnimationFrame(frame);
-    }
-    setup(); draw(0);
-    if (!still) requestAnimationFrame(frame);
-    addEventListener('resize', function () { setup(); draw(last / 1000 * .5); });
-    if (window.IntersectionObserver) new IntersectionObserver(function (e) { visible = e[0].isIntersecting; }).observe(cv);
-    var recolor = function () { readColors(); draw(last / 1000 * .5); };
+    if (document.readyState === 'complete') start(); else addEventListener('load', start);
+    var recolor = function () { if (effect) effect.setOptions(opts()); };
     if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recolor);
     new MutationObserver(recolor).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
   })();
 
   setLang(lang);
   markDemo();
-  placeStops(); onScroll();
+  buildTape(); update();
   document.getElementById('cta-label').querySelector('.de').textContent = own === 'win' ? 'Für Windows laden' : 'Für macOS laden';
   document.getElementById('cta-label').querySelector('.en').textContent = own === 'win' ? 'Download for Windows' : 'Download for macOS';
 })();
