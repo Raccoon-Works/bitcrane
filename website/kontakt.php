@@ -63,7 +63,7 @@ function finish(bool $ok, string $code, bool $json, string $lang): never
     header('Content-Type: text/html; charset=utf-8');
     echo '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">'
-        . '<title>Bitcrane</title><link rel="stylesheet" href="legal.css"></head><body><main class="wrap">'
+        . '<title>Bitcrane</title><link rel="stylesheet" href="legal.css?v=1"></head><body><main class="wrap">'
         . '<h1>Bitcrane</h1><p>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</p>'
         . '<p><a href="index.html#kontakt">' . htmlspecialchars($t['back'], ENT_QUOTES, 'UTF-8') . '</a></p>'
         . '</main><footer><div class="wrap"><span>© 2026 RaccoonWorks</span><nav>'
