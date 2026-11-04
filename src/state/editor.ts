@@ -181,7 +181,8 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
   if (d.serverId === null) return saveAs(id);
   if (!LIVE) {
     patchDoc(id, { dirty: false, conflict: false });
-    showToast($t('„{0}“ gesichert.', d.name), 'ok');
+    // Same message as the app, so the preview shows that a server file goes straight back.
+    showToast(d.serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name), 'ok');
     return true;
   }
   const serverId = d.serverId || null;

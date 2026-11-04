@@ -43,7 +43,7 @@ export function Progress({ value, tone = 'accent' }: { value: number; tone?: 'ac
 }
 
 function ActivityRow({ t }: { t: Transfer }) {
-  const pct = t.size ? t.done / t.size : 0;
+  const pct = t.size ? Math.min(1, t.done / t.size) : 0;
   const onRetry = () => {
     // In the prototype the demo error is "fixed" before retrying.
     fixDemoPermissions();
@@ -68,7 +68,7 @@ function ActivityRow({ t }: { t: Transfer }) {
         <span className="act-progress">
           <Progress value={t.state === 'done' ? 1 : pct} tone={t.state === 'done' ? 'ok' : 'accent'} />
           <span className="small muted act-right">
-            {t.state === 'done' ? (t.error ? $t('Übersprungen') : $t('Fertig {0}', t.finishedAt ? formatTime(t.finishedAt) : '')) : t.state === 'queued' ? $t('Wartet') : t.state === 'paused' ? (t.error ?? $t('Pausiert')) : `${Math.round(pct * 100)} %`}
+            {t.state === 'done' ? (t.error ? $t('Übersprungen') : $t('Fertig {0}', t.finishedAt ? formatTime(t.finishedAt) : '')) : t.state === 'queued' ? $t('Wartet') : t.state === 'paused' ? (t.error ?? $t('Pausiert')) : t.direction === 'command' ? $t('Läuft') : `${Math.round(pct * 100)} %`}
           </span>
         </span>
       )}
@@ -141,14 +141,14 @@ export function Activity() {
         </>
       );
     } else if (current) {
-      const pct = current.size ? current.done / current.size : 0;
+      const pct = current.size ? Math.min(1, current.done / current.size) : 0;
       line = (
         <>
           <TransferIcon t={current} />
           <span className="strong">{current.name}</span>
           <span className="small muted ellipsis">{current.folder}</span>
           <span className="compact-bar"><Progress value={pct} /></span>
-          <span className="small muted">{Math.round(pct * 100)} %</span>
+          <span className="small muted">{current.direction === 'command' ? $t('Befehl läuft …') : `${Math.round(pct * 100)} %`}</span>
         </>
       );
     } else {

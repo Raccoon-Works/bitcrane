@@ -255,7 +255,31 @@ html.rv-on .rv.in { opacity: 1; transform: none; transition: opacity 600ms ease-
 .shot-frame { cursor: pointer; }
 .shot-over { clip-path: polygon(0% 0%, 0% 0%, -30% 101%, 0% 101%); transition: clip-path 750ms cubic-bezier(.65, 0, .35, 1); }
 .shot.flipped .shot-over { clip-path: polygon(0% 0%, 130% 0%, 100% 101%, 0% 101%); }
-[data-crop] .shot-tag { display: none; }
+[data-crop] .shot-tag, [data-clip] .shot-tag { display: none; }
+/* Clips: short silent loops of the app window, the window's own corners rounded by script. */
+[data-clip] .shot-frame { background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
+[data-clip] .shot-frame video {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; border-radius: var(--vr, 12px);
+  background: var(--surface); box-shadow: 0 18px 40px -8px rgba(16, 32, 56, .28), 0 1px 3px rgba(16, 32, 56, .14), 0 0 0 1px rgba(16, 32, 56, .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) [data-clip] .shot-frame video { box-shadow: 0 24px 50px -10px rgba(0, 0, 0, .75), 0 0 0 1px rgba(255, 255, 255, .07); } }
+:root[data-theme="dark"] [data-clip] .shot-frame video { box-shadow: 0 24px 50px -10px rgba(0, 0, 0, .75), 0 0 0 1px rgba(255, 255, 255, .07); }
+.shot-play {
+  position: absolute; left: 12px; bottom: 12px; z-index: 2; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; border: 0; cursor: pointer; color: #fff;
+  background: rgba(10, 14, 20, .55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  opacity: 0; transition: opacity 200ms ease, background-color 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1);
+}
+.shot-play svg { width: 16px; height: 16px; }
+.shot-play .i-play, .shot.paused .shot-play .i-pause { display: none; }
+.shot.paused .shot-play .i-play { display: block; }
+/* Visible when it matters: on hover, on keyboard focus, while paused, and on touch screens. */
+.shot-frame:hover .shot-play, .shot-play:focus-visible, .shot.paused .shot-play { opacity: 1; }
+@media (hover: none) { .shot-play { opacity: 1; } }
+.shot-play:hover { background: rgba(10, 14, 20, .8); transform: scale(1.06); }
+.shot-play:active { transform: scale(.96); }
+.lb-video { display: block; width: 100%; height: auto; max-height: calc(100vh - 110px); border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); background: #000; }
+
 /* Cut-out shots (a dialog or panel on a transparent background): no frame, a soft shadow of their own. */
 [data-crop] .shot-frame { background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
 [data-crop] .shot-frame img { object-fit: contain; filter: drop-shadow(0 18px 36px rgba(16, 32, 56, .22)) drop-shadow(0 1px 2px rgba(16, 32, 56, .12)); }
@@ -558,7 +582,7 @@ footer a { color: var(--muted); }
           </ul>
           <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
-        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 1440"><img class="shot-base" alt="" loading="lazy" width="1520" height="1440"><img class="shot-over" alt="" loading="lazy" width="1520" height="1440"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot zoomable" data-view="save" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none" aria-hidden="true"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><span class="shot-tag"></span><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -572,7 +596,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Tunnel für Datenbanken und Dienste</span><span class="en">Tunnels for databases and services</span></li>
           </ul>
         </div>
-        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 489"><img class="shot-base" alt="" loading="lazy" width="1600" height="489"><img class="shot-over" alt="" loading="lazy" width="1600" height="489"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot zoomable" data-view="term" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none" aria-hidden="true"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><span class="shot-tag"></span><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -789,6 +813,7 @@ footer a { color: var(--muted); }
     <button type="button" class="lb-close" id="lb-close" aria-label="Schließen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
   </div>
   <img class="lb-img" id="lb-img" alt="">
+  <video class="lb-video" id="lb-video" muted loop playsinline controls hidden></video>
 </dialog>
 
 <footer>
@@ -823,8 +848,8 @@ footer a { color: var(--muted); }
   });
   var lang = store.get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2) === 'de' ? 'de' : 'en');
   var ALT = {
-    de: { main: 'Bitcrane-Hauptfenster: links der eigene Ordner, rechts der Server', watchsetup: 'Ordnerüberwachung einrichten', terminal: 'SSH-Terminal unter der Dateiansicht', editor: 'Eingebauter Editor', compare: 'Ordnervergleich', import: 'Server aus anderen Programmen übernehmen', light: 'Hell', dark: 'Dunkel' },
-    en: { main: 'Bitcrane main window: your folder on the left, the server on the right', watchsetup: 'Setting up a folder watch', terminal: 'SSH terminal below the file view', editor: 'Built-in editor', compare: 'Folder comparison', import: 'Taking over servers from other apps', light: 'Light', dark: 'Dark' }
+    de: { save: 'Video: Im Editor wird app.py geändert und gesichert, Bitcrane lädt die Datei hoch und startet die App auf dem Server neu', term: 'Video: Das Terminal öffnet sich unter den Dateien, pm2 restart webshop wird ausgeführt', main: 'Bitcrane-Hauptfenster: links der eigene Ordner, rechts der Server', watchsetup: 'Ordnerüberwachung einrichten', terminal: 'SSH-Terminal unter der Dateiansicht', editor: 'Eingebauter Editor', compare: 'Ordnervergleich', import: 'Server aus anderen Programmen übernehmen', light: 'Hell', dark: 'Dunkel' },
+    en: { save: 'Video: app.py is changed and saved in the editor, Bitcrane uploads it and restarts the app on the server', term: 'Video: the terminal opens below the files and runs pm2 restart webshop', main: 'Bitcrane main window: your folder on the left, the server on the right', watchsetup: 'Setting up a folder watch', terminal: 'SSH terminal below the file view', editor: 'Built-in editor', compare: 'Folder comparison', import: 'Taking over servers from other apps', light: 'Light', dark: 'Dark' }
   };
   function setLang(l) {
     lang = l; root.dataset.lang = l; root.lang = l;
@@ -854,11 +879,43 @@ footer a { color: var(--muted); }
       ? (touch ? 'Tippen' : 'Klicken') + ' für das ' + (want === 'dark' ? 'dunkle' : 'helle') + ' Design'
       : (touch ? 'Tap' : 'Click') + ' for ' + want + ' mode';
   }
+  /* Clips: video files per platform, design and language; the poster is the finished moment. */
+  /* Raise CLIP_V after recording the clips again, so browsers do not keep the old ones. */
+  var CLIP_V = '1';
+  function clipSrc(view, pf, th, ext) { return 'vid/' + view + '-' + pf + '-' + th + '-' + lang + '.' + ext + '?v=' + CLIP_V; }
+  var CLIP_W = 1011, CLIP_R = { mac: 16, win: 8 }, CLIP_AR = { mac: '1600 / 936', win: '1600 / 972' };
+  function setClip(fig, v, base, other) {
+    var b = fig.querySelector('.shot-base'), o = fig.querySelector('.shot-over');
+    fig.querySelector('.shot-frame').style.setProperty('--ar', CLIP_AR[platform]);
+    [[b, base], [o, other]].forEach(function (pair) {
+      var el = pair[0], want = clipSrc(v, platform, pair[1], 'mp4');
+      el.poster = clipSrc(v, platform, pair[1], 'webp');
+      el.dataset.src = want;
+      /* Already playing: switch at once and keep the position. */
+      if (el.getAttribute('src') && el.getAttribute('src') !== want) { var at = el.currentTime; el.src = want; try { el.currentTime = at; } catch (e) { /* not loaded yet */ } if (fig.classList.contains('playing')) el.play().catch(function () {}); }
+    });
+    var lbl = ALT[lang][v] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][base] + ')';
+    fig.querySelector('.shot-frame').setAttribute('aria-label', lbl);
+    fig.querySelector('.shot-frame').setAttribute('role', 'img');
+    clipRadius(fig);
+    clipPlayLabel(fig);
+  }
+  /* The window's rounded corners, scaled to the shown size. */
+  function clipRadius(fig) {
+    var w = fig.querySelector('.shot-frame').clientWidth;
+    if (w) fig.querySelector('.shot-frame').style.setProperty('--vr', (CLIP_R[platform] * w / CLIP_W).toFixed(2) + 'px');
+  }
+  function clipPlayLabel(fig) {
+    var paused = fig.classList.contains('paused');
+    fig.querySelector('.shot-play').setAttribute('aria-label', lang === 'de' ? (paused ? 'Video abspielen' : 'Video anhalten') : (paused ? 'Play video' : 'Pause video'));
+  }
+
   function render() {
     var base = pageTheme(), other = base === 'dark' ? 'light' : 'dark';
     document.querySelectorAll('.shot').forEach(function (fig) {
       var v = fig.dataset.view;
       var b = fig.querySelector('.shot-base'), o = fig.querySelector('.shot-over'), tag = fig.querySelector('.shot-tag');
+      if (fig.dataset.clip) { setClip(fig, v, base, other); caption(fig); return; }
       var crop = fig.dataset.crop ? '-c' : '';
       b.src = src(v, platform, base).replace('.webp', crop + '.webp'); o.src = src(v, platform, other).replace('.webp', crop + '.webp');
       b.alt = ALT[lang][v] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][base] + ')';
@@ -889,17 +946,67 @@ footer a { color: var(--muted); }
   document.querySelectorAll('.shot').forEach(function (fig) {
     fig.querySelector('.shot-frame').addEventListener('click', function (e) {
       if (e.target.closest('.shot-zoom')) { openLightbox(fig.dataset.view); return; }
+      if (e.target.closest('.shot-play')) return;
       fig.classList.toggle('flipped');
+      if (fig.dataset.clip) { var vb = fig.querySelector('.shot-base'), vo = fig.querySelector('.shot-over'); if (vo.readyState > 0) vo.currentTime = vb.currentTime; }
       caption(fig);
     });
   });
 
+  /* Clips play while they are in view. With reduced motion they wait for the play button
+     and show their finished moment meanwhile. */
+  (function () {
+    var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var figs = [].slice.call(document.querySelectorAll('.shot[data-clip]'));
+    function vids(fig) { return [fig.querySelector('.shot-base'), fig.querySelector('.shot-over')]; }
+    function load(fig) { vids(fig).forEach(function (v) { if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; } }); }
+    function play(fig) {
+      load(fig);
+      var vs = vids(fig), lead = vs[0];
+      fig.classList.add('playing');
+      vs.forEach(function (v) { v.play().catch(function () { fig.classList.add('paused'); fig.classList.remove('playing'); clipPlayLabel(fig); }); });
+      /* Keep the hidden design in step with the shown one, for the wipe. */
+      if (!fig._sync) fig._sync = setInterval(function () { if (vs[1].readyState > 0 && Math.abs(vs[1].currentTime - lead.currentTime) > 0.2) vs[1].currentTime = lead.currentTime; }, 250);
+    }
+    function stop(fig) { fig.classList.remove('playing'); vids(fig).forEach(function (v) { v.pause(); }); clearInterval(fig._sync); fig._sync = null; }
+    figs.forEach(function (fig) {
+      if (still) fig.classList.add('paused');
+      clipPlayLabel(fig);
+      fig.querySelector('.shot-play').addEventListener('click', function (e) {
+        e.stopPropagation();
+        fig.classList.toggle('paused');
+        clipPlayLabel(fig);
+        if (fig.classList.contains('paused')) stop(fig); else play(fig);
+      });
+    });
+    if ('ResizeObserver' in window) { var ro = new ResizeObserver(function () { figs.forEach(clipRadius); }); figs.forEach(function (f) { ro.observe(f.querySelector('.shot-frame')); }); }
+    if (!('IntersectionObserver' in window)) { figs.forEach(function (f) { if (!f.classList.contains('paused')) play(f); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var fig = en.target;
+        if (en.isIntersecting && en.intersectionRatio >= 0.35) { if (!fig.classList.contains('paused')) play(fig); }
+        else if (fig.classList.contains('playing')) stop(fig);
+      });
+    }, { threshold: [0, 0.35, 0.6] });
+    figs.forEach(function (f) { io.observe(f); });
+  })();
+
   /* Large view: the whole window of a feature shot, with its own light/dark switch. */
   var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lb-img'), lbView = '', lbTheme = 'light';
+  var lbVid = document.getElementById('lb-video');
   function lbShow() {
-    lbImg.src = src(lbView, platform, lbTheme);
+    var isClip = !!document.querySelector('.shot[data-clip][data-view="' + lbView + '"]');
+    lbImg.hidden = isClip; lbVid.hidden = !isClip;
+    if (isClip) {
+      lbVid.poster = clipSrc(lbView, platform, lbTheme, 'webp');
+      lbVid.src = clipSrc(lbView, platform, lbTheme, 'mp4');
+      lbVid.setAttribute('aria-label', ALT[lang][lbView]);
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) lbVid.play().catch(function () {});
+    } else { lbVid.pause(); lbVid.removeAttribute('src'); }
+    if (isClip) lbImg.removeAttribute('src'); else lbImg.src = src(lbView, platform, lbTheme);
     lbImg.alt = ALT[lang][lbView] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][lbTheme] + ')';
-    document.getElementById('lb-title').textContent = ALT[lang][lbView];
+    var CLIP_TITLE = { de: { save: 'Speichern und hochladen', term: 'SSH-Terminal' }, en: { save: 'Save and upload', term: 'SSH terminal' } };
+    document.getElementById('lb-title').textContent = CLIP_TITLE[lang][lbView] || ALT[lang][lbView];
     lb.querySelectorAll('[data-lb-theme]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lbTheme === lbTheme)); });
   }
   function openLightbox(view) {
@@ -910,6 +1017,7 @@ footer a { color: var(--muted); }
   lb.querySelectorAll('[data-lb-theme]').forEach(function (b) { b.addEventListener('click', function () { lbTheme = b.dataset.lbTheme; lbShow(); }); });
   document.getElementById('lb-close').addEventListener('click', function () { lb.close(); });
   lb.addEventListener('click', function (e) { if (e.target === lb) lb.close(); });
+  lb.addEventListener('close', function () { lbVid.pause(); });
 
 
   /* Demo: loaded only on request; platform and theme switch without a reload. */
