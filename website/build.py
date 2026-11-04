@@ -67,11 +67,12 @@ def main():
         head_part = head_part.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')
         (DIST / name).write_text(HEAD.replace('{site}', SITE) + head_part + '\n</head>\n<body>\n' + body_part.lstrip() + '\n</body>\n</html>\n', encoding='utf-8')
 
-    write('index.html', page)
-    # Variant B (large wordmark head) for comparison; see variant_b.py.
+    # Start page: variant B (large wordmark head, see variant_b.py). The earlier head stays
+    # reachable as index-a.html for comparison.
     sys.path.insert(0, str(ROOT))
     import variant_b
-    write('index-b.html', variant_b.make(page))
+    write('index.html', variant_b.make(page))
+    write('index-a.html', page)
     for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess']:
         shutil.copy2(ROOT / name, DIST / name)
     shutil.copytree(ROOT / 'img', DIST / 'img')
