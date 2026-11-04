@@ -54,7 +54,12 @@ EARLY = """
 (function () {
   var root = document.documentElement, still = false;
   try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* old browser */ }
-  if (!still) root.classList.add('intro');
+  if (!still) {
+    root.classList.add('intro');
+    /* Safety net: whatever happens (a script error, a tab opened in the background where
+       animation frames do not run), the page is fully visible after a few seconds. */
+    setTimeout(function () { root.classList.remove('intro', 'intro-run', 'intro-rest'); }, 4000);
+  }
 })();
 </script>
 """
