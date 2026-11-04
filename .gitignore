@@ -29,3 +29,6 @@ src-tauri/target
 src-tauri/gen/schemas
 website/demo/
 website/dist/
+
+# Private addresses of the website contact form
+website/kontakt.config.php

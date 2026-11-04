@@ -18,10 +18,13 @@ declare(strict_types=1);
 
 date_default_timezone_set('Europe/Berlin');
 
-// Mailbox that receives the messages, and the sender address. At All-Inkl the sender must be
-// an existing mailbox of this domain, otherwise the mail server refuses to send.
-const MAIL_TO = 'info@bitcrane.de';
-const MAIL_FROM = 'info@bitcrane.de';
+// Mailbox that receives the messages, and the sender address (an existing mailbox on the same
+// hosting account, so the mail server accepts it). The real addresses live in kontakt.config.php
+// next to this file, which is not part of the public repository; without it the public address
+// is used for both.
+$config = is_file(__DIR__ . '/kontakt.config.php') ? (array)require __DIR__ . '/kontakt.config.php' : [];
+define('MAIL_TO', (string)($config['to'] ?? 'info@bitcrane.de'));
+define('MAIL_FROM', (string)($config['from'] ?? 'info@bitcrane.de'));
 const MIN_SECONDS = 3;
 const MAX_MESSAGE = 5000;
 
@@ -109,8 +112,9 @@ if (mb_strlen($message) < 10) {
 }
 $message = mb_substr($message, 0, MAX_MESSAGE);
 
-$subject = 'Bitcrane Kontakt' . ($name !== '' ? ': ' . $name : '');
-$body = "Name: " . ($name !== '' ? $name : '-') . "\n"
+$subject = '[Bitcrane] Kontaktformular' . ($name !== '' ? ' – ' . $name : '');
+$body = "Nachricht über das Kontaktformular auf bitcrane.de. Mit „Antworten“ geht die Antwort an den Absender.\n\n"
+    . "Name: " . ($name !== '' ? $name : '-') . "\n"
     . "E-Mail: " . $email . "\n"
     . "Sprache der Seite: " . $lang . "\n"
     . "Gesendet: " . date('d.m.Y H:i') . "\n\n"
