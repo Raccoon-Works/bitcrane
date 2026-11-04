@@ -1,7 +1,7 @@
 """Variant B of the start page: a large "Bitcrane" wordmark as the head of the page.
 
-The logo stands for the B; the remaining letters resolve out of bits (0 and 1) each time
-the page opens, then the rest of the head fades in. Built from index.html by build.py, so
+The logo stands for the B; each time the page opens the remaining letters rise out of the
+baseline as bits (0 and 1) and settle as letters, then the rest of the head fades in. Built from index.html by build.py, so
 both variants share everything else and can be compared side by side
 (index.html and index-b.html).
 """
@@ -12,13 +12,16 @@ CSS = """
   display: inline-flex; align-items: baseline; gap: 0; margin: 6px 0 0;
   font: 800 clamp(60px, 11vw, 148px)/.9 var(--font-display); letter-spacing: -0.045em; color: var(--ink);
 }
-/* The logo is the B: its body is as tall as a capital (about 71 % of the image), it sits on
-   the baseline, and the transparent edge of the image is pulled in so it reads as one word. */
-.wm-hero .wm-logo { height: 1em; width: auto; margin: 0 -.17em -.045em -.17em; display: block; }
+/* The logo is the B: its light front face (64 % of the image) is as tall as a capital and
+   stands on the baseline, the darker edge below it like a shadow; the transparent sides of
+   the image are pulled in so it reads as one word. */
+.wm-hero .wm-logo { height: 1.09em; width: auto; margin: 0 -.185em 0 -.18em; display: block; position: relative; top: .118em; }
 .wm-hero .wm-word { display: inline-flex; white-space: nowrap; }
-.wm-hero .wm-l { display: inline-block; text-align: center; }
+.wm-hero .wm-l { display: inline-block; text-align: center; overflow: clip; padding: .22em 0 .06em; margin: -.22em 0 -.06em; }
+.wm-hero .wm-l .g { display: inline-block; }
 .wm-hero .wm-l.thin { font-weight: 300; letter-spacing: -0.02em; }
-.wm-hero .wm-l.bits { color: var(--accent); display: inline-flex; justify-content: center; }
+.wm-hero .wm-l.bits { color: var(--accent); }
+.wm-hero .wm-l.bits .g { display: inline-flex; justify-content: center; width: 100%; }
 .wm-hero .wm-l .b { font-style: normal; display: inline-block; }
 .wm-tag { font: 600 clamp(20px, 2.6vw, 30px)/1.2 var(--font-display); letter-spacing: -0.02em; margin-top: -4px; }
 .wm-tag em { font-style: normal; color: var(--accent); }
@@ -39,9 +42,8 @@ HEAD_NEW = (
     '        <h1 class="wm-hero" aria-label="Bitcrane">'
     '<img class="wm-logo" src="img/icon-180.png" alt="" width="180" height="180">'
     '<span class="wm-word" id="wm-word" aria-hidden="true">'
-    '<span class="wm-l">i</span><span class="wm-l">t</span>'
-    '<span class="wm-l thin">c</span><span class="wm-l thin">r</span><span class="wm-l thin">a</span>'
-    '<span class="wm-l thin">n</span><span class="wm-l thin">e</span></span></h1>\n'
+    + ''.join(f'<span class="wm-l{" thin" if i > 1 else ""}"><span class="g">{c}</span></span>' for i, c in enumerate('itcrane'))
+    + '</span></h1>\n'
     '        <p class="wm-tag reveal" style="--i:0"><span class="de">Speichern. <em>Schon ist es auf dem Server.</em></span>'
     '<span class="en">Save. <em>It’s already on the server.</em></span></p>\n'
 )
@@ -59,36 +61,47 @@ EARLY = """
 
 # The bits: every letter shows random 0/1 until its turn, then settles; the rest follows.
 INTRO = r"""
-  /* Variant B intro: the logo appears, the letters resolve out of bits, then the rest fades in. */
+  /* Variant B intro: the logo appears, then each letter rises out of the baseline like an
+     upload, flickering as bits (0/1) on the way up and settling as the letter at the top;
+     after that the rest of the head fades in. */
   (function () {
     var word = document.getElementById('wm-word');
     if (!word) return;
     var letters = [].slice.call(word.querySelectorAll('.wm-l'));
     /* Keep every letter as wide as its final glyph, so the word does not jump while bits change. */
-    letters.forEach(function (l) { l.dataset.ch = l.textContent; l.style.width = l.getBoundingClientRect().width + 'px'; });
+    letters.forEach(function (l) { var g = l.firstChild; l.dataset.ch = g.textContent; l.style.width = l.getBoundingClientRect().width + 'px'; });
     if (!root.classList.contains('intro')) return;
     /* A digit is wider than i or t: squeeze the bits in narrow letters so they never overlap. */
-    function setBit(l) { l.innerHTML = '<i class="b" style="transform:scaleX(' + l.dataset.sx + ')">' + (Math.random() < .5 ? '0' : '1') + '</i>'; }
     letters.forEach(function (l) {
-      var probe = l.cloneNode(false);
-      probe.style.cssText = 'position:absolute;visibility:hidden;width:auto';
+      var probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap';
+      probe.className = l.className;
       probe.textContent = '0';
-      l.parentNode.appendChild(probe);
+      word.appendChild(probe);
       var dw = probe.getBoundingClientRect().width, w = parseFloat(l.style.width);
       probe.remove();
       l.dataset.sx = dw > w ? (w / dw).toFixed(3) : '1';
-      setBit(l); l.classList.add('bits');
+      l.classList.add('bits');
+      l.firstChild.style.transform = 'translateY(110%)';
     });
+    function setBit(l) { l.firstChild.innerHTML = '<i class="b" style="transform:scaleX(' + l.dataset.sx + ')">' + (Math.random() < .5 ? '0' : '1') + '</i>'; }
+    letters.forEach(setBit);
     requestAnimationFrame(function () { root.classList.add('intro-run'); });
-    var start = performance.now(), last = 0;
+    var RISE = 520, start = performance.now(), last = 0;
+    function ease(p) { return 1 - Math.pow(1 - p, 3); }
     function tick(now) {
-      var t = now - start, done = 0;
+      var t = now - start, done = 0, flick = now - last > 50;
       letters.forEach(function (l, i) {
-        var settle = 260 + i * 85;
-        if (t >= settle) { if (l.classList.contains('bits')) { l.textContent = l.dataset.ch; l.classList.remove('bits'); } done++; }
-        else if (now - last > 45) { setBit(l); }
+        var from = 220 + i * 80, p = Math.max(0, Math.min(1, (t - from) / RISE)), g = l.firstChild;
+        if (p >= 1) {
+          if (l.classList.contains('bits')) { l.classList.remove('bits'); g.textContent = l.dataset.ch; g.style.transform = ''; }
+          done++;
+          return;
+        }
+        g.style.transform = 'translateY(' + (110 * (1 - ease(p))).toFixed(1) + '%)';
+        if (flick) setBit(l);
       });
-      if (now - last > 45) last = now;
+      if (flick) last = now;
       if (done < letters.length) { requestAnimationFrame(tick); return; }
       root.classList.add('intro-rest');
       setTimeout(function () { root.classList.remove('intro', 'intro-run', 'intro-rest'); }, 1400);
