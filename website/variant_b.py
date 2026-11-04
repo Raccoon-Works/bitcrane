@@ -9,10 +9,12 @@ both variants share everything else and can be compared side by side
 CSS = """
 /* Variant B: wordmark head */
 .hero h1.wm-hero {
-  display: inline-flex; align-items: flex-end; gap: .02em; margin: 6px 0 0;
+  display: inline-flex; align-items: baseline; gap: 0; margin: 6px 0 0;
   font: 800 clamp(60px, 11vw, 148px)/.9 var(--font-display); letter-spacing: -0.045em; color: var(--ink);
 }
-.wm-hero .wm-logo { height: 1.04em; width: auto; margin: 0 -.13em -.07em -.06em; display: block; }
+/* The logo is the B: its body is as tall as a capital (about 71 % of the image), it sits on
+   the baseline, and the transparent edge of the image is pulled in so it reads as one word. */
+.wm-hero .wm-logo { height: 1em; width: auto; margin: 0 -.17em -.045em -.17em; display: block; }
 .wm-hero .wm-word { display: inline-flex; white-space: nowrap; }
 .wm-hero .wm-l { display: inline-block; text-align: center; }
 .wm-hero .wm-l.thin { font-weight: 300; letter-spacing: -0.02em; }
