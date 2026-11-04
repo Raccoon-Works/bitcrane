@@ -192,9 +192,20 @@ footer { position: relative; background: var(--bg); }
 .upload-label .ok { display: none; }
 .upload.complete .upload-label .ok { display: block; }
 .upload.complete .upload-label .up { display: none; }
+/* While you scroll, the ticks around the block in transfer stretch out like a wave and
+   settle again when you stop. */
+.upload-wave { position: absolute; right: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.upload-wave i {
+  position: absolute; right: 0; height: 2px; width: 9px; border-radius: 1px; background: var(--accent);
+  transform-origin: left; will-change: transform, opacity; opacity: 0; /* swings out towards the screen edge, away from the names */
+}
+/* Counter digits roll like an odometer. */
+.odo { display: inline-flex; height: 1.2em; line-height: 1.2em; overflow: hidden; vertical-align: top; }
+.odo-col { display: flex; flex-direction: column; transition: transform 300ms cubic-bezier(.2, .9, .2, 1); }
+.odo-col > b { display: block; height: 1.2em; font-weight: inherit; text-align: center; }
 @media (max-width: 1279px) { .upload { display: none; } }
 @media (max-width: 1359px) { .upload-head { display: none; } }
-@media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span, .odo-col { transition: none; } .upload-wave { display: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
@@ -488,7 +499,7 @@ footer a { color: var(--muted); }
 <div class="waves" id="waves" aria-hidden="true"></div>
 
 <div class="upload" id="upload" role="scrollbar" aria-controls="top" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Position auf der Seite">
-  <div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-cursor" id="upload-cursor"></div>
+  <div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-wave" id="upload-wave"></div><div class="upload-cursor" id="upload-cursor"></div>
   <ol id="upload-stops"></ol>
   <div class="upload-head" id="upload-head">
     <div class="upload-label">
@@ -1008,6 +1019,46 @@ footer a { color: var(--muted); }
       s.li.classList.toggle('squeezed', len > room);
     });
   }
+  /* Counter: each digit is a column 0-9 that rolls to its value; other characters stay plain. */
+  var counterShape = '';
+  function setCounter(text) {
+    var shape = text.replace(/[0-9]/g, '#');
+    if (shape !== counterShape) {
+      counterShape = shape;
+      upText.innerHTML = text.split('').map(function (ch) {
+        return /[0-9]/.test(ch)
+          ? '<span class="odo"><span class="odo-col"><b>0</b><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b><b>6</b><b>7</b><b>8</b><b>9</b></span></span>'
+          : '<span>' + ch.replace(/</g, '&lt;') + '</span>';
+      }).join('');
+    }
+    upText.setAttribute('aria-label', text);
+    var cols = upText.querySelectorAll('.odo-col'), k = 0;
+    text.split('').forEach(function (ch) { if (/[0-9]/.test(ch)) cols[k++].style.transform = 'translateY(' + (-1.2 * +ch) + 'em)'; });
+  }
+
+  /* Scroll wave: a few ticks around the block in transfer stretch with the scroll speed. */
+  var wave = document.getElementById('upload-wave'), waveTicks = [], WAVE = 6, waveEnergy = 0, wavePos = 0, waveY = scrollY, waveRun = false;
+  for (var wi = -WAVE; wi <= WAVE; wi++) { var t = document.createElement('i'); wave.appendChild(t); waveTicks.push({ el: t, k: wi }); }
+  var stillMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function waveFrame() {
+    waveEnergy *= 0.92;
+    var base = Math.round(wavePos / 7) * 7;
+    waveTicks.forEach(function (w) {
+      var fall = Math.exp(-(w.k * w.k) / 10);
+      var e = Math.min(1, waveEnergy) * fall;
+      w.el.style.top = (base + w.k * 7) + 'px';
+      w.el.style.transform = 'scaleX(' + (1 + e * 1.6).toFixed(3) + ')';
+      w.el.style.opacity = (e * 0.95).toFixed(3);
+    });
+    if (waveEnergy > 0.01) requestAnimationFrame(waveFrame); else waveRun = false;
+  }
+  addEventListener('scroll', function () {
+    if (stillMotion) return;
+    var dy = Math.abs(scrollY - waveY); waveY = scrollY;
+    waveEnergy = Math.min(1.5, waveEnergy + dy / 90);
+    if (!waveRun) { waveRun = true; requestAnimationFrame(waveFrame); }
+  }, { passive: true });
+
   function update() {
     var p = Math.max(0, Math.min(1, scrollY / maxScroll()));
     upFill.style.clipPath = 'inset(0 0 ' + ((1 - p) * 100).toFixed(2) + '% 0)';
@@ -1016,9 +1067,8 @@ footer a { color: var(--muted); }
     up.classList.toggle('complete', done);
     var cur = 0;
     stops.forEach(function (s, i) { if (p + 0.002 >= s.p) cur = i; });
-    upText.textContent = done
-      ? (lang === 'de' ? 'Übertragen' : 'Transferred')
-      : mb(total * p) + ' / ' + mb(total) + ' MB';
+    setCounter(done ? (lang === 'de' ? 'Übertragen' : 'Transferred') : mb(total * p) + ' / ' + mb(total) + ' MB');
+    wavePos = p * up.clientHeight;
     if (cur !== lastCur) { lastCur = cur; stops.forEach(function (s, i) { s.li.classList.toggle('current', i === cur); }); setTimeout(squeeze, 320); }
     up.setAttribute('aria-valuenow', String(Math.round(p * 100)));
     stops.forEach(function (s) { s.a.classList.toggle('done', p + 0.002 >= s.p); });
