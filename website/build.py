@@ -6,6 +6,8 @@ browser demo comes from the single-file build of the prototype (npm run build:si
 """
 import pathlib
 import re
+import html
+import json
 import shutil
 import subprocess
 import sys
@@ -73,8 +75,20 @@ def main():
     import variant_b
     write('index.html', variant_b.make(page))
     write('index-a.html', page)
-    for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess', '404.html', 'kontakt.php']:
+    for name in ['legal.css', '.htaccess', '404.html', 'kontakt.php']:
         shutil.copy2(ROOT / name, DIST / name)
+    # Legal pages: the owner's name and address come from private.json, which exists only in the
+    # local folder and never in the public repository. Missing values stay marked placeholders.
+    private = json.loads((ROOT / 'private.json').read_text(encoding='utf-8')) if (ROOT / 'private.json').exists() else {}
+    for name in ['impressum.html', 'datenschutz.html']:
+        text = (ROOT / name).read_text(encoding='utf-8')
+        def fill(m):
+            value = (private.get(m.group(1)) or '').strip()
+            return html.escape(value) if value else m.group(0)
+        text = re.sub(r'<mark data-private="(\w+)">[^<]*</mark>', fill, text)
+        if private.get('name') and private.get('street') and private.get('city'):
+            text = re.sub(r'\s*<p class="note">.*?</p>', '', text, count=1, flags=re.S)
+        (DIST / name).write_text(text, encoding='utf-8')
     # Private addresses of the contact form: only in the local folder, never in the repository.
     if (ROOT / 'kontakt.config.php').exists():
         shutil.copy2(ROOT / 'kontakt.config.php', DIST / 'kontakt.config.php')
