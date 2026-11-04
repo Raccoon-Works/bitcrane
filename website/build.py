@@ -60,11 +60,18 @@ def main():
     if version:
         page = re.sub(r'<span data-version>[^<]*</span>', f'<span data-version>{version}</span>', page)
     print('version', version or '(as written in the page)')
-    # The <title>, metas and <style> at the top of the page belong in the head; the rest is the body.
-    split = page.index('</style>') + len('</style>')
-    head_part, body_part = page[:split], page[split:]
-    head_part = head_part.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')
-    (DIST / 'index.html').write_text(HEAD.replace('{site}', SITE) + head_part + '\n</head>\n<body>\n' + body_part.lstrip() + '\n</body>\n</html>\n', encoding='utf-8')
+    # The <title>, metas and <style> at the top of a page belong in the head; the rest is the body.
+    def write(name, text):
+        split = text.index('</style>') + len('</style>')
+        head_part, body_part = text[:split], text[split:]
+        head_part = head_part.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')
+        (DIST / name).write_text(HEAD.replace('{site}', SITE) + head_part + '\n</head>\n<body>\n' + body_part.lstrip() + '\n</body>\n</html>\n', encoding='utf-8')
+
+    write('index.html', page)
+    # Variant B (large wordmark head) for comparison; see variant_b.py.
+    sys.path.insert(0, str(ROOT))
+    import variant_b
+    write('index-b.html', variant_b.make(page))
     for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess']:
         shutil.copy2(ROOT / name, DIST / name)
     shutil.copytree(ROOT / 'img', DIST / 'img')
