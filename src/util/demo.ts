@@ -13,6 +13,9 @@ const params = typeof location !== 'undefined' ? new URLSearchParams(location.se
 /** True when the prototype runs as the website demo (no prototype control bar). */
 export const DEMO = params.has('demo');
 
+/** Recording a website clip (…?demo&clip): only scripted events happen, nothing random. */
+export const DEMO_CLIP = DEMO && params.has('clip');
+
 function pick<T extends string>(key: string, values: readonly T[]): T | undefined {
   const v = params.get(key);
   return values.includes(v as T) ? (v as T) : undefined;

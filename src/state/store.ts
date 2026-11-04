@@ -23,7 +23,7 @@ import { isCloudProtocol } from '../backend/types';
 import { describeFile, formatSize, matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
-import { DEMO_PLATFORM, DEMO_THEME, listenForDemoMessages } from '../util/demo';
+import { DEMO_CLIP, DEMO_PLATFORM, DEMO_THEME, listenForDemoMessages } from '../util/demo';
 import { $t, LANG, rememberLanguage, type Lang } from '../i18n';
 
 /** True inside the desktop app: real files and real servers instead of the demo data. */
@@ -3112,7 +3112,7 @@ const pendingCommand = new Set<string>();
  * Simulates the user saving a file in a watched folder. Called by the
  * prototype panel and by a slow background timer.
  */
-export function simulateLocalChange(watchId?: string) {
+export function simulateLocalChange(watchId?: string, path?: string) {
   if (LIVE) {
     // In the app this is "Abgleichen": compare the watched folder with the server now.
     const w = watchId ? state.watches.find((x) => x.id === watchId) : watchForLocal(panePath('local')) ?? state.watches.find((x) => x.state !== 'paused');
@@ -3129,7 +3129,8 @@ export function simulateLocalChange(watchId?: string) {
     .filter((f) => !matchesExclude(f.entry.name, w.excludes))
     .filter((f) => !f.path.includes('/static/logo.png'));
   if (!candidates.length) return;
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  // A given file (used by the scripted website clips), otherwise a random one.
+  const pick = candidates.find((f) => path && f.path.endsWith(path)) ?? candidates[Math.floor(Math.random() * candidates.length)];
   fs.touch('local', w.serverId, pick.path, Math.round((Math.random() - 0.3) * 600));
   setState((s) => ({ fsRev: s.fsRev + 1 }));
   if (w.state === 'paused') {
@@ -3682,11 +3683,12 @@ function tick() {
       changed = true;
       if (offline[tr.serverId] || (tr.sourceServerId && offline[tr.sourceServerId])) return { ...tr, state: 'queued' as const, done: 0 };
       if (tr.direction === 'command') {
+        // The preview runs a command for 1.5 seconds; done counts the milliseconds of that.
         const done = tr.done + TICK;
         if (done >= 1500) {
           return { ...tr, done: tr.size, state: 'done' as const, finishedAt: now, output: $t('[PM2] Applying action restartProcessId on app [{0}]\n[PM2] [{1}](0) ✓', tr.name.split(' ').pop(), tr.name.split(' ').pop()) };
         }
-        return { ...tr, done };
+        return { ...tr, done, size: 1500 };
       }
       const err = writeError(tr);
       if (err) {
@@ -3695,9 +3697,11 @@ function tick() {
         return { ...tr, done: Math.round(tr.size * 0.2) };
       }
       // Simulated throughput: roughly 1.2 MB/s, small files finish quickly.
-      const rate = 1.2 * 1024 * 1024 * (0.8 + Math.random() * 0.4);
-      const step = Math.max(2048, (rate * TICK) / 1000);
-      speed += rate;
+      // While a website clip is recorded, a small file takes about a second, so it can be seen.
+      const rate = DEMO_CLIP ? 20 * 1024 : 1.2 * 1024 * 1024 * (0.8 + Math.random() * 0.4);
+      const step = DEMO_CLIP ? (rate * TICK) / 1000 : Math.max(2048, (rate * TICK) / 1000);
+      // The clip shows a usual speed, even though its file moves slowly enough to be seen.
+      speed += DEMO_CLIP ? 2.4 * 1024 * 1024 * (0.9 + Math.random() * 0.2) : rate;
       const done = Math.min(tr.size, tr.done + step);
       if (done >= tr.size) {
         const targetSide = tr.direction === 'down' ? 'local' : 'remote';
@@ -3729,8 +3733,9 @@ function tick() {
     }
   }
 
-  // A gentle background event every 40 seconds keeps the active watch alive.
-  if (now - lastAuto > 40000) {
+  // A gentle background event every 40 seconds keeps the active watch alive
+  // (not while a website clip is recorded, where the script decides what happens).
+  if (!DEMO_CLIP && now - lastAuto > 40000) {
     lastAuto = now;
     const active = watches.find((w) => w.state === 'active');
     if (active && !s.dialog) window.setTimeout(() => simulateLocalChange(active.id), 0);

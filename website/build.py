@@ -76,6 +76,7 @@ def main():
     for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess']:
         shutil.copy2(ROOT / name, DIST / name)
     shutil.copytree(ROOT / 'img', DIST / 'img')
+    shutil.copytree(ROOT / 'vid', DIST / 'vid')
     (DIST / 'demo').mkdir()
     shutil.copy2(DEMO, DIST / 'demo' / 'index.html')
     print('built', sum(1 for _ in DIST.rglob('*') if _.is_file()), 'files in', DIST)
