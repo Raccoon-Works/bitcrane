@@ -75,6 +75,9 @@ def main():
     write('index-a.html', page)
     for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess', '404.html', 'kontakt.php']:
         shutil.copy2(ROOT / name, DIST / name)
+    # Private addresses of the contact form: only in the local folder, never in the repository.
+    if (ROOT / 'kontakt.config.php').exists():
+        shutil.copy2(ROOT / 'kontakt.config.php', DIST / 'kontakt.config.php')
     # The test site stays out of search engines; the real one invites them in.
     test = '://dev.' in SITE
     (DIST / 'robots.txt').write_text('User-agent: *\nDisallow: /\n' if test else f'User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n', encoding='utf-8')
