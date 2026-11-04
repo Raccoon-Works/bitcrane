@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nicht gefunden · Bitcrane</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/img/icon-64.png">
+<link rel="stylesheet" href="/legal.css">
+<script>
+(function () {
+  var r = document.documentElement;
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var t = get('bc-site-theme'); if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t);
+  var l = get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en');
+  r.lang = l === 'en' ? 'en' : 'de';
+})();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/img/icon-64.png" alt="" width="30" height="30"><span><span class="wm-bit">Bit</span><span class="wm-crane">crane</span></span></a>
+  </div>
+</header>
+<main class="wrap">
+  <h1><span class="de">Diese Seite gibt es nicht</span><span class="en">This page does not exist</span></h1>
+  <p><span class="de">Vielleicht ist der Link veraltet oder vertippt. Auf der Startseite findest du alles zu Bitcrane.</span><span class="en">The link may be outdated or mistyped. The start page has everything about Bitcrane.</span></p>
+  <p><a href="/"><span class="de">Zur Startseite</span><span class="en">Go to the start page</span></a></p>
+</main>
+</body>
+</html>
