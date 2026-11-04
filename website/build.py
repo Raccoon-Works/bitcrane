@@ -73,8 +73,19 @@ def main():
     import variant_b
     write('index.html', variant_b.make(page))
     write('index-a.html', page)
-    for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess']:
+    for name in ['impressum.html', 'datenschutz.html', 'legal.css', '.htaccess', '404.html', 'kontakt.php']:
         shutil.copy2(ROOT / name, DIST / name)
+    # The test site stays out of search engines; the real one invites them in.
+    test = '://dev.' in SITE
+    (DIST / 'robots.txt').write_text('User-agent: *\nDisallow: /\n' if test else f'User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n', encoding='utf-8')
+    if not test:
+        pages = ['', 'impressum.html', 'datenschutz.html']
+        (DIST / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                          + ''.join(f'  <url><loc>{SITE}/{p}</loc></url>\n' for p in pages) + '</urlset>\n', encoding='utf-8')
+    else:
+        for name in ['index.html', 'index-a.html']:
+            f = DIST / name
+            f.write_text(f.read_text(encoding='utf-8').replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex">', 1), encoding='utf-8')
     shutil.copytree(ROOT / 'img', DIST / 'img')
     shutil.copytree(ROOT / 'vid', DIST / 'vid')
     (DIST / 'demo').mkdir()

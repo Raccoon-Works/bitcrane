@@ -345,6 +345,7 @@ html.rv-on .rv.in { opacity: 1; transform: none; transition: opacity 600ms ease-
 .proto li + li::before { content: ""; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: var(--muted); opacity: .6; margin: 0 11px; vertical-align: middle; }
 .proto-cloud li { color: var(--accent); }
 .proto-sep { width: 1px; align-self: stretch; background: var(--line); }
+.proto-more { margin: 12px auto 0; max-width: 940px; text-align: center; font-size: 13px; color: var(--muted); opacity: .85; }
 @media (max-width: 760px) {
   .proto { flex-direction: column; gap: 12px; padding: 16px; }
   .proto-sep { width: 40px; height: 1px; align-self: center; }
@@ -473,6 +474,39 @@ section { scroll-margin-top: 76px; }
 
 /* FAQ */
 .faq { padding-block: 96px 40px; }
+/* Contact: copy on the left, the form on the right; one column on narrow screens. */
+.contact { padding-block: 56px 96px; }
+.contact-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: start; }
+.contact h2 { font-size: clamp(30px, 3.8vw, 44px); line-height: 1.06; margin-bottom: 14px; }
+.contact-copy p { color: var(--muted); margin: 0 0 22px; max-width: 42ch; }
+.contact-ways { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.contact-ways li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; align-items: baseline; color: var(--muted); }
+.cw-label { font: 600 12px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.contact-ways .mail a, .contact-ways .mail { color: var(--ink); font-weight: 500; }
+.contact-form {
+  display: grid; gap: 16px; padding: clamp(18px, 3vw, 28px); border-radius: 18px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--lift);
+}
+.field { display: grid; gap: 6px; }
+.field label { font: 600 14px var(--font-body); }
+.field .opt { font-weight: 400; color: var(--muted); }
+.field input, .field textarea {
+  width: 100%; font: 400 16px/1.45 var(--font-body); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field textarea { resize: vertical; min-height: 140px; }
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.field [aria-invalid="true"] { border-color: #d0453b; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.form-foot { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+.form-foot .btn[disabled] { opacity: .6; cursor: progress; }
+.form-note { margin: 0; flex: 1 1 220px; font-size: 13px; color: var(--muted); }
+.form-status { margin: 0; min-height: 1.4em; font-weight: 500; }
+.form-status.ok { color: #2f8a4f; }
+.form-status.err { color: #d0453b; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 860px) { .contact-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
 .faq dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 48px; }
 .faq dt { font: 600 18px/1.3 var(--font-body); margin-bottom: 8px; }
 .faq dd { margin: 0; color: var(--muted); font-size: 16px; }
@@ -491,7 +525,7 @@ footer a { color: var(--muted); }
       <a href="#funktionen"><span class="de">Funktionen</span><span class="en">Features</span></a>
       <a href="#demo">Demo</a>
       <a href="#download">Download</a>
-      <a href="https://github.com/Raccoon-Works/bitcrane" rel="noopener">GitHub</a>
+      <a href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener">GitHub<span class="sr"><span class="de"> (öffnet neuen Tab)</span><span class="en"> (opens a new tab)</span></span></a>
     </nav>
     <div class="langs themes" role="group" aria-label="Design">
       <button type="button" data-theme-set="light" aria-label="Hell"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
@@ -530,7 +564,7 @@ footer a { color: var(--muted); }
           <a class="btn btn-ghost try-demo" href="#demo"><span class="de">Im Browser ausprobieren</span><span class="en">Try it in the browser</span></a>
         </div>
         <p class="meta"><span class="de">macOS 11 oder neuer (Apple Silicon und Intel) · Windows 10 und 11</span><span class="en">macOS 11 or later (Apple silicon and Intel) · Windows 10 and 11</span></p>
-        <a class="gh-link" href="https://github.com/Raccoon-Works/bitcrane" rel="noopener"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2"/></svg><span class="de">Quellcode auf GitHub</span><span class="en">Source code on GitHub</span></a>
+        <a class="gh-link" href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2"/></svg><span class="de">Quellcode auf GitHub</span><span class="en">Source code on GitHub</span></a>
       </div>
 
       <div class="switch-row">
@@ -565,6 +599,7 @@ footer a { color: var(--muted); }
         <span class="proto-sep" aria-hidden="true"></span>
         <div class="proto-group proto-cloud"><span class="proto-label">Cloud</span><ul><li>Dropbox</li><li>OneDrive</li><li>Google Drive</li></ul></div>
       </div>
+      <p class="proto-more"><span class="de">S3 auch mit Backblaze B2, Cloudflare R2, Wasabi, Hetzner und MinIO. WebDAV etwa für Nextcloud.</span><span class="en">S3 also works with Backblaze B2, Cloudflare R2, Wasabi, Hetzner and MinIO. WebDAV, for example, for Nextcloud.</span></p>
     </div>
   </section>
 
@@ -765,7 +800,7 @@ footer a { color: var(--muted); }
       <div class="section-head">
         <span class="kicker">Version <span data-version>0.3</span></span>
         <h2 id="news-h"><span class="de">Neu in dieser Version</span><span class="en">New in this version</span></h2>
-        <p><a href="https://github.com/Raccoon-Works/bitcrane/releases" rel="noopener"><span class="de">Alle Änderungen auf GitHub</span><span class="en">All changes on GitHub</span> →</a></p>
+        <p><a href="https://github.com/Raccoon-Works/bitcrane/releases" target="_blank" rel="noopener"><span class="de">Alle Änderungen auf GitHub</span><span class="en">All changes on GitHub</span><span class="sr"><span class="de"> (öffnet neuen Tab)</span><span class="en"> (opens a new tab)</span></span> ↗</a></p>
       </div>
       <ul class="news-list">
         <li><strong><span class="de">Server übernehmen beim ersten Start</span><span class="en">Bring your servers on first start</span></strong><span class="de">Bitcrane findet Server aus FileZilla, WinSCP, Transmit und der SSH-Konfiguration.</span><span class="en">Bitcrane finds servers from FileZilla, WinSCP, Transmit and your SSH config.</span></li>
@@ -787,7 +822,7 @@ footer a { color: var(--muted); }
         </div>
         <div>
           <dt><span class="de">Was heißt Beta?</span><span class="en">What does beta mean?</span></dt>
-          <dd><span class="de">SFTP, FTP, FTPS und Dropbox sind gründlich getestet. WebDAV, S3, SMB, OneDrive und Google Drive funktionieren, sind aber noch wenig erprobt. Fehler meldest du am besten auf GitHub.</span><span class="en">SFTP, FTP, FTPS and Dropbox are thoroughly tested. WebDAV, S3, SMB, OneDrive and Google Drive work but have seen less use so far. Please report problems on GitHub.</span></dd>
+          <dd><span class="de">SFTP, FTP, FTPS und Dropbox sind gründlich getestet. WebDAV, S3, SMB, OneDrive und Google Drive funktionieren, sind aber noch wenig erprobt. Für Google Drive brauchst du zurzeit einen eigenen Zugang aus der Google Cloud Console (Client-ID und Secret). Fehler meldest du am besten <a href="https://github.com/Raccoon-Works/bitcrane/issues" target="_blank" rel="noopener">auf GitHub</a>.</span><span class="en">SFTP, FTP, FTPS and Dropbox are thoroughly tested. WebDAV, S3, SMB, OneDrive and Google Drive work but have seen less use so far. Google Drive currently needs your own access from the Google Cloud Console (client ID and secret). Please report problems <a href="https://github.com/Raccoon-Works/bitcrane/issues" target="_blank" rel="noopener">on GitHub</a>.</span></dd>
         </div>
         <div>
           <dt><span class="de">Sendet Bitcrane Daten irgendwohin?</span><span class="en">Does Bitcrane send data anywhere?</span></dt>
@@ -798,6 +833,42 @@ footer a { color: var(--muted); }
           <dd><span class="de">Bitcrane wird von RaccoonWorks entwickelt, gebaut mit Tauri, Rust und React.</span><span class="en">Bitcrane is made by RaccoonWorks, built with Tauri, Rust and React.</span></dd>
         </div>
       </dl>
+    </div>
+  </section>
+
+  <section class="contact" id="kontakt" aria-labelledby="contact-h">
+    <div class="wrap contact-grid">
+      <div class="contact-copy">
+        <h2 id="contact-h"><span class="de">Schreib uns</span><span class="en">Get in touch</span></h2>
+        <p><span class="de">Eine Frage, eine Idee oder einfach Rückmeldung? Wir lesen jede Nachricht und antworten per E-Mail.</span><span class="en">A question, an idea or just feedback? We read every message and reply by email.</span></p>
+        <ul class="contact-ways">
+          <li><span class="cw-label">E-Mail</span><span class="mail" data-mail="info|bitcrane.de">info [at] bitcrane.de</span></li>
+          <li><span class="cw-label"><span class="de">Fehler</span><span class="en">Bugs</span></span><span><span class="de">am besten als</span><span class="en">best reported as an</span> <a href="https://github.com/Raccoon-Works/bitcrane/issues" target="_blank" rel="noopener"><span class="de">Issue auf GitHub</span><span class="en">issue on GitHub</span><span class="sr"><span class="de"> (öffnet neuen Tab)</span><span class="en"> (opens a new tab)</span></span></a><span class="de">, dort können alle mithelfen</span><span class="en">, where everyone can help</span></span></li>
+        </ul>
+      </div>
+      <form class="contact-form" id="contact-form" action="kontakt.php" method="post" novalidate>
+        <div class="field">
+          <label for="cf-name"><span class="de">Name</span><span class="en">Name</span> <span class="opt"><span class="de">(freiwillig)</span><span class="en">(optional)</span></span></label>
+          <input id="cf-name" name="name" type="text" maxlength="100" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="cf-email"><span class="de">E-Mail</span><span class="en">Email</span></label>
+          <input id="cf-email" name="email" type="email" maxlength="200" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="cf-msg"><span class="de">Nachricht</span><span class="en">Message</span></label>
+          <textarea id="cf-msg" name="message" rows="6" maxlength="5000" required></textarea>
+        </div>
+        <!-- Left empty by people; bots that fill in every field give themselves away. -->
+        <div class="hp" aria-hidden="true"><label for="cf-web">Website</label><input id="cf-web" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+        <input type="hidden" name="ts" id="cf-ts" value="">
+        <input type="hidden" name="lang" id="cf-lang" value="de">
+        <div class="form-foot">
+          <button class="btn btn-primary" type="submit" id="cf-send"><span class="de">Nachricht senden</span><span class="en">Send message</span></button>
+          <p class="form-note"><span class="de">Deine Nachricht geht per E-Mail an uns, gespeichert wird auf dem Server nichts. Mehr in der <a href="datenschutz.html">Datenschutzerklärung</a>.</span><span class="en">Your message reaches us by email; nothing is stored on the server. More in the <a href="datenschutz.html">privacy policy</a>.</span></p>
+        </div>
+        <p class="form-status" id="cf-status" role="status" aria-live="polite"></p>
+      </form>
     </div>
   </section>
   </div>
@@ -820,7 +891,8 @@ footer a { color: var(--muted); }
   <div class="wrap">
     <span>© 2026 RaccoonWorks</span>
     <nav aria-label="Rechtliches">
-      <a href="https://github.com/Raccoon-Works/bitcrane" rel="noopener">GitHub</a>
+      <a href="#kontakt"><span class="de">Kontakt</span><span class="en">Contact</span></a>
+      <a href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener">GitHub<span class="sr"><span class="de"> (öffnet neuen Tab)</span><span class="en"> (opens a new tab)</span></span></a>
       <a href="impressum.html"><span class="de">Impressum</span><span class="en">Legal notice</span></a>
       <a href="datenschutz.html"><span class="de">Datenschutz</span><span class="en">Privacy</span></a>
     </nav>
@@ -989,6 +1061,42 @@ footer a { color: var(--muted); }
       });
     }, { threshold: [0, 0.35, 0.6] });
     figs.forEach(function (f) { io.observe(f); });
+  })();
+
+  /* E-mail address put together here, so address harvesters reading the source do not find it. */
+  document.querySelectorAll('[data-mail]').forEach(function (el) {
+    var p = el.getAttribute('data-mail').split('|'), a = document.createElement('a');
+    a.href = 'mailto:' + p[0] + '@' + p[1]; a.textContent = p[0] + '@' + p[1];
+    el.textContent = ''; el.appendChild(a);
+  });
+
+  /* Contact form: sent in the background; without JavaScript it posts normally. */
+  (function () {
+    var form = document.getElementById('contact-form'); if (!form) return;
+    var status = document.getElementById('cf-status'), send = document.getElementById('cf-send');
+    document.getElementById('cf-ts').value = String(Math.floor(Date.now() / 1000));
+    var MSG = {
+      de: { sent: 'Danke! Deine Nachricht ist angekommen. Wir antworten per E-Mail.', email: 'Bitte prüfe deine E-Mail-Adresse.', short: 'Bitte schreib ein paar Worte mehr.', error: 'Das hat leider nicht geklappt. Schreib uns bitte direkt an info@bitcrane.de.', sending: 'Wird gesendet …' },
+      en: { sent: 'Thank you! Your message has arrived. We will reply by email.', email: 'Please check your email address.', short: 'Please write a few more words.', error: 'Sorry, that did not work. Please write to info@bitcrane.de directly.', sending: 'Sending …' }
+    };
+    function show(code, ok) { status.textContent = MSG[lang][code] || MSG[lang].error; status.className = 'form-status ' + (ok ? 'ok' : 'err'); }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = form.email, msg = form.message;
+      email.removeAttribute('aria-invalid'); msg.removeAttribute('aria-invalid');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { email.setAttribute('aria-invalid', 'true'); email.focus(); show('email'); return; }
+      if (msg.value.trim().length < 10) { msg.setAttribute('aria-invalid', 'true'); msg.focus(); show('short'); return; }
+      document.getElementById('cf-lang').value = lang;
+      send.disabled = true; status.className = 'form-status'; status.textContent = MSG[lang].sending;
+      fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.ok) { form.reset(); document.getElementById('cf-ts').value = String(Math.floor(Date.now() / 1000)); show('sent', true); }
+          else show(res.code);
+        })
+        .catch(function () { show('error'); })
+        .then(function () { send.disabled = false; });
+    });
   })();
 
   /* Large view: the whole window of a feature shot, with its own light/dark switch. */

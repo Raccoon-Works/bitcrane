@@ -7,49 +7,137 @@
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="img/icon-64.png">
 <link rel="stylesheet" href="legal.css">
+<script>
+/* Same language and design as chosen on the start page; before the first paint. */
+(function () {
+  var r = document.documentElement;
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var t = get('bc-site-theme'); if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t);
+  var l = get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en');
+  r.lang = l === 'en' ? 'en' : 'de';
+})();
+</script>
 </head>
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="index.html"><img src="img/icon-64.png" alt="" width="30" height="30"><span class="wm-bit">Bit</span><span class="wm-crane">crane</span></a>
-    <a class="back" href="index.html">← Zur Startseite</a>
+    <a class="brand" href="index.html"><img src="img/icon-64.png" alt="" width="30" height="30"><span><span class="wm-bit">Bit</span><span class="wm-crane">crane</span></span></a>
+    <div class="langs" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></div>
+    <a class="back" href="index.html">←<span class="label"><span class="de"> Zur Startseite</span><span class="en"> Back to start</span></span></a>
   </div>
 </header>
 
 <main class="wrap">
-  <h1>Impressum</h1>
-  <p class="note">Entwurf mit Beispieldaten. Die markierten Angaben werden vor der Veröffentlichung durch die echten ersetzt.</p>
+  <h1><span class="de">Impressum</span><span class="en">Legal notice</span></h1>
+  <p class="note"><span class="de">Name und Anschrift folgen vor der Veröffentlichung.</span><span class="en">Name and address will be added before publication.</span></p>
 
-  <h2>Angaben gemäß § 5 DDG</h2>
-  <address>
-    <mark>Max Mustermann</mark><br>
-    RaccoonWorks<br>
-    <mark>Musterstraße 1</mark><br>
-    <mark>12345 Musterstadt</mark><br>
-    Deutschland
-  </address>
+  <!-- German (binding) -->
+  <div class="de">
+    <h2>Angaben gemäß § 5 DDG</h2>
+    <address>
+      <mark>Vorname Nachname</mark><br>
+      RaccoonWorks<br>
+      <mark>Straße Hausnummer</mark><br>
+      <mark>PLZ Ort</mark><br>
+      Deutschland
+    </address>
 
-  <h2>Kontakt</h2>
-  <p>E-Mail: <mark>kontakt@bitcrane.de</mark></p>
+    <h2>Kontakt</h2>
+    <dl class="facts">
+      <dt>E-Mail</dt><dd><span class="mail" data-mail="info|bitcrane.de">info [at] bitcrane.de</span></dd>
+      <dt>Formular</dt><dd><a href="index.html#kontakt">Kontaktformular auf der Startseite</a></dd>
+    </dl>
 
-  <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
-  <address><mark>Max Mustermann</mark>, Anschrift wie oben</address>
+    <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
+    <address><mark>Vorname Nachname</mark>, Anschrift wie oben</address>
 
-  <h2>Haftung für Inhalte</h2>
-  <p>Die Inhalte dieser Seite wurden mit Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden. Als Diensteanbieter bin ich für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich.</p>
+    <h2>Verbraucherstreitbeilegung</h2>
+    <p>Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
 
-  <h2>Haftung für Links</h2>
-  <p>Diese Seite enthält Links zu externen Websites, etwa zu GitHub. Auf deren Inhalte habe ich keinen Einfluss; für sie ist der jeweilige Anbieter verantwortlich. Werden mir Rechtsverletzungen bekannt, entferne ich den betreffenden Link umgehend.</p>
+    <h2>Haftung für Inhalte</h2>
+    <p>Die Inhalte dieser Seite sind mit Sorgfalt erstellt. Für Richtigkeit, Vollständigkeit und Aktualität können wir jedoch keine Gewähr übernehmen. Für eigene Inhalte sind wir nach den allgemeinen Gesetzen verantwortlich.</p>
 
-  <h2>Software</h2>
-  <p>Bitcrane ist freie Software unter der GNU General Public License, Version 3. Der Quellcode ist auf <a href="https://github.com/Raccoon-Works/bitcrane" rel="noopener">GitHub</a> veröffentlicht. Die Software wird ohne Gewährleistung bereitgestellt, soweit gesetzlich zulässig.</p>
+    <h2>Haftung für Links</h2>
+    <p>Diese Seite verweist auf Seiten anderer Anbieter, vor allem auf GitHub. Auf deren Inhalte haben wir keinen Einfluss, verantwortlich ist der jeweilige Anbieter. Zum Zeitpunkt der Verlinkung waren keine Rechtsverstöße erkennbar. Werden uns welche bekannt, entfernen wir den Link umgehend.</p>
+
+    <h2>Software und Lizenz</h2>
+    <p>Bitcrane ist freie Software unter der GNU General Public License, Version 3. Der Quellcode liegt öffentlich auf <a href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener">GitHub</a>. Die Software wird ohne Gewährleistung bereitgestellt, soweit das gesetzlich zulässig ist.</p>
+
+    <h2>Marken</h2>
+    <p>Dropbox, OneDrive, Google Drive, Amazon S3, macOS, Windows und andere genannte Namen sind Marken ihrer jeweiligen Inhaber. Bitcrane steht in keiner Verbindung zu diesen Unternehmen und wird von ihnen weder unterstützt noch geprüft.</p>
+
+    <h2>Bilder und Videos</h2>
+    <p>Alle Bilder und Videos auf dieser Seite zeigen Bitcrane selbst und sind eigene Aufnahmen. Die gezeigten Server, Dateien und Namen sind ausgedacht.</p>
+  </div>
+
+  <!-- English (translation) -->
+  <div class="en">
+    <p class="muted">This is a translation for your convenience; the German version is legally binding.</p>
+
+    <h2>Information according to § 5 DDG (German Digital Services Act)</h2>
+    <address>
+      <mark>First name Last name</mark><br>
+      RaccoonWorks<br>
+      <mark>Street and number</mark><br>
+      <mark>Postcode Town</mark><br>
+      Germany
+    </address>
+
+    <h2>Contact</h2>
+    <dl class="facts">
+      <dt>Email</dt><dd><span class="mail" data-mail="info|bitcrane.de">info [at] bitcrane.de</span></dd>
+      <dt>Form</dt><dd><a href="index.html#kontakt">Contact form on the start page</a></dd>
+    </dl>
+
+    <h2>Responsible for the content according to § 18 (2) MStV</h2>
+    <address><mark>First name Last name</mark>, address as above</address>
+
+    <h2>Consumer dispute resolution</h2>
+    <p>We are neither willing nor obliged to take part in dispute resolution proceedings before a consumer arbitration board.</p>
+
+    <h2>Liability for content</h2>
+    <p>The content of this site has been written with care. We cannot, however, guarantee that it is correct, complete and up to date. We are responsible for our own content under the general laws.</p>
+
+    <h2>Liability for links</h2>
+    <p>This site links to sites of other providers, mainly GitHub. We have no influence on their content; the respective provider is responsible for it. No legal violations were apparent when the links were set. Should we learn of any, we will remove the link at once.</p>
+
+    <h2>Software and licence</h2>
+    <p>Bitcrane is free software under the GNU General Public License, version 3. The source code is public on <a href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener">GitHub</a>. The software comes without warranty, to the extent permitted by law.</p>
+
+    <h2>Trademarks</h2>
+    <p>Dropbox, OneDrive, Google Drive, Amazon S3, macOS, Windows and other names mentioned are trademarks of their respective owners. Bitcrane is not affiliated with, endorsed or reviewed by these companies.</p>
+
+    <h2>Pictures and videos</h2>
+    <p>All pictures and videos on this site show Bitcrane itself and are our own recordings. The servers, files and names shown are made up.</p>
+  </div>
 </main>
 
 <footer>
   <div class="wrap">
     <span>© 2026 RaccoonWorks</span>
-    <nav aria-label="Rechtliches"><a href="index.html">Startseite</a><a href="datenschutz.html">Datenschutz</a></nav>
+    <nav aria-label="Rechtliches / Legal"><a href="index.html"><span class="de">Startseite</span><span class="en">Start</span></a><a href="datenschutz.html"><span class="de">Datenschutz</span><span class="en">Privacy</span></a></nav>
   </div>
 </footer>
+<script>
+/* Language switch (remembered like on the start page) and the e-mail address, put together
+   only here so that address harvesters reading the page source do not find it. */
+(function () {
+  var r = document.documentElement;
+  var titles = { de: 'Impressum · Bitcrane', en: 'Legal notice · Bitcrane' };
+  function mark() {
+    document.title = titles[r.lang];
+    document.querySelectorAll('.langs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === r.lang)); });
+  }
+  document.querySelectorAll('.langs button').forEach(function (b) {
+    b.addEventListener('click', function () { r.lang = b.dataset.lang; try { localStorage.setItem('bc-site-lang', b.dataset.lang); } catch (e) { /* storage blocked */ } mark(); });
+  });
+  document.querySelectorAll('[data-mail]').forEach(function (el) {
+    var p = el.getAttribute('data-mail').split('|'), a = document.createElement('a');
+    a.href = 'mailto:' + p[0] + '@' + p[1]; a.textContent = p[0] + '@' + p[1];
+    el.textContent = ''; el.appendChild(a);
+  });
+  mark();
+})();
+</script>
 </body>
 </html>

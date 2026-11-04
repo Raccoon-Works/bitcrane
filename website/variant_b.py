@@ -13,9 +13,9 @@ CSS = """
   font: 800 clamp(60px, 11vw, 148px)/.9 var(--font-display); letter-spacing: -0.045em; color: var(--ink);
 }
 /* The logo is the B: its light front face (64 % of the image) is as tall as a capital and
-   stands on the baseline, the darker edge below it like a shadow; the transparent sides of
+   sits just above the baseline, so with its darker edge below it the B does not look sunk; the transparent sides of
    the image are pulled in so it reads as one word. */
-.wm-hero .wm-logo { height: 1.09em; width: auto; margin: 0 -.185em 0 -.18em; display: block; position: relative; top: .118em; }
+.wm-hero .wm-logo { height: 1.09em; width: auto; margin: 0 -.185em 0 -.18em; display: block; position: relative; top: .09em; }
 .wm-hero .wm-word { display: inline-flex; white-space: nowrap; }
 .wm-hero .wm-l { display: inline-block; text-align: center; }
 .wm-hero .wm-l .g { display: inline-block; will-change: transform; }
