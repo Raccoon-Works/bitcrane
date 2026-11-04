@@ -92,7 +92,19 @@ def main():
     shutil.copytree(ROOT / 'img', DIST / 'img')
     shutil.copytree(ROOT / 'vid', DIST / 'vid')
     (DIST / 'demo').mkdir()
-    shutil.copy2(DEMO, DIST / 'demo' / 'index.html')
+    # The demo opened in its own window needs a way to the legal pages (two clicks at most);
+    # inside the start page (iframe) the page's own footer covers it.
+    demo = DEMO.read_text(encoding='utf-8')
+    legal = (
+        '<div id="bc-legal" hidden style="position:fixed;left:50%;bottom:3px;transform:translateX(-50%);z-index:9999;'
+        'font:500 11px -apple-system,BlinkMacSystemFont,\'Segoe UI\',system-ui,sans-serif;letter-spacing:.01em;opacity:.7">'
+        '<a href="../impressum.html" style="color:inherit">Impressum</a> &middot; <a href="../datenschutz.html" style="color:inherit">Datenschutz</a></div>'
+        '<script>(function(){if(window.top!==window)return;var d=document.getElementById("bc-legal");'
+        'var dark=/theme=dark/.test(location.search)||(!/theme=light/.test(location.search)&&matchMedia("(prefers-color-scheme: dark)").matches);'
+        'd.style.color=dark?"#c9d4e1":"#4a5668";var en=/lang=en/.test(location.search);'
+        'if(en){d.children[0].textContent="Legal notice";d.children[1].textContent="Privacy";}d.hidden=false;})();</script>\n'
+    )
+    (DIST / 'demo' / 'index.html').write_text(demo.replace('</body>', legal + '</body>', 1), encoding='utf-8')
     print('built', sum(1 for _ in DIST.rglob('*') if _.is_file()), 'files in', DIST)
 
 

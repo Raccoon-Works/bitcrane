@@ -66,7 +66,10 @@ function finish(bool $ok, string $code, bool $json, string $lang): never
         . '<title>Bitcrane</title><link rel="stylesheet" href="legal.css"></head><body><main class="wrap">'
         . '<h1>Bitcrane</h1><p>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</p>'
         . '<p><a href="index.html#kontakt">' . htmlspecialchars($t['back'], ENT_QUOTES, 'UTF-8') . '</a></p>'
-        . '</main></body></html>';
+        . '</main><footer><div class="wrap"><span>© 2026 RaccoonWorks</span><nav>'
+        . '<a href="impressum.html">' . ($lang === 'en' ? 'Legal notice' : 'Impressum') . '</a>'
+        . '<a href="datenschutz.html">' . ($lang === 'en' ? 'Privacy' : 'Datenschutz') . '</a>'
+        . '</nav></div></footer></body></html>';
     exit;
 }
 
