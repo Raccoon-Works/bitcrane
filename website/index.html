@@ -157,16 +157,23 @@ footer { position: relative; background: var(--bg); }
 }
 .upload li a.done { border-color: var(--accent); }
 .upload li a:hover { transform: scale(1.3); text-decoration: none; }
+.upload li a:focus-visible { outline-offset: 4px; }
+/* Section names stand at their dots along the bar: the one you are in large, the others
+   small and quiet, so the bar reads as a table of contents of the page. */
 .upload li a span {
-  position: absolute; right: 18px; top: 50%; transform: translateY(-50%); white-space: nowrap;
-  font: 500 13px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
-  padding: 3px 9px; border-radius: 7px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 150ms ease;
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%); white-space: nowrap; pointer-events: none;
+  font: 600 11px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); opacity: .55;
+  text-shadow: 0 0 10px var(--bg), 0 0 18px var(--bg);
+  transition: font-size 260ms cubic-bezier(.23, 1, .32, 1), letter-spacing 260ms ease, opacity 200ms ease, color 200ms ease;
 }
-.upload li a:hover span, .upload li a:focus-visible span { opacity: 1; }
-.upload-head { position: absolute; right: 24px; top: 0; will-change: transform; pointer-events: none; }
+.upload li a:hover span { opacity: 1; color: var(--ink); }
+.upload li.current a span { font-size: 19px; letter-spacing: .02em; font-weight: 700; color: var(--ink); opacity: 1; font-family: var(--font-display); }
+.upload li.current a { background: var(--accent); border-color: var(--accent); }
+/* Transfer counter under the bar. */
+.upload-head { position: absolute; right: -6px; bottom: -36px; pointer-events: none; }
 .upload-label {
-  display: flex; align-items: center; gap: 7px; transform: translateY(-50%); white-space: nowrap;
-  font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  font: 500 11px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
   background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px 4px 7px; box-shadow: var(--shadow);
 }
@@ -175,8 +182,11 @@ footer { position: relative; background: var(--bg); }
 .upload.complete .upload-label .ok { display: block; }
 .upload.complete .upload-label .up { display: none; }
 @media (max-width: 1279px) { .upload { display: none; } }
-@media (max-width: 1439px) { .upload-head { display: none; } }
+/* Without room beside the content, only the current section is named. */
+@media (max-width: 1559px) { .upload li:not(.current) a span { opacity: 0; } .upload li a:hover span { opacity: 1; } }
+@media (max-width: 1439px) { .upload li a span { display: none; } .upload-head { display: none; } }
 @media (prefers-reduced-motion: reduce) { .upload li a, .upload li a span { transition: none; } }
+.upload { top: 110px; bottom: 80px; }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
@@ -980,16 +990,14 @@ footer a { color: var(--muted); }
   function update() {
     var p = Math.max(0, Math.min(1, scrollY / maxScroll()));
     upFill.style.transform = 'scaleY(' + p + ')';
-    upHead.style.transform = 'translateY(' + (p * up.clientHeight) + 'px)';
     var done = p > 0.995;
     up.classList.toggle('complete', done);
     var cur = 0;
     stops.forEach(function (s, i) { if (p + 0.002 >= s.p) cur = i; });
-    var section = STOPS[cur][lang === 'de' ? 1 : 2];
     upText.textContent = done
       ? (lang === 'de' ? 'Übertragen' : 'Transferred')
-      : section + ' · ' + mb(total * p) + (lang === 'de' ? ' von ' : ' of ') + mb(total) + ' MB';
-    upText.parentNode.dataset.section = section;
+      : mb(total * p) + ' / ' + mb(total) + ' MB';
+    stops.forEach(function (s, i) { s.li.classList.toggle('current', i === cur); });
     up.setAttribute('aria-valuenow', String(Math.round(p * 100)));
     stops.forEach(function (s) { s.a.classList.toggle('done', p + 0.002 >= s.p); });
   }
@@ -1090,7 +1098,7 @@ footer a { color: var(--muted); }
     }
     function frame(ms) {
       var dt = last ? Math.min(0.05, (ms - last) / 1000) : 0; last = ms;
-      boost *= Math.pow(0.12, dt);   /* calms down within about a second */
+      boost *= Math.pow(0.15, dt);   /* calms down within about a second */
       if (running) draw(dt);
       requestAnimationFrame(frame);
     }
@@ -1099,7 +1107,7 @@ footer a { color: var(--muted); }
     function check() {
       running = !document.hidden && scrollY < innerHeight * 1.1;
       var dy = Math.abs(scrollY - lastY); lastY = scrollY;
-      boost = Math.min(5, boost + dy * 0.02 * slow);
+      boost = Math.min(8, boost + dy * 0.06);
     }
     addEventListener('scroll', check, { passive: true });
     document.addEventListener('visibilitychange', check);
