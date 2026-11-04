@@ -141,7 +141,7 @@ footer { position: relative; background: var(--bg); }
 .upload {
   --tick: color-mix(in srgb, var(--ink) 22%, transparent);
   position: fixed; z-index: 8; right: max(18px, env(safe-area-inset-right, 0px));
-  top: 110px; bottom: 80px; width: 44px; touch-action: none; cursor: pointer;
+  top: 110px; bottom: 48px; width: 44px; touch-action: none; cursor: pointer;
 }
 .upload-track, .upload-fill {
   position: absolute; right: 0; top: 0; bottom: 0; width: 9px;
@@ -156,6 +156,8 @@ footer { position: relative; background: var(--bg); }
   will-change: transform; pointer-events: none;
 }
 .upload.complete .upload-cursor { opacity: 0; }
+/* Where there is no room below its mark (the last sections), a name runs upwards instead. */
+.upload li.flip a span { top: auto; bottom: 8px; }
 .upload ol { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
 .upload li { position: absolute; right: 0; left: 0; height: 0; }
 .upload li a { position: absolute; right: 0; top: -1px; display: block; width: 44px; height: 2px; text-decoration: none; }
@@ -180,18 +182,6 @@ footer { position: relative; background: var(--bg); }
 .upload li.current a span { font: 700 15px/1 var(--font-display); letter-spacing: .06em; color: var(--ink); opacity: 1; }
 .upload li.squeezed:not(.current) a span { opacity: 0; }
 .upload li.squeezed:not(.current) a:hover span { opacity: 1; }
-/* Transfer counter under the column. */
-.upload-head { position: absolute; right: -4px; bottom: -36px; pointer-events: none; }
-.upload-label {
-  display: flex; align-items: center; gap: 6px; white-space: nowrap;
-  font: 500 11px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px 4px 7px; box-shadow: var(--shadow);
-}
-.upload-label svg { width: 13px; height: 13px; color: var(--accent); flex: none; }
-.upload-label .ok { display: none; }
-.upload.complete .upload-label .ok { display: block; }
-.upload.complete .upload-label .up { display: none; }
 /* While you scroll, the ticks around the block in transfer stretch out like a wave and
    settle again when you stop. */
 .upload-wave { position: absolute; right: 0; top: 0; width: 0; height: 0; pointer-events: none; }
@@ -199,12 +189,7 @@ footer { position: relative; background: var(--bg); }
   position: absolute; right: 0; height: 2px; width: 9px; border-radius: 1px; background: var(--accent);
   transform-origin: left; will-change: transform, opacity; opacity: 0; /* swings out towards the screen edge, away from the names */
 }
-/* Counter digits roll like an odometer. */
-.odo { display: inline-flex; height: 1.2em; line-height: 1.2em; overflow: hidden; vertical-align: top; }
-.odo-col { display: flex; flex-direction: column; transition: transform 300ms cubic-bezier(.2, .9, .2, 1); }
-.odo-col > b { display: block; height: 1.2em; font-weight: inherit; text-align: center; }
 @media (max-width: 1279px) { .upload { display: none; } }
-@media (max-width: 1359px) { .upload-head { display: none; } }
 @media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span { transition: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
@@ -501,13 +486,6 @@ footer a { color: var(--muted); }
 <div class="upload" id="upload" role="scrollbar" aria-controls="top" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Position auf der Seite">
   <div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-wave" id="upload-wave"></div><div class="upload-cursor" id="upload-cursor"></div>
   <ol id="upload-stops"></ol>
-  <div class="upload-head" id="upload-head">
-    <div class="upload-label">
-      <svg class="up" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3.5M4 7.5 8 3.5l4 4"/></svg>
-      <svg class="ok" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg>
-      <span id="upload-text"></span>
-    </div>
-  </div>
 </div>
 
 <main id="top">
@@ -976,7 +954,6 @@ footer a { color: var(--muted); }
     ['demo', 'Demo', 'Demo'], ['download', 'Download', 'Download'], ['neu', 'Neu', 'New'], ['fragen', 'Fragen', 'Questions']
   ];
   var up = document.getElementById('upload'), upFill = document.getElementById('upload-fill');
-  var upHead = document.getElementById('upload-head'), upText = document.getElementById('upload-text');
   var upList = document.getElementById('upload-stops'), upCur = document.getElementById('upload-cursor');
   var stops = STOPS.map(function (st) {
     var li = document.createElement('li'), a = document.createElement('a');
@@ -986,18 +963,6 @@ footer a { color: var(--muted); }
     li.appendChild(a); upList.appendChild(li);
     return { li: li, a: a, el: document.getElementById(st[0]), p: 0 };
   });
-  /* The "file" is the page itself: what the browser loaded for it, read from the
-     performance entries; a plausible size when the browser does not tell. */
-  var total = 0;
-  function measure() {
-    try {
-      var nav = performance.getEntriesByType('navigation')[0];
-      total = (nav ? nav.encodedBodySize || nav.transferSize || 0 : 0);
-      performance.getEntriesByType('resource').forEach(function (r) { total += r.encodedBodySize || r.transferSize || 0; });
-    } catch (e) { total = 0; }
-    if (total < 1048576) total = Math.max(total, 1.6 * 1048576);
-  }
-  function mb(n) { return (n / 1048576).toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
   function maxScroll() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
   function placeStops() {
     var m = maxScroll();
@@ -1010,30 +975,31 @@ footer a { color: var(--muted); }
      until you point at it. */
   var lastCur = -1;
   function squeeze() {
-    var h = up.clientHeight;
-    stops.forEach(function (s, i) {
-      var spans = [].slice.call(s.a.querySelectorAll('span')).filter(function (x) { return x.offsetHeight; });
-      var len = spans.length ? spans[0].offsetHeight : 0;
+    var h = up.clientHeight, GAP = 8;
+    var info = stops.map(function (s, i) {
+      var span = [].slice.call(s.a.querySelectorAll('span')).filter(function (x) { return x.offsetHeight; })[0];
+      var at = s.p * h, len = span ? span.offsetHeight : 0;
       var next = i + 1 < stops.length ? stops[i + 1].p * h : h;
-      var room = next - s.p * h - 8 - 10;
-      s.li.classList.toggle('squeezed', len > room);
+      return { at: at, len: len, next: next, cur: s.li.classList.contains('current'), flip: false, hide: false };
     });
-  }
-  /* Counter: each digit is a column 0-9 that rolls to its value; other characters stay plain. */
-  var counterShape = '';
-  function setCounter(text) {
-    var shape = text.replace(/[0-9]/g, '#');
-    if (shape !== counterShape) {
-      counterShape = shape;
-      upText.innerHTML = text.split('').map(function (ch) {
-        return /[0-9]/.test(ch)
-          ? '<span class="odo"><span class="odo-col"><b>0</b><b>1</b><b>2</b><b>3</b><b>4</b><b>5</b><b>6</b><b>7</b><b>8</b><b>9</b></span></span>'
-          : '<span>' + ch.replace(/</g, '&lt;') + '</span>';
-      }).join('');
+    /* The current name always shows: downwards if it fits before the bar ends, otherwise upwards. */
+    var c = info.filter(function (n) { return n.cur; })[0];
+    if (c) {
+      c.flip = c.at + GAP + c.len > h && c.at - GAP - c.len >= 0;
+      c.from = c.flip ? c.at - GAP - c.len : c.at + GAP;
+      c.to = c.from + c.len;
     }
-    upText.setAttribute('aria-label', text);
-    var cols = upText.querySelectorAll('.odo-col'), k = 0;
-    text.split('').forEach(function (ch) { if (/[0-9]/.test(ch)) cols[k++].style.transform = 'translateY(' + (-1.2 * +ch) + 'em)'; });
+    /* Every other name runs downwards; it stays hidden (until pointed at) when it would reach the
+       next mark or touch the current name. */
+    info.forEach(function (n) {
+      if (n.cur) return;
+      var from = n.at + GAP, to = from + n.len;
+      n.hide = to > n.next - 4 || (c && from < c.to + 6 && to > c.from - 6);
+    });
+    info.forEach(function (n, i) {
+      stops[i].li.classList.toggle('flip', n.flip);
+      stops[i].li.classList.toggle('squeezed', n.hide);
+    });
   }
 
   /* Scroll wave: a few ticks around the block in transfer stretch with the scroll speed.
@@ -1066,7 +1032,6 @@ footer a { color: var(--muted); }
     up.classList.toggle('complete', done);
     var cur = 0;
     stops.forEach(function (s, i) { if (p + 0.002 >= s.p) cur = i; });
-    setCounter(done ? (lang === 'de' ? 'Übertragen' : 'Transferred') : mb(total * p) + ' / ' + mb(total) + ' MB');
     wavePos = p * up.clientHeight;
     if (cur !== lastCur) { lastCur = cur; stops.forEach(function (s, i) { s.li.classList.toggle('current', i === cur); }); setTimeout(squeeze, 320); }
     up.setAttribute('aria-valuenow', String(Math.round(p * 100)));
@@ -1086,7 +1051,7 @@ footer a { color: var(--muted); }
   });
   addEventListener('scroll', update, { passive: true });
   addEventListener('resize', function () { placeStops(); update(); squeeze(); });
-  addEventListener('load', function () { measure(); placeStops(); update(); squeeze(); setTimeout(function () { measure(); placeStops(); update(); squeeze(); }, 3000); });
+  addEventListener('load', function () { placeStops(); update(); squeeze(); setTimeout(function () { placeStops(); update(); squeeze(); }, 3000); });
   document.querySelectorAll('.langs:not(.themes) button').forEach(function (b) { b.addEventListener('click', function () { update(); squeeze(); }); });
 
   /* Data stream behind the hero: lanes run from the left (your folder) towards a point on the
@@ -1213,7 +1178,7 @@ footer a { color: var(--muted); }
 
   setLang(lang);
   markDemo();
-  measure(); placeStops(); update();
+  placeStops(); update();
   document.getElementById('cta-label').querySelector('.de').textContent = own === 'win' ? 'Für Windows laden' : 'Für macOS laden';
   document.getElementById('cta-label').querySelector('.en').textContent = own === 'win' ? 'Download for Windows' : 'Download for macOS';
 })();
