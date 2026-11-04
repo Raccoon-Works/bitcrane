@@ -205,7 +205,7 @@ footer { position: relative; background: var(--bg); }
 .odo-col > b { display: block; height: 1.2em; font-weight: inherit; text-align: center; }
 @media (max-width: 1279px) { .upload { display: none; } }
 @media (max-width: 1359px) { .upload-head { display: none; } }
-@media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span, .odo-col { transition: none; } .upload-wave { display: none; } }
+@media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span { transition: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
   display: inline-flex; gap: 10px; align-items: center; font: 600 13px var(--font-body);
@@ -1036,10 +1036,10 @@ footer a { color: var(--muted); }
     text.split('').forEach(function (ch) { if (/[0-9]/.test(ch)) cols[k++].style.transform = 'translateY(' + (-1.2 * +ch) + 'em)'; });
   }
 
-  /* Scroll wave: a few ticks around the block in transfer stretch with the scroll speed. */
+  /* Scroll wave: a few ticks around the block in transfer stretch with the scroll speed.
+     Small and only ever driven by your own scrolling, so it stays on with reduced motion too. */
   var wave = document.getElementById('upload-wave'), waveTicks = [], WAVE = 6, waveEnergy = 0, wavePos = 0, waveY = scrollY, waveRun = false;
   for (var wi = -WAVE; wi <= WAVE; wi++) { var t = document.createElement('i'); wave.appendChild(t); waveTicks.push({ el: t, k: wi }); }
-  var stillMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function waveFrame() {
     waveEnergy *= 0.92;
     var base = Math.round(wavePos / 7) * 7;
@@ -1053,7 +1053,6 @@ footer a { color: var(--muted); }
     if (waveEnergy > 0.01) requestAnimationFrame(waveFrame); else waveRun = false;
   }
   addEventListener('scroll', function () {
-    if (stillMotion) return;
     var dy = Math.abs(scrollY - waveY); waveY = scrollY;
     waveEnergy = Math.min(1.5, waveEnergy + dy / 90);
     if (!waveRun) { waveRun = true; requestAnimationFrame(waveFrame); }
