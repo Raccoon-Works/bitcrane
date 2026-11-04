@@ -18,6 +18,8 @@
   --code-bg: #0f1722;
   --code-ink: #dbe7f5;
   --shadow: 0 1px 2px rgba(15, 23, 34, .06), 0 18px 48px -18px rgba(23, 52, 92, .28);
+  /* Product shots lift off the page: several soft layers, as a real window shadow. */
+  --lift: 0 0 0 1px rgba(15, 23, 34, .06), 0 2px 4px rgba(15, 23, 34, .05), 0 12px 24px -6px rgba(23, 52, 92, .14), 0 40px 80px -20px rgba(23, 52, 92, .32);
   /* The system fonts, as in the app: SF Pro on the Mac, Segoe UI on Windows. Nothing is downloaded. */
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -34,6 +36,8 @@
     --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
     --code-bg: #05080d; --code-ink: #cfe0f2;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
+  --lift: 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .4), 0 16px 32px -8px rgba(0, 0, 0, .55), 0 50px 100px -20px rgba(0, 0, 0, .75), 0 0 120px -40px rgba(111, 184, 255, .25);
+    --lift: 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .4), 0 16px 32px -8px rgba(0, 0, 0, .55), 0 50px 100px -20px rgba(0, 0, 0, .75), 0 0 120px -40px rgba(111, 184, 255, .25);
     --stream-lane: 111,184,255; --stream-dot: 140,170,205; --stream-file: 111,184,255;
     color-scheme: dark;
   }
@@ -96,6 +100,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   letter-spacing: .06em; padding: 5px 9px; cursor: pointer;
 }
 .langs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.themes button { display: grid; place-items: center; }
+.themes svg { width: 14px; height: 14px; }
+@media (max-width: 720px) { .themes { margin-left: auto; } .themes + .langs { margin-left: 0; } }
 @media (max-width: 720px) { .nav { display: none; } .langs { margin-left: auto; } }
 
 /* Buttons */
@@ -204,12 +211,14 @@ footer { position: relative; background: var(--bg); }
 .shot-frame {
   position: relative; aspect-ratio: var(--ar, 1300 / 800); max-width: 100%;
   border-radius: var(--radius); overflow: hidden; background: var(--surface);
-  box-shadow: var(--shadow); border: 1px solid var(--line);
+  box-shadow: var(--lift); border: 0;
   touch-action: pan-y;
 }
 .shot-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; -webkit-user-drag: none; }
-.shot-over { opacity: 0; transition: opacity 260ms ease; }
-.shot:hover .shot-over, .shot.flipped .shot-over { opacity: 1; }
+/* The other design wipes in diagonally on click, and back on the next click. */
+.shot-frame { cursor: pointer; }
+.shot-over { clip-path: polygon(0% 0%, 0% 0%, -30% 101%, 0% 101%); transition: clip-path 750ms cubic-bezier(.65, 0, .35, 1); }
+.shot.flipped .shot-over { clip-path: polygon(0% 0%, 130% 0%, 100% 101%, 0% 101%); }
 [data-crop] .shot-tag { display: none; }
 /* Cut-out shots (a dialog or panel on a transparent background): no frame, a soft shadow of their own. */
 [data-crop] .shot-frame { background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
@@ -217,17 +226,15 @@ footer { position: relative; background: var(--bg); }
 :root[data-theme="dark"] [data-crop] .shot-frame img { filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .6)) drop-shadow(0 0 0 1px rgba(255, 255, 255, .06)); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) [data-crop] .shot-frame img { filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .6)); } }
 @media (max-width: 760px) { .try-demo { display: none; } }
-.zoomable .shot-frame { cursor: zoom-in; transition: transform 300ms cubic-bezier(.23, 1, .32, 1), box-shadow 300ms ease; }
-.zoomable:hover .shot-frame { transform: translateY(-3px); }
 .shot-zoom {
   position: absolute; top: 12px; right: 12px; z-index: 2; width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center; border: 0; cursor: zoom-in; color: #fff;
-  background: rgba(10, 14, 20, .62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  opacity: 0; transform: scale(.9); transition: opacity 180ms ease, transform 180ms cubic-bezier(.23, 1, .32, 1);
+  background: rgba(10, 14, 20, .55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: background-color 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1);
 }
 .shot-zoom svg { width: 17px; height: 17px; }
-.zoomable:hover .shot-zoom, .shot-zoom:focus-visible { opacity: 1; transform: none; }
-@media (hover: none) { .shot-zoom { opacity: 1; transform: none; } }
+.shot-zoom:hover { background: rgba(10, 14, 20, .8); transform: scale(1.06); }
+.shot-zoom:active { transform: scale(.96); }
 
 /* Large view of a product shot */
 .lightbox {
@@ -252,7 +259,7 @@ footer { position: relative; background: var(--bg); }
   display: block; width: 100%; height: auto; max-height: calc(100vh - 110px); object-fit: contain;
   border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
 }
-@media (prefers-reduced-motion: reduce) { .lightbox[open] { animation: none; } .zoomable .shot-frame, .shot-zoom { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .lightbox[open] { animation: none; } .shot-zoom { transition: none; } }
 
 .shot-tag {
   position: absolute; right: 12px; bottom: 12px; z-index: 2;
@@ -261,19 +268,7 @@ footer { position: relative; background: var(--bg); }
   background: rgba(10, 14, 20, .72); color: #fff; backdrop-filter: blur(8px);
 }
 
-/* Hero shot: the other theme follows the pointer */
-.hero-shot .shot-over { opacity: 1; clip-path: inset(0 100% 0 0); transition: clip-path 360ms cubic-bezier(.23, 1, .32, 1); }
-.hero-shot.tracking .shot-over { transition: none; }
-.hero-shot.flipped .shot-over { clip-path: inset(0 0 0 0); }
-.hero-shot .seam {
-  position: absolute; top: 0; bottom: 0; width: 2px; z-index: 2; left: 0;
-  background: var(--accent); box-shadow: 0 0 0 1px rgba(255, 255, 255, .5), 0 0 18px var(--accent);
-  opacity: 0; transition: opacity 200ms ease; pointer-events: none;
-}
-.hero-shot.tracking .seam { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .shot-over, .hero-shot .shot-over { transition: none; }
-}
+@media (prefers-reduced-motion: reduce) { .shot-over { transition: none; } }
 
 /* Protocol strip */
 .protocols { padding-block: 48px 8px; }
@@ -367,7 +362,8 @@ section { scroll-margin-top: 76px; }
 }
 .demo-cover .inner p { color: var(--muted); font-size: 15px; }
 .demo-small { display: none; }
-@media (max-width: 760px) { #demo-start, .demo-cover .inner p:not(.demo-small) { display: none; } .demo-small { display: block; } }
+.demo-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+@media (max-width: 760px) { .demo-actions, .demo-cover .inner p:not(.demo-small) { display: none; } .demo-small { display: block; } }
 .demo-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .demo-note { font-size: 14px; color: var(--muted); }
 @media (max-width: 720px) { .demo-box { aspect-ratio: 4 / 5; } }
@@ -429,6 +425,11 @@ footer a { color: var(--muted); }
       <a href="#download">Download</a>
       <a href="https://github.com/Raccoon-Works/bitcrane" rel="noopener">GitHub</a>
     </nav>
+    <div class="langs themes" role="group" aria-label="Design">
+      <button type="button" data-theme-set="light" aria-label="Hell"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
+      <button type="button" data-theme-set="dark" aria-label="Dunkel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1Z"/></svg></button>
+      <button type="button" data-theme-set="auto" aria-label="Wie das System"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 2.4v11.2A5.6 5.6 0 0 0 8 2.4Z" fill="currentColor" stroke="none"/></svg></button>
+    </div>
     <div class="langs" role="group" aria-label="Sprache / Language">
       <button type="button" id="lang-de" data-lang="de">DE</button>
       <button type="button" id="lang-en" data-lang="en">EN</button>
@@ -485,11 +486,11 @@ footer a { color: var(--muted); }
         <span class="hint"><span class="dot" aria-hidden="true"></span><span class="de" id="hint-de">Maus über das Bild: das dunkle Design</span><span class="en" id="hint-en">Hover the picture: the dark design</span></span>
       </div>
 
-      <figure class="shot hero-shot" data-view="main">
+      <figure class="shot hero-shot zoomable" data-view="main">
         <div class="shot-frame">
           <img class="shot-base" alt="" width="2000" height="1231">
           <img class="shot-over" alt="" width="2000" height="1231">
-          <span class="seam" aria-hidden="true"></span>
+          <button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button>
         </div>
       </figure>
     </div>
@@ -647,7 +648,7 @@ footer a { color: var(--muted); }
           <div class="inner">
             <strong><span class="de">Demo im Browser</span><span class="en">Demo in the browser</span></strong>
             <p><span class="de">Etwa 1,5 MB. Am besten auf einem Computer, die App ist für große Bildschirme gemacht.</span><span class="en">About 1.5 MB. Best on a computer; the app is made for large screens.</span></p>
-            <button class="btn btn-primary" type="button" id="demo-start"><span class="de">Demo starten</span><span class="en">Start the demo</span></button>
+            <div class="demo-actions"><button class="btn btn-primary" type="button" id="demo-start"><span class="de">Demo starten</span><span class="en">Start the demo</span></button><a class="btn btn-ghost" id="demo-window" target="_blank" rel="noopener" href="demo/index.html?demo"><span class="de">Im neuen Fenster</span><span class="en">In a new window</span></a></div>
             <p class="demo-small"><span class="de">Die Demo ist für Computer gemacht. Schau gern am Mac oder PC vorbei.</span><span class="en">The demo is made for computers. Have a look on your Mac or PC.</span></p>
           </div>
         </div>
@@ -770,6 +771,15 @@ footer a { color: var(--muted); }
   };
 
   /* Language: remembered choice, then the browser language. */
+  /* Design: light, dark or as the system; a choice is remembered on this device. */
+  function applyTheme(t) {
+    if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+    document.querySelectorAll('[data-theme-set]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeSet === (t || 'auto'))); });
+  }
+  applyTheme(store.get('bc-site-theme') || 'auto');
+  document.querySelectorAll('[data-theme-set]').forEach(function (b) {
+    b.addEventListener('click', function () { store.set('bc-site-theme', b.dataset.themeSet); applyTheme(b.dataset.themeSet); });
+  });
   var lang = store.get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2) === 'de' ? 'de' : 'en');
   var ALT = {
     de: { main: 'Bitcrane-Hauptfenster: links der eigene Ordner, rechts der Server', watchsetup: 'Ordnerüberwachung einrichten', terminal: 'SSH-Terminal unter der Dateiansicht', editor: 'Eingebauter Editor', compare: 'Ordnervergleich', import: 'Server aus anderen Programmen übernehmen', light: 'Hell', dark: 'Dunkel' },
@@ -777,7 +787,7 @@ footer a { color: var(--muted); }
   };
   function setLang(l) {
     lang = l; root.dataset.lang = l; root.lang = l;
-    document.querySelectorAll('.langs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === l)); });
+    document.querySelectorAll('.langs:not(.themes) button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === l)); });
     render();
   }
 
@@ -803,15 +813,14 @@ footer a { color: var(--muted); }
       b.src = src(v, platform, base).replace('.webp', crop + '.webp'); o.src = src(v, platform, other).replace('.webp', crop + '.webp');
       b.alt = ALT[lang][v] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][base] + ')';
       o.alt = '';
-      if (tag) tag.textContent = ALT[lang][fig.classList.contains('flipped') || fig.matches(':hover') ? other : base];
     });
     document.querySelectorAll('[data-platform]').forEach(function (btn) {
       if (btn.closest('.demo-bar')) return;
       btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
     });
     var touch = window.matchMedia && matchMedia('(hover: none)').matches;
-    document.getElementById('hint-de').textContent = (touch ? 'Tippe auf das Bild, um das ' : 'Mit der Maus über das Bild fahren, um das ') + (other === 'dark' ? 'dunkle' : 'helle') + ' Design zu sehen';
-    document.getElementById('hint-en').textContent = (touch ? 'Tap the picture to see the ' : 'Move the mouse over the picture to see the ') + other + ' design';
+    document.getElementById('hint-de').textContent = (touch ? 'Tippe' : 'Klicke') + ' auf ein Bild für das ' + (other === 'dark' ? 'dunkle' : 'helle') + ' Design, die Lupe vergrößert';
+    document.getElementById('hint-en').textContent = (touch ? 'Tap' : 'Click') + ' a picture for the ' + other + ' design; the magnifier enlarges it';
     var poster = document.getElementById('demo-poster');
     poster.src = src('main', demoPf, demoTh);
     document.getElementById('dl-mac').classList.toggle('current', own === 'mac');
@@ -821,17 +830,16 @@ footer a { color: var(--muted); }
   document.querySelectorAll('.switch-row [data-platform]').forEach(function (btn) {
     btn.addEventListener('click', function () { platform = btn.dataset.platform; render(); });
   });
-  document.querySelectorAll('.langs button').forEach(function (btn) {
+  document.querySelectorAll('.langs:not(.themes) button').forEach(function (btn) {
     btn.addEventListener('click', function () { store.set('bc-site-lang', btn.dataset.lang); setLang(btn.dataset.lang); });
   });
 
-  /* Feature shots: hover crossfades to the other theme; a tap toggles it. */
-  document.querySelectorAll('.shot:not(.hero-shot)').forEach(function (fig) {
-    var tag = fig.querySelector('.shot-tag');
-    function label() { var base = pageTheme(); var on = fig.classList.contains('flipped') || fig.matches(':hover'); tag.textContent = ALT[lang][on ? (base === 'dark' ? 'light' : 'dark') : base]; }
-    fig.addEventListener('pointerenter', label);
-    fig.addEventListener('pointerleave', function () { setTimeout(label, 0); });
-    fig.querySelector('.shot-frame').addEventListener('click', function () { openLightbox(fig.dataset.view); });
+  /* Every shot: a click wipes in the other design; the magnifier opens the large view. */
+  document.querySelectorAll('.shot').forEach(function (fig) {
+    fig.querySelector('.shot-frame').addEventListener('click', function (e) {
+      if (e.target.closest('.shot-zoom')) { openLightbox(fig.dataset.view); return; }
+      fig.classList.toggle('flipped');
+    });
   });
 
   /* Large view: the whole window of a feature shot, with its own light/dark switch. */
@@ -851,26 +859,6 @@ footer a { color: var(--muted); }
   document.getElementById('lb-close').addEventListener('click', function () { lb.close(); });
   lb.addEventListener('click', function (e) { if (e.target === lb) lb.close(); });
 
-  /* Hero shot: the other theme is revealed up to the pointer, with a seam. */
-  var hero = document.querySelector('.hero-shot');
-  var frame = hero.querySelector('.shot-frame'), over = hero.querySelector('.shot-over'), seam = hero.querySelector('.seam');
-  frame.addEventListener('pointermove', function (e) {
-    if (e.pointerType !== 'mouse') return;
-    var r = frame.getBoundingClientRect();
-    var x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    hero.classList.add('tracking');
-    over.style.clipPath = 'inset(0 ' + ((1 - x) * 100).toFixed(2) + '% 0 0)';
-    seam.style.transform = 'translateX(' + (x * r.width - 1) + 'px)';
-  });
-  frame.addEventListener('pointerleave', function () {
-    hero.classList.remove('tracking');
-    over.style.clipPath = '';
-  });
-  frame.addEventListener('click', function (e) {
-    if (e.pointerType === 'mouse') return;
-    over.style.clipPath = '';
-    hero.classList.toggle('flipped');
-  });
 
   /* Demo: loaded only on request; platform and theme switch without a reload. */
   var demoPf = own, demoTh = pageTheme(), frameEl = null;
@@ -878,6 +866,7 @@ footer a { color: var(--muted); }
     document.querySelectorAll('.demo-bar [data-platform]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.platform === demoPf)); });
     document.querySelectorAll('.demo-bar [data-theme-choice]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeChoice === demoTh)); });
     document.getElementById('demo-poster').src = src('main', demoPf, demoTh);
+    document.getElementById('demo-window').href = 'demo/index.html?demo&platform=' + demoPf + '&theme=' + demoTh + '&lang=' + lang;
     if (frameEl && frameEl.contentWindow) frameEl.contentWindow.postMessage({ bitcraneDemo: true, platform: demoPf, theme: demoTh }, '*');
   }
   document.querySelectorAll('.demo-bar [data-platform]').forEach(function (b) { b.addEventListener('click', function () { demoPf = b.dataset.platform; markDemo(); }); });
@@ -970,7 +959,7 @@ footer a { color: var(--muted); }
   addEventListener('scroll', update, { passive: true });
   addEventListener('resize', function () { placeStops(); update(); });
   addEventListener('load', function () { measure(); placeStops(); update(); setTimeout(function () { measure(); update(); }, 3000); });
-  document.querySelectorAll('.langs button').forEach(function (b) { b.addEventListener('click', update); });
+  document.querySelectorAll('.langs:not(.themes) button').forEach(function (b) { b.addEventListener('click', update); });
 
   /* Data stream behind the hero: lanes run from the left (your folder) towards a point on the
      right (the server); small packets travel along them, and now and then a file lights up.
