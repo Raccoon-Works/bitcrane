@@ -215,6 +215,9 @@ footer { position: relative; background: var(--bg); }
   touch-action: pan-y;
 }
 .shot-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; -webkit-user-drag: none; }
+/* A quiet hint under each shot, as on Transmit: readable when you look, not loud. */
+.shot-cap { margin-top: 14px; text-align: center; font-size: 13px; color: var(--muted); opacity: .7; letter-spacing: .01em; }
+[data-crop] .shot-cap { margin-top: 18px; }
 /* The other design wipes in diagonally on click, and back on the next click. */
 .shot-frame { cursor: pointer; }
 .shot-over { clip-path: polygon(0% 0%, 0% 0%, -30% 101%, 0% 101%); transition: clip-path 750ms cubic-bezier(.65, 0, .35, 1); }
@@ -381,8 +384,16 @@ section { scroll-margin-top: 76px; }
 .dl-head h3 { font-size: 24px; }
 .dl-file { font: 400 13px var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .dl p { color: var(--muted); font-size: 15px; }
-.dl .first { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 10px; }
-.dl .first strong { font-size: 14px; color: var(--ink); font-weight: 600; }
+.dl .first { border-top: 1px solid var(--line); padding-top: 12px; }
+.dl .first summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; color: var(--muted); padding-block: 4px;
+}
+.dl .first summary::-webkit-details-marker { display: none; }
+.dl .first summary::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 160ms ease; margin-right: 2px; }
+.dl .first[open] summary::before { transform: rotate(45deg); }
+.dl .first summary:hover { color: var(--ink); }
+.dl .first .first-body { display: grid; gap: 10px; padding-top: 10px; }
 .copyline { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
 .copyline code {
   flex: 1; min-width: 0; font-size: 12.5px; background: var(--code-bg); color: var(--code-ink);
@@ -483,7 +494,6 @@ footer a { color: var(--muted); }
             Windows
           </button>
         </div>
-        <span class="hint"><span class="dot" aria-hidden="true"></span><span class="de" id="hint-de">Maus über das Bild: das dunkle Design</span><span class="en" id="hint-en">Hover the picture: the dark design</span></span>
       </div>
 
       <figure class="shot hero-shot zoomable" data-view="main">
@@ -492,6 +502,7 @@ footer a { color: var(--muted); }
           <img class="shot-over" alt="" width="2000" height="1231">
           <button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button>
         </div>
+      <figcaption class="shot-cap" aria-live="polite"></figcaption>
       </figure>
     </div>
   </section>
@@ -521,7 +532,7 @@ footer a { color: var(--muted); }
           </ul>
           <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
-        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 1440"><img class="shot-base" alt="" loading="lazy" width="1520" height="1440"><img class="shot-over" alt="" loading="lazy" width="1520" height="1440"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="watchsetup" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 1440"><img class="shot-base" alt="" loading="lazy" width="1520" height="1440"><img class="shot-over" alt="" loading="lazy" width="1520" height="1440"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -535,7 +546,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Tunnel für Datenbanken und Dienste</span><span class="en">Tunnels for databases and services</span></li>
           </ul>
         </div>
-        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 489"><img class="shot-base" alt="" loading="lazy" width="1600" height="489"><img class="shot-over" alt="" loading="lazy" width="1600" height="489"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="terminal" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 489"><img class="shot-base" alt="" loading="lazy" width="1600" height="489"><img class="shot-over" alt="" loading="lazy" width="1600" height="489"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -548,7 +559,7 @@ footer a { color: var(--muted); }
             <li><span class="de">Suchen und Ersetzen</span><span class="en">Find and replace</span></li>
           </ul>
         </div>
-        <figure class="shot zoomable" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 602"><img class="shot-base" alt="" loading="lazy" width="1600" height="602"><img class="shot-over" alt="" loading="lazy" width="1600" height="602"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 602"><img class="shot-base" alt="" loading="lazy" width="1600" height="602"><img class="shot-over" alt="" loading="lazy" width="1600" height="602"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -557,7 +568,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Sieh, was sich unterscheidet, bevor du etwas überschreibst.</span><span class="en">See what differs before you overwrite anything.</span></h2>
           <p><span class="de">Bitcrane vergleicht deinen Ordner mit dem Server und zeigt neue, geänderte und fehlende Dateien. Du entscheidest, in welche Richtung abgeglichen wird.</span><span class="en">Bitcrane compares your folder with the server and lists new, changed and missing files. You decide which way to bring them in line.</span></p>
         </div>
-        <figure class="shot zoomable" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 835"><img class="shot-base" alt="" loading="lazy" width="1600" height="835"><img class="shot-over" alt="" loading="lazy" width="1600" height="835"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 835"><img class="shot-base" alt="" loading="lazy" width="1600" height="835"><img class="shot-over" alt="" loading="lazy" width="1600" height="835"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -566,7 +577,7 @@ footer a { color: var(--muted); }
           <h2><span class="de">Deine Server bringst du einfach mit.</span><span class="en">Bring your servers along.</span></h2>
           <p><span class="de">Beim ersten Start findet Bitcrane gespeicherte Server aus FileZilla, WinSCP, Transmit und deiner SSH-Konfiguration und übernimmt sie auf Wunsch.</span><span class="en">On first start, Bitcrane finds servers saved in FileZilla, WinSCP, Transmit and your SSH config, and takes them over if you like.</span></p>
         </div>
-        <figure class="shot zoomable" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 992"><img class="shot-base" alt="" loading="lazy" width="1520" height="992"><img class="shot-over" alt="" loading="lazy" width="1520" height="992"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div></figure>
+        <figure class="shot zoomable" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 992"><img class="shot-base" alt="" loading="lazy" width="1520" height="992"><img class="shot-over" alt="" loading="lazy" width="1520" height="992"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
       </article>
     </div>
   </section>
@@ -672,11 +683,13 @@ footer a { color: var(--muted); }
           <p><span class="de">macOS 11 oder neuer, Apple Silicon und Intel in einer Datei.</span><span class="en">macOS 11 or later, Apple silicon and Intel in one file.</span></p>
           <div><a class="btn btn-primary" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a></div>
           <span class="dl-file" id="file-mac">Bitcrane-macOS.dmg · 33 MB</span>
-          <div class="first">
-            <strong><span class="de">Beim ersten Start</span><span class="en">On first start</span></strong>
+          <details class="first">
+            <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
+            <div class="first-body">
             <p><span class="de">Bitcrane ist noch nicht von Apple beglaubigt. Nach dem Verschieben in „Programme“ einmal im Terminal ausführen, sonst meldet macOS die App als beschädigt:</span><span class="en">Bitcrane is not notarized by Apple yet. After moving it to Applications, run this once in Terminal, otherwise macOS reports the app as damaged:</span></p>
             <div class="copyline"><code id="xattr">xattr -dr com.apple.quarantine /Applications/Bitcrane.app</code><button type="button" id="copy-xattr"><span class="de">Kopieren</span><span class="en">Copy</span></button></div>
-          </div>
+            </div>
+          </details>
         </div>
         <div class="dl" id="dl-win">
           <div class="dl-head">
@@ -686,10 +699,12 @@ footer a { color: var(--muted); }
           <p><span class="de">Windows 10 und 11, 64 Bit. Installation ohne Administratorrechte.</span><span class="en">Windows 10 and 11, 64-bit. Installs without administrator rights.</span></p>
           <div><a class="btn btn-primary" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a></div>
           <span class="dl-file" id="file-win">Bitcrane-Windows-Setup.exe · 11 MB</span>
-          <div class="first">
-            <strong><span class="de">Beim ersten Start</span><span class="en">On first start</span></strong>
+          <details class="first">
+            <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
+            <div class="first-body">
             <p><span class="de">Windows zeigt „Der Computer wurde durch Windows geschützt“. Auf „Weitere Informationen“ klicken, dann auf „Trotzdem ausführen“. Updates aus Bitcrane heraus brauchen diesen Schritt nicht.</span><span class="en">Windows shows “Windows protected your PC”. Click “More info”, then “Run anyway”. Updates installed from within Bitcrane skip this step.</span></p>
-          </div>
+            </div>
+          </details>
         </div>
       </div>
     </div>
@@ -804,6 +819,15 @@ footer a { color: var(--muted); }
   }
   function src(view, pf, th) { return 'img/' + view + '-' + pf + '-' + th + '-' + lang + '.webp'; }
 
+  function caption(fig) {
+    var cap = fig.querySelector('.shot-cap'); if (!cap) return;
+    var base = pageTheme(), shown = fig.classList.contains('flipped') ? (base === 'dark' ? 'light' : 'dark') : base;
+    var want = shown === 'dark' ? 'light' : 'dark';
+    var touch = window.matchMedia && matchMedia('(hover: none)').matches;
+    cap.textContent = lang === 'de'
+      ? (touch ? 'Tippen' : 'Klicken') + ' für das ' + (want === 'dark' ? 'dunkle' : 'helle') + ' Design'
+      : (touch ? 'Tap' : 'Click') + ' for ' + want + ' mode';
+  }
   function render() {
     var base = pageTheme(), other = base === 'dark' ? 'light' : 'dark';
     document.querySelectorAll('.shot').forEach(function (fig) {
@@ -813,14 +837,15 @@ footer a { color: var(--muted); }
       b.src = src(v, platform, base).replace('.webp', crop + '.webp'); o.src = src(v, platform, other).replace('.webp', crop + '.webp');
       b.alt = ALT[lang][v] + ' (' + (platform === 'mac' ? 'macOS' : 'Windows') + ', ' + ALT[lang][base] + ')';
       o.alt = '';
+      caption(fig);
     });
     document.querySelectorAll('[data-platform]').forEach(function (btn) {
       if (btn.closest('.demo-bar')) return;
       btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
     });
     var touch = window.matchMedia && matchMedia('(hover: none)').matches;
-    document.getElementById('hint-de').textContent = (touch ? 'Tippe' : 'Klicke') + ' auf ein Bild für das ' + (other === 'dark' ? 'dunkle' : 'helle') + ' Design, die Lupe vergrößert';
-    document.getElementById('hint-en').textContent = (touch ? 'Tap' : 'Click') + ' a picture for the ' + other + ' design; the magnifier enlarges it';
+    void 0; // = (touch ? 'Tippe' : 'Klicke') + ' auf ein Bild für das ' + (other === 'dark' ? 'dunkle' : 'helle') + ' Design, die Lupe vergrößert';
+    void 0; // = (touch ? 'Tap' : 'Click') + ' a picture for the ' + other + ' design; the magnifier enlarges it';
     var poster = document.getElementById('demo-poster');
     poster.src = src('main', demoPf, demoTh);
     document.getElementById('dl-mac').classList.toggle('current', own === 'mac');
@@ -839,6 +864,7 @@ footer a { color: var(--muted); }
     fig.querySelector('.shot-frame').addEventListener('click', function (e) {
       if (e.target.closest('.shot-zoom')) { openLightbox(fig.dataset.view); return; }
       fig.classList.toggle('flipped');
+      caption(fig);
     });
   });
 

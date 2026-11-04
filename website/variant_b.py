@@ -1,7 +1,7 @@
 """Variant B of the start page: a large "Bitcrane" wordmark as the head of the page.
 
-The logo stands for the B; the remaining letters resolve out of bits (0 and 1) when the
-page opens, then the rest of the head fades in. Built from index.html by build.py, so
+The logo stands for the B; the remaining letters resolve out of bits (0 and 1) each time
+the page opens, then the rest of the head fades in. Built from index.html by build.py, so
 both variants share everything else and can be compared side by side
 (index.html and index-b.html).
 """
@@ -10,13 +10,14 @@ CSS = """
 /* Variant B: wordmark head */
 .hero h1.wm-hero {
   display: inline-flex; align-items: flex-end; gap: .02em; margin: 6px 0 0;
-  font: 800 clamp(64px, 12.5vw, 164px)/.9 var(--font-display); letter-spacing: -0.045em; color: var(--ink);
+  font: 800 clamp(60px, 11vw, 148px)/.9 var(--font-display); letter-spacing: -0.045em; color: var(--ink);
 }
-.wm-hero .wm-logo { height: 1.04em; width: auto; margin: 0 -.04em -.07em -.06em; display: block; }
+.wm-hero .wm-logo { height: 1.04em; width: auto; margin: 0 -.13em -.07em -.06em; display: block; }
 .wm-hero .wm-word { display: inline-flex; white-space: nowrap; }
 .wm-hero .wm-l { display: inline-block; text-align: center; }
 .wm-hero .wm-l.thin { font-weight: 300; letter-spacing: -0.02em; }
-.wm-hero .wm-l.bits { color: var(--accent); }
+.wm-hero .wm-l.bits { color: var(--accent); display: inline-flex; justify-content: center; }
+.wm-hero .wm-l .b { font-style: normal; display: inline-block; }
 .wm-tag { font: 600 clamp(20px, 2.6vw, 30px)/1.2 var(--font-display); letter-spacing: -0.02em; margin-top: -4px; }
 .wm-tag em { font-style: normal; color: var(--accent); }
 
@@ -47,10 +48,9 @@ HEAD_NEW = (
 EARLY = """
 <script>
 (function () {
-  var root = document.documentElement, seen = false, still = false;
-  try { seen = sessionStorage.getItem('bc-intro') === '1'; } catch (e) { /* storage blocked */ }
+  var root = document.documentElement, still = false;
   try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* old browser */ }
-  if (!seen && !still) root.classList.add('intro');
+  if (!still) root.classList.add('intro');
 })();
 </script>
 """
@@ -65,8 +65,18 @@ INTRO = r"""
     /* Keep every letter as wide as its final glyph, so the word does not jump while bits change. */
     letters.forEach(function (l) { l.dataset.ch = l.textContent; l.style.width = l.getBoundingClientRect().width + 'px'; });
     if (!root.classList.contains('intro')) return;
-    try { sessionStorage.setItem('bc-intro', '1'); } catch (e) { /* storage blocked */ }
-    letters.forEach(function (l) { l.textContent = Math.random() < .5 ? '0' : '1'; l.classList.add('bits'); });
+    /* A digit is wider than i or t: squeeze the bits in narrow letters so they never overlap. */
+    function setBit(l) { l.innerHTML = '<i class="b" style="transform:scaleX(' + l.dataset.sx + ')">' + (Math.random() < .5 ? '0' : '1') + '</i>'; }
+    letters.forEach(function (l) {
+      var probe = l.cloneNode(false);
+      probe.style.cssText = 'position:absolute;visibility:hidden;width:auto';
+      probe.textContent = '0';
+      l.parentNode.appendChild(probe);
+      var dw = probe.getBoundingClientRect().width, w = parseFloat(l.style.width);
+      probe.remove();
+      l.dataset.sx = dw > w ? (w / dw).toFixed(3) : '1';
+      setBit(l); l.classList.add('bits');
+    });
     requestAnimationFrame(function () { root.classList.add('intro-run'); });
     var start = performance.now(), last = 0;
     function tick(now) {
@@ -74,7 +84,7 @@ INTRO = r"""
       letters.forEach(function (l, i) {
         var settle = 260 + i * 85;
         if (t >= settle) { if (l.classList.contains('bits')) { l.textContent = l.dataset.ch; l.classList.remove('bits'); } done++; }
-        else if (now - last > 45) { l.textContent = Math.random() < .5 ? '0' : '1'; }
+        else if (now - last > 45) { setBit(l); }
       });
       if (now - last > 45) last = now;
       if (done < letters.length) { requestAnimationFrame(tick); return; }
