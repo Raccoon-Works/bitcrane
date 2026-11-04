@@ -112,10 +112,18 @@ if (mb_strlen($message) < 10) {
 }
 $message = mb_substr($message, 0, MAX_MESSAGE);
 
-$subject = '[Bitcrane] Kontaktformular' . ($name !== '' ? ' – ' . $name : '');
+// Kind of message (chosen on the form) and, for bug reports, where it happened.
+$categories = ['question' => 'Frage', 'bug' => 'Fehler', 'idea' => 'Idee', 'other' => 'Sonstiges'];
+$category = $categories[(string)($_POST['category'] ?? '')] ?? 'Sonstiges';
+$version = oneLine((string)($_POST['version'] ?? ''), 40);
+$os = in_array($_POST['os'] ?? '', ['macOS', 'Windows'], true) ? (string)$_POST['os'] : '';
+
+$subject = '[Bitcrane] ' . $category . ($name !== '' ? ' – ' . $name : '');
 $body = "Nachricht über das Kontaktformular auf bitcrane.de. Mit „Antworten“ geht die Antwort an den Absender.\n\n"
+    . "Art: " . $category . "\n"
     . "Name: " . ($name !== '' ? $name : '-') . "\n"
     . "E-Mail: " . $email . "\n"
+    . ($category === 'Fehler' ? "Bitcrane-Version: " . ($version !== '' ? $version : '-') . "\nSystem: " . ($os !== '' ? $os : '-') . "\n" : '')
     . "Sprache der Seite: " . $lang . "\n"
     . "Gesendet: " . date('d.m.Y H:i') . "\n\n"
     . $message . "\n";
