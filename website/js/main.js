@@ -3,6 +3,7 @@
  * the header switches (design, language, platform) and starts the parts in order.
  */
 import { root, store, state, refresh, onRefresh } from './core.js';
+import { pressed } from './util.js';
 import { initShots } from './shots.js';
 import { initDemo } from './demo.js';
 import { initDownloads } from './downloads.js';
@@ -11,8 +12,6 @@ import { initProgress } from './progress.js';
 import { initStream } from './stream.js';
 import { initReveal } from './reveal.js';
 import { initIntro } from './intro.js';
-
-const pressed = (selector, isOn) => document.querySelectorAll(selector).forEach((b) => b.setAttribute('aria-pressed', String(isOn(b))));
 
 /* Design: light, dark or as the system; a choice is remembered on this device. */
 function setTheme(theme) {

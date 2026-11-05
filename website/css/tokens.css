@@ -1,0 +1,37 @@
+/*
+ * Colours and fonts shared by every page of bitcrane.de. Each page's own stylesheet adds the
+ * tokens only it needs. The dark values are written twice on purpose: once for "follow the
+ * system" (media query) and once for an explicit choice (data-theme on <html>), so a choice
+ * wins in both directions.
+ */
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --ink: #0f1722;
+  --muted: #566376;
+  --line: #dbe3ec;
+  --accent: #2a6dba;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3eefb;
+  /* The system fonts, as in the app: SF Pro on the Mac, Segoe UI on Windows. Nothing is downloaded. */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0e14; --surface: #121923; --ink: #e9eff6; --muted: #93a1b3; --line: #1f2a37;
+    --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0e14; --surface: #121923; --ink: #e9eff6; --muted: #93a1b3; --line: #1f2a37;
+  --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
+  color-scheme: dark;
+}
+
+/* Both languages are in each page; the root's data-lang (set before the first paint) shows one. */
+:root[data-lang="de"] .en, :root[data-lang="en"] .de { display: none !important; }
+[hidden] { display: none !important; }

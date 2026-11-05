@@ -1,8 +1,8 @@
 /*
  * Data stream behind the hero: lanes run from the left (your folder) towards a point on the
  * right (the server); small packets travel along them, and now and then a file lights up.
- * Calmer around the headline, stopped once the page has scrolled past, slower with reduced
- * motion. Scrolling pushes the stream: it speeds up, then calms down again.
+ * Calmer around the headline and stopped once the page has scrolled past; with reduced motion
+ * it is a still picture. Scrolling pushes the stream: it speeds up, then calms down again.
  */
 import { root, pageTheme, reducedMotion, onRefresh } from './core.js';
 
@@ -11,12 +11,9 @@ export function initStream() {
   const canvas = document.createElement('canvas');
   host.appendChild(canvas);
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const speed = reducedMotion() ? 0.3 : 1;
   const color = {};
   let W = 0, H = 0, lanes = [], packets = [];
-  let laneAlpha = 0.11, dotAlpha = 0.6;
+  let laneAlpha, dotAlpha;
   let boost = 0, lastY = scrollY, last = 0, frameId = 0;
 
   /* Fixed seed: the same picture on every visit. */
@@ -82,7 +79,7 @@ export function initStream() {
       ctx.stroke();
     });
     packets.forEach((p, i) => {
-      p.x += p.v * dt * speed * (1 + boost);
+      p.x += p.v * dt * (1 + boost);
       if (p.x > W + 40) { packets[i] = spawn(false); return; }
       const x0 = Math.max(0, p.x - p.len), y0 = laneY(p.lane, x0), y1 = laneY(p.lane, p.x);
       const arrive = Math.min(1, (W - p.x) / (W * 0.18));   /* packets fade out as they reach the server */
@@ -104,7 +101,7 @@ export function initStream() {
   }
 
   /* Runs only while the stream can be seen. */
-  const visible = () => !document.hidden && scrollY < innerHeight * 1.1;
+  const visible = () => !reducedMotion() && !document.hidden && scrollY < innerHeight * 1.1;
   function frame(ms) {
     const dt = last ? Math.min(0.05, (ms - last) / 1000) : 0;
     last = ms;
@@ -120,7 +117,13 @@ export function initStream() {
   setup();
   draw(0);
   wake();
-  addEventListener('resize', () => { setup(); draw(0); });
+  /* Phones fire resize when their toolbar collapses; the picture only starts over when the
+     stream's own size changes. */
+  addEventListener('resize', () => {
+    if (host.clientWidth === W && host.clientHeight === H) return;
+    setup();
+    draw(0);
+  });
   addEventListener('scroll', () => {
     boost = Math.min(8, boost + Math.abs(scrollY - lastY) * 0.06);
     lastY = scrollY;

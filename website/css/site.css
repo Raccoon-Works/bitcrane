@@ -2,7 +2,7 @@
  * bitcrane.de — start page styles.
  *
  * Contents
- *   1. Design tokens (light, dark by system preference, dark by choice)
+ *   1. Design tokens of the start page
  *   2. Base
  *   3. Page scaffolding (data stream background, sheet, sections)
  *   4. Header
@@ -23,22 +23,15 @@
  *  19. Touch screens
  *  20. Reduced motion
  *
- * Every colour and shadow comes from a token in section 1. The dark values are written twice
- * on purpose: once for "follow the system" (media query) and once for an explicit choice
- * (data-theme), so the switch in the header wins in both directions.
+ * The shared colours and fonts are in tokens.css (loaded first); section 1 adds the start
+ * page's own, in the same three blocks (light, dark by system preference, dark by choice).
+ * Colours outside the tokens are deliberate: the lightbox and the buttons on a shot sit on a
+ * dark veil in both designs, the terminal line on its own dark background.
  */
 
 /* 1. Design tokens ------------------------------------------------------------------------ */
 
 :root {
-  --bg: #f4f7fb;
-  --surface: #ffffff;
-  --ink: #0f1722;
-  --muted: #566376;
-  --line: #dbe3ec;
-  --accent: #2a6dba;
-  --accent-ink: #ffffff;
-  --accent-soft: #e3eefb;
   --code-bg: #0f1722;
   --code-ink: #dbe7f5;
   --ok: #2f8a4f;
@@ -51,22 +44,18 @@
   --plate-shadow: 0 30px 80px -30px rgba(23, 52, 92, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
   --clip-shadow: 0 18px 40px -8px rgba(16, 32, 56, .28), 0 1px 3px rgba(16, 32, 56, .14), 0 0 0 1px rgba(16, 32, 56, .06);
   --crop-shadow: drop-shadow(0 18px 36px rgba(16, 32, 56, .22)) drop-shadow(0 1px 2px rgba(16, 32, 56, .12));
+  /* Selected segment of a choice. */
+  --chip-shadow: 0 1px 2px rgba(15, 23, 34, .12);
   /* Data stream behind the hero, as "r,g,b" for the canvas: lanes, packets, files. */
   --stream-lane: 42,109,186;
   --stream-dot: 52,98,158;
   --stream-file: 42,109,186;
-  /* The system fonts, as in the app: SF Pro on the Mac, Segoe UI on Windows. Nothing is downloaded. */
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   --radius: 14px;
   --ease-out: cubic-bezier(.23, 1, .32, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a0e14; --surface: #121923; --ink: #e9eff6; --muted: #93a1b3; --line: #1f2a37;
-    --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
     --code-bg: #05080d; --code-ink: #cfe0f2;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
     --lift: 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .4), 0 16px 32px -8px rgba(0, 0, 0, .55), 0 50px 100px -20px rgba(0, 0, 0, .75), 0 0 120px -40px rgba(111, 184, 255, .25);
@@ -74,14 +63,12 @@
     --plate-shadow: 0 40px 100px -30px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .06);
     --clip-shadow: 0 24px 50px -10px rgba(0, 0, 0, .75), 0 0 0 1px rgba(255, 255, 255, .07);
     --crop-shadow: drop-shadow(0 22px 44px rgba(0, 0, 0, .6));
+    --chip-shadow: 0 1px 2px rgba(0, 0, 0, .4);
     --stream-lane: 111,184,255; --stream-dot: 140,170,205; --stream-file: 111,184,255;
-    color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0a0e14; --surface: #121923; --ink: #e9eff6; --muted: #93a1b3; --line: #1f2a37;
-  --accent: #6fb8ff; --accent-ink: #06121f; --accent-soft: #13243a;
   --code-bg: #05080d; --code-ink: #cfe0f2;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 60px -20px rgba(0, 0, 0, .7);
   --lift: 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .4), 0 16px 32px -8px rgba(0, 0, 0, .55), 0 50px 100px -20px rgba(0, 0, 0, .75), 0 0 120px -40px rgba(111, 184, 255, .25);
@@ -89,8 +76,8 @@
   --plate-shadow: 0 40px 100px -30px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .06);
   --clip-shadow: 0 24px 50px -10px rgba(0, 0, 0, .75), 0 0 0 1px rgba(255, 255, 255, .07);
   --crop-shadow: drop-shadow(0 22px 44px rgba(0, 0, 0, .6));
+  --chip-shadow: 0 1px 2px rgba(0, 0, 0, .4);
   --stream-lane: 111,184,255; --stream-dot: 140,170,205; --stream-file: 111,184,255;
-  color-scheme: dark;
 }
 
 /* 2. Base --------------------------------------------------------------------------------- */
@@ -104,9 +91,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 img { max-width: 100%; }
-[hidden] { display: none !important; }
-/* Both languages are in the page; the root's data-lang shows one of them. */
-:root[data-lang="de"] .en, :root[data-lang="en"] .de { display: none !important; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -264,11 +248,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   color: var(--ink); background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
   box-shadow: var(--shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  opacity: 0; transform: translateY(8px) scale(.96); pointer-events: none;
-  transition: opacity 200ms ease, transform 240ms var(--ease-out), border-color 160ms ease, color 160ms ease;
+  opacity: 0; visibility: hidden; transform: translateY(8px) scale(.96);
+  transition: opacity 200ms ease, visibility 0s 200ms, transform 240ms var(--ease-out), border-color 160ms ease, color 160ms ease;
 }
 .totop svg { width: 18px; height: 18px; }
-.totop.show { opacity: 1; transform: none; pointer-events: auto; }
+.totop.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 .totop:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); text-decoration: none; }
 .totop:active { transform: scale(.94); }
 @media (min-width: 1280px) {
@@ -305,7 +289,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .wm-logo { height: 1.09em; width: auto; margin: 0 -.185em 0 -.18em; display: block; position: relative; top: .09em; }
 .wm-word { display: inline-flex; white-space: nowrap; }
 .wm-l { display: inline-block; text-align: center; }
-.wm-l .g { display: inline-block; will-change: transform; }
+.wm-l .g { display: inline-block; }
 .wm-l.thin { font-weight: 300; letter-spacing: -0.02em; }
 /* While the intro runs, letters show as bits (0 and 1) in the accent colour. */
 .wm-l.bits { color: var(--accent); }
@@ -321,26 +305,24 @@ html.intro-rest .reveal { opacity: 1; transform: none; transition: opacity 500ms
 /* 8. Product shots ------------------------------------------------------------------------ */
 
 .shot { margin: 0; position: relative; }
-.shot-frame {
-  position: relative; aspect-ratio: var(--ar, 1300 / 800); max-width: 100%;
-  border-radius: var(--radius); overflow: hidden; background: var(--surface);
-  box-shadow: var(--lift); border: 0; cursor: pointer; touch-action: pan-y;
+/* Every shot is a cut-out (a window, dialog or panel on a transparent background) or a clip:
+   no frame of its own, a soft shadow instead. */
+.shot-frame { position: relative; aspect-ratio: var(--ar, 1300 / 800); max-width: 100%; cursor: pointer; touch-action: pan-y; }
+.shot-frame img {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none;
+  object-fit: contain; filter: var(--crop-shadow);
 }
-.shot-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; -webkit-user-drag: none; }
 /* The other design wipes in diagonally on click, and back on the next click. */
 .shot-over { clip-path: polygon(0% 0%, 0% 0%, -30% 101%, 0% 101%); transition: clip-path 750ms cubic-bezier(.65, 0, .35, 1); }
 .shot.flipped .shot-over { clip-path: polygon(0% 0%, 130% 0%, 100% 101%, 0% 101%); }
-/* A quiet hint under each shot, readable when you look, not loud. */
+/* A quiet hint under each shot that also switches the design (for keyboards and screen readers). */
 .shot-cap { margin-top: 14px; text-align: center; font-size: 13px; color: var(--muted); opacity: .7; letter-spacing: .01em; }
-
-/* Cut-out shots (a dialog or panel on a transparent background) and clips: no frame of their
-   own, a soft shadow instead. */
-[data-crop] .shot-frame, [data-clip] .shot-frame { background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
-[data-crop] .shot-frame img { object-fit: contain; filter: var(--crop-shadow); }
 [data-crop] .shot-cap { margin-top: 18px; }
+.shot-switch { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.shot-switch:hover { color: var(--ink); }
 
 /* Hero: the cut-out app window floats on a glass plate, the data stream blurred behind it. */
-.hero-shot[data-crop] .shot-frame {
+.hero-shot .shot-frame {
   --pad: clamp(12px, 2.6vw, 34px);
   aspect-ratio: auto; padding: var(--pad); border-radius: clamp(18px, 2.4vw, 30px);
   background: var(--plate-bg);
@@ -603,7 +585,7 @@ html.intro-rest .reveal { opacity: 1; transform: none; transition: opacity 500ms
 .cats label { position: relative; cursor: pointer; }
 .cats input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .cats label > span { display: grid; place-items: center; height: 38px; border-radius: 9px; font: 600 14px var(--font-body); color: var(--muted); transition: background-color 150ms ease, color 150ms ease; }
-.cats input:checked + span { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 23, 34, .12), 0 0 0 1px var(--line); }
+.cats input:checked + span { background: var(--surface); color: var(--ink); box-shadow: var(--chip-shadow), 0 0 0 1px var(--line); }
 .cats input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
 .bug-extra { display: grid; gap: 14px; }
 .bug-hint { padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; color: var(--ink); }

@@ -10,10 +10,14 @@ const BASE = `https://github.com/${REPO}/releases/latest/download/`;
 export function initDownloads() {
   document.getElementById('link-mac').href = BASE + FILES.mac;
   document.getElementById('link-win').href = BASE + FILES.win;
-  document.getElementById('cta-main').href = BASE + FILES[ownPlatform];
-  const label = document.getElementById('cta-label');
-  label.querySelector('.de').textContent = ownPlatform === 'win' ? 'Für Windows laden' : 'Für macOS laden';
-  label.querySelector('.en').textContent = ownPlatform === 'win' ? 'Download for Windows' : 'Download for macOS';
+  /* On a phone or an unknown system the main button leads to the two cards instead. */
+  if (ownPlatform) {
+    const name = ownPlatform === 'win' ? 'Windows' : 'macOS';
+    const label = document.getElementById('cta-label');
+    document.getElementById('cta-main').href = BASE + FILES[ownPlatform];
+    label.querySelector('.de').textContent = `Für ${name} laden`;
+    label.querySelector('.en').textContent = `Download for ${name}`;
+  }
   document.getElementById('dl-mac').classList.toggle('current', ownPlatform === 'mac');
   document.getElementById('dl-win').classList.toggle('current', ownPlatform === 'win');
 
