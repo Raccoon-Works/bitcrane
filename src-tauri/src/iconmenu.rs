@@ -116,11 +116,14 @@ mod platform {
         list.SetAppID(app_id)?;
         let mut slots = 0u32;
         let _removed: IObjectArray = list.BeginList(&mut slots)?;
-        let servers = collection(&exe, content.servers.iter().take(slots as usize))?;
-        if !content.servers.is_empty() {
-            list.AppendCategory(&HSTRING::from(content.servers_title.as_str()), &servers)?;
-        }
-        list.AddUserTasks(&collection(&exe, content.tasks.iter())?)?;
+        let servers = content.servers.iter().take(slots as usize);
+        // Windows refuses custom categories (E_ACCESSDENIED) while "Zuletzt geöffnete Elemente in
+        // Start, Sprunglisten und Datei-Explorer anzeigen" is off; tasks still show, so the servers
+        // go there instead.
+        let in_category = content.servers.is_empty()
+            || list.AppendCategory(&HSTRING::from(content.servers_title.as_str()), &collection(&exe, servers.clone())?).is_ok();
+        let tasks = content.tasks.iter().chain(servers.filter(|_| !in_category));
+        list.AddUserTasks(&collection(&exe, tasks)?)?;
         list.CommitList()
     }
 
