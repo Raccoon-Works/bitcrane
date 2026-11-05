@@ -2027,6 +2027,7 @@ body.is-resizing-h, body.is-resizing-h * { cursor: row-resize !important; }
 .panes { gap: 0; }
 .panes > .pane:first-child { flex: var(--split, 0.5) 1 0; }
 .panes > .pane:last-child { flex: calc(1 - var(--split, 0.5)) 1 0; }
+.panes.is-single > .pane { flex: 1 1 0; }
 .split-handle { margin: 0 0; }
 .sources-handle { margin-left: -4px; margin-right: -4px; }
 .server-sources { flex-shrink: 0; }

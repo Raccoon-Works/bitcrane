@@ -421,7 +421,7 @@ pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec
 const THUMB_MAX_BYTES: u64 = 40 * 1024 * 1024;
 
 /// Image type of a file name for the preview pictures, or None.
-fn image_mime(name: &str) -> Option<&'static str> {
+pub(crate) fn image_mime(name: &str) -> Option<&'static str> {
     let ext = name.rsplit('.').next()?.to_ascii_lowercase();
     Some(match ext.as_str() {
         "png" => "image/png",

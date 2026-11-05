@@ -496,7 +496,7 @@ export function Pane({ side }: { side: PaneSide }) {
       return (
         <div key={entry.name} {...props} className={`${rowClass(entry, index).replace('row', 'tile')}`}>
           <span className="tile-icon">
-            {dirLike ? <FolderGlyph size={ICON_PX[iconStep]} /> : entry.kind === 'dir' ? <PackageGlyph size={ICON_PX[iconStep]} path={paths.join(path, entry.name)} name={label} /> : <Thumb side={ls} path={paths.join(path, entry.name)} name={label} size={ICON_PX[iconStep]} />}
+            {dirLike ? <FolderGlyph size={ICON_PX[iconStep]} /> : entry.kind === 'dir' ? <PackageGlyph size={ICON_PX[iconStep]} path={paths.join(path, entry.name)} name={label} /> : <Thumb side={ls} serverId={sid} path={paths.join(path, entry.name)} name={label} bytes={entry.size} mtime={entry.mtime} size={ICON_PX[iconStep]} />}
             {ext && <span className="tile-ext" aria-hidden="true">{ext}</span>}
             {link}
           </span>

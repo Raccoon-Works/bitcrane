@@ -97,7 +97,7 @@ fn build_menu(app: &AppHandle, items: &[TrayItem]) -> tauri::Result<Menu<Wry>> {
 
 /// Menu actions. "open" is handled here; everything else goes to the interface
 /// as a `tray-action` event, after bringing the window up when it needs it.
-fn on_menu(app: &AppHandle, id: &str) {
+pub(crate) fn on_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_main_window(app),
         "quit" => {

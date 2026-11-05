@@ -212,6 +212,8 @@ export interface Backend {
   localZip(paths: string[]): Promise<string>;
   /** Paths Bitcrane was started with from the Explorer menu (only once). */
   takePendingUploads(): Promise<string[]>;
+  /** The jump list entry (Windows) Bitcrane was started from: an action id of the status menu. */
+  takeStartAction(): Promise<string | null>;
   /** Extracts entries of archives into a new temporary folder; returns [folder, names]. */
   archiveExtractTemp(paths: string[]): Promise<[string, string[]]>;
   /** Shared settings file in a sync folder (null when there is none yet). */

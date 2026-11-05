@@ -2365,5 +2365,11 @@
   "Name, z. B. Webshop · Live": "Nome, ad es. Webshop · Live",
   "z. B. Kunden": "ad es. Clienti",
   "z. B. Webshop": "ad es. Webshop",
-  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminale (anteprima)"
+  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminale (anteprima)",
+  "Vorschaubilder für Bilder auf dem Server": "Anteprime delle immagini sul server",
+  "In der Symbolansicht wird dafür jedes Bild bis 10 MB vom Server geladen. Bei langsamen Verbindungen oder vielen Fotos dauert das.": "Nella vista a icone ogni immagine fino a 10 MB viene letta dal server. Con connessioni lente o molte foto richiede tempo.",
+  "Nur eine Hälfte ein/aus": "Solo una metà sì/no",
+  "Zur anderen Hälfte wechseln": "Passa all’altra metà",
+  "Nur eine Hälfte": "Solo una metà",
+  "Zeigt nur die aktive Hälfte. Die andere bleibt Ziel beim Übertragen und lässt sich jederzeit einblenden.": "Mostra solo la metà attiva. L’altra resta la destinazione dei trasferimenti e si può mostrare in qualsiasi momento."
 }

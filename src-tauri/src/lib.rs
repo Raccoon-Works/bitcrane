@@ -41,6 +41,8 @@ mod sshconfig;
 mod sysicons;
 mod tray;
 mod terminal;
+mod thumbs;
+mod iconmenu;
 mod forward;
 mod transfer;
 mod vault;
@@ -453,6 +455,16 @@ fn mount_folder(state: State<'_, AppState>, server_id: String) -> Option<String>
 #[tauri::command]
 fn cli_path() -> String {
     std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()
+}
+
+/// The jump list entry Bitcrane was started from (Windows), once.
+#[tauri::command]
+fn take_start_action() -> Option<String> {
+    static TAKEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if TAKEN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return None;
+    }
+    iconmenu::action_arg(&std::env::args().collect::<Vec<_>>())
 }
 
 #[tauri::command]
@@ -1541,6 +1553,7 @@ async fn remote_preview(state: State<'_, AppState>, server_id: String, path: Str
 /// Shows or hides the status icon and sets its tooltip and menu.
 #[tauri::command]
 fn tray_update(app: tauri::AppHandle, visible: bool, tooltip: String, items: Vec<tray::TrayItem>) -> AppResult<()> {
+    iconmenu::update(&app, &items);
     tray::update(&app, visible, &tooltip, &items).map_err(|e| AppError::other("Das Symbol in der Menüleiste konnte nicht gesetzt werden.").with_detail(e.to_string()))
 }
 
@@ -1852,6 +1865,9 @@ pub fn run() {
             if !paths.is_empty() {
                 let _ = app.emit("upload-files", paths);
             }
+            if let Some(action) = iconmenu::action_arg(&args) {
+                tray::on_menu(app, &action);
+            }
         }));
     }
     builder
@@ -1899,20 +1915,19 @@ pub fn run() {
             let range = request.headers().get("range").and_then(|r| r.to_str().ok()).map(String::from);
             std::thread::spawn(move || responder.respond(local::media_response(&path, range.as_deref())));
         })
-        // Preview pictures of local images in the icons view (images only, see local::thumb).
+        // Preview pictures in the icons view: local images, and images on a server when that is
+        // turned on (see thumbs).
         .register_asynchronous_uri_scheme_protocol("thumb", |_ctx, request, responder| {
             let path = request.uri().path().to_string();
-            std::thread::spawn(move || {
-                let response = match local::thumb(&path) {
-                    Some((mime, bytes)) => tauri::http::Response::builder()
-                        .header("Content-Type", mime)
-                        .header("Cache-Control", "max-age=60")
-                        .body(bytes),
-                    None => tauri::http::Response::builder().status(404).body(Vec::new()),
-                };
-                if let Ok(r) = response {
-                    responder.respond(r);
-                }
+            std::thread::spawn(move || responder.respond(thumbs::response(local::thumb(&path))));
+        })
+        .register_asynchronous_uri_scheme_protocol("rthumb", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            let path = request.uri().path().to_string();
+            let query = request.uri().query().unwrap_or_default().to_string();
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                responder.respond(thumbs::response(thumbs::remote(&state, &path, &query).await));
             });
         })
         // Started at login: "--autostart" lets Bitcrane stay in the notification area if the user wants that.
@@ -1926,6 +1941,7 @@ pub fn run() {
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-preview"));
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-drag"));
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("bitcrane-archive"));
+            let _ = std::fs::remove_dir_all(std::env::temp_dir().join(thumbs::CACHE_DIR));
             let dir = app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane"));
             app.manage(AppState::new(dir));
             // The window is created invisible (tauri.conf.json). A normal start shows it at once;
@@ -1992,6 +2008,7 @@ pub fn run() {
             local_zip,
             archive_extract_temp,
             take_pending_uploads,
+            take_start_action,
             cli_path,
             mount_start,
             mount_stop,

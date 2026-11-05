@@ -367,6 +367,7 @@ export async function startShell() {
     }
   }
 
+  // Clicks in the status menu, the Dock menu and the jump list (see iconmenu.rs).
   await listen<string>('tray-action', (e) => onTrayAction(e.payload));
 
   // "Mit Bitcrane hochladen" from the Explorer: paths of a second start, and the ones Bitcrane was started with.
@@ -375,6 +376,8 @@ export async function startShell() {
   void whenLoaded().then(async () => {
     const first = await backend.takePendingUploads().catch(() => [] as string[]);
     if (first.length) receiveUploadPaths(first);
+    const startAction = await backend.takeStartAction().catch(() => null);
+    if (startAction) onTrayAction(startAction);
     // The context-menu entry follows the setting.
     let shellOn: boolean | undefined;
     const syncShell = () => {
