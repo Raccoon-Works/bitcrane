@@ -6,6 +6,8 @@
 //!
 //! - Windows starts Bitcrane again with `--tray-action <id>` for a jump list entry; the single
 //!   instance handler (or `take_start_action` at a first start) hands the id to the interface.
+//!   The taskbar shows a jump list only for the app ID of its button: the installer's shortcuts
+//!   carry the bundle identifier as app ID, so the process and the list use it too.
 //! - On the Mac the Dock asks the app delegate for `applicationDockMenu:`; Tauri's delegate gets
 //!   that method and one for the clicks (`bitcraneDockItem:`) added at the first update.
 
@@ -72,6 +74,9 @@ pub fn action_arg(args: &[String]) -> Option<String> {
 }
 
 #[cfg(windows)]
+pub use platform::set_app_id;
+
+#[cfg(windows)]
 mod platform {
     use super::{Content, ACTION_FLAG};
     use tauri::AppHandle;
@@ -84,19 +89,31 @@ mod platform {
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
     use windows::Win32::UI::Shell::{DestinationList, EnumerableObjectCollection, ICustomDestinationList, IShellLinkW, SHStrDupW, ShellLink};
 
-    pub fn apply(_app: &AppHandle, content: Content) {
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+
+    /// Gives the process the app ID of the installer's shortcuts, also when it was started
+    /// directly (at login, from the command line), so its taskbar button and jump list match.
+    pub fn set_app_id(identifier: &str) {
+        if let Err(e) = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(identifier)) } {
+            log::warn!("app user model id: {e}");
+        }
+    }
+
+    pub fn apply(app: &AppHandle, content: Content) {
+        let app_id = HSTRING::from(app.config().identifier.as_str());
         // COM wants a thread of its own; the list is written in a few milliseconds.
         std::thread::spawn(move || {
-            if let Err(e) = unsafe { write(&content) } {
+            if let Err(e) = unsafe { write(&app_id, &content) } {
                 log::warn!("jump list: {e}");
             }
         });
     }
 
-    unsafe fn write(content: &Content) -> windows::core::Result<()> {
+    unsafe fn write(app_id: &HSTRING, content: &Content) -> windows::core::Result<()> {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         let exe = HSTRING::from(std::env::current_exe().unwrap_or_default().as_os_str());
         let list: ICustomDestinationList = CoCreateInstance(&DestinationList, None, CLSCTX_INPROC_SERVER)?;
+        list.SetAppID(app_id)?;
         let mut slots = 0u32;
         let _removed: IObjectArray = list.BeginList(&mut slots)?;
         let servers = collection(&exe, content.servers.iter().take(slots as usize))?;

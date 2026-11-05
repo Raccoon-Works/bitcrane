@@ -1854,6 +1854,10 @@ fn app_info(app: tauri::AppHandle, state: State<'_, AppState>) -> AppInfo {
 /// Entry point used by `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Before any window exists, so the taskbar button gets the app ID of the shortcuts (see iconmenu).
+    #[cfg(windows)]
+    iconmenu::set_app_id(&context.config().identifier);
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
@@ -2095,7 +2099,7 @@ pub fn run() {
             log_path,
             app_info,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building Bitcrane")
         .run(|app, event| {
             // macOS: clicking the Dock icon brings a hidden window back.
