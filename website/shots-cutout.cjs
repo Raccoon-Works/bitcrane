@@ -7,10 +7,8 @@ const ev = (p, code) => p.evaluate(`(async () => { const m = await import('/src/
 const V = [
   ['main', '.window', async (p) => { await p.locator('section[data-side="local"] .row[data-name="app.py"]').first().click(); await p.waitForTimeout(300); }],
   ['import', '.dialog', async (p) => { await p.evaluate(async () => { const m = await import('/src/state/store.ts'); m.showFirstRun(); }); await p.waitForTimeout(900); }],
-  ['terminal', '.term-panel', async (p) => { await p.evaluate(async () => { const t = await import('/src/state/terminal.ts'); t.toggleTerminal('server'); }); await p.waitForTimeout(1200); }],
   ['editor', '.code-editor', async (p) => { await ev(p, `m.openInEditor('local','app.py')`); await p.waitForTimeout(800); }],
   ['compare', '.dialog', async (p) => { await ev(p, `m.openDialog({ type: 'compare' })`); await p.waitForTimeout(700); }],
-  ['watchsetup', '.dialog', async (p) => { await ev(p, `m.openDialog({ type: 'watchSetup' })`); await p.waitForTimeout(300); }],
 ];
 (async () => {
   const b = await chromium.launch();

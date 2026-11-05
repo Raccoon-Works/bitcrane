@@ -1,21 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Nicht gefunden · Bitcrane</title>
+<title data-en="Not found · Bitcrane">Nicht gefunden · Bitcrane</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="/img/icon-64.png">
-<link rel="stylesheet" href="/legal.css?v=1">
-<script>
-(function () {
-  var r = document.documentElement;
-  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  var t = get('bc-site-theme'); if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t);
-  var l = get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en');
-  r.lang = l === 'en' ? 'en' : 'de';
-})();
-</script>
+<link rel="stylesheet" href="/css/legal.css">
+<script src="/js/prefs.js"></script>
+<script type="module" src="/js/legal.js"></script>
 </head>
 <body>
 <header class="top">

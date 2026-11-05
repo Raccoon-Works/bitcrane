@@ -1,13 +1,24 @@
 """Builds the deployable website into website/dist.
 
-The start page is written as page content (as the preview needs it); here it gets
-its full HTML document around it. The other files are copied as they are, and the
-browser demo comes from the single-file build of the prototype (npm run build:single).
+    python3 website/build.py https://dev.bitcrane.de 0.3
+
+First argument: the address the site is published at (link previews need absolute URLs; a
+"dev." address keeps search engines out). Second: the version shown on the page (major.minor),
+else the latest GitHub release.
+
+The pages work as they are in website/; the build only
+  - fills in the address, the version and the owner's private data (private.json, never in the
+    public repository),
+  - inlines js/prefs.js (it must run before the first paint),
+  - stamps css/ and js/ with one content hash, so browsers keep them long but never stale,
+  - writes robots.txt (and sitemap.xml for the real site),
+  - adds the browser demo from the prototype's single-file build (npm run build:single).
 """
-import pathlib
-import re
+import hashlib
 import html
 import json
+import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -15,111 +26,116 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent
 DIST = ROOT / 'dist'
 DEMO = ROOT.parent / 'dist-single' / 'index.html'
-# Address the site is published at (link previews need absolute URLs): python3 build.py https://dev.bitcrane.de
+PAGES = ['index.html', 'demo.html', 'impressum.html', 'datenschutz.html', '404.html', 'kontakt.php']
+COPY = ['.htaccess', 'css', 'js', 'img', 'vid']
+
 SITE = (sys.argv[1] if len(sys.argv) > 1 else 'https://bitcrane.de').rstrip('/')
-# Version shown on the page (major.minor). Second argument, else the latest GitHub release.
 VERSION = sys.argv[2] if len(sys.argv) > 2 else None
+TEST = '://dev.' in SITE
 
 
 def latest_version():
+    """major.minor of the latest GitHub release, or None when it cannot be asked."""
     try:
         tag = subprocess.run(['gh', 'api', 'repos/Raccoon-Works/bitcrane/releases/latest', '-q', '.tag_name'],
                              capture_output=True, text=True, timeout=30).stdout.strip()
     except (OSError, subprocess.SubprocessError):
-        tag = ''
+        return None
     m = re.match(r'v?(\d+)\.(\d+)', tag)
     return f'{m.group(1)}.{m.group(2)}' if m else None
 
-HEAD = """<!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta property="og:title" content="Bitcrane">
-<meta property="og:description" content="SFTP, FTP, WebDAV, SMB, S3 und Cloud für macOS und Windows, mit Ordnerüberwachung, SSH-Terminal und Editor.">
-<meta property="og:image" content="{site}/img/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:url" content="{site}/">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="apple-touch-icon" href="img/icon-180.png">
-<style>
-:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
-body { margin: 0; }
-img { max-width: 100%; }
-[hidden] { display: none !important; }
-</style>
-"""
+
+def asset_hash():
+    """One hash over all styles and scripts: any change gives every file a new address."""
+    h = hashlib.sha256()
+    for f in sorted([*(ROOT / 'css').glob('*.css'), *(ROOT / 'js').glob('*.js')]):
+        h.update(f.name.encode() + f.read_bytes())
+    return h.hexdigest()[:10]
 
 
-def main():
-    if DIST.exists():
-        shutil.rmtree(DIST)
-    DIST.mkdir()
-    page = (ROOT / 'index.html').read_text(encoding='utf-8')
-    version = VERSION or latest_version()
-    if version:
-        page = re.sub(r'<span data-version>[^<]*</span>', f'<span data-version>{version}</span>', page)
-    print('version', version or '(as written in the page)')
-    # The <title>, metas and <style> at the top of a page belong in the head; the rest is the body.
-    def write(name, text):
-        split = text.index('</style>') + len('</style>')
-        head_part, body_part = text[:split], text[split:]
-        head_part = head_part.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')
-        (DIST / name).write_text(HEAD.replace('{site}', SITE) + head_part + '\n</head>\n<body>\n' + body_part.lstrip() + '\n</body>\n</html>\n', encoding='utf-8')
+def fill_private(text, private):
+    """Legal pages: the owner's name and address replace the marked placeholders; once all are
+    known, the note about missing data goes too."""
+    def fill(m):
+        value = (private.get(m.group(1)) or '').strip()
+        return html.escape(value) if value else m.group(0)
+    text = re.sub(r'<mark data-private="(\w+)">[^<]*</mark>', fill, text)
+    if all(private.get(k) for k in ('name', 'street', 'city')):
+        text = re.sub(r'\s*<p class="note">.*?</p>', '', text, count=1, flags=re.S)
+    return text
 
-    # Start page: variant B (large wordmark head, see variant_b.py). The earlier head stays
-    # reachable as index-a.html for comparison.
-    sys.path.insert(0, str(ROOT))
-    import variant_b
-    write('index.html', variant_b.make(page))
-    write('index-a.html', page)
-    for name in ['legal.css', '.htaccess', '404.html', 'kontakt.php', 'demo.html']:
-        shutil.copy2(ROOT / name, DIST / name)
-    # Legal pages: the owner's name and address come from private.json, which exists only in the
-    # local folder and never in the public repository. Missing values stay marked placeholders.
-    private = json.loads((ROOT / 'private.json').read_text(encoding='utf-8')) if (ROOT / 'private.json').exists() else {}
-    for name in ['impressum.html', 'datenschutz.html']:
-        text = (ROOT / name).read_text(encoding='utf-8')
-        def fill(m):
-            value = (private.get(m.group(1)) or '').strip()
-            return html.escape(value) if value else m.group(0)
-        text = re.sub(r'<mark data-private="(\w+)">[^<]*</mark>', fill, text)
-        if private.get('name') and private.get('street') and private.get('city'):
-            text = re.sub(r'\s*<p class="note">.*?</p>', '', text, count=1, flags=re.S)
-        (DIST / name).write_text(text, encoding='utf-8')
-    # Private addresses of the contact form: only in the local folder, never in the repository.
-    if (ROOT / 'kontakt.config.php').exists():
-        shutil.copy2(ROOT / 'kontakt.config.php', DIST / 'kontakt.config.php')
-    # The test site stays out of search engines; the real one invites them in.
-    test = '://dev.' in SITE
-    (DIST / 'robots.txt').write_text('User-agent: *\nDisallow: /\n' if test else f'User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n', encoding='utf-8')
-    if not test:
-        pages = ['', 'impressum.html', 'datenschutz.html']
-        (DIST / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-                                          + ''.join(f'  <url><loc>{SITE}/{p}</loc></url>\n' for p in pages) + '</urlset>\n', encoding='utf-8')
-    else:
-        for name in ['index.html', 'index-a.html']:
-            f = DIST / name
-            f.write_text(f.read_text(encoding='utf-8').replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex">', 1), encoding='utf-8')
-    shutil.copytree(ROOT / 'img', DIST / 'img')
-    shutil.copytree(ROOT / 'vid', DIST / 'vid')
-    (DIST / 'demo').mkdir()
-    # The demo opened in its own window needs a way to the legal pages (two clicks at most);
-    # inside the start page (iframe) the page's own footer covers it.
-    demo = DEMO.read_text(encoding='utf-8')
+
+def demo_app():
+    """The browser demo for the site. The prototype names Inter from Google Fonts only as a
+    fallback behind the system fonts; on the site that request would send every visitor's
+    address to Google, so it goes. The demo opened in its own window also needs a way to the
+    legal pages; inside the start page and demo.html (iframes) the page around it has them."""
     legal = (
         '<div id="bc-legal" hidden style="position:fixed;left:50%;bottom:3px;transform:translateX(-50%);z-index:9999;'
         'font:500 11px -apple-system,BlinkMacSystemFont,\'Segoe UI\',system-ui,sans-serif;letter-spacing:.01em;opacity:.7">'
         '<a href="../impressum.html" style="color:inherit">Impressum</a> &middot; <a href="../datenschutz.html" style="color:inherit">Datenschutz</a></div>'
         '<script>(function(){if(window.top!==window)return;var d=document.getElementById("bc-legal");'
         'var dark=/theme=dark/.test(location.search)||(!/theme=light/.test(location.search)&&matchMedia("(prefers-color-scheme: dark)").matches);'
-        'd.style.color=dark?"#c9d4e1":"#4a5668";var en=/lang=en/.test(location.search);'
-        'if(en){d.children[0].textContent="Legal notice";d.children[1].textContent="Privacy";}d.hidden=false;})();</script>\n'
+        'd.style.color=dark?"#c9d4e1":"#4a5668";if(/lang=en/.test(location.search)){d.children[0].textContent="Legal notice";'
+        'd.children[1].textContent="Privacy";}d.hidden=false;})();</script>\n'
     )
-    (DIST / 'demo' / 'index.html').write_text(demo.replace('</body>', legal + '</body>', 1), encoding='utf-8')
-    print('built', sum(1 for _ in DIST.rglob('*') if _.is_file()), 'files in', DIST)
+    app = DEMO.read_text(encoding='utf-8')
+    app = re.sub(r'[ \t]*<link[^>]*fonts\.(?:googleapis|gstatic)\.com[^>]*>\n?', '', app)
+    assert 'fonts.g' not in app, 'Google Fonts still referenced in the demo'
+    return app.replace('</body>', legal + '</body>', 1)
+
+
+def main():
+    if DIST.exists():
+        shutil.rmtree(DIST)
+    DIST.mkdir()
+    for name in COPY:
+        src = ROOT / name
+        (shutil.copytree if src.is_dir() else shutil.copy2)(src, DIST / name)
+
+    version = VERSION or latest_version()
+    stamp = asset_hash()
+    prefs = '<script>\n' + (ROOT / 'js' / 'prefs.js').read_text(encoding='utf-8').strip() + '\n</script>'
+    private_file = ROOT / 'private.json'
+    private = json.loads(private_file.read_text(encoding='utf-8')) if private_file.exists() else {}
+
+    for name in PAGES:
+        text = (ROOT / name).read_text(encoding='utf-8')
+        text = text.replace('{{SITE}}', SITE)
+        if version:
+            text = re.sub(r'<span data-version>[^<]*</span>', f'<span data-version>{version}</span>', text)
+        text = re.sub(r'<script src="/?js/prefs\.js"></script>', lambda m: prefs, text)
+        text = re.sub(r'((?:href|src)="/?(?:css|js)/[\w-]+\.(?:css|js))"', rf'\1?v={stamp}"', text)
+        if name in ('impressum.html', 'datenschutz.html'):
+            text = fill_private(text, private)
+        if TEST and name in ('index.html', 'demo.html'):
+            text = text.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex">', 1)
+        (DIST / name).write_text(text, encoding='utf-8')
+
+    # Modules import each other: the same stamp, so each file has exactly one address.
+    (DIST / 'js' / 'prefs.js').unlink()
+    for f in (DIST / 'js').glob('*.js'):
+        f.write_text(re.sub(r"(from '\./[\w-]+\.js)'", rf"\1?v={stamp}'", f.read_text(encoding='utf-8')), encoding='utf-8')
+
+    # Mail addresses of the contact form: only in the local folder, never in the repository.
+    if (ROOT / 'kontakt.config.php').exists():
+        shutil.copy2(ROOT / 'kontakt.config.php', DIST / 'kontakt.config.php')
+
+    # The test site stays out of search engines; the real one invites them in.
+    if TEST:
+        (DIST / 'robots.txt').write_text('User-agent: *\nDisallow: /\n', encoding='utf-8')
+    else:
+        (DIST / 'robots.txt').write_text(f'User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n', encoding='utf-8')
+        urls = ''.join(f'  <url><loc>{SITE}/{p}</loc></url>\n' for p in ['', 'impressum.html', 'datenschutz.html'])
+        (DIST / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
+                                          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                          + urls + '</urlset>\n', encoding='utf-8')
+
+    (DIST / 'demo').mkdir()
+    (DIST / 'demo' / 'index.html').write_text(demo_app(), encoding='utf-8')
+
+    print('version', version or '(as written in the page)', '· assets', stamp)
+    print('built', sum(1 for f in DIST.rglob('*') if f.is_file()), 'files in', DIST)
 
 
 if __name__ == '__main__':
