@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bitcrane Demo</title>
+<meta name="description" content="Bitcrane im Browser ausprobieren: mit ausgedachten Servern und Dateien, ohne Installation.">
+<link rel="icon" type="image/png" href="img/icon-64.png">
+<style>
+/* Stand-alone demo window: a thin bar with the switches, the app below it. */
+:root {
+  --bg: #eef2f7; --bar: #ffffff; --ink: #0f1722; --muted: #566376; --line: #dbe3ec; --accent: #2a6dba; --accent-soft: #e3eefb;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #05080c; --bar: #0d131b; --ink: #e9eff6; --muted: #93a1b3; --line: #1f2a37; --accent: #6fb8ff; --accent-soft: #13243a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font: 400 14px var(--font); -webkit-font-smoothing: antialiased; }
+.bar {
+  flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  min-height: 52px; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
+  background: var(--bar); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 9px; color: var(--ink); text-decoration: none; font: 700 17px var(--font); }
+.brand img { width: 24px; height: 24px; }
+.brand .crane { font-weight: 300; }
+.brand .tag { font: 600 11px var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 999px; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line); border-radius: 9px; }
+.seg button {
+  border: 0; background: transparent; color: var(--muted); font: 600 13px var(--font); height: 28px; padding: 0 11px; border-radius: 6px; cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.seg button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switches { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.links { display: flex; gap: 14px; align-items: center; font-size: 13px; }
+.links a { color: var(--muted); }
+.links a:hover { color: var(--ink); }
+.links .back { color: var(--ink); font-weight: 600; text-decoration: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; }
+.links .back:hover { border-color: var(--accent); }
+.stage { flex: 1; position: relative; min-height: 0; }
+.stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.small { display: none; flex: 1; place-items: center; padding: 32px 20px; text-align: center; color: var(--muted); }
+.small strong { color: var(--ink); display: block; font-size: 18px; margin-bottom: 8px; }
+.small button { margin-top: 16px; font: 600 15px var(--font); color: #fff; background: var(--accent); border: 0; border-radius: 10px; height: 42px; padding: 0 18px; cursor: pointer; }
+/* The app is made for large screens: on phones a note first, the demo only on request. */
+@media (max-width: 760px) {
+  body:not(.force) .stage { display: none; }
+  body:not(.force) .small { display: grid; }
+  .switches { margin-left: 0; }
+  .links .legal { display: none; }
+}
+html[lang="en"] .de, html[lang="de"] .en { display: none !important; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="index.html"><img src="img/icon-64.png" alt=""><span><span>Bit</span><span class="crane">crane</span></span><span class="tag">Demo</span></a>
+  <div class="switches">
+    <div class="seg" role="group" aria-label="System"><button type="button" data-pf="mac">macOS</button><button type="button" data-pf="win">Windows</button></div>
+    <div class="seg" role="group" aria-label="Design"><button type="button" data-th="light"><span class="de">Hell</span><span class="en">Light</span></button><button type="button" data-th="dark"><span class="de">Dunkel</span><span class="en">Dark</span></button></div>
+    <div class="seg" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></div>
+  </div>
+  <nav class="links" aria-label="Seite">
+    <a class="legal" href="impressum.html"><span class="de">Impressum</span><span class="en">Legal notice</span></a>
+    <a class="legal" href="datenschutz.html"><span class="de">Datenschutz</span><span class="en">Privacy</span></a>
+    <a class="back" href="index.html"><span class="de">Zur Seite</span><span class="en">Back to site</span></a>
+  </nav>
+</header>
+<main class="stage" id="stage"></main>
+<div class="small"><div><strong><span class="de">Für große Bildschirme gemacht</span><span class="en">Made for large screens</span></strong><span class="de">Bitcrane ist eine App für Mac und PC. Auf dem Handy wird die Demo sehr eng.</span><span class="en">Bitcrane is an app for Mac and PC. On a phone the demo gets very cramped.</span><br><button type="button" id="force"><span class="de">Trotzdem öffnen</span><span class="en">Open anyway</span></button></div></div>
+<script>
+/* State comes from the address (set by the start page), falls back to the stored site choices,
+   and is written back to the address, so a reload or a shared link keeps it. */
+(function () {
+  var q = new URLSearchParams(location.search), root = document.documentElement;
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var st = {
+    pf: q.get('platform') === 'win' || q.get('platform') === 'mac' ? q.get('platform') : (/Win/i.test(navigator.userAgent) ? 'win' : 'mac'),
+    th: q.get('theme') === 'dark' || q.get('theme') === 'light' ? q.get('theme') : (get('bc-site-theme') === 'dark' || (get('bc-site-theme') !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'),
+    lang: q.get('lang') === 'en' || q.get('lang') === 'de' ? q.get('lang') : ((get('bc-site-lang') || (navigator.language || 'de').slice(0, 2)) === 'de' ? 'de' : 'en')
+  };
+  var frame = null, frameLang = null;
+  function appUrl() { return 'demo/index.html?demo&platform=' + st.pf + '&theme=' + st.th + '&lang=' + st.lang; }
+  function apply() {
+    root.lang = st.lang; root.setAttribute('data-theme', st.th);
+    document.title = st.lang === 'de' ? 'Bitcrane Demo' : 'Bitcrane demo';
+    document.querySelectorAll('[data-pf]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.pf === st.pf)); });
+    document.querySelectorAll('[data-th]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.th === st.th)); });
+    document.querySelectorAll('[data-lang]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === st.lang)); });
+    history.replaceState(null, '', '?platform=' + st.pf + '&theme=' + st.th + '&lang=' + st.lang);
+    if (!frame) return;
+    /* Platform and design switch live; the language needs the app to start again. */
+    if (frameLang !== st.lang) { frame.src = appUrl(); frameLang = st.lang; }
+    else if (frame.contentWindow) frame.contentWindow.postMessage({ bitcraneDemo: true, platform: st.pf, theme: st.th }, '*');
+  }
+  function start() {
+    if (frame) return;
+    frame = document.createElement('iframe');
+    frame.title = 'Bitcrane Demo';
+    frame.src = appUrl(); frameLang = st.lang;
+    document.getElementById('stage').appendChild(frame);
+  }
+  document.querySelectorAll('[data-pf]').forEach(function (b) { b.addEventListener('click', function () { st.pf = b.dataset.pf; apply(); }); });
+  document.querySelectorAll('[data-th]').forEach(function (b) { b.addEventListener('click', function () { st.th = b.dataset.th; apply(); }); });
+  document.querySelectorAll('[data-lang]').forEach(function (b) { b.addEventListener('click', function () { st.lang = b.dataset.lang; apply(); }); });
+  document.getElementById('force').addEventListener('click', function () { document.body.classList.add('force'); start(); });
+  apply();
+  if (matchMedia('(min-width: 761px)').matches) start();
+})();
+</script>
+</body>
+</html>

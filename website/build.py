@@ -75,7 +75,7 @@ def main():
     import variant_b
     write('index.html', variant_b.make(page))
     write('index-a.html', page)
-    for name in ['legal.css', '.htaccess', '404.html', 'kontakt.php']:
+    for name in ['legal.css', '.htaccess', '404.html', 'kontakt.php', 'demo.html']:
         shutil.copy2(ROOT / name, DIST / name)
     # Legal pages: the owner's name and address come from private.json, which exists only in the
     # local folder and never in the public repository. Missing values stay marked placeholders.
