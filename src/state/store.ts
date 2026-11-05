@@ -140,6 +140,8 @@ export interface Settings {
   parallel: number;
   /** The two halves on top of each other instead of side by side. */
   stackHalves?: boolean;
+  /** Only the active half is shown (narrow windows, work on one side); the other stays the target of transfers. */
+  singleHalf?: boolean;
   /** Sidebar with favourites, recent folders, devices, shares and tags (on unless switched off). */
   sidebar?: boolean;
   /** Keys: Explorer / Finder style, or the F keys of WinSCP and Total Commander (F5 copy, F6 move …). */
@@ -287,6 +289,8 @@ export interface Settings {
   iconSize?: Partial<Record<PaneSide, number>>;
   /** File symbols of the system (Explorer/Finder) instead of Bitcrane's own. */
   systemIcons?: boolean;
+  /** Preview pictures for images on servers in the icons view (each one is read from the server). */
+  remoteThumbs?: boolean;
   /** Optional columns of the file lists. */
   columns: { mtime: boolean; size: boolean; kind?: boolean; owner?: boolean };
   /** "detail" also logs every single step (listings, transfers, prompts). */
@@ -1910,6 +1914,16 @@ export function openWatchFolders(watchId: string) {
 
 export function setFocusSide(side: PaneSide) {
   if (state.focusSide !== side) setState({ focusSide: side });
+}
+
+/** Makes the other half the active one; with "Nur eine Hälfte" that also shows it. */
+export function focusOtherHalf() {
+  setFocusSide(state.focusSide === 'local' ? 'remote' : 'local');
+}
+
+/** "Nur eine Hälfte": shows only the active half, or both again. */
+export function toggleSingleHalf() {
+  updateSettings({ singleHalf: !state.settings.singleHalf });
 }
 
 /** Mouse click on a row with optional modifier keys. */

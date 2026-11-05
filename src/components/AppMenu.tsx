@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   computeFolderSizes, newFolderWithSelection, selectedNames, setSearchContent, showToast, pasteMove, goLocal, openInOtherHalf, revealSelection, openTerminal,
   activeTab, askDelete, stepZoom, closeTab, copySelection, cutSelection, editPath, getState, pasteClipboard, setDeepSearch, toggleSyncBrowse, selectAll, copyPath, download, goBack, goForward, goUp, newFile, newFolder, undoLast, updateSettings, newTab, openDialog, pauseAllTransfers, pauseAllWatches,
-  addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList,
+  addBookmark, exportConfig, importConfig, refresh, runWatchCommand, setState, toggleActivity, togglePermsColumn, toggleSwapSides, toggleHidden, toggleInspector, togglePopover, upload, useStore, setViewMode, setPaneServerList, toggleSingleHalf, focusOtherHalf,
 } from '../state/store';
 import { closeWindow, minimizeWindow, quitApp, toggleMaximizeWindow } from '../util/appWindow';
 import { formatTime } from '../util/format';
@@ -106,6 +106,8 @@ export function menuDefs(): MenuDef[] {
         { label: $t('Editor ein/aus'), ...sc('codeEditor'), run: () => void import('../state/editor').then((m) => m.toggleEditor()) },
         { label: $t('Seitenleiste ein/aus'), ...sc('sidebar'), run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
         { label: $t('Hälften untereinander ein/aus'), run: () => updateSettings({ stackHalves: !getState().settings.stackHalves }) },
+        { label: $t('Nur eine Hälfte ein/aus'), ...sc('singleHalf'), run: toggleSingleHalf },
+        { label: $t('Zur anderen Hälfte wechseln'), ...sc('otherHalf'), run: focusOtherHalf },
         { label: $t('Synchron blättern'), ...sc('syncBrowse'), run: toggleSyncBrowse },
         { label: $t('Verzeichnisse vergleichen'), ...sc('compareDirs'), run: toggleCompareDirs },
         { label: $t('Suche in Unterordnern'), ...sc('deepSearch'), run: () => setDeepSearch(!getState().deepSearchOn) },

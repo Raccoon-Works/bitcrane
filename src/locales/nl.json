@@ -2365,5 +2365,11 @@
   "Name, z. B. Webshop · Live": "Naam, bijv. Webshop · Live",
   "z. B. Kunden": "bijv. Klanten",
   "z. B. Webshop": "bijv. Webshop",
-  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminal (voorbeeld)"
+  "Bitcrane – Terminal (Vorschau)": "Bitcrane – Terminal (voorbeeld)",
+  "Vorschaubilder für Bilder auf dem Server": "Voorbeelden van afbeeldingen op de server",
+  "In der Symbolansicht wird dafür jedes Bild bis 10 MB vom Server geladen. Bei langsamen Verbindungen oder vielen Fotos dauert das.": "In de pictogramweergave wordt daarvoor elke afbeelding tot 10 MB van de server gelezen. Bij trage verbindingen of veel foto’s duurt dat even.",
+  "Nur eine Hälfte ein/aus": "Eén helft aan/uit",
+  "Zur anderen Hälfte wechseln": "Naar de andere helft",
+  "Nur eine Hälfte": "Eén helft",
+  "Zeigt nur die aktive Hälfte. Die andere bleibt Ziel beim Übertragen und lässt sich jederzeit einblenden.": "Toont alleen de actieve helft. De andere blijft het doel van overdrachten en kan altijd weer worden getoond."
 }

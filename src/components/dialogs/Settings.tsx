@@ -796,6 +796,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             </Row>
             <ZoomPicker value={currentZoom()} standard={defaultZoom()} />
             <Row label={$t('Dateisymbole des Systems')} note={mac ? $t('Statt der farbigen Bitcrane-Symbole die Symbole von macOS zeigen.') : $t('Statt der farbigen Bitcrane-Symbole die Symbole von Windows zeigen.')}><Switch checked={!!s.systemIcons} onChange={(v) => updateSettings({ systemIcons: v })} label={$t('Dateisymbole des Systems')} /></Row>
+            <Row label={$t('Vorschaubilder für Bilder auf dem Server')} note={$t('In der Symbolansicht wird dafür jedes Bild bis 10 MB vom Server geladen. Bei langsamen Verbindungen oder vielen Fotos dauert das.')}><Switch checked={!!s.remoteThumbs} onChange={(v) => updateSettings({ remoteThumbs: v })} label={$t('Vorschaubilder für Bilder auf dem Server')} /></Row>
             <Row label={$t('Versteckte Dateien zeigen')}><Switch checked={s.showHidden} onChange={(v) => updateSettings({ showHidden: v })} label={$t('Versteckte Dateien zeigen')} /></Row>
             {/* Windows only: protected system items (hidden + system attribute); the Mac has no such files in the home folder. */}
             {!mac && <Row label={$t('Geschützte Systemdateien zeigen')} note={$t('Wie im Explorer standardmäßig aus, z. B. „Anwendungsdaten“ oder „Eigene Dateien“ im Benutzerordner.')}><Switch checked={!!s.showSystem} onChange={(v) => updateSettings({ showSystem: v })} label={$t('Geschützte Systemdateien zeigen')} /></Row>}
@@ -812,6 +813,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
             </Row>
             <Row label={$t('Seitenleiste')} note={$t('Favoriten, zuletzt verwendete Ordner, Geräte, Freigaben und Tags links im Fenster. Aus: die Orte-Leisten über den Hälften.')}><Switch checked={s.sidebar !== false} onChange={(v) => updateSettings({ sidebar: v })} label={$t('Seitenleiste')} /></Row>
             <Row label={$t('Hälften untereinander')} note={$t('Für schmale Fenster: die beiden Hälften übereinander statt nebeneinander.')}><Switch checked={!!s.stackHalves} onChange={(v) => updateSettings({ stackHalves: v })} label={$t('Hälften untereinander')} /></Row>
+            <Row label={$t('Nur eine Hälfte')} note={$t('Zeigt nur die aktive Hälfte. Die andere bleibt Ziel beim Übertragen und lässt sich jederzeit einblenden.')}><Switch checked={!!s.singleHalf} onChange={(v) => updateSettings({ singleHalf: v })} label={$t('Nur eine Hälfte')} /></Row>
             <Row label={$t('Git-Status in Ordnern dieses Computers')} note={$t('Zeigt in Git-Projekten geänderte Dateien und den Zweig mit Commit, Pull und Push. Braucht ein installiertes Git.')}><Switch checked={s.gitStatus !== false} onChange={(v) => updateSettings({ gitStatus: v })} label={$t('Git-Status')} /></Row>
             <Row label={$t('Bewegung')} note={$t('Folgt der Systemeinstellung „Bewegung reduzieren“.')}><span className="small muted"><Eye size={13} strokeWidth={1.5} aria-hidden="true" /> {$t('automatisch')}</span></Row>
           </Group>

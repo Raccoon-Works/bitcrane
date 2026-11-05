@@ -89,6 +89,8 @@ winreg = "0.56.0"
 cloud-filter = "0.0.6"
 # System file symbols (sysicons.rs).
 windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_Foundation", "Win32_UI_Controls", "Win32_System_Com", "Win32_System_Console"] }
+# Jump list of the taskbar icon (iconmenu.rs): COM interfaces, which windows-sys does not have.
+windows = { version = "0.62", features = ["Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_Storage_EnhancedStorage"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Finder tags (tags.rs).
@@ -97,7 +99,7 @@ xattr = "1"
 # System file symbols (sysicons.rs).
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSDictionary", "NSGeometry"] }
-objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics"] }
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics", "NSApplication", "NSResponder", "NSMenu", "NSMenuItem"] }
 objc2-core-graphics = { version = "0.3", features = ["CGImage"] }
 
 # Two small fixes to the SMB client (details in vendor/BITCRANE.md):

@@ -10,7 +10,7 @@
 import type { Platform } from '../backend/types';
 import {
   activeTab, addBookmark, closeTab, copyPath, copySelection, cutSelection, copyToOtherHalf, moveToOtherSide, toggleAtCursor, askDelete, openInEditor, panePath, pasteMove, goLocal, openInOtherHalf, download, editPath, getState, updateSettings, goBack, goForward, LIVE, newFile, selectedNames, undoLast, newFolder, newTab, openDialog,
-  computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode,
+  computeFolderSizes, newFolderWithSelection, pasteClipboard, pauseAllWatches, refresh, stepZoom, setDeepSearch, setSearchContent, toggleActivity, toggleHidden, toggleInspector, togglePopover, toggleSyncBrowse, upload, useStore, setViewMode, toggleSingleHalf, focusOtherHalf,
 } from './store';
 import { $t, LANG } from '../i18n';
 import { join as joinPath } from '../util/paths';
@@ -46,6 +46,9 @@ export const ACTIONS: ShortcutAction[] = [
   { id: 'viewIcons', group: $t('Darstellung'), label: $t('Als Symbole'), mac: ['Mod+2'], win: ['Mod+Shift+2'], run: () => setViewMode(focus(), 'icons') },
   { id: 'viewColumns', group: $t('Darstellung'), label: $t('Als Spalten'), mac: ['Mod+3'], win: ['Mod+Shift+3'], run: () => setViewMode(focus(), 'columns') },
   { id: 'codeEditor', group: $t('Darstellung'), label: $t('Editor ein/aus'), mac: ['Mod+Shift+E'], win: ['Mod+Shift+E'], run: () => void import('./editor').then((m) => m.toggleEditor()) },
+  // Windows: Ctrl+Alt+2 would be AltGr+2 (²) on German keyboards; F6 moves between the areas of an Explorer window.
+  { id: 'singleHalf', group: $t('Darstellung'), label: $t('Nur eine Hälfte ein/aus'), mac: ['Mod+Alt+1'], win: ['Mod+Alt+1'], run: toggleSingleHalf },
+  { id: 'otherHalf', group: $t('Darstellung'), label: $t('Zur anderen Hälfte wechseln'), mac: ['Mod+Alt+2'], win: ['F6'], run: focusOtherHalf },
   { id: 'sidebar', group: $t('Darstellung'), label: $t('Seitenleiste ein/aus'), mac: ['Mod+Ctrl+S'], win: ['Mod+B'], run: () => updateSettings({ sidebar: getState().settings.sidebar === false }) },
   { id: 'syncBrowse', group: $t('Darstellung'), label: $t('Synchron blättern ein/aus'), mac: [], win: [], run: toggleSyncBrowse },
   { id: 'compareDirs', group: $t('Darstellung'), label: $t('Verzeichnisse vergleichen ein/aus'), mac: ['Mod+Alt+Shift+V'], win: ['Mod+Alt+V'], run: () => void import('./tools').then((m) => m.toggleCompareDirs()) },
@@ -121,6 +124,8 @@ export const FIXED: Array<{ label: string; mac: string; win: string }> = [
  */
 const COMMANDER: Record<string, string[]> = {
   previewSel: ['F3'], editSel: ['F4'], copyToOther: ['F5'], moveToOther: ['F6'], newFolder: ['F7', 'Mod+Shift+N'], deleteSel: ['F8'], propsSel: ['F9'],
+  // F6 is "move" here, so switching halves has no key of its own.
+  otherHalf: [],
   refresh: ['Mod+R'], toggleSel: ['Insert'], selectAdd: ['NumpadAdd'], selectRemove: ['NumpadSubtract'], invertSelection: ['NumpadMultiply', 'Mod+Shift+I'],
 };
 
