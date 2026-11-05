@@ -190,6 +190,25 @@ footer { position: relative; background: var(--bg); }
   transform-origin: left; will-change: transform, opacity; opacity: 0; /* swings out towards the screen edge, away from the names */
 }
 @media (max-width: 1279px) { .upload { display: none; } }
+/* Back to the top: appears once the head of the page is left. On wide screens it closes the
+   upload column at its lower end, elsewhere it sits in the corner. */
+.totop {
+  position: fixed; z-index: 9; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--ink); background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
+  box-shadow: var(--shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  opacity: 0; transform: translateY(8px) scale(.96); pointer-events: none;
+  transition: opacity 200ms ease, transform 240ms cubic-bezier(.23, 1, .32, 1), border-color 160ms ease, color 160ms ease;
+}
+.totop svg { width: 18px; height: 18px; }
+.totop.show { opacity: 1; transform: none; pointer-events: auto; }
+.totop:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); text-decoration: none; }
+.totop:active { transform: scale(.94); }
+@media (min-width: 1280px) {
+  .totop { width: 34px; height: 34px; right: calc(max(18px, env(safe-area-inset-right, 0px)) - 12px); bottom: 8px; }
+  .totop svg { width: 15px; height: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { .totop { transition: opacity 120ms ease; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .upload li a::before, .upload li a span { transition: none; } }
 .hero-text { max-width: 760px; margin: 0 auto; text-align: center; display: grid; gap: 22px; justify-items: center; }
 .eyebrow {
@@ -407,27 +426,35 @@ section { scroll-margin-top: 76px; }
   .fact:nth-child(even) { padding-left: 0; border-left: 0; }
 }
 
-/* Demo */
-.demo { padding-block: 104px 24px; }
+/* Demo: a slim band with a preview; the demo itself opens in its own window or, on request, here. */
+.demo { padding-block: 88px 16px; }
+.demo-band {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: center;
+  padding: clamp(22px, 3.4vw, 40px); border-radius: 22px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.demo-copy { display: grid; gap: 16px; align-content: start; }
+.demo-copy h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.08; }
+.demo-copy p { margin: 0; color: var(--muted); }
+.demo-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.demo-note { font-size: 14px; }
+.demo-small { display: none; }
+.demo-thumb { position: relative; display: block; border-radius: 14px; overflow: hidden; aspect-ratio: 2000 / 1231; border: 1px solid var(--line); background: var(--bg); }
+.demo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 400ms cubic-bezier(.23, 1, .32, 1); }
+.demo-thumb:hover img { transform: scale(1.02); }
+.demo-thumb .play {
+  position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff; background: rgba(10, 14, 20, .6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: transform 160ms ease-out, background-color 160ms ease;
+}
+.demo-thumb .play svg { width: 26px; height: 26px; margin-left: 3px; }
+.demo-thumb:hover .play { transform: scale(1.06); background: rgba(10, 14, 20, .78); }
 .demo-box {
-  position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: var(--radius);
+  position: relative; margin-top: 20px; aspect-ratio: 16 / 10; max-width: 100%; border-radius: var(--radius);
   overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--surface);
 }
 .demo-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.demo-cover { position: absolute; inset: 0; display: grid; place-items: center; }
-.demo-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(3px) saturate(.9); opacity: .55; transform: scale(1.02); }
-.demo-cover .inner {
-  position: relative; display: grid; gap: 14px; justify-items: center; text-align: center;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 26px 28px; max-width: min(440px, 88%);
-  box-shadow: var(--shadow);
-}
-.demo-cover .inner p { color: var(--muted); font-size: 15px; }
-.demo-small { display: none; }
-.demo-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-@media (max-width: 760px) { .demo-actions, .demo-cover .inner p:not(.demo-small) { display: none; } .demo-small { display: block; } }
-.demo-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.demo-note { font-size: 14px; color: var(--muted); }
-@media (max-width: 720px) { .demo-box { aspect-ratio: 4 / 5; } }
+@media (max-width: 860px) { .demo-band { grid-template-columns: minmax(0, 1fr); } .demo-thumb { order: -1; } }
+@media (max-width: 760px) { .demo-actions, .demo-note { display: none; } .demo-small { display: block; } .demo-thumb { pointer-events: none; } .demo-thumb .play { display: none; } }
 
 /* Download */
 .download { padding-block: 104px 32px; }
@@ -436,9 +463,16 @@ section { scroll-margin-top: 76px; }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 26px; display: grid; gap: 14px; align-content: start; min-width: 0;
 }
-.dl.current { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.dl.current { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow); }
+/* The card of the visitor's own system says so; the other one keeps a quieter button. */
+.dl-mine { display: none; margin-left: auto; font: 600 12px var(--font-body); letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px; }
+.dl.current .dl-mine { display: inline-block; }
+.dl-btn { width: 100%; justify-content: center; }
+.dl:not(.current) .dl-btn { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.dl:not(.current) .dl-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--surface); }
+.dl-file { text-align: center; }
+.dl-file .nw { white-space: nowrap; }
 .dl-head { display: flex; align-items: center; gap: 12px; }
-.dl-head svg { width: 26px; height: 26px; }
 .dl-head h3 { font-size: 24px; }
 .dl-file { font: 400 13px var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .dl p { color: var(--muted); font-size: 15px; }
@@ -477,10 +511,10 @@ section { scroll-margin-top: 76px; }
 /* Contact: copy on the left, the form on the right; one column on narrow screens. */
 /* Contact: the closing chapter of the page, centred over the full width on a band of its own. */
 .contact {
-  padding-block: clamp(64px, 9vw, 112px); margin-top: 40px; border-top: 1px solid var(--line);
+  padding-block: clamp(40px, 5vw, 64px); border-top: 1px solid var(--line);
   background: linear-gradient(to bottom, color-mix(in srgb, var(--accent-soft) 70%, var(--bg)), var(--bg) 85%);
 }
-.contact-inner { display: grid; justify-items: center; gap: 36px; }
+.contact-inner { display: grid; justify-items: center; gap: 24px; }
 .contact-head { text-align: center; display: grid; gap: 12px; justify-items: center; }
 .contact h2 { font-size: clamp(34px, 5vw, 56px); line-height: 1.04; }
 .contact-head p { margin: 0; color: var(--muted); font-size: 18px; }
@@ -539,7 +573,7 @@ footer a { color: var(--muted); }
     <a class="brand" href="#top"><img src="img/icon-64.png" alt="" width="30" height="30"><span class="wordmark" aria-label="Bitcrane"><span class="wm-bit" aria-hidden="true">Bit</span><span class="wm-crane" aria-hidden="true">crane</span></span></a>
     <nav class="nav" aria-label="Seiten">
       <a href="#funktionen"><span class="de">Funktionen</span><span class="en">Features</span></a>
-      <a href="#demo">Demo</a>
+      <a href="demo.html" target="_blank" rel="noopener">Demo<span class="sr"><span class="de"> (neues Fenster)</span><span class="en"> (new window)</span></span></a>
       <a href="#download">Download</a>
       <a href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener">GitHub<span class="sr"><span class="de"> (öffnet neuen Tab)</span><span class="en"> (opens a new tab)</span></span></a>
     </nav>
@@ -557,6 +591,7 @@ footer a { color: var(--muted); }
 
 <div class="waves" id="waves" aria-hidden="true"></div>
 
+<a class="totop" id="totop" href="#top" aria-label="Nach oben"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15.5v-11M5.5 9 10 4.5 14.5 9"/></svg></a>
 <div class="upload" id="upload" role="scrollbar" aria-controls="top" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Position auf der Seite">
   <div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-wave" id="upload-wave"></div><div class="upload-cursor" id="upload-cursor"></div>
   <ol id="upload-stops"></ol>
@@ -577,7 +612,7 @@ footer a { color: var(--muted); }
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></svg>
             <span id="cta-label"><span class="de">Bitcrane laden</span><span class="en">Download Bitcrane</span></span>
           </a>
-          <a class="btn btn-ghost try-demo" href="#demo"><span class="de">Im Browser ausprobieren</span><span class="en">Try it in the browser</span></a>
+          <a class="btn btn-ghost try-demo" href="demo.html" target="_blank" rel="noopener"><span class="de">Im Browser ausprobieren</span><span class="en">Try it in the browser</span></a>
         </div>
         <p class="meta"><span class="de">macOS 11 oder neuer (Apple Silicon und Intel) · Windows 10 und 11</span><span class="en">macOS 11 or later (Apple silicon and Intel) · Windows 10 and 11</span></p>
         <a class="gh-link" href="https://github.com/Raccoon-Works/bitcrane" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2"/></svg><span class="de">Quellcode auf GitHub</span><span class="en">Source code on GitHub</span></a>
@@ -740,32 +775,20 @@ footer a { color: var(--muted); }
 
   <section class="demo" id="demo" aria-labelledby="demo-h">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="demo-h"><span class="de">Klick dich durch, gleich hier</span><span class="en">Click through it, right here</span></h2>
-        <p><span class="de">Die Demo läuft komplett in deinem Browser, mit ausgedachten Servern und Dateien. Es wird nichts installiert und nichts verbunden.</span><span class="en">The demo runs entirely in your browser, with made-up servers and files. Nothing is installed and nothing connects anywhere.</span></p>
-      </div>
-      <div class="demo-bar">
-        <div class="seg" role="group" aria-label="Demo">
-          <button type="button" id="demo-mac" data-platform="mac">macOS</button>
-          <button type="button" id="demo-win" data-platform="win">Windows</button>
-        </div>
-        <div class="seg" role="group" aria-label="Design">
-          <button type="button" id="demo-light" data-theme-choice="light"><span class="de">Hell</span><span class="en">Light</span></button>
-          <button type="button" id="demo-dark" data-theme-choice="dark"><span class="de">Dunkel</span><span class="en">Dark</span></button>
-        </div>
-      </div>
-      <div class="demo-box" id="demo-box">
-        <div class="demo-cover" id="demo-cover">
-          <img alt="" id="demo-poster" loading="lazy">
-          <div class="inner">
-            <strong><span class="de">Demo im Browser</span><span class="en">Demo in the browser</span></strong>
-            <p><span class="de">Etwa 1,5 MB. Am besten auf einem Computer, die App ist für große Bildschirme gemacht.</span><span class="en">About 1.5 MB. Best on a computer; the app is made for large screens.</span></p>
-            <div class="demo-actions"><button class="btn btn-primary" type="button" id="demo-start"><span class="de">Demo starten</span><span class="en">Start the demo</span></button><a class="btn btn-ghost" id="demo-window" target="_blank" rel="noopener" href="demo/index.html?demo"><span class="de">Im neuen Fenster</span><span class="en">In a new window</span></a></div>
-            <p class="demo-small"><span class="de">Die Demo ist für Computer gemacht. Schau gern am Mac oder PC vorbei.</span><span class="en">The demo is made for computers. Have a look on your Mac or PC.</span></p>
+      <div class="demo-band">
+        <div class="demo-copy">
+          <h2 id="demo-h"><span class="de">Klick dich durch, gleich hier</span><span class="en">Click through it, right here</span></h2>
+          <p><span class="de">Die Demo läuft komplett in deinem Browser, mit ausgedachten Servern und Dateien. Es wird nichts installiert und nichts verbunden.</span><span class="en">The demo runs entirely in your browser, with made-up servers and files. Nothing is installed and nothing connects anywhere.</span></p>
+          <div class="demo-actions">
+            <a class="btn btn-primary" id="demo-window" target="_blank" rel="noopener" href="demo.html"><span class="de">Demo öffnen</span><span class="en">Open the demo</span><span class="sr"><span class="de"> (neues Fenster)</span><span class="en"> (new window)</span></span></a>
+            <button class="btn btn-ghost" type="button" id="demo-start"><span class="de">Hier auf der Seite</span><span class="en">Right on this page</span></button>
           </div>
+          <p class="demo-note"><span class="de">Etwa 1,5 MB, am besten auf einem Computer. Tipp: Rechtsklick auf eine Datei oder Strg/⌘ + Umschalt + P für alle Befehle.</span><span class="en">About 1.5 MB, best on a computer. Tip: right-click a file or press Ctrl/⌘ + Shift + P for every command.</span></p>
+          <p class="demo-small"><span class="de">Die Demo ist für große Bildschirme gemacht. Schau gern am Mac oder PC vorbei.</span><span class="en">The demo is made for large screens. Have a look on your Mac or PC.</span></p>
         </div>
+        <a class="demo-thumb" id="demo-thumb" target="_blank" rel="noopener" href="demo.html" aria-hidden="true" tabindex="-1"><img alt="" id="demo-poster" loading="lazy"><span class="play"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></span></a>
       </div>
-      <p class="demo-note" style="margin-top:14px"><span class="de">Tipp: Rechtsklick auf eine Datei, Doppelklick auf einen Ordner oder Strg/⌘ + Umschalt + P für alle Befehle.</span><span class="en">Tip: right-click a file, double-click a folder, or press Ctrl/⌘ + Shift + P for every command.</span></p>
+      <div class="demo-box" id="demo-box" hidden></div>
     </div>
   </section>
 
@@ -778,12 +801,12 @@ footer a { color: var(--muted); }
       <div class="dl-grid">
         <div class="dl" id="dl-mac">
           <div class="dl-head">
-            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.2 8.5c0-1.6 1.3-2.3 1.4-2.4-.8-1.1-1.9-1.3-2.3-1.3-1-.1-1.9.6-2.4.6-.5 0-1.3-.6-2.1-.6C4.7 4.8 3.7 5.4 3.2 6.4c-1.2 2-.3 5 .8 6.6.6.8 1.2 1.7 2 1.6.8 0 1.1-.5 2.1-.5s1.2.5 2.1.5 1.4-.8 1.9-1.6c.6-.9.9-1.8.9-1.8s-1.8-.7-1.8-2.7ZM9.6 3.6c.4-.5.7-1.2.6-1.9-.6 0-1.4.4-1.8.9-.4.4-.7 1.1-.6 1.8.7.1 1.4-.3 1.8-.8Z"/></svg>
             <h3>macOS</h3>
+            <span class="dl-mine"><span class="de">Dein System</span><span class="en">Your system</span></span>
           </div>
           <p><span class="de">macOS 11 oder neuer, Apple Silicon und Intel in einer Datei.</span><span class="en">macOS 11 or later, Apple silicon and Intel in one file.</span></p>
-          <div><a class="btn btn-primary" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a></div>
-          <span class="dl-file" id="file-mac">Bitcrane-macOS.dmg · 33 MB</span>
+          <a class="btn btn-primary dl-btn" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a>
+          <span class="dl-file" id="file-mac"><span class="nw">Version <span data-version>0.3</span></span> · <span class="nw">Bitcrane-macOS.dmg</span> · <span class="nw">33 MB</span></span>
           <details class="first">
             <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
             <div class="first-body">
@@ -794,12 +817,12 @@ footer a { color: var(--muted); }
         </div>
         <div class="dl" id="dl-win">
           <div class="dl-head">
-            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.5 3.2 6.8 2.5v5H1.5zM7.6 2.4 14.5 1.5v6H7.6zM1.5 8.5h5.3v5L1.5 12.8zM7.6 8.5h6.9v6l-6.9-.9z"/></svg>
             <h3>Windows</h3>
+            <span class="dl-mine"><span class="de">Dein System</span><span class="en">Your system</span></span>
           </div>
           <p><span class="de">Windows 10 und 11, 64 Bit. Installation ohne Administratorrechte.</span><span class="en">Windows 10 and 11, 64-bit. Installs without administrator rights.</span></p>
-          <div><a class="btn btn-primary" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a></div>
-          <span class="dl-file" id="file-win">Bitcrane-Windows-Setup.exe · 11 MB</span>
+          <a class="btn btn-primary dl-btn" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a>
+          <span class="dl-file" id="file-win"><span class="nw">Version <span data-version>0.3</span></span> · <span class="nw">Bitcrane-Windows-Setup.exe</span> · <span class="nw">11 MB</span></span>
           <details class="first">
             <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
             <div class="first-body">
@@ -1031,14 +1054,12 @@ footer a { color: var(--muted); }
       caption(fig);
     });
     document.querySelectorAll('[data-platform]').forEach(function (btn) {
-      if (btn.closest('.demo-bar')) return;
       btn.setAttribute('aria-pressed', String(btn.dataset.platform === platform));
     });
     var touch = window.matchMedia && matchMedia('(hover: none)').matches;
     void 0; // = (touch ? 'Tippe' : 'Klicke') + ' auf ein Bild für das ' + (other === 'dark' ? 'dunkle' : 'helle') + ' Design, die Lupe vergrößert';
     void 0; // = (touch ? 'Tap' : 'Click') + ' a picture for the ' + other + ' design; the magnifier enlarges it';
-    var poster = document.getElementById('demo-poster');
-    poster.src = src('main', demoPf, demoTh);
+    if (typeof markDemo === 'function') markDemo();
     document.getElementById('dl-mac').classList.toggle('current', own === 'mac');
     document.getElementById('dl-win').classList.toggle('current', own === 'win');
       }
@@ -1167,23 +1188,24 @@ footer a { color: var(--muted); }
   lb.addEventListener('close', function () { lbVid.pause(); });
 
 
-  /* Demo: loaded only on request; platform and theme switch without a reload. */
-  var demoPf = own, demoTh = pageTheme(), frameEl = null;
+  /* Demo: opens in its own window (demo.html, with its own switches); on request also right here. */
+  var frameEl = null;
+  function demoQuery() { return '?platform=' + platform + '&theme=' + pageTheme() + '&lang=' + lang; }
   function markDemo() {
-    document.querySelectorAll('.demo-bar [data-platform]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.platform === demoPf)); });
-    document.querySelectorAll('.demo-bar [data-theme-choice]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeChoice === demoTh)); });
-    document.getElementById('demo-poster').src = src('main', demoPf, demoTh);
-    document.getElementById('demo-window').href = 'demo/index.html?demo&platform=' + demoPf + '&theme=' + demoTh + '&lang=' + lang;
-    if (frameEl && frameEl.contentWindow) frameEl.contentWindow.postMessage({ bitcraneDemo: true, platform: demoPf, theme: demoTh }, '*');
+    document.getElementById('demo-poster').src = src('main', platform, pageTheme());
+    document.querySelectorAll('a[href^="demo.html"]').forEach(function (a) { a.href = 'demo.html' + demoQuery(); });
+    if (frameEl && frameEl.contentWindow) frameEl.contentWindow.postMessage({ bitcraneDemo: true, platform: platform, theme: pageTheme() }, '*');
   }
-  document.querySelectorAll('.demo-bar [data-platform]').forEach(function (b) { b.addEventListener('click', function () { demoPf = b.dataset.platform; markDemo(); }); });
-  document.querySelectorAll('.demo-bar [data-theme-choice]').forEach(function (b) { b.addEventListener('click', function () { demoTh = b.dataset.themeChoice; markDemo(); }); });
   document.getElementById('demo-start').addEventListener('click', function () {
-    frameEl = document.createElement('iframe');
-    frameEl.title = 'Bitcrane Demo';
-    frameEl.src = 'demo/index.html?demo&platform=' + demoPf + '&theme=' + demoTh + '&lang=' + lang;
-    document.getElementById('demo-box').appendChild(frameEl);
-    document.getElementById('demo-cover').hidden = true;
+    var box = document.getElementById('demo-box');
+    if (!frameEl) {
+      frameEl = document.createElement('iframe');
+      frameEl.title = 'Bitcrane Demo';
+      frameEl.src = 'demo/index.html?demo&platform=' + platform + '&theme=' + pageTheme() + '&lang=' + lang;
+      box.appendChild(frameEl);
+    }
+    box.hidden = false;
+    box.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   });
 
   /* Copy button for the macOS first-start command. */
@@ -1305,6 +1327,16 @@ footer a { color: var(--muted); }
     up.addEventListener('pointerup', function end() { up.removeEventListener('pointermove', move); up.removeEventListener('pointerup', end); });
   });
   addEventListener('scroll', update, { passive: true });
+  /* Back-to-top button: shown below the head of the page. */
+  var totop = document.getElementById('totop');
+  function toTopShow() { totop.classList.toggle('show', scrollY > innerHeight * 0.8); }
+  addEventListener('scroll', toTopShow, { passive: true }); toTopShow();
+  totop.setAttribute('aria-label', lang === 'de' ? 'Nach oben' : 'Back to top');
+  document.querySelectorAll('.langs:not(.themes) button').forEach(function (b) { b.addEventListener('click', function () { totop.setAttribute('aria-label', lang === 'de' ? 'Nach oben' : 'Back to top'); }); });
+  totop.addEventListener('click', function (e) {
+    e.preventDefault();
+    scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
   addEventListener('resize', function () { placeStops(); update(); squeeze(); });
   addEventListener('load', function () { placeStops(); update(); squeeze(); setTimeout(function () { placeStops(); update(); squeeze(); }, 3000); });
   document.querySelectorAll('.langs:not(.themes) button').forEach(function (b) { b.addEventListener('click', function () { update(); squeeze(); }); });
@@ -1410,7 +1442,7 @@ footer a { color: var(--muted); }
   /* Gentle reveal on scroll. */
   (function () {
     if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var groups = ['.protocols .proto', '.feature .copy', '.feature .shot', '.section-head', '.fact', '.dl', '.news-list li', '.faq dl > div', '.demo-bar', '.demo-box'];
+    var groups = ['.protocols .proto', '.feature .copy', '.feature .shot', '.section-head', '.fact', '.dl', '.news-list li', '.faq dl > div', '.demo-band'];
     var els = [];
     groups.forEach(function (sel) {
       [].slice.call(document.querySelectorAll(sel)).forEach(function (el, i) {
