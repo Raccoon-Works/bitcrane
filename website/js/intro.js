@@ -6,6 +6,7 @@
  * motion); that script also shows everything after a few seconds, whatever happens here.
  */
 import { root } from './core.js';
+import { clamp01 } from './util.js';
 
 const POP = 380;        /* ms the logo takes to appear */
 const SLIDE_AT = 520;   /* ms until it starts moving to its place */
@@ -17,19 +18,19 @@ const LOGO_SIDE = 0.18; /* transparent share of the logo image on its right side
 
 const out = (p) => 1 - Math.pow(1 - p, 3);
 const inOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 export function initIntro() {
   const hero = document.querySelector('.wm-hero');
   const word = document.getElementById('wm-word');
   const logo = hero.querySelector('.wm-logo');
   const letters = [...word.querySelectorAll('.wm-l')];
-  /* Keep every letter as wide as its final glyph, so the word does not jump while bits change. */
+  if (!root.classList.contains('intro')) return;
+  /* While it runs, every letter keeps the width of its final glyph, so the word does not jump
+     while bits change. */
   letters.forEach((l) => {
     l.dataset.ch = l.firstChild.textContent;
     l.style.width = l.getBoundingClientRect().width + 'px';
   });
-  if (!root.classList.contains('intro')) return;
 
   /* Final positions, measured before anything moves. */
   const box = hero.getBoundingClientRect(), lr = logo.getBoundingClientRect();
@@ -75,7 +76,7 @@ export function initIntro() {
         if (l.classList.contains('bits')) {
           l.classList.remove('bits');
           g.textContent = l.dataset.ch;
-          g.style.transform = g.style.clipPath = '';
+          g.style.transform = g.style.clipPath = l.style.width = '';
           g.style.opacity = '1';
         }
         done++;

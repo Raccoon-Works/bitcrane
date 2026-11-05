@@ -61,9 +61,9 @@ function finish(bool $ok, string $code, bool $json, string $lang): never
     $t = $texts[$lang];
     $line = $t[$code] ?? $t['error'];
     header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8">'
+    echo '<!DOCTYPE html><html lang="' . $lang . '" data-lang="' . $lang . '"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">'
-        . '<title>Bitcrane</title><link rel="stylesheet" href="css/legal.css"></head><body><main class="wrap">'
+        . '<title>Bitcrane</title><link rel="stylesheet" href="css/tokens.css"><link rel="stylesheet" href="css/legal.css"></head><body><main class="wrap">'
         . '<h1>Bitcrane</h1><p>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</p>'
         . '<p><a href="index.html#kontakt">' . htmlspecialchars($t['back'], ENT_QUOTES, 'UTF-8') . '</a></p>'
         . '</main><footer><div class="wrap"><span>© 2026 RaccoonWorks</span><nav>'
@@ -71,6 +71,13 @@ function finish(bool $ok, string $code, bool $json, string $lang): never
         . '<a href="datenschutz.html">' . ($lang === 'en' ? 'Privacy' : 'Datenschutz') . '</a>'
         . '</nav></div></footer></body></html>';
     exit;
+}
+
+/** A posted field as text; anything else (an array, say) counts as empty. */
+function field(string $name): string
+{
+    $value = $_POST[$name] ?? '';
+    return is_string($value) ? $value : '';
 }
 
 /** One line without line breaks or control characters (keeps headers safe). */
@@ -95,17 +102,17 @@ if ($origin !== '' && strcasecmp($originHost, (string)($_SERVER['HTTP_HOST'] ?? 
 }
 
 // Spam traps: pretend success.
-if (trim((string)($_POST['website'] ?? '')) !== '') {
+if (trim(field('website')) !== '') {
     finish(true, 'sent', $wantsJson, $lang);
 }
-$ts = (int)($_POST['ts'] ?? 0);
+$ts = (int)field('ts');
 if ($ts > 0 && time() - $ts < MIN_SECONDS) {
     finish(true, 'sent', $wantsJson, $lang);
 }
 
-$name = oneLine((string)($_POST['name'] ?? ''), 100);
-$email = oneLine((string)($_POST['email'] ?? ''), 200);
-$message = trim(str_replace("\r\n", "\n", (string)($_POST['message'] ?? '')));
+$name = oneLine(field('name'), 100);
+$email = oneLine(field('email'), 200);
+$message = trim(str_replace("\r\n", "\n", field('message')));
 
 if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
     finish(false, 'email', $wantsJson, $lang);
@@ -117,9 +124,9 @@ $message = mb_substr($message, 0, MAX_MESSAGE);
 
 // Kind of message (chosen on the form) and, for bug reports, where it happened.
 $categories = ['question' => 'Frage', 'bug' => 'Fehler', 'idea' => 'Idee', 'other' => 'Sonstiges'];
-$category = $categories[(string)($_POST['category'] ?? '')] ?? 'Sonstiges';
-$version = oneLine((string)($_POST['version'] ?? ''), 40);
-$os = in_array($_POST['os'] ?? '', ['macOS', 'Windows'], true) ? (string)$_POST['os'] : '';
+$category = $categories[field('category')] ?? 'Sonstiges';
+$version = oneLine(field('version'), 40);
+$os = in_array(field('os'), ['macOS', 'Windows'], true) ? field('os') : '';
 
 $subject = '[Bitcrane] ' . $category . ($name !== '' ? ' – ' . $name : '');
 $body = "Nachricht über das Kontaktformular auf bitcrane.de. Mit „Antworten“ geht die Antwort an den Absender.\n\n"
@@ -136,9 +143,10 @@ $headers = [
     'Reply-To' => $email,
     'MIME-Version' => '1.0',
     'Content-Type' => 'text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding' => '8bit',
+    // Quoted-printable keeps every line under the mail limit, however long the message lines are.
+    'Content-Transfer-Encoding' => 'quoted-printable',
     'X-Mailer' => 'bitcrane.de contact form',
 ];
 
-$sent = mail(MAIL_TO, mb_encode_mimeheader($subject, 'UTF-8'), $body, $headers, '-f' . MAIL_FROM);
+$sent = mail(MAIL_TO, mb_encode_mimeheader($subject, 'UTF-8'), quoted_printable_encode($body), $headers, '-f' . MAIL_FROM);
 finish($sent, $sent ? 'sent' : 'error', $wantsJson, $lang);

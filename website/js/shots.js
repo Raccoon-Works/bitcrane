@@ -43,17 +43,16 @@ const shots = [...document.querySelectorAll('.shot')].map((fig) => ({
   frame: fig.querySelector('.shot-frame'),
   base: fig.querySelector('.shot-base'),
   over: fig.querySelector('.shot-over'),
-  cap: fig.querySelector('.shot-cap'),
+  switcher: fig.querySelector('.shot-switch'),
   play: fig.querySelector('.shot-play')
 }));
 const clips = shots.filter((s) => s.isClip);
 
 /* The hint under a shot names the design a click brings in. */
 function caption(s) {
-  if (!s.cap) return;
   const shown = s.fig.classList.contains('flipped') ? otherTheme(pageTheme()) : pageTheme();
   const next = otherTheme(shown);
-  s.cap.textContent = tr(
+  s.switcher.textContent = tr(
     `${isTouch() ? 'Tippen' : 'Klicken'} für das ${next === 'dark' ? 'dunkle' : 'helle'} Design`,
     `${isTouch() ? 'Tap' : 'Click'} for ${next} mode`
   );
@@ -85,8 +84,7 @@ function renderClip(s, theme) {
       if (s.fig.classList.contains('playing')) video.play().catch(() => {});
     }
   });
-  s.frame.setAttribute('role', 'img');
-  s.frame.setAttribute('aria-label', describe(s.view, theme));
+  s.base.setAttribute('aria-label', describe(s.view, theme));
   clipRadius(s);
   playLabel(s);
 }
@@ -185,13 +183,12 @@ function initLightbox() {
     title.textContent = CLIP_TITLE[state.lang][view] || ALT[state.lang][view];
     box.querySelectorAll('[data-lb-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lbTheme === theme)));
   }
-  /* <dialog> came to Safari with 15.4; older versions on macOS 11 get the plain open attribute. */
-  const close = () => { if (box.close) box.close(); else { box.removeAttribute('open'); video.pause(); } };
+  const close = () => box.close();
   function open(name) {
     view = name;
     theme = pageTheme();
     show();
-    if (box.showModal) box.showModal(); else box.setAttribute('open', '');
+    box.showModal();
   }
   box.querySelectorAll('[data-lb-theme]').forEach((b) => b.addEventListener('click', () => { theme = b.dataset.lbTheme; show(); }));
   document.getElementById('lb-close').addEventListener('click', close);
@@ -202,15 +199,18 @@ function initLightbox() {
 
 export function initShots() {
   const openLightbox = initLightbox();
-  /* A click on a shot wipes in the other design; the magnifier opens the large view. */
+  /* A click on a shot or on the hint below wipes in the other design; the magnifier opens the
+     large view (the play button handles its own clicks). */
+  const flip = (s) => {
+    s.fig.classList.toggle('flipped');
+    if (s.isClip && s.over.readyState > 0) s.over.currentTime = s.base.currentTime;
+    caption(s);
+  };
   shots.forEach((s) => {
     s.frame.addEventListener('click', (e) => {
-      if (e.target.closest('.shot-zoom')) { openLightbox(s.view); return; }
-      if (e.target.closest('.shot-play')) return;
-      s.fig.classList.toggle('flipped');
-      if (s.isClip && s.over.readyState > 0) s.over.currentTime = s.base.currentTime;
-      caption(s);
+      if (e.target.closest('.shot-zoom')) openLightbox(s.view); else flip(s);
     });
+    s.switcher.addEventListener('click', () => flip(s));
   });
   initClips();
   onRefresh(render);

@@ -81,7 +81,8 @@ def demo_app():
     )
     app = DEMO.read_text(encoding='utf-8')
     app = re.sub(r'[ \t]*<link[^>]*fonts\.(?:googleapis|gstatic)\.com[^>]*>\n?', '', app)
-    assert 'fonts.g' not in app, 'Google Fonts still referenced in the demo'
+    if 'fonts.g' in app:
+        raise SystemExit('Google Fonts are still referenced in the demo')
     return app.replace('</body>', legal + '</body>', 1)
 
 
@@ -98,6 +99,9 @@ def main():
     prefs = '<script>\n' + (ROOT / 'js' / 'prefs.js').read_text(encoding='utf-8').strip() + '\n</script>'
     private_file = ROOT / 'private.json'
     private = json.loads(private_file.read_text(encoding='utf-8')) if private_file.exists() else {}
+    # The test site may show placeholders; the real one must never publish a legal notice without them.
+    if not TEST and not all(private.get(k) for k in ('name', 'street', 'city')):
+        raise SystemExit('private.json needs name, street and city for the real site')
 
     for name in PAGES:
         text = (ROOT / name).read_text(encoding='utf-8')
@@ -126,10 +130,10 @@ def main():
         (DIST / 'robots.txt').write_text('User-agent: *\nDisallow: /\n', encoding='utf-8')
     else:
         (DIST / 'robots.txt').write_text(f'User-agent: *\nAllow: /\nSitemap: {SITE}/sitemap.xml\n', encoding='utf-8')
-        urls = ''.join(f'  <url><loc>{SITE}/{p}</loc></url>\n' for p in ['', 'impressum.html', 'datenschutz.html'])
+        # Only the start page: the legal pages are kept out of search engines (see .htaccess).
         (DIST / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
                                           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-                                          + urls + '</urlset>\n', encoding='utf-8')
+                                          f'  <url><loc>{SITE}/</loc></url>\n</urlset>\n', encoding='utf-8')
 
     (DIST / 'demo').mkdir()
     (DIST / 'demo' / 'index.html').write_text(demo_app(), encoding='utf-8')

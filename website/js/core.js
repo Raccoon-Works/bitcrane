@@ -7,18 +7,17 @@
 export const root = document.documentElement;
 export const REPO = 'Raccoon-Works/bitcrane';
 
-/* Remembered choices; storage can be blocked (private windows, strict settings). */
-export const store = {
-  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
-  set(key, value) { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } }
-};
+import { detectPlatform } from './util.js';
 
-/* The visitor's own system decides which download and which screenshots come first. */
-export const ownPlatform = /Win/i.test(navigator.userAgent + ' ' + (navigator.platform || '')) ? 'win' : 'mac';
+export { store } from './util.js';
+
+/* The visitor's own system decides which download and which screenshots come first
+   (null on phones and tablets: then the Mac screenshots and no direct download). */
+export const ownPlatform = detectPlatform();
 
 export const state = {
   lang: root.dataset.lang === 'en' ? 'en' : 'de',   /* set before the first paint by js/prefs.js */
-  platform: ownPlatform
+  platform: ownPlatform || 'mac'
 };
 
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');

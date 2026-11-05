@@ -10,14 +10,14 @@ const MSG = {
     sent: 'Danke! Deine Nachricht ist angekommen. Wir antworten per E-Mail.',
     email: 'Bitte prüfe deine E-Mail-Adresse.',
     short: 'Bitte schreib ein paar Worte mehr.',
-    error: 'Das hat leider nicht geklappt. Schreib uns bitte direkt an info@bitcrane.de.',
+    error: 'Das hat leider nicht geklappt. Schreib uns bitte direkt per E-Mail, die Adresse steht oben.',
     sending: 'Wird gesendet …'
   },
   en: {
     sent: 'Thank you! Your message has arrived. We will reply by email.',
     email: 'Please check your email address.',
     short: 'Please write a few more words.',
-    error: 'Sorry, that did not work. Please write to info@bitcrane.de directly.',
+    error: 'Sorry, that did not work. Please email us directly, the address is shown above.',
     sending: 'Sending …'
   }
 };

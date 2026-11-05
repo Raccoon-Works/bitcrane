@@ -15,6 +15,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="img/icon-64.png">
 <link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 <script src="js/prefs.js"></script>
 <script>
@@ -53,9 +54,9 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
 <div class="waves" id="waves" aria-hidden="true"></div>
 
 <a class="totop" id="totop" href="#top" aria-label="Nach oben" data-label-en="Back to top"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15.5v-11M5.5 9 10 4.5 14.5 9"/></svg></a>
-<div class="upload" id="upload" role="scrollbar" aria-controls="top" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Position auf der Seite" data-label-en="Position on the page">
-  <div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-wave" id="upload-wave"></div><div class="upload-cursor" id="upload-cursor"></div>
-  <ol id="upload-stops"></ol>
+<div class="upload" id="upload">
+  <div aria-hidden="true"><div class="upload-track"></div><div class="upload-fill" id="upload-fill"></div><div class="upload-wave" id="upload-wave"></div><div class="upload-cursor" id="upload-cursor"></div></div>
+  <nav aria-label="Abschnitte" data-label-en="Sections"><ol id="upload-stops"></ol></nav>
 </div>
 
 <main id="top">
@@ -82,10 +83,8 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
 
       <div class="reveal switch-row" style="--i:5">
         <div class="seg" role="group" aria-label="Plattform" data-label-en="Platform">
-          <button type="button" id="pf-mac" data-platform="mac">macOS
-          </button>
-          <button type="button" id="pf-win" data-platform="win">Windows
-          </button>
+          <button type="button" id="pf-mac" data-platform="mac">macOS</button>
+          <button type="button" id="pf-win" data-platform="win">Windows</button>
         </div>
       </div>
 
@@ -95,7 +94,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           <img class="shot-over" src="img/main-mac-dark-de-c.webp" alt="" width="1800" height="1059">
           <button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button>
         </div>
-      <figcaption class="shot-cap" aria-live="polite"></figcaption>
+      <figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption>
       </figure>
     </div>
   </section>
@@ -126,7 +125,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           </ul>
           <div class="term-line"><i>~/Projekte/webshop/live</i> → <b>deploy@shop.example</b>:/home/deploy/apps/webshop<br><span class="cmd">$ pm2 restart webshop</span></div>
         </div>
-        <figure class="shot" data-view="save" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none" aria-hidden="true"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><span class="shot-tag"></span><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot" data-view="save" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -140,7 +139,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
             <li><span class="de">Tunnel für Datenbanken und Dienste</span><span class="en">Tunnels for databases and services</span></li>
           </ul>
         </div>
-        <figure class="shot" data-view="term" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none" aria-hidden="true"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><span class="shot-tag"></span><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot" data-view="term" data-clip="1"><div class="shot-frame" style="--ar: 1600 / 936"><video class="shot-base" muted loop playsinline preload="none"></video><video class="shot-over" muted loop playsinline preload="none" aria-hidden="true"></video><button type="button" class="shot-play" aria-label="Video anhalten"><svg class="i-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg><svg class="i-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z"/></svg></button><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -153,7 +152,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
             <li><span class="de">Suchen und Ersetzen</span><span class="en">Find and replace</span></li>
           </ul>
         </div>
-        <figure class="shot" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 602"><img class="shot-base" src="img/editor-mac-light-de-c.webp" alt="" loading="lazy" width="1600" height="602"><img class="shot-over" src="img/editor-mac-dark-de-c.webp" alt="" loading="lazy" width="1600" height="602"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot" data-view="editor" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 602"><img class="shot-base" src="img/editor-mac-light-de-c.webp" alt="" loading="lazy" width="1600" height="602"><img class="shot-over" src="img/editor-mac-dark-de-c.webp" alt="" loading="lazy" width="1600" height="602"><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -162,7 +161,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           <h2><span class="de">Sieh, was sich unterscheidet, bevor du etwas überschreibst.</span><span class="en">See what differs before you overwrite anything.</span></h2>
           <p><span class="de">Bitcrane vergleicht deinen Ordner mit dem Server und zeigt neue, geänderte und fehlende Dateien. Du entscheidest, in welche Richtung abgeglichen wird.</span><span class="en">Bitcrane compares your folder with the server and lists new, changed and missing files. You decide which way to bring them in line.</span></p>
         </div>
-        <figure class="shot" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 835"><img class="shot-base" src="img/compare-mac-light-de-c.webp" alt="" loading="lazy" width="1600" height="835"><img class="shot-over" src="img/compare-mac-dark-de-c.webp" alt="" loading="lazy" width="1600" height="835"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot" data-view="compare" data-crop="1"><div class="shot-frame" style="--ar: 1600 / 835"><img class="shot-base" src="img/compare-mac-light-de-c.webp" alt="" loading="lazy" width="1600" height="835"><img class="shot-over" src="img/compare-mac-dark-de-c.webp" alt="" loading="lazy" width="1600" height="835"><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption></figure>
       </article>
 
       <article class="feature">
@@ -171,7 +170,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           <h2><span class="de">Deine Server bringst du einfach mit.</span><span class="en">Bring your servers along.</span></h2>
           <p><span class="de">Beim ersten Start findet Bitcrane gespeicherte Server aus FileZilla, WinSCP, Transmit und deiner SSH-Konfiguration und übernimmt sie auf Wunsch.</span><span class="en">On first start, Bitcrane finds servers saved in FileZilla, WinSCP, Transmit and your SSH config, and takes them over if you like.</span></p>
         </div>
-        <figure class="shot" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 992"><img class="shot-base" src="img/import-mac-light-de-c.webp" alt="" loading="lazy" width="1520" height="992"><img class="shot-over" src="img/import-mac-dark-de-c.webp" alt="" loading="lazy" width="1520" height="992"><span class="shot-tag"></span><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap" aria-live="polite"></figcaption></figure>
+        <figure class="shot" data-view="import" data-crop="1"><div class="shot-frame" style="--ar: 1520 / 992"><img class="shot-base" src="img/import-mac-light-de-c.webp" alt="" loading="lazy" width="1520" height="992"><img class="shot-over" src="img/import-mac-dark-de-c.webp" alt="" loading="lazy" width="1520" height="992"><button type="button" class="shot-zoom" aria-label="Vergrößern" data-label-en="Enlarge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6 17 17M8.5 6v5M6 8.5h5"/></svg></button></div><figcaption class="shot-cap"><button type="button" class="shot-switch">Klicken für das dunkle Design</button></figcaption></figure>
       </article>
     </div>
   </section>
@@ -263,7 +262,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
             <span class="dl-mine"><span class="de">Dein System</span><span class="en">Your system</span></span>
           </div>
           <p><span class="de">macOS 11 oder neuer, Apple Silicon und Intel in einer Datei.</span><span class="en">macOS 11 or later, Apple silicon and Intel in one file.</span></p>
-          <a class="btn btn-primary dl-btn" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a>
+          <a class="btn btn-primary dl-btn" id="link-mac" href="https://github.com/Raccoon-Works/bitcrane/releases/latest"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für macOS laden</span><span class="en">Download for macOS</span></a>
           <span class="dl-file" id="file-mac"><span class="nw">Version <span data-version>0.3</span></span> · <span class="nw">Bitcrane-macOS.dmg</span> · <span class="nw">33 MB</span></span>
           <details class="first">
             <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
@@ -279,7 +278,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
             <span class="dl-mine"><span class="de">Dein System</span><span class="en">Your system</span></span>
           </div>
           <p><span class="de">Windows 10 und 11, 64 Bit. Installation ohne Administratorrechte.</span><span class="en">Windows 10 and 11, 64-bit. Installs without administrator rights.</span></p>
-          <a class="btn btn-primary dl-btn" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest" rel="noopener"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a>
+          <a class="btn btn-primary dl-btn" id="link-win" href="https://github.com/Raccoon-Works/bitcrane/releases/latest"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6 8.8l4 4 4-4M4 16h12"/></svg><span class="de">Für Windows laden</span><span class="en">Download for Windows</span></a>
           <span class="dl-file" id="file-win"><span class="nw">Version <span data-version>0.3</span></span> · <span class="nw">Bitcrane-Windows-Setup.exe</span> · <span class="nw">11 MB</span></span>
           <details class="first">
             <summary><span class="de">Hinweis zum ersten Start</span><span class="en">Note on the first start</span></summary>
@@ -383,7 +382,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
         <input type="hidden" name="ts" id="cf-ts" value="">
         <input type="hidden" name="lang" id="cf-lang" value="de">
         <button class="btn btn-primary send" type="submit" id="cf-send"><span class="de">Nachricht senden</span><span class="en">Send message</span></button>
-        <p class="form-status" id="cf-status" role="status" aria-live="polite"></p>
+        <p class="form-status" id="cf-status" role="status"></p>
         <p class="form-note"><span class="de">Deine Nachricht geht per E-Mail an uns, auf dem Server wird nichts gespeichert. Mehr in der <a href="datenschutz.html">Datenschutzerklärung</a>.</span><span class="en">Your message reaches us by email; nothing is stored on the server. More in the <a href="datenschutz.html">privacy policy</a>.</span></p>
       </form>
     </div>

@@ -11,12 +11,19 @@ export function initDemo() {
   const poster = document.getElementById('demo-poster');
   const box = document.getElementById('demo-box');
   let frame = null;
+  let frameLang = null;
 
   onRefresh(() => {
     poster.src = imgSrc('main', pageTheme());
     document.querySelectorAll('a[href^="demo.html"]').forEach((a) => { a.href = `demo.html?${query()}`; });
-    /* The embedded demo switches platform and design live; a new language needs a reload. */
-    if (frame) frame.contentWindow.postMessage({ bitcraneDemo: true, platform: state.platform, theme: pageTheme() }, '*');
+    /* The embedded demo switches platform and design live; a new language needs a restart. */
+    if (!frame) return;
+    if (frameLang !== state.lang) {
+      frame.src = `demo/index.html?demo&${query()}`;
+      frameLang = state.lang;
+    } else {
+      frame.contentWindow.postMessage({ bitcraneDemo: true, platform: state.platform, theme: pageTheme() }, '*');
+    }
   });
 
   document.getElementById('demo-start').addEventListener('click', () => {
@@ -24,6 +31,7 @@ export function initDemo() {
       frame = document.createElement('iframe');
       frame.title = 'Bitcrane Demo';
       frame.src = `demo/index.html?demo&${query()}`;
+      frameLang = state.lang;
       box.appendChild(frame);
     }
     box.hidden = false;

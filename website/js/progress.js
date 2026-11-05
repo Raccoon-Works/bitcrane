@@ -3,7 +3,8 @@
  * ticks fills as you read, the block in transfer glows, sections are marked with their names,
  * and a click or drag along the column moves through the page. Below it, back to the top.
  */
-import { scrollBehavior, onRefresh } from './core.js';
+import { root, scrollBehavior, onRefresh } from './core.js';
+import { clamp01 } from './util.js';
 
 const STOPS = [
   ['top', 'Start', 'Start'], ['funktionen', 'Funktionen', 'Features'], ['mehr', 'Mehr', 'More'],
@@ -19,17 +20,8 @@ const cursor = document.getElementById('upload-cursor');
 const totop = document.getElementById('totop');
 
 const maxScroll = () => Math.max(1, document.documentElement.scrollHeight - innerHeight);
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-const stops = STOPS.map(([id, de, en]) => {
-  const li = document.createElement('li');
-  const a = document.createElement('a');
-  a.href = '#' + id;
-  a.innerHTML = `<span class="de">${de}</span><span class="en">${en}</span>`;
-  li.appendChild(a);
-  document.getElementById('upload-stops').appendChild(li);
-  return { li, a, section: document.getElementById(id), at: 0 };
-});
+let stops = [];
 let current = -1;
 
 /* Each mark sits where its section starts to be read (40 % down the screen). */
@@ -78,7 +70,6 @@ function update() {
   fill.style.clipPath = `inset(0 0 ${((1 - p) * 100).toFixed(2)}% 0)`;
   cursor.style.transform = `translateY(${(p * bar.clientHeight).toFixed(1)}px)`;
   bar.classList.toggle('complete', p > 0.995);
-  bar.setAttribute('aria-valuenow', String(Math.round(p * 100)));
   let cur = 0;
   stops.forEach((s, i) => {
     const reached = p + 0.002 >= s.at;
@@ -97,7 +88,7 @@ function update() {
 /* While you scroll, the ticks around the block in transfer swing out with the scroll speed and
    settle again. Small and only ever driven by your own scrolling, so it stays on with reduced
    motion too. */
-const wave = (() => {
+function createWave() {
   const host = document.getElementById('upload-wave');
   const ticks = [];
   for (let k = -WAVE; k <= WAVE; k++) {
@@ -123,12 +114,25 @@ const wave = (() => {
     lastY = scrollY;
     if (!running) { running = true; requestAnimationFrame(frame); }
   };
-})();
+}
 
 function relayout() { placeStops(); update(); squeeze(); }
 
 export function initProgress() {
-  /* Click or drag along the column to move through the page. */
+  const list = document.getElementById('upload-stops');
+  stops = STOPS.map(([id, de, en]) => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = '#' + id;
+    a.innerHTML = `<span class="de">${de}</span><span class="en">${en}</span>`;
+    li.appendChild(a);
+    list.appendChild(li);
+    return { li, a, section: document.getElementById(id), at: 0 };
+  });
+  const wave = createWave();
+
+  /* Click or drag along the column to move through the page; while dragging the page follows
+     the pointer directly instead of gliding. */
   const seek = (e) => {
     const r = bar.getBoundingClientRect();
     scrollTo(0, clamp01((e.clientY - r.top) / r.height) * maxScroll());
@@ -136,8 +140,10 @@ export function initProgress() {
   bar.addEventListener('pointerdown', (e) => {
     if (e.target.closest('a')) return;
     bar.setPointerCapture(e.pointerId);
+    root.style.scrollBehavior = 'auto';
     seek(e);
     const end = () => {
+      root.style.scrollBehavior = '';
       bar.removeEventListener('pointermove', seek);
       bar.removeEventListener('pointerup', end);
       bar.removeEventListener('pointercancel', end);
