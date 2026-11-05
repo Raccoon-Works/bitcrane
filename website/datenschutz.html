@@ -1,22 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Datenschutz · Bitcrane</title>
+<title data-en="Privacy · Bitcrane">Datenschutz · Bitcrane</title>
 <meta name="robots" content="noindex, noarchive, nosnippet">
 <link rel="icon" type="image/png" href="img/icon-64.png">
-<link rel="stylesheet" href="legal.css?v=1">
-<script>
-/* Same language and design as chosen on the start page; before the first paint. */
-(function () {
-  var r = document.documentElement;
-  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  var t = get('bc-site-theme'); if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t);
-  var l = get('bc-site-lang') || ((navigator.language || 'de').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en');
-  r.lang = l === 'en' ? 'en' : 'de';
-})();
-</script>
+<link rel="stylesheet" href="css/legal.css">
+<script src="js/prefs.js"></script>
+<script type="module" src="js/legal.js"></script>
 </head>
 <body>
 <header class="top">
@@ -148,26 +140,5 @@
     <nav aria-label="Rechtliches / Legal"><a href="index.html"><span class="de">Startseite</span><span class="en">Start</span></a><a href="impressum.html"><span class="de">Impressum</span><span class="en">Legal notice</span></a></nav>
   </div>
 </footer>
-<script>
-/* Language switch (remembered like on the start page) and the e-mail address, put together
-   only here so that address harvesters reading the page source do not find it. */
-(function () {
-  var r = document.documentElement;
-  var titles = { de: 'Datenschutz · Bitcrane', en: 'Privacy · Bitcrane' };
-  function mark() {
-    document.title = titles[r.lang];
-    document.querySelectorAll('.langs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === r.lang)); });
-  }
-  document.querySelectorAll('.langs button').forEach(function (b) {
-    b.addEventListener('click', function () { r.lang = b.dataset.lang; try { localStorage.setItem('bc-site-lang', b.dataset.lang); } catch (e) { /* storage blocked */ } mark(); });
-  });
-  document.querySelectorAll('[data-mail]').forEach(function (el) {
-    var p = el.getAttribute('data-mail').split('|'), a = document.createElement('a');
-    a.href = 'mailto:' + p[0] + '@' + p[1]; a.textContent = p[0] + '@' + p[1];
-    el.textContent = ''; el.appendChild(a);
-  });
-  mark();
-})();
-</script>
 </body>
 </html>

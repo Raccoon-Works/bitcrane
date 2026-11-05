@@ -33,3 +33,6 @@ website/dist/
 # Private addresses of the website contact form
 website/kontakt.config.php
 website/private.json
+
+# Python bytecode
+__pycache__/

@@ -22,7 +22,7 @@ the poster being the finished last moment, also shown with reduced motion).
    (`6.8` for `term`).
 4. Copy the MP4 and WebP files to `website/vid/` and rebuild the site.
 
-5. Raise `CLIP_V` in `website/index.html`: browsers keep the clips for 30 days
+5. Raise `CLIP_V` in `website/js/shots.js`: browsers keep the clips for 30 days
    (`.htaccess`), the new number makes them load the new files.
 
 Chromium must run with `--force-device-scale-factor=2`, otherwise the screencast delivers
