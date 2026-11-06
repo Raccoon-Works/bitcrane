@@ -6,7 +6,7 @@
  */
 
 /** Splits "~/Projekte/a" or "/home/ubuntu" into segments. */
-function segments(path: string): string[] {
+export function segments(path: string): string[] {
   return path.replace(/^~\/?/, '').split('/').filter(Boolean);
 }
 

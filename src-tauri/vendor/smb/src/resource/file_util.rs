@@ -1,3 +1,5 @@
+// Bitcrane: only the `std-fs-impls` module below uses these (see vendor/BITCRANE.md).
+#[cfg(feature = "std-fs-impls")]
 use crate::sync_helpers::*;
 use maybe_async::*;
 

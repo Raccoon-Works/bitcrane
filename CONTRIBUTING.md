@@ -26,6 +26,7 @@ npm run dev             # browser demo of the UI with invented servers and files
 npm run tauri dev       # the real app
 npm run format          # Prettier (interface); `npm run format:check` only reports
 npm run lint            # ESLint, fails on any warning
+npm test                # unit tests (Vitest, `*.test.ts` next to the code)
 npm run build           # type check and production build of the UI
 cd src-tauri && cargo fmt && cargo test --lib && cargo clippy --all-targets -- -D warnings
 python3 website/build.py https://dev.bitcrane.de   # test build of the website

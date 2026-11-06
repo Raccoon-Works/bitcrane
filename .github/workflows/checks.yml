@@ -1,6 +1,6 @@
 # Code checks without building installers or publishing anything. Every warning
 # fails a check, so the code base stays at zero warnings:
-# - interface: Prettier, ESLint and the TypeScript compiler,
+# - interface: Prettier, ESLint, the TypeScript compiler and the unit tests (Vitest),
 # - Rust: rustfmt, Clippy and the tests on Windows, where the platform code (e.g. the
 #   jump list in iconmenu.rs) is compiled. The release build compiles the Mac code.
 name: Checks
@@ -30,6 +30,7 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npx tsc -b
+      - run: npm test
 
   rust:
     # Windows only: GitHub often has no free Mac runner (a cancelled job sends a

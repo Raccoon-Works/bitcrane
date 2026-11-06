@@ -6,6 +6,7 @@
  * simple tree of nodes. The real app replaces this module with Rust commands
  * that talk to the disk and to the SFTP session.
  */
+import { basename, join, parent, segments } from '../util/paths';
 import type { FileEntry } from './types';
 
 interface FileNode {
@@ -236,31 +237,6 @@ function rootFor(side: 'local' | 'remote', serverId: string): DirNode {
   if (side === 'local') return localRoot;
   if (!remoteRoots[serverId]) remoteRoots[serverId] = createRemote(serverId);
   return remoteRoots[serverId];
-}
-
-/** Splits a path like "~/Projekte/a" or "/home/deploy" into segments. */
-function segments(path: string): string[] {
-  return path.replace(/^~\/?/, '').split('/').filter(Boolean);
-}
-
-/** Joins a parent path and a child name. */
-function join(parent: string, name: string): string {
-  if (parent === '/') return '/' + name;
-  return parent.replace(/\/$/, '') + '/' + name;
-}
-
-/** Returns the parent path, or the same path when already at the root. */
-function parent(path: string): string {
-  if (path === '~' || path === '/') return path;
-  const i = path.lastIndexOf('/');
-  if (i <= 0) return path.startsWith('~') ? '~' : '/';
-  return path.slice(0, i);
-}
-
-/** Returns the last path segment. */
-function basename(path: string): string {
-  const s = segments(path);
-  return s.length ? s[s.length - 1] : path;
 }
 
 function find(side: 'local' | 'remote', serverId: string, path: string): Node | undefined {
