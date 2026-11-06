@@ -137,17 +137,12 @@ fn entry_of(v: &Value, pdf: bool) -> Option<FileEntry> {
         name = format!("{name}.{ext}");
     }
     let dir = mime == FOLDER;
-    Some(FileEntry {
+    Some(FileEntry::plain(
         name,
-        kind: if dir { "dir".into() } else { "file".into() },
-        size: if dir { 0 } else { v.get("size").and_then(|s| s.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0) },
-        mtime: parse_time(v.get("modifiedTime").and_then(|t| t.as_str())),
-        perms: if dir { "755".into() } else { "644".into() },
-        owner: String::new(),
-        group: String::new(),
-        link: None,
-        hidden: 0,
-    })
+        dir,
+        v.get("size").and_then(|s| s.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0),
+        parse_time(v.get("modifiedTime").and_then(|t| t.as_str())),
+    ))
 }
 
 /// Turns an API error answer into a clear message.

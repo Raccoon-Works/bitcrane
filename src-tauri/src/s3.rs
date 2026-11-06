@@ -205,20 +205,6 @@ fn mtime_of(headers: &reqwest::header::HeaderMap) -> i64 {
         .unwrap_or(0)
 }
 
-fn entry(name: String, dir: bool, size: u64, mtime: i64) -> FileEntry {
-    FileEntry {
-        name,
-        kind: if dir { "dir".into() } else { "file".into() },
-        size: if dir { 0 } else { size },
-        mtime,
-        perms: if dir { "755".into() } else { "644".into() },
-        owner: String::new(),
-        group: String::new(),
-        link: None,
-        hidden: 0,
-    }
-}
-
 /// One page of ListObjectsV2: files (key, size, time) and folders (prefixes).
 struct Listing {
     files: Vec<(String, u64, i64)>,
@@ -494,7 +480,7 @@ impl S3Conn {
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
         let (bucket, key) = self.split(path);
         let Some(bucket) = bucket else {
-            return Ok(self.buckets().await?.into_iter().map(|(n, t)| entry(n, true, 0, t)).collect());
+            return Ok(self.buckets().await?.into_iter().map(|(n, t)| FileEntry::plain(n, true, 0, t)).collect());
         };
         let prefix = Self::dir_prefix(&key);
         let mut out = Vec::new();
@@ -504,14 +490,14 @@ impl S3Conn {
             for p in page.prefixes {
                 let name = p.trim_end_matches('/').rsplit('/').next().unwrap_or("").to_string();
                 if !name.is_empty() {
-                    out.push(entry(name, true, 0, 0));
+                    out.push(FileEntry::plain(name, true, 0, 0));
                 }
             }
             for (k, size, mtime) in page.files {
                 // The folder's own marker object ("docs/") is not an entry.
                 let name = k.strip_prefix(&prefix).unwrap_or(&k).to_string();
                 if !name.is_empty() && !name.contains('/') {
-                    out.push(entry(name, false, size, mtime));
+                    out.push(FileEntry::plain(name, false, size, mtime));
                 }
             }
             match page.next {
@@ -530,12 +516,12 @@ impl S3Conn {
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
         let (bucket, key) = self.split(path);
         let name = if path.trim_matches('/').is_empty() { "/".to_string() } else { remote_name(path) };
-        let Some(bucket) = bucket else { return Ok(entry(name, true, 0, 0)) };
+        let Some(bucket) = bucket else { return Ok(FileEntry::plain(name, true, 0, 0)) };
         let key = key.trim_end_matches('/').to_string();
         if key.is_empty() {
             // A bucket: exists when it can be listed.
             self.list_page(&bucket, "", Some("/"), None, Some(1)).await?;
-            return Ok(entry(name, true, 0, 0));
+            return Ok(FileEntry::plain(name, true, 0, 0));
         }
         let r = self.req(Method::HEAD, Some(&bucket), &key);
         let resp = self.build(&r, EMPTY_SHA256).send().await.map_err(net_err)?;
@@ -546,7 +532,7 @@ impl S3Conn {
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0);
-            return Ok(entry(name, false, size, mtime_of(resp.headers())));
+            return Ok(FileEntry::plain(name, false, size, mtime_of(resp.headers())));
         }
         if resp.status() != StatusCode::NOT_FOUND {
             return Err(status_err(resp.status(), "", &format!("„{name}“")));
@@ -554,7 +540,7 @@ impl S3Conn {
         // No object: a folder when anything lies below it.
         let page = self.list_page(&bucket, &Self::dir_prefix(&key), Some("/"), None, Some(1)).await?;
         if !page.files.is_empty() || !page.prefixes.is_empty() {
-            return Ok(entry(name, true, 0, 0));
+            return Ok(FileEntry::plain(name, true, 0, 0));
         }
         Err(AppError::new(ErrorKind::NotFound, format!("„{name}“ gibt es nicht.")))
     }
