@@ -53,7 +53,15 @@ pub struct TransferOptions {
 
 impl Default for TransferOptions {
     fn default() -> Self {
-        Self { temp_name: true, keep_mtime: true, resume: true, file_perms: None, dir_perms: None, keep_versions: 0, limit_kbps: 0 }
+        Self {
+            temp_name: true,
+            keep_mtime: true,
+            resume: true,
+            file_perms: None,
+            dir_perms: None,
+            keep_versions: 0,
+            limit_kbps: 0,
+        }
     }
 }
 
@@ -71,7 +79,10 @@ pub fn temp_name(path: &str) -> String {
 
 /// Name of the partial file of a download.
 pub fn local_temp(native: &std::path::Path) -> std::path::PathBuf {
-    native.with_file_name(format!(".{}.bitcrane-part", native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()))
+    native.with_file_name(format!(
+        ".{}.bitcrane-part",
+        native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+    ))
 }
 
 /// Waits so the transfer stays below the speed limit.
@@ -130,7 +141,8 @@ async fn keep_old_version(conn: &Remote, remote_path: &str, keep: u32) -> AppRes
     conn.rename(remote_path, &remote_join(&dir, &version)).await?;
     // Remove the oldest versions of this file beyond the limit (names sort by time).
     // Only exact "<name>.<stamp>" names count, so ".env" leaves ".env.example.<stamp>" alone.
-    let mut versions: Vec<String> = conn.list(&dir).await?.into_iter().map(|e| e.name).filter(|n| is_version_of(n, &name)).collect();
+    let mut versions: Vec<String> =
+        conn.list(&dir).await?.into_iter().map(|e| e.name).filter(|n| is_version_of(n, &name)).collect();
     versions.sort();
     while versions.len() > keep as usize {
         let old = versions.remove(0);
@@ -156,7 +168,14 @@ fn is_version_of(candidate: &str, name: &str) -> bool {
 }
 
 /// Uploads one local file to `remote_path`.
-pub async fn upload(conn: &Remote, local_path: &str, remote_path: &str, opts: &TransferOptions, progress: Progress<'_>, flag: Arc<AtomicU8>) -> AppResult<u64> {
+pub async fn upload(
+    conn: &Remote,
+    local_path: &str,
+    remote_path: &str,
+    opts: &TransferOptions,
+    progress: Progress<'_>,
+    flag: Arc<AtomicU8>,
+) -> AppResult<u64> {
     let native = to_native(local_path);
     let meta = tokio::fs::metadata(&native).await?;
     let total = meta.len();
@@ -181,7 +200,10 @@ pub async fn upload(conn: &Remote, local_path: &str, remote_path: &str, opts: &T
     let offset = if use_temp && opts.resume && conn.can_append(remote_path) {
         conn.meta(&target)
             .await
-            .filter(|m| m.size <= total && matches!((m.mtime, mtime), (Some(part), Some(src)) if part + conn.mtime_slack() >= src))
+            .filter(|m| {
+                m.size <= total
+                    && matches!((m.mtime, mtime), (Some(part), Some(src)) if part + conn.mtime_slack() >= src)
+            })
             .map(|m| m.size)
             .unwrap_or(0)
     } else {
@@ -248,8 +270,17 @@ pub async fn upload(conn: &Remote, local_path: &str, remote_path: &str, opts: &T
 }
 
 /// Downloads one remote file to `local_path`.
-pub async fn download(conn: &Remote, remote_path: &str, local_path: &str, opts: &TransferOptions, progress: Progress<'_>, flag: Arc<AtomicU8>) -> AppResult<u64> {
-    let meta = conn.meta(remote_path).await.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Server nicht.", remote_name(remote_path))))?;
+pub async fn download(
+    conn: &Remote,
+    remote_path: &str,
+    local_path: &str,
+    opts: &TransferOptions,
+    progress: Progress<'_>,
+    flag: Arc<AtomicU8>,
+) -> AppResult<u64> {
+    let meta = conn.meta(remote_path).await.ok_or_else(|| {
+        AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Server nicht.", remote_name(remote_path)))
+    })?;
     let total = meta.size;
     let native = to_native(local_path);
     if let Some(parent) = native.parent() {
@@ -258,11 +289,15 @@ pub async fn download(conn: &Remote, remote_path: &str, local_path: &str, opts: 
     let tmp = local_temp(&native);
     let offset = if opts.resume && conn.can_seek(remote_path) {
         // Only when the server file has not changed since the partial was written.
-        let part_time = |m: &std::fs::Metadata| m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_secs());
+        let part_time = |m: &std::fs::Metadata| {
+            m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_secs())
+        };
         tokio::fs::metadata(&tmp)
             .await
             .ok()
-            .filter(|m| m.len() <= total && matches!((part_time(m), meta.mtime), (Some(part), Some(src)) if part >= src as u64))
+            .filter(|m| {
+                m.len() <= total && matches!((part_time(m), meta.mtime), (Some(part), Some(src)) if part >= src as u64)
+            })
             .map(|m| m.len())
             .unwrap_or(0)
     } else {
@@ -270,7 +305,11 @@ pub async fn download(conn: &Remote, remote_path: &str, local_path: &str, opts: 
     };
 
     let mut src = conn.reader(remote_path, offset).await?;
-    let mut dst = if offset > 0 { tokio::fs::OpenOptions::new().append(true).open(&tmp).await? } else { tokio::fs::File::create(&tmp).await? };
+    let mut dst = if offset > 0 {
+        tokio::fs::OpenOptions::new().append(true).open(&tmp).await?
+    } else {
+        tokio::fs::File::create(&tmp).await?
+    };
     let mut buf = vec![0u8; CHUNK];
     let mut done = offset;
     let mut last = Instant::now();
@@ -302,7 +341,8 @@ pub async fn download(conn: &Remote, remote_path: &str, local_path: &str, opts: 
     // A shorter file than announced means the connection ended early.
     let result = result.and(closed).and_then(|()| {
         if done < total {
-            Err(AppError::new(ErrorKind::ConnectionLost, "Die Datei kam nicht vollständig an.").with_detail(format!("{done} von {total} Bytes")))
+            Err(AppError::new(ErrorKind::ConnectionLost, "Die Datei kam nicht vollständig an.")
+                .with_detail(format!("{done} von {total} Bytes")))
         } else {
             Ok(())
         }
@@ -328,8 +368,18 @@ pub async fn download(conn: &Remote, remote_path: &str, local_path: &str, opts: 
 /// target gets the same temp-name and replace handling as an upload; there is
 /// no resume, a stopped transfer starts again from the beginning.
 #[allow(clippy::too_many_arguments)]
-pub async fn cross(src: &Remote, src_path: &str, dst: &Remote, dst_path: &str, opts: &TransferOptions, progress: Progress<'_>, flag: Arc<AtomicU8>) -> AppResult<u64> {
-    let meta = src.meta(src_path).await.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Quell-Server nicht.", remote_name(src_path))))?;
+pub async fn cross(
+    src: &Remote,
+    src_path: &str,
+    dst: &Remote,
+    dst_path: &str,
+    opts: &TransferOptions,
+    progress: Progress<'_>,
+    flag: Arc<AtomicU8>,
+) -> AppResult<u64> {
+    let meta = src.meta(src_path).await.ok_or_else(|| {
+        AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Quell-Server nicht.", remote_name(src_path)))
+    })?;
     let total = meta.size;
     let keep_mtime = meta.mtime.filter(|_| opts.keep_mtime);
     let parent = remote_parent(dst_path);
@@ -378,7 +428,8 @@ pub async fn cross(src: &Remote, src_path: &str, dst: &Remote, dst_path: &str, o
     let closed = reader.close(copied.is_ok()).await;
     let result = match copied.and(closed).and_then(|()| {
         if done < total {
-            Err(AppError::new(ErrorKind::ConnectionLost, "Die Datei kam nicht vollständig an.").with_detail(format!("{done} von {total} Bytes")))
+            Err(AppError::new(ErrorKind::ConnectionLost, "Die Datei kam nicht vollständig an.")
+                .with_detail(format!("{done} von {total} Bytes")))
         } else {
             Ok(())
         }

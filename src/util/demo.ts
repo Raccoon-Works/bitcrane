@@ -23,7 +23,7 @@ function pick<T extends string>(key: string, values: readonly T[]): T | undefine
 
 export const DEMO_PLATFORM: Platform | undefined = DEMO ? pick('platform', ['mac', 'win'] as const) : undefined;
 export const DEMO_THEME: Theme | undefined = DEMO ? pick('theme', ['light', 'dark'] as const) : undefined;
-export const DEMO_LANG: string | undefined = DEMO ? params.get('lang') ?? undefined : undefined;
+export const DEMO_LANG: string | undefined = DEMO ? (params.get('lang') ?? undefined) : undefined;
 
 /**
  * Listens for platform and theme changes from the host page. Only messages

@@ -24,10 +24,24 @@ function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () => void }
   return (
     <>
       {items.map((it, i) =>
-        it.sep ? <div key={`sep${i}`} className="menu-sep" role="separator" /> : (
-          <button key={it.label} type="button" role="menuitem" className={`menu-item${it.danger ? ' is-danger' : ''}`} disabled={!it.run} onClick={() => { onClose(); it.run?.(); }}>
+        it.sep ? (
+          <div key={`sep${i}`} className="menu-sep" role="separator" />
+        ) : (
+          <button
+            key={it.label}
+            type="button"
+            role="menuitem"
+            className={`menu-item${it.danger ? ' is-danger' : ''}`}
+            disabled={!it.run}
+            onClick={() => {
+              onClose();
+              it.run?.();
+            }}
+          >
             <span className="flex-1">{menuText(it.label)}</span>
-            {(platform === 'mac' ? it.mac : it.win) && <span className="menu-key">{platform === 'mac' ? it.mac : it.win}</span>}
+            {(platform === 'mac' ? it.mac : it.win) && (
+              <span className="menu-key">{platform === 'mac' ? it.mac : it.win}</span>
+            )}
           </button>
         ),
       )}
@@ -58,7 +72,10 @@ export function MacMenuBar() {
             aria-haspopup="menu"
             aria-expanded={open === m.id}
             className={`menubar-item${m.id === 'app' ? ' is-app' : ''}${open === m.id ? ' is-open' : ''}`}
-            onMouseDown={(e) => { e.preventDefault(); setState({ appMenu: open === m.id ? null : m.id }); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setState({ appMenu: open === m.id ? null : m.id });
+            }}
             onMouseEnter={() => open && open !== m.id && setState({ appMenu: m.id })}
           >
             {m.label}
@@ -71,11 +88,17 @@ export function MacMenuBar() {
         </div>
       ))}
       <span className="flex-1" />
-      <button type="button" className={`menubar-extra${trayOpen ? ' is-open' : ''}`} aria-label={$t('Bitcrane in der Menüleiste')} onClick={() => setState((s) => ({ menuBarWindowOpen: !s.menuBarWindowOpen }))}>
+      <button
+        type="button"
+        className={`menubar-extra${trayOpen ? ' is-open' : ''}`}
+        aria-label={$t('Bitcrane in der Menüleiste')}
+        onClick={() => setState((s) => ({ menuBarWindowOpen: !s.menuBarWindowOpen }))}
+      >
         <BMark variant="mono" size={16} />
         {running && <span className="extra-dot" />}
       </button>
-      <span className="menubar-clock">{day}  {formatTime(now)}</span>
+      {/* Two spaces between date and time, as in the macOS menu bar. */}
+      <span className="menubar-clock">{`${day}  ${formatTime(now)}`}</span>
     </div>
   );
 }
@@ -106,7 +129,15 @@ export function WinSystemMenu() {
   ];
   return (
     <div className="win-menu-anchor" ref={ref}>
-      <button type="button" className="win-logo-btn" aria-label={$t('Fenstermenü')} aria-haspopup="menu" aria-expanded={open} onClick={() => setState({ appMenu: open ? null : 'system' })} onDoubleClick={closeWindow}>
+      <button
+        type="button"
+        className="win-logo-btn"
+        aria-label={$t('Fenstermenü')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setState({ appMenu: open ? null : 'system' })}
+        onDoubleClick={closeWindow}
+      >
         <BMark variant="winApp" size={24} />
       </button>
       {open && (
@@ -127,7 +158,10 @@ export function WinMoreMenu() {
   const open = useStore((s) => s.appMenu === 'win');
   const [sub, setSub] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const close = () => { setSub(null); setState({ appMenu: null }); };
+  const close = () => {
+    setSub(null);
+    setState({ appMenu: null });
+  };
   useCloseOnOutside(open, ref, close);
   const defs = menuDefs();
   const byId = (id: string) => defs.find((m) => m.id === id)!;
@@ -140,20 +174,33 @@ export function WinMoreMenu() {
   ];
   // Help, updates and "Über Bitcrane" moved to the B in the title bar; settings have their own button.
   const subs = ['file', 'edit', 'view', 'go', 'server', 'watch'];
-  const bottom: MenuItem[] = [
-    { label: $t('Werkzeugleiste anpassen …'), run: () => openDialog({ type: 'toolbar' }) },
-  ];
+  const bottom: MenuItem[] = [{ label: $t('Werkzeugleiste anpassen …'), run: () => openDialog({ type: 'toolbar' }) }];
   return (
     <div className="more-anchor" ref={ref}>
       {/* Settings in one click (gear), next to the main menu (three lines), both as tool buttons. */}
       <span className="tool-group more-group">
         <Tooltip text={$t('Einstellungen')} shortcut="Strg+,">
-          <button type="button" className="icon-btn" aria-label={$t('Einstellungen')} onClick={() => { close(); openDialog({ type: 'settings', tab: 'general' }); }}>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label={$t('Einstellungen')}
+            onClick={() => {
+              close();
+              openDialog({ type: 'settings', tab: 'general' });
+            }}
+          >
             <GearSix size={19} />
           </button>
         </Tooltip>
         <Tooltip text={$t('Menü')} shortcut="Alt">
-          <button type="button" className={`icon-btn${open ? ' is-on' : ''}`} aria-label={$t('Menü')} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setState({ appMenu: 'win' }))}>
+          <button
+            type="button"
+            className={`icon-btn${open ? ' is-on' : ''}`}
+            aria-label={$t('Menü')}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={() => (open ? close() : setState({ appMenu: 'win' }))}
+          >
             <List size={19} />
           </button>
         </Tooltip>
@@ -173,7 +220,12 @@ export function WinMoreMenu() {
                   aria-expanded={sub === id}
                   className={`menu-item${sub === id ? ' is-hl' : ''}`}
                   onClick={() => setSub(sub === id ? null : id)}
-                  onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setSub(id); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      setSub(id);
+                    }
+                  }}
                 >
                   <span className="flex-1">{m.label}</span>
                   <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />

@@ -15,8 +15,10 @@ import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
 /** Demo texts for the browser prototype. */
-const DEMO_SERVER = 'from flask import Flask\n\nfrom .routes import cart, products\n\nDEBUG = True\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\n\n\n@app.get("/health")\ndef health():\n    return "ok"\n';
-const DEMO_LOCAL = 'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
+const DEMO_SERVER =
+  'from flask import Flask\n\nfrom .routes import cart, products\n\nDEBUG = True\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\n\n\n@app.get("/health")\ndef health():\n    return "ok"\n';
+const DEMO_LOCAL =
+  'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
 
 interface Loaded {
   server: string;
@@ -37,15 +39,19 @@ export function DiffDialog({ transferId }: { transferId: string }) {
     }
     let cancelled = false;
     // Uploads go from the local source to the server target, downloads the other way round.
-    const [remotePath, localPath] = transfer.direction === 'down' ? [transfer.source, transfer.target] : [transfer.target, transfer.source];
+    const [remotePath, localPath] =
+      transfer.direction === 'down' ? [transfer.source, transfer.target] : [transfer.target, transfer.source];
     Promise.all([backend.remoteReadText(transfer.serverId, remotePath), backend.localReadText(localPath)])
       .then(([server, local]) => {
-        if (!cancelled) setData({ server: server.text, local: local.text, truncated: server.truncated || local.truncated });
+        if (!cancelled)
+          setData({ server: server.text, local: local.text, truncated: server.truncated || local.truncated });
       })
       .catch((e) => {
         if (!cancelled) setError(toBackendError(e).message);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // Load once per transfer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transferId]);
@@ -63,11 +69,36 @@ export function DiffDialog({ transferId }: { transferId: string }) {
       width={820}
       maxHeight={640}
       onClose={back}
-      footer={<><span className="flex-1 small muted">{data && (stats.added || stats.removed) ? $t('{0} Zeilen neu, {1} Zeilen entfernt', stats.added, stats.removed) : ''}</span><Button variant="primary" onClick={back}>{$t('Zurück zur Entscheidung')}</Button></>}
+      footer={
+        <>
+          <span className="flex-1 small muted">
+            {data && (stats.added || stats.removed)
+              ? $t('{0} Zeilen neu, {1} Zeilen entfernt', stats.added, stats.removed)
+              : ''}
+          </span>
+          <Button variant="primary" onClick={back}>
+            {$t('Zurück zur Entscheidung')}
+          </Button>
+        </>
+      }
     >
-      {!data && !error && <p className="row-inline muted"><Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />{$t('Wird geladen …')}</p>}
-      {error && <div className="notice tone-warn-notice"><AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" /><span>{error}</span></div>}
-      {data && !hunks.length && <p className="muted">{$t('Die beiden Versionen sind inhaltlich gleich; nur das Änderungsdatum unterscheidet sich.')}</p>}
+      {!data && !error && (
+        <p className="row-inline muted">
+          <Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />
+          {$t('Wird geladen …')}
+        </p>
+      )}
+      {error && (
+        <div className="notice tone-warn-notice">
+          <AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
+      {data && !hunks.length && (
+        <p className="muted">
+          {$t('Die beiden Versionen sind inhaltlich gleich; nur das Änderungsdatum unterscheidet sich.')}
+        </p>
+      )}
       {data && hunks.length > 0 && <DiffTable hunks={hunks} truncated={data.truncated} />}
     </Dialog>
   );
@@ -82,13 +113,29 @@ function DiffTable({ hunks, truncated }: { hunks: Hunks; truncated: boolean }) {
       {truncated && <div className="diff-skip">{$t('Die Datei ist sehr groß; gezeigt wird nur der Anfang.')}</div>}
       {hunks.map((h, i) => (
         <div key={i} role="rowgroup">
-          {h.skipped > 0 && <div className="diff-skip">{h.skipped} {$t('unveränderte')}{' '}{h.skipped === 1 ? $t('Zeile') : $t('Zeilen')}</div>}
+          {h.skipped > 0 && (
+            <div className="diff-skip">
+              {h.skipped} {$t('unveränderte')} {h.skipped === 1 ? $t('Zeile') : $t('Zeilen')}
+            </div>
+          )}
           {h.lines.map((l, j) => (
             <div key={j} role="row" className={`diff-line is-${l.op}`}>
-              <span className="diff-no" role="cell">{l.oldNo ?? ''}</span>
-              <span className="diff-no" role="cell">{l.newNo ?? ''}</span>
-              <span className="diff-sign" role="cell" aria-label={l.op === 'add' ? $t('neu') : l.op === 'del' ? $t('entfernt') : $t('gleich')}>{l.op === 'add' ? '+' : l.op === 'del' ? '−' : ''}</span>
-              <span className="diff-text" role="cell">{l.text || ' '}</span>
+              <span className="diff-no" role="cell">
+                {l.oldNo ?? ''}
+              </span>
+              <span className="diff-no" role="cell">
+                {l.newNo ?? ''}
+              </span>
+              <span
+                className="diff-sign"
+                role="cell"
+                aria-label={l.op === 'add' ? $t('neu') : l.op === 'del' ? $t('entfernt') : $t('gleich')}
+              >
+                {l.op === 'add' ? '+' : l.op === 'del' ? '−' : ''}
+              </span>
+              <span className="diff-text" role="cell">
+                {l.text || ' '}
+              </span>
             </div>
           ))}
         </div>
@@ -113,9 +160,15 @@ export function CompareFilesDialog({ a, b }: { a: CompareRef; b: CompareRef }) {
     }
     let cancelled = false;
     Promise.all([readText(a), readText(b)])
-      .then(([x, y]) => { if (!cancelled) setData({ a: x.text, b: y.text, truncated: x.truncated || y.truncated }); })
-      .catch((e) => { if (!cancelled) setError(toBackendError(e).message); });
-    return () => { cancelled = true; };
+      .then(([x, y]) => {
+        if (!cancelled) setData({ a: x.text, b: y.text, truncated: x.truncated || y.truncated });
+      })
+      .catch((e) => {
+        if (!cancelled) setError(toBackendError(e).message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [a, b]);
   const lines = useMemo(() => (data ? diffLines(data.a, data.b) : []), [data]);
   const hunks = useMemo(() => toHunks(lines), [lines]);
@@ -127,10 +180,31 @@ export function CompareFilesDialog({ a, b }: { a: CompareRef; b: CompareRef }) {
       subtitle={$t('Rot (−): nur in {0}. Grün (+): nur in {1}.', a.label, b.label)}
       width={820}
       maxHeight={640}
-      footer={<><span className="flex-1 small muted">{data && (stats.added || stats.removed) ? $t('{0} Zeilen neu, {1} Zeilen entfernt', stats.added, stats.removed) : ''}</span><Button variant="primary" onClick={closeDialog}>{$t('Fertig')}</Button></>}
+      footer={
+        <>
+          <span className="flex-1 small muted">
+            {data && (stats.added || stats.removed)
+              ? $t('{0} Zeilen neu, {1} Zeilen entfernt', stats.added, stats.removed)
+              : ''}
+          </span>
+          <Button variant="primary" onClick={closeDialog}>
+            {$t('Fertig')}
+          </Button>
+        </>
+      }
     >
-      {!data && !error && <p className="row-inline muted"><Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />{$t('Wird geladen …')}</p>}
-      {error && <div className="notice tone-warn-notice"><AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" /><span>{error}</span></div>}
+      {!data && !error && (
+        <p className="row-inline muted">
+          <Loader2 size={14} strokeWidth={1.75} className="spin" aria-hidden="true" />
+          {$t('Wird geladen …')}
+        </p>
+      )}
+      {error && (
+        <div className="notice tone-warn-notice">
+          <AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
       {data && !hunks.length && <p className="muted">{$t('Die beiden Dateien sind inhaltlich gleich.')}</p>}
       {data && hunks.length > 0 && <DiffTable hunks={hunks} truncated={data.truncated} />}
     </Dialog>

@@ -74,8 +74,12 @@ pub fn toggle(paths: &[String], name: &str, color: u8, on: bool) -> AppResult<()
         }
         let items: Vec<String> = tags.iter().map(|t| format!("{}\n{}", t.name, t.color)).collect();
         let mut buf = Vec::new();
-        plist::to_writer_binary(&mut buf, &items).map_err(|e| crate::error::AppError::other("Markierung konnte nicht gesetzt werden.").with_detail(e.to_string()))?;
-        xattr::set(&native, ATTR, &buf).map_err(|e| crate::error::AppError::other("Markierung konnte nicht gesetzt werden.").with_detail(e.to_string()))?;
+        plist::to_writer_binary(&mut buf, &items).map_err(|e| {
+            crate::error::AppError::other("Markierung konnte nicht gesetzt werden.").with_detail(e.to_string())
+        })?;
+        xattr::set(&native, ATTR, &buf).map_err(|e| {
+            crate::error::AppError::other("Markierung konnte nicht gesetzt werden.").with_detail(e.to_string())
+        })?;
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (paths, name, color, on);
@@ -103,8 +107,18 @@ pub fn find(name: &str, limit: usize) -> Vec<Tagged> {
         if let Ok(o) = std::process::Command::new("/usr/bin/mdfind").arg(q).output() {
             for line in String::from_utf8_lossy(&o.stdout).lines().take(limit) {
                 let Ok(md) = std::fs::metadata(line) else { continue };
-                let mtime = md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
-                out.push(Tagged { path: crate::paths::to_ui(std::path::Path::new(line)), size: if md.is_dir() { 0 } else { md.len() }, mtime, dir: md.is_dir() });
+                let mtime = md
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+                out.push(Tagged {
+                    path: crate::paths::to_ui(std::path::Path::new(line)),
+                    size: if md.is_dir() { 0 } else { md.len() },
+                    mtime,
+                    dir: md.is_dir(),
+                });
             }
         }
     }

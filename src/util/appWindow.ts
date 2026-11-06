@@ -32,7 +32,9 @@ export function quitApp() {
     showToast($t('Im Prototyp lässt sich Bitcrane nicht beenden.'));
     return;
   }
-  void import('../state/editor').then((ed) => { if (ed.editorCanQuit()) doQuit(); });
+  void import('../state/editor').then((ed) => {
+    if (ed.editorCanQuit()) doQuit();
+  });
 }
 
 function doQuit() {

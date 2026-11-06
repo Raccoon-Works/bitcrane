@@ -43,7 +43,9 @@ fn expand_includes(text: &str, home_dir: &Path, depth: u8) -> String {
     for raw in text.lines() {
         let line = raw.trim();
         let lower = line.to_ascii_lowercase();
-        if depth < 4 && (lower.starts_with("include ") || lower.starts_with("include=") || lower.starts_with("include\t")) {
+        if depth < 4
+            && (lower.starts_with("include ") || lower.starts_with("include=") || lower.starts_with("include\t"))
+        {
             for pattern in line[7..].trim_start_matches(|c: char| c.is_whitespace() || c == '=').split_whitespace() {
                 let pattern = pattern.trim_matches('"');
                 let full = match pattern.strip_prefix("~/") {
@@ -75,7 +77,12 @@ fn matching_files(path: &Path) -> Vec<std::path::PathBuf> {
     let Some(dir) = path.parent() else { return vec![] };
     let Ok(glob) = globset::Glob::new(&name).map(|g| g.compile_matcher()) else { return vec![] };
     let mut files: Vec<_> = std::fs::read_dir(dir)
-        .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.is_file() && p.file_name().map(|n| glob.is_match(n)).unwrap_or(false)).collect())
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_file() && p.file_name().map(|n| glob.is_match(n)).unwrap_or(false))
+                .collect()
+        })
         .unwrap_or_default();
     files.sort();
     files
@@ -92,7 +99,8 @@ pub fn parse(text: &str, default_user: &str, home_dir: &Path) -> Vec<SshConfigHo
     let mut current: Vec<usize> = Vec::new();
     // Inside a "Host *" block: its User/Port/IdentityFile are defaults for all hosts.
     let mut in_defaults = false;
-    let (mut def_user, mut def_port, mut def_identity): (Option<String>, Option<u16>, Option<String>) = (None, None, None);
+    let (mut def_user, mut def_port, mut def_identity): (Option<String>, Option<u16>, Option<String>) =
+        (None, None, None);
     // Which values a host set itself (those win over the defaults).
     let mut explicit: Vec<[bool; 3]> = Vec::new();
     for raw in text.lines() {
@@ -114,7 +122,14 @@ pub fn parse(text: &str, default_user: &str, home_dir: &Path) -> Vec<SshConfigHo
                     if alias.contains('*') || alias.contains('?') || alias.starts_with('!') {
                         continue;
                     }
-                    out.push(SshConfigHost { alias: alias.to_string(), host: alias.to_string(), port: 22, user: default_user.to_string(), identity_file: None, proxy_jump: None });
+                    out.push(SshConfigHost {
+                        alias: alias.to_string(),
+                        host: alias.to_string(),
+                        port: 22,
+                        user: default_user.to_string(),
+                        identity_file: None,
+                        proxy_jump: None,
+                    });
                     explicit.push([false; 3]);
                     current.push(out.len() - 1);
                 }
@@ -199,7 +214,11 @@ mod tests {
         let home = std::env::temp_dir().join(format!("bitcrane-sshcfg-{}", std::process::id()));
         std::fs::create_dir_all(home.join(".ssh/config.d")).unwrap();
         std::fs::write(home.join(".ssh/config.d/work"), "Host work\n  HostName work.example.org\n").unwrap();
-        let text = expand_includes("Include config.d/*\nHost home\n  Port 2200\nHost *\n  User admin\n  Port 2222\n", &home, 0);
+        let text = expand_includes(
+            "Include config.d/*\nHost home\n  Port 2200\nHost *\n  User admin\n  Port 2222\n",
+            &home,
+            0,
+        );
         let hosts = parse(&text, "alex", &home);
         let work = hosts.iter().find(|h| h.alias == "work").unwrap();
         assert_eq!((work.host.as_str(), work.user.as_str(), work.port), ("work.example.org", "admin", 2222));

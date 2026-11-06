@@ -118,8 +118,14 @@ mod sync_root_tests {
     #[test]
     fn maps_explorer_paths_to_the_server() {
         let root = PathBuf::from(r"C:\Users\c\Bitcrane\Web");
-        assert_eq!(to_remote(&root, "/var/www", Path::new(r"C:\Users\c\Bitcrane\Web\a\b.txt")).as_deref(), Some("/var/www/a/b.txt"));
-        assert_eq!(to_remote(&root, "/var/www", Path::new(r"\\?\c:\users\c\bitcrane\web")).as_deref(), Some("/var/www"));
+        assert_eq!(
+            to_remote(&root, "/var/www", Path::new(r"C:\Users\c\Bitcrane\Web\a\b.txt")).as_deref(),
+            Some("/var/www/a/b.txt")
+        );
+        assert_eq!(
+            to_remote(&root, "/var/www", Path::new(r"\\?\c:\users\c\bitcrane\web")).as_deref(),
+            Some("/var/www")
+        );
         assert_eq!(to_remote(&root, "/", Path::new(r"C:\Users\c\Bitcrane\Webseite\x")), None);
         assert_eq!(to_remote(&root, "/", Path::new(r"C:\Users\c\Bitcrane\Web\x")).as_deref(), Some("/x"));
     }
@@ -138,14 +144,21 @@ pub fn storable_name(name: &str) -> String {
 /// The Windows rule itself (kept separate so it is tested on every system).
 pub fn windows_name(name: &str) -> String {
     let pct = |c: char| format!("%{:02X}", c as u32);
-    let mut out: String = name.chars().map(|c| if "<>:\"|?*\\".contains(c) || (c as u32) < 32 { pct(c) } else { c.to_string() }).collect();
+    let mut out: String = name
+        .chars()
+        .map(|c| if "<>:\"|?*\\".contains(c) || (c as u32) < 32 { pct(c) } else { c.to_string() })
+        .collect();
     if let Some(last) = out.chars().last().filter(|c| *c == '.' || *c == ' ') {
         out.pop();
         out.push_str(&pct(last));
     }
     let lower = out.to_ascii_lowercase();
     let stem = lower.split('.').next().unwrap_or("");
-    let reserved = matches!(stem, "con" | "prn" | "aux" | "nul") || ((stem.starts_with("com") || stem.starts_with("lpt")) && stem.len() == 4 && stem.as_bytes()[3].is_ascii_digit() && stem.as_bytes()[3] != b'0');
+    let reserved = matches!(stem, "con" | "prn" | "aux" | "nul")
+        || ((stem.starts_with("com") || stem.starts_with("lpt"))
+            && stem.len() == 4
+            && stem.as_bytes()[3].is_ascii_digit()
+            && stem.as_bytes()[3] != b'0');
     if reserved {
         let first = out.chars().next().unwrap_or('_');
         out = format!("{}{}", pct(first), &out[first.len_utf8()..]);

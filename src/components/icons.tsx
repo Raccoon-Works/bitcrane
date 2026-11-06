@@ -33,7 +33,9 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
   const rim = !mono && !tile && light;
   const vb = tile ? '-7.17 -7.17 114.34 114.34' : '0 0 100 100';
   // The tile version is moved so the mark sits optically in the middle of the tile.
-  const tf = tile ? 'translate(48.50 51.00) scale(0.84) translate(-44.5 -48)' : 'translate(50 50) scale(1.12) translate(-44.5 -48)';
+  const tf = tile
+    ? 'translate(48.50 51.00) scale(0.84) translate(-44.5 -48)'
+    : 'translate(50 50) scale(1.12) translate(-44.5 -48)';
   const fill = (k: string) => (mono ? color : `url(#${id}${k})`);
   const shape = (bowl: string, arrow: string, key?: string | number, t?: string, withRim = false) => (
     <g key={key} transform={t}>
@@ -51,22 +53,50 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
   return (
     <svg width={size} height={size} viewBox={vb} role="img" aria-label="Bitcrane">
       <defs>
-        <linearGradient id={`${id}b`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="84"><stop offset="0" stopColor="#6FB8FF" /><stop offset="1" stopColor="#4A9EF2" /></linearGradient>
-        <linearGradient id={`${id}a`} gradientUnits="userSpaceOnUse" x1="0" y1="84" x2="0" y2="10"><stop offset="0" stopColor="#9FD6FF" /><stop offset="1" stopColor="#DDF2FF" /></linearGradient>
-        <linearGradient id={`${id}sb`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="88"><stop offset="0" stopColor="#2A6DBA" /><stop offset="1" stopColor="#1F5FA8" /></linearGradient>
-        <linearGradient id={`${id}sa`} gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="88"><stop offset="0" stopColor="#5E9DD6" /><stop offset="1" stopColor="#4E8FCB" /></linearGradient>
-        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1C1C1E" /><stop offset="1" stopColor="#0D0D0D" /></linearGradient>
-        <linearGradient id={`${id}r`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" /><stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0" /></linearGradient>
+        <linearGradient id={`${id}b`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="84">
+          <stop offset="0" stopColor="#6FB8FF" />
+          <stop offset="1" stopColor="#4A9EF2" />
+        </linearGradient>
+        <linearGradient id={`${id}a`} gradientUnits="userSpaceOnUse" x1="0" y1="84" x2="0" y2="10">
+          <stop offset="0" stopColor="#9FD6FF" />
+          <stop offset="1" stopColor="#DDF2FF" />
+        </linearGradient>
+        <linearGradient id={`${id}sb`} gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="88">
+          <stop offset="0" stopColor="#2A6DBA" />
+          <stop offset="1" stopColor="#1F5FA8" />
+        </linearGradient>
+        <linearGradient id={`${id}sa`} gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="88">
+          <stop offset="0" stopColor="#5E9DD6" />
+          <stop offset="1" stopColor="#4E8FCB" />
+        </linearGradient>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1C1C1E" />
+          <stop offset="1" stopColor="#0D0D0D" />
+        </linearGradient>
+        <linearGradient id={`${id}r`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" />
+          <stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
       </defs>
       {tile && (
         <>
           <rect x="4" y="4" width="92" height="92" rx="20.6" fill={`url(#${id}t)`} />
-          <rect x="4.3" y="4.3" width="91.4" height="91.4" rx="20.3" fill="none" stroke={`url(#${id}r)`} strokeWidth="0.6" />
+          <rect
+            x="4.3"
+            y="4.3"
+            width="91.4"
+            height="91.4"
+            rx="20.3"
+            fill="none"
+            stroke={`url(#${id}r)`}
+            strokeWidth="0.6"
+          />
         </>
       )}
       <g transform={tf}>
         <g transform={relief ? 'translate(0.80 -2.60)' : undefined}>
-          {relief && EDGE.map(([x, y], i) => shape(fill('sb'), fill('sa'), i, `translate(${x.toFixed(3)} ${y.toFixed(3)})`))}
+          {relief &&
+            EDGE.map(([x, y], i) => shape(fill('sb'), fill('sa'), i, `translate(${x.toFixed(3)} ${y.toFixed(3)})`))}
           {/* Small and flat on a light background (Windows title bar): the light blue
               face would almost vanish, so the darker edge colours carry the mark. */}
           {!relief && light && !mono && !tile
@@ -78,9 +108,26 @@ export function BMark({ variant, size, color = 'currentColor' }: { variant: BVar
   );
 }
 
-export function WatchIcon({ size = 16, waves = 1, strokeWidth = 1.5 }: { size?: number; waves?: 1 | 2; strokeWidth?: number }) {
+export function WatchIcon({
+  size = 16,
+  waves = 1,
+  strokeWidth = 1.5,
+}: {
+  size?: number;
+  waves?: 1 | 2;
+  strokeWidth?: number;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" />
       <path d="M5 5a4.2 4.2 0 0 0 0 6M11 5a4.2 4.2 0 0 1 0 6" />
       {waves === 2 && <path d="M2.8 2.8a7.3 7.3 0 0 0 0 10.4M13.2 2.8a7.3 7.3 0 0 1 0 10.4" />}
@@ -109,7 +156,18 @@ export function FileGlyph({ size = 16, name }: { size?: number; name?: string })
   const base = name ? name.slice(name.lastIndexOf('/') + 1) : '';
   const ext = base.lastIndexOf('.') > 0 ? base.slice(base.lastIndexOf('.') + 1) : '';
   if (systemIcons && ext && !failed) {
-    return <img className="glyph-system" src={convertFileSrc(ext.toLowerCase(), 'fileicon')} width={size} height={size} alt="" aria-hidden="true" draggable={false} onError={() => setFailed(true)} />;
+    return (
+      <img
+        className="glyph-system"
+        src={convertFileSrc(ext.toLowerCase(), 'fileicon')}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        onError={() => setFailed(true)}
+      />
+    );
   }
   const t = name ? typeIconFor(name) : undefined;
   if (t) return <t.Icon size={size} weight="duotone" className={`glyph-type tone-file-${t.tone}`} aria-hidden="true" />;
@@ -127,5 +185,17 @@ export function FileGlyph({ size = 16, name }: { size?: number; name?: string })
 export function PackageGlyph({ size = 16, path, name }: { size?: number; path: string; name: string }) {
   const [failed, setFailed] = useState(false);
   if (!LIVE || failed) return <FileGlyph size={size} name={name} />;
-  return <img className="glyph-system" src={convertFileSrc(path, 'itemicon')} width={size} height={size} alt="" aria-hidden="true" draggable={false} loading="lazy" onError={() => setFailed(true)} />;
+  return (
+    <img
+      className="glyph-system"
+      src={convertFileSrc(path, 'itemicon')}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
 }

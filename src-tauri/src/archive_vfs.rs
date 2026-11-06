@@ -91,12 +91,16 @@ fn items(archive: &Path) -> AppResult<Vec<Item>> {
     let mut out: Vec<Item> = Vec::new();
     match kind {
         Kind::Zip => {
-            let mut zip = zip::ZipArchive::new(io::BufReader::new(fs::File::open(archive).map_err(err)?)).map_err(err)?;
+            let mut zip =
+                zip::ZipArchive::new(io::BufReader::new(fs::File::open(archive).map_err(err)?)).map_err(err)?;
             for i in 0..zip.len() {
                 let e = zip.by_index(i).map_err(err)?;
                 let mtime = e
                     .last_modified()
-                    .and_then(|d| chrono::NaiveDate::from_ymd_opt(d.year() as i32, d.month() as u32, d.day() as u32).and_then(|day| day.and_hms_opt(d.hour() as u32, d.minute() as u32, d.second() as u32)))
+                    .and_then(|d| {
+                        chrono::NaiveDate::from_ymd_opt(d.year() as i32, d.month() as u32, d.day() as u32)
+                            .and_then(|day| day.and_hms_opt(d.hour() as u32, d.minute() as u32, d.second() as u32))
+                    })
                     // Zip stores the local time of the computer that packed it.
                     .and_then(|t| chrono::TimeZone::from_local_datetime(&chrono::Local, &t).earliest())
                     .map(|t| t.timestamp_millis())
@@ -114,7 +118,12 @@ fn items(archive: &Path) -> AppResult<Vec<Item>> {
                 if !dir && !h.entry_type().is_file() {
                     continue;
                 }
-                out.push(Item { path, dir, size: h.size().unwrap_or(0), mtime: h.mtime().map(|m| m as i64 * 1000).unwrap_or(0) });
+                out.push(Item {
+                    path,
+                    dir,
+                    size: h.size().unwrap_or(0),
+                    mtime: h.mtime().map(|m| m as i64 * 1000).unwrap_or(0),
+                });
             }
         }
     }
@@ -176,10 +185,23 @@ pub fn list(archive: &Path, inner: &str) -> AppResult<Vec<FileEntry>> {
 pub fn stat(archive: &Path, inner: &str) -> AppResult<FileEntry> {
     if inner.is_empty() {
         let name = archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        return Ok(FileEntry { name, kind: "dir".into(), size: 0, mtime: 0, perms: "555".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+        return Ok(FileEntry {
+            name,
+            kind: "dir".into(),
+            size: 0,
+            mtime: 0,
+            perms: "555".into(),
+            owner: String::new(),
+            group: String::new(),
+            link: None,
+            hidden: 0,
+        });
     }
     let all = items(archive)?;
-    let it = all.iter().find(|i| i.path == inner).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{inner}“ gibt es im Archiv nicht.")))?;
+    let it = all
+        .iter()
+        .find(|i| i.path == inner)
+        .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{inner}“ gibt es im Archiv nicht.")))?;
     Ok(entry(inner.rsplit('/').next().unwrap_or(inner), it))
 }
 
@@ -189,7 +211,8 @@ fn each_file(archive: &Path, inner: &str, mut f: impl FnMut(&str, &mut dyn Read)
     let under = |p: &str| p == inner || inner.is_empty() || p.starts_with(&format!("{inner}/"));
     match kind {
         Kind::Zip => {
-            let mut zip = zip::ZipArchive::new(io::BufReader::new(fs::File::open(archive).map_err(err)?)).map_err(err)?;
+            let mut zip =
+                zip::ZipArchive::new(io::BufReader::new(fs::File::open(archive).map_err(err)?)).map_err(err)?;
             for i in 0..zip.len() {
                 let mut e = zip.by_index(i).map_err(err)?;
                 let p = clean(e.name());
@@ -240,7 +263,11 @@ pub fn read(archive: &Path, inner: &str, limit: usize) -> AppResult<Vec<u8>> {
 /// clashing name gets " Kopie". Returns the name used.
 pub fn extract(archive: &Path, inner: &str, dest_dir: &Path) -> AppResult<String> {
     let base = inner.rsplit('/').next().unwrap_or(inner).to_string();
-    let base = if base.is_empty() { archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into()) } else { base };
+    let base = if base.is_empty() {
+        archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into())
+    } else {
+        base
+    };
     let name = copy_name(|n| dest_dir.join(n).exists(), &base);
     let is_dir = inner.is_empty() || stat(archive, inner)?.kind == "dir";
     let target_root = dest_dir.join(&name);
@@ -280,7 +307,15 @@ pub fn walk(archive: &Path, inner: &str, ui_path: &str) -> AppResult<Vec<WalkIte
             let rel_in = if inner.is_empty() { i.path.as_str() } else { &i.path[inner.len() + 1..] };
             WalkItem {
                 path: format!("{base_ui}/{rel_in}"),
-                relative: if inner.is_empty() { format!("{}/{}", archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), i.path) } else { i.path[parent_len..].to_string() },
+                relative: if inner.is_empty() {
+                    format!(
+                        "{}/{}",
+                        archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                        i.path
+                    )
+                } else {
+                    i.path[parent_len..].to_string()
+                },
                 size: i.size,
                 mtime: i.mtime,
             }
@@ -320,7 +355,10 @@ mod tests {
         let top = list(&zip, "").unwrap();
         assert_eq!(top.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), vec!["site"]);
         let site = list(&zip, "site").unwrap();
-        assert_eq!(site.iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(), vec![("css", "dir"), ("index.html", "file")]);
+        assert_eq!(
+            site.iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(),
+            vec![("css", "dir"), ("index.html", "file")]
+        );
         assert_eq!(read(&zip, "site/index.html", 100).unwrap(), b"<h1>Hallo</h1>");
         let out = base.join("out");
         fs::create_dir_all(&out).unwrap();

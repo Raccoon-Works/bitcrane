@@ -40,7 +40,8 @@ pub fn save(dir: &Path, value: &Value) -> AppResult<()> {
 }
 
 fn entry(account: &str) -> AppResult<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE, account).map_err(|e| AppError::other("Schlüsselbund nicht verfügbar.").with_detail(e.to_string()))
+    keyring::Entry::new(KEYRING_SERVICE, account)
+        .map_err(|e| AppError::other("Schlüsselbund nicht verfügbar.").with_detail(e.to_string()))
 }
 
 pub fn secret_get(account: &str) -> AppResult<Option<String>> {
@@ -52,7 +53,9 @@ pub fn secret_get(account: &str) -> AppResult<Option<String>> {
 }
 
 pub fn secret_set(account: &str, value: &str) -> AppResult<()> {
-    entry(account)?.set_password(value).map_err(|e| AppError::other("Konnte nicht im Schlüsselbund speichern.").with_detail(e.to_string()))
+    entry(account)?
+        .set_password(value)
+        .map_err(|e| AppError::other("Konnte nicht im Schlüsselbund speichern.").with_detail(e.to_string()))
 }
 
 pub fn secret_delete(account: &str) -> AppResult<()> {

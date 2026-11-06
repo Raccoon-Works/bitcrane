@@ -93,9 +93,12 @@ impl From<std::io::Error> for AppError {
             K::NotFound => ErrorKind::NotFound,
             K::PermissionDenied => ErrorKind::PermissionDenied,
             K::AlreadyExists => ErrorKind::AlreadyExists,
-            K::ConnectionRefused | K::ConnectionReset | K::ConnectionAborted | K::TimedOut | K::HostUnreachable | K::NetworkUnreachable => {
-                ErrorKind::Unreachable
-            }
+            K::ConnectionRefused
+            | K::ConnectionReset
+            | K::ConnectionAborted
+            | K::TimedOut
+            | K::HostUnreachable
+            | K::NetworkUnreachable => ErrorKind::Unreachable,
             _ => ErrorKind::Other,
         };
         let message = match kind {
@@ -124,7 +127,9 @@ impl From<russh_sftp::client::error::Error> for AppError {
                 };
                 AppError::new(kind, message).with_detail(status.error_message.clone())
             }
-            E::Timeout => AppError::new(ErrorKind::ConnectionLost, "Der Server antwortet nicht.").with_detail(e.to_string()),
+            E::Timeout => {
+                AppError::new(ErrorKind::ConnectionLost, "Der Server antwortet nicht.").with_detail(e.to_string())
+            }
             _ => AppError::new(ErrorKind::ConnectionLost, "Verbindung unterbrochen").with_detail(e.to_string()),
         }
     }

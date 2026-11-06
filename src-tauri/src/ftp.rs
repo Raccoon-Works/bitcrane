@@ -73,7 +73,10 @@ fn default_mode() -> String {
 }
 
 /// Extensions sent in text mode with mode "auto".
-const TEXT_EXT: &[&str] = &["txt", "html", "htm", "css", "js", "php", "py", "md", "json", "xml", "csv", "sh", "ini", "conf", "cfg", "yml", "yaml", "sql", "htaccess", "log"];
+const TEXT_EXT: &[&str] = &[
+    "txt", "html", "htm", "css", "js", "php", "py", "md", "json", "xml", "csv", "sh", "ini", "conf", "cfg", "yml",
+    "yaml", "sql", "htaccess", "log",
+];
 
 #[derive(Default, Clone, Debug)]
 struct Feats {
@@ -128,8 +131,12 @@ fn reply_error(code: u32, text: &str, what: &str) -> AppError {
     let kind = match code {
         530 => ErrorKind::AuthFailed,
         421 | 425 | 426 => ErrorKind::ConnectionLost,
-        550 | 553 | 450 | 451 if t.contains("exist") && !t.contains("not exist") && !t.contains("no such") => ErrorKind::AlreadyExists,
-        550 | 553 | 450 if t.contains("denied") || t.contains("permission") || t.contains("not allowed") => ErrorKind::PermissionDenied,
+        550 | 553 | 450 | 451 if t.contains("exist") && !t.contains("not exist") && !t.contains("no such") => {
+            ErrorKind::AlreadyExists
+        }
+        550 | 553 | 450 if t.contains("denied") || t.contains("permission") || t.contains("not allowed") => {
+            ErrorKind::PermissionDenied
+        }
         550 | 450 => ErrorKind::NotFound,
         552 => ErrorKind::Other,
         _ => ErrorKind::Other,
@@ -179,7 +186,8 @@ impl Shared {
     async fn wrap(&self, config: Arc<rustls::ClientConfig>, tcp: TcpStream) -> AppResult<Io> {
         let name = self.tls.clone().expect("TLS configured").1;
         let connector = tokio_rustls::TlsConnector::from(config);
-        match tokio::time::timeout(crate::ssh::connect_timeout(self.params.timeout), connector.connect(name, tcp)).await {
+        match tokio::time::timeout(crate::ssh::connect_timeout(self.params.timeout), connector.connect(name, tcp)).await
+        {
             Err(_) => Err(AppError::new(ErrorKind::Unreachable, "TLS-Verbindung: keine Antwort (Zeitüberschreitung).")),
             Ok(Ok(s)) => Ok(Box::new(s)),
             Ok(Err(e)) => Err(self.tls_error(e)),
@@ -203,9 +211,18 @@ pub fn cert_error(host: &str, fingerprint: String, stored: Option<String>) -> Ap
     let changed = stored.is_some();
     let mut err = AppError::new(
         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
-        if changed { "Das Zertifikat des Servers hat sich geändert." } else { "Das Zertifikat dieses Servers ist noch nicht bekannt." },
+        if changed {
+            "Das Zertifikat des Servers hat sich geändert."
+        } else {
+            "Das Zertifikat dieses Servers ist noch nicht bekannt."
+        },
     );
-    err.host_key = Some(Box::new(crate::error::HostKeyInfo { host: host.to_string(), algorithm: "TLS-Zertifikat".into(), fingerprint, previous: stored }));
+    err.host_key = Some(Box::new(crate::error::HostKeyInfo {
+        host: host.to_string(),
+        algorithm: "TLS-Zertifikat".into(),
+        fingerprint,
+        previous: stored,
+    }));
     err
 }
 
@@ -229,7 +246,10 @@ async fn read_line<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R) -> AppResult<V
 /// Reads one (possibly multi-line) reply: code and the text of all lines.
 async fn read_reply<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R, shared: &Shared) -> AppResult<(u32, String)> {
     let first = read_line(r).await?;
-    let code: u32 = std::str::from_utf8(first.get(..3).unwrap_or(b"")).ok().and_then(|c| c.parse().ok()).ok_or_else(|| lost(format!("Unerwartete Antwort: {}", String::from_utf8_lossy(&first))))?;
+    let code: u32 = std::str::from_utf8(first.get(..3).unwrap_or(b""))
+        .ok()
+        .and_then(|c| c.parse().ok())
+        .ok_or_else(|| lost(format!("Unerwartete Antwort: {}", String::from_utf8_lossy(&first))))?;
     let mut text = shared.decode(first.get(4..).unwrap_or(b""));
     if first.get(3) == Some(&b'-') {
         let end = format!("{code} ");
@@ -299,7 +319,10 @@ impl Session {
             Arc::new(c)
         });
         let tcp = shared.tcp(&p.host, p.port).await?;
-        let not_ftp = |code: u32, text: String| AppError::new(ErrorKind::Unreachable, "Der Server meldet sich nicht als FTP-Server.").with_detail(format!("{code} {text}"));
+        let not_ftp = |code: u32, text: String| {
+            AppError::new(ErrorKind::Unreachable, "Der Server meldet sich nicht als FTP-Server.")
+                .with_detail(format!("{code} {text}"))
+        };
         let ctrl: BufReader<Io> = if p.tls == "implicit" {
             let mut c = BufReader::new(shared.wrap(tls.clone().expect("TLS"), tcp).await?);
             let (code, text) = read_reply(&mut c, &shared).await?;
@@ -317,7 +340,8 @@ impl Session {
                 send_line(plain.get_mut(), &shared, "AUTH", Some("TLS")).await?;
                 let (code, text) = read_reply(&mut plain, &shared).await?;
                 if code != 234 {
-                    return Err(AppError::other("Der Server bietet kein verschlüsseltes FTP (FTPS) an.").with_detail(format!("{code} {text}")));
+                    return Err(AppError::other("Der Server bietet kein verschlüsseltes FTP (FTPS) an.")
+                        .with_detail(format!("{code} {text}")));
                 }
                 BufReader::new(shared.wrap(tls.clone().expect("TLS"), plain.into_inner()).await?)
             } else {
@@ -330,7 +354,8 @@ impl Session {
         match code {
             230 => {}
             331 | 332 => {
-                let Some(pass) = p.password.clone().or_else(|| p.user.is_empty().then(|| "bitcrane@".to_string())) else {
+                let Some(pass) = p.password.clone().or_else(|| p.user.is_empty().then(|| "bitcrane@".to_string()))
+                else {
                     return Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort."));
                 };
                 let (code, text) = s.cmd("PASS", Some(&pass)).await?;
@@ -341,12 +366,14 @@ impl Session {
             _ => return Err(reply_error(code, &text, "Anmeldung")),
         }
         if p.tls != "none" {
-            s.expect("PBSZ", Some("0"), &[200], "TLS")
-                .await
-                .map_err(|e| AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.").with_detail(e.detail.unwrap_or_default()))?;
-            s.expect("PROT", Some("P"), &[200], "TLS")
-                .await
-                .map_err(|e| AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.").with_detail(e.detail.unwrap_or_default()))?;
+            s.expect("PBSZ", Some("0"), &[200], "TLS").await.map_err(|e| {
+                AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.")
+                    .with_detail(e.detail.unwrap_or_default())
+            })?;
+            s.expect("PROT", Some("P"), &[200], "TLS").await.map_err(|e| {
+                AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.")
+                    .with_detail(e.detail.unwrap_or_default())
+            })?;
         }
         let first_session = !shared.feats_known.swap(true, std::sync::atomic::Ordering::Relaxed);
         if first_session {
@@ -390,7 +417,11 @@ impl Session {
             "auto" => {
                 let name = remote_name(path).to_lowercase();
                 let ext = name.rsplit('.').next().unwrap_or("");
-                if name.contains('.') && TEXT_EXT.contains(&ext) { 'A' } else { 'I' }
+                if name.contains('.') && TEXT_EXT.contains(&ext) {
+                    'A'
+                } else {
+                    'I'
+                }
             }
             _ => 'I',
         }
@@ -549,7 +580,17 @@ impl Session {
 
     async fn stat(&mut self, path: &str) -> AppResult<FileEntry> {
         if path == "/" {
-            return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: "755".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+            return Ok(FileEntry {
+                name: "/".into(),
+                kind: "dir".into(),
+                size: 0,
+                mtime: 0,
+                perms: "755".into(),
+                owner: String::new(),
+                group: String::new(),
+                link: None,
+                hidden: 0,
+            });
         }
         if self.shared.feats.lock().unwrap().mlst {
             let (code, text) = self.cmd("MLST", Some(path)).await?;
@@ -581,7 +622,9 @@ impl Session {
     }
 
     async fn mkdir(&mut self, path: &str) -> AppResult<()> {
-        self.expect("MKD", Some(path), &[257, 250], &format!("Ordner „{}“ anlegen", remote_name(path))).await.map(|_| ())
+        self.expect("MKD", Some(path), &[257, 250], &format!("Ordner „{}“ anlegen", remote_name(path)))
+            .await
+            .map(|_| ())
     }
 
     async fn mkdir_all(&mut self, path: &str) -> AppResult<()> {
@@ -671,7 +714,17 @@ pub fn parse_mlsx(line: &str) -> Option<FileEntry> {
     if name.is_empty() {
         return None;
     }
-    let mut e = FileEntry { name: name.to_string(), kind: "file".into(), size: 0, mtime: 0, perms: "644".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 };
+    let mut e = FileEntry {
+        name: name.to_string(),
+        kind: "file".into(),
+        size: 0,
+        mtime: 0,
+        perms: "644".into(),
+        owner: String::new(),
+        group: String::new(),
+        link: None,
+        hidden: 0,
+    };
     for fact in facts.split(';').filter(|f| !f.is_empty()) {
         let (k, v) = fact.split_once('=')?;
         match k.to_lowercase().as_str() {
@@ -690,7 +743,11 @@ pub fn parse_mlsx(line: &str) -> Option<FileEntry> {
             }
             "size" | "sizd" => e.size = v.parse().unwrap_or(0),
             "modify" => e.mtime = parse_mlsx_time(v).unwrap_or(0),
-            "unix.mode" => e.perms = perms_string(u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches('0'), 8).unwrap_or(0o644)),
+            "unix.mode" => {
+                e.perms = perms_string(
+                    u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches('0'), 8).unwrap_or(0o644),
+                )
+            }
             "unix.owner" | "unix.ownername" => e.owner = v.to_string(),
             "unix.group" | "unix.groupname" => e.group = v.to_string(),
             _ => {}
@@ -742,7 +799,8 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
             fields.push((s, &line[s..]));
         }
         // Find the month: owner/group columns vary between servers.
-        let mi = (3..fields.len().saturating_sub(2)).find(|&i| MONTHS.contains(&fields[i].1.to_lowercase().as_str()))?;
+        let mi =
+            (3..fields.len().saturating_sub(2)).find(|&i| MONTHS.contains(&fields[i].1.to_lowercase().as_str()))?;
         if mi + 3 > fields.len() {
             return None;
         }
@@ -756,7 +814,10 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
         let mtime = if let Some((h, m)) = ty.split_once(':') {
             use chrono::Datelike;
             let mut year = now.year();
-            let make = |y: i32| chrono::NaiveDate::from_ymd_opt(y, month, day).and_then(|d| d.and_hms_opt(h.parse().ok()?, m.parse().ok()?, 0));
+            let make = |y: i32| {
+                chrono::NaiveDate::from_ymd_opt(y, month, day)
+                    .and_then(|d| d.and_hms_opt(h.parse().ok()?, m.parse().ok()?, 0))
+            };
             let mut t = make(year)?;
             // Without a year the date is within the last half year.
             if t.and_utc().timestamp_millis() - offset_ms > now.timestamp_millis() + 86_400_000 {
@@ -766,7 +827,8 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
             t.and_utc().timestamp_millis() - offset_ms
         } else {
             let y: i32 = ty.parse().ok()?;
-            chrono::NaiveDate::from_ymd_opt(y, month, day)?.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis() - offset_ms
+            chrono::NaiveDate::from_ymd_opt(y, month, day)?.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis()
+                - offset_ms
         };
         let mut link = None;
         if first == 'l' {
@@ -806,8 +868,12 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
     if name.is_empty() {
         return None;
     }
-    let d = chrono::NaiveDate::parse_from_str(date, "%m-%d-%y").or_else(|_| chrono::NaiveDate::parse_from_str(date, "%m-%d-%Y")).ok()?;
-    let t = chrono::NaiveTime::parse_from_str(time, "%I:%M%p").or_else(|_| chrono::NaiveTime::parse_from_str(time, "%H:%M")).ok()?;
+    let d = chrono::NaiveDate::parse_from_str(date, "%m-%d-%y")
+        .or_else(|_| chrono::NaiveDate::parse_from_str(date, "%m-%d-%Y"))
+        .ok()?;
+    let t = chrono::NaiveTime::parse_from_str(time, "%I:%M%p")
+        .or_else(|_| chrono::NaiveTime::parse_from_str(time, "%H:%M"))
+        .ok()?;
     let is_dir = what.eq_ignore_ascii_case("<DIR>");
     Some(FileEntry {
         name,
@@ -846,11 +912,21 @@ impl FtpConn {
         let (tls, seen) = if params.tls == "none" {
             (None, None)
         } else {
-            let (config, seen) = crate::tls::client_config(known.clone(), host_id.clone(), params.trust.clone(), params.tls13_only);
-            let name = crate::tls::server_name(&params.host).map_err(|_| AppError::other("Ungültiger Servername für TLS."))?;
+            let (config, seen) =
+                crate::tls::client_config(known.clone(), host_id.clone(), params.trust.clone(), params.tls13_only);
+            let name =
+                crate::tls::server_name(&params.host).map_err(|_| AppError::other("Ungültiger Servername für TLS."))?;
             (Some((config, name)), Some(seen))
         };
-        let shared = Arc::new(Shared { params, tls, seen, host_id, known, feats: Mutex::new(Feats::default()), feats_known: Default::default() });
+        let shared = Arc::new(Shared {
+            params,
+            tls,
+            seen,
+            host_id,
+            known,
+            feats: Mutex::new(Feats::default()),
+            feats_known: Default::default(),
+        });
         let mut s = Session::open(shared.clone()).await?;
         let home = s.pwd().await?;
         let conn = FtpConn { shared, idle: tokio::sync::Mutex::new(vec![]), home };
@@ -865,7 +941,9 @@ impl FtpConn {
             match s {
                 None => return Session::open(self.shared.clone()).await,
                 Some(mut s) => {
-                    if s.last_used.elapsed() < Duration::from_secs(20) || matches!(s.cmd("NOOP", None).await, Ok((200, _))) {
+                    if s.last_used.elapsed() < Duration::from_secs(20)
+                        || matches!(s.cmd("NOOP", None).await, Ok((200, _)))
+                    {
                         return Ok(s);
                     }
                 }
@@ -948,7 +1026,12 @@ impl FtpConn {
         let root = self.stat(path).await?;
         let mut out = Vec::new();
         if root.kind != "dir" {
-            out.push(WalkItem { path: path.to_string(), relative: path.strip_prefix(&base).unwrap_or(path).trim_start_matches('/').to_string(), size: root.size, mtime: root.mtime });
+            out.push(WalkItem {
+                path: path.to_string(),
+                relative: path.strip_prefix(&base).unwrap_or(path).trim_start_matches('/').to_string(),
+                size: root.size,
+                mtime: root.mtime,
+            });
             return Ok(out);
         }
         let mut stack = vec![path.to_string()];
@@ -986,7 +1069,9 @@ impl FtpConn {
         let mut s = self.take().await?;
         let kind = s.kind_for(path);
         s.set_type(kind).await?;
-        let io = s.data(if append { "APPE" } else { "STOR" }, Some(path), &format!("„{}“ schreiben", remote_name(path))).await?;
+        let io = s
+            .data(if append { "APPE" } else { "STOR" }, Some(path), &format!("„{}“ schreiben", remote_name(path)))
+            .await?;
         Ok((io, FtpFinish { conn: self.clone(), session: Some(s), what: "Schreiben".into() }))
     }
 
@@ -1008,7 +1093,9 @@ impl FtpConn {
 /// so TLS 1.3 session tickets sent on it are taken up; the next data
 /// connection needs one to resume the session (servers like vsftpd insist).
 pub async fn close_data(mut io: Io) -> AppResult<()> {
-    io.shutdown().await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Datei konnte nicht abgeschlossen werden.").with_detail(e.to_string()))?;
+    io.shutdown().await.map_err(|e| {
+        AppError::new(ErrorKind::ConnectionLost, "Datei konnte nicht abgeschlossen werden.").with_detail(e.to_string())
+    })?;
     let mut sink = [0u8; 4096];
     let _ = tokio::time::timeout(Duration::from_secs(3), async {
         while let Ok(n) = io.read(&mut sink).await {
@@ -1053,7 +1140,15 @@ mod tests {
     fn parses_unix_list_lines() {
         let e = parse_list_line("-rw-r--r--    1 1000     1000         1234 Jan 05  2024 bot file.py", 0).unwrap();
         assert_eq!((e.name.as_str(), e.kind.as_str(), e.size, e.perms.as_str()), ("bot file.py", "file", 1234, "644"));
-        assert_eq!(e.mtime, chrono::NaiveDate::from_ymd_opt(2024, 1, 5).unwrap().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis());
+        assert_eq!(
+            e.mtime,
+            chrono::NaiveDate::from_ymd_opt(2024, 1, 5)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()
+                .timestamp_millis()
+        );
         let d = parse_list_line("drwxr-xr-x    2 ftp ftp 4096 Mar 01 10:20 cogs", 60).unwrap();
         assert_eq!((d.name.as_str(), d.kind.as_str(), d.perms.as_str()), ("cogs", "dir", "755"));
         let l = parse_list_line("lrwxrwxrwx 1 u g 7 Feb 2 2025 web -> /var/www", 0).unwrap();
@@ -1081,7 +1176,15 @@ mod tests {
     fn parses_mlsd() {
         let e = parse_mlsx("type=file;size=12;modify=20261027120000;unix.mode=0640; name with space.txt").unwrap();
         assert_eq!((e.name.as_str(), e.size, e.perms.as_str()), ("name with space.txt", 12, "640"));
-        assert_eq!(e.mtime, chrono::NaiveDate::from_ymd_opt(2026, 10, 27).unwrap().and_hms_opt(12, 0, 0).unwrap().and_utc().timestamp_millis());
+        assert_eq!(
+            e.mtime,
+            chrono::NaiveDate::from_ymd_opt(2026, 10, 27)
+                .unwrap()
+                .and_hms_opt(12, 0, 0)
+                .unwrap()
+                .and_utc()
+                .timestamp_millis()
+        );
         assert!(parse_mlsx("type=cdir;modify=20261027120000; .").is_none());
         assert_eq!(parse_mlsx("type=dir;modify=20261027120000; sub").unwrap().kind, "dir");
     }
@@ -1091,7 +1194,10 @@ mod tests {
         assert_eq!(reply_error(530, "Login incorrect.", "x").kind, ErrorKind::AuthFailed);
         assert_eq!(reply_error(550, "Permission denied.", "x").kind, ErrorKind::PermissionDenied);
         assert_eq!(reply_error(550, "Failed to open file.", "x").kind, ErrorKind::NotFound);
-        assert_eq!(reply_error(550, "Create directory operation failed. File exists", "x").kind, ErrorKind::AlreadyExists);
+        assert_eq!(
+            reply_error(550, "Create directory operation failed. File exists", "x").kind,
+            ErrorKind::AlreadyExists
+        );
     }
 }
 
@@ -1110,9 +1216,19 @@ mod integration {
     }
 
     fn params(host: &str, port: u16, tls: &str, trust: Option<String>) -> FtpParams {
-        FtpParams { timeout: None,
-            host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: tls.into(), tls13_only: false,
-            encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust, proxy: None,
+        FtpParams {
+            timeout: None,
+            host: host.into(),
+            port,
+            user: "test".into(),
+            password: Some("geheim123".into()),
+            tls: tls.into(),
+            tls13_only: false,
+            encoding: "utf8".into(),
+            tz_offset_min: 0,
+            mode: "binary".into(),
+            trust,
+            proxy: None,
         }
     }
 
@@ -1142,7 +1258,10 @@ mod integration {
         conn.chmod(&file, 0o600, false).await.unwrap();
         assert_eq!(conn.stat(&file).await.unwrap().perms, "600");
         conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();
-        assert_eq!(conn.rename(&format!("{base}/neu.txt"), &format!("{base}/a b")).await.err().map(|e| e.kind), Some(ErrorKind::AlreadyExists));
+        assert_eq!(
+            conn.rename(&format!("{base}/neu.txt"), &format!("{base}/a b")).await.err().map(|e| e.kind),
+            Some(ErrorKind::AlreadyExists)
+        );
         assert_eq!(conn.walk(&base).await.unwrap().len(), 1);
         assert_eq!(conn.stat(&format!("{base}/fehlt")).await.err().map(|e| e.kind), Some(ErrorKind::NotFound));
         // Many operations in a row use the pooled sessions.
@@ -1163,15 +1282,23 @@ mod integration {
         let mut bad = params(&host, ports[0], "none", None);
         bad.password = Some("falsch".into());
         assert_eq!(FtpConn::connect(bad, known.clone()).await.err().map(|e| e.kind), Some(ErrorKind::AuthFailed));
-        let conn = Arc::new(FtpConn::connect(params(&host, ports[0], "none", None), known.clone()).await.expect("plain ftp"));
+        let conn =
+            Arc::new(FtpConn::connect(params(&host, ports[0], "none", None), known.clone()).await.expect("plain ftp"));
         assert!(conn.home.starts_with('/'));
         round_trip(conn.clone()).await;
         // Explicit TLS demanded from a server: works; self-signed certificate must be confirmed first.
         for (port, tls) in ports.iter().skip(1).copied().zip(["explicit", "implicit"]) {
-            let err = FtpConn::connect(params(&host, port, tls, None), known.clone()).await.err().expect("unknown certificate");
+            let err = FtpConn::connect(params(&host, port, tls, None), known.clone())
+                .await
+                .err()
+                .expect("unknown certificate");
             assert_eq!(err.kind, ErrorKind::HostKeyUnknown, "{tls}: {err:?}");
             let fp = err.host_key.unwrap().fingerprint;
-            let conn = Arc::new(FtpConn::connect(params(&host, port, tls, Some(fp)), known.clone()).await.unwrap_or_else(|e| panic!("{tls}: {e:?}")));
+            let conn = Arc::new(
+                FtpConn::connect(params(&host, port, tls, Some(fp)), known.clone())
+                    .await
+                    .unwrap_or_else(|e| panic!("{tls}: {e:?}")),
+            );
             round_trip(conn).await;
         }
         // Plain FTP to a server that insists on TLS fails with a clear message.

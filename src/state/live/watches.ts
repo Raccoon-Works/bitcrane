@@ -37,7 +37,15 @@ export function reconcileWatches(s: AppState) {
   for (const [id, w] of wanted) {
     if (runningWatches.has(id)) continue;
     runningWatches.set(id, signature(w));
-    backend.watchStart(id, w.localPath, w.options.includeSubfolders, watchExcludes(w), Math.max(200, w.options.delay * 1000), onWatchBatch)
+    backend
+      .watchStart(
+        id,
+        w.localPath,
+        w.options.includeSubfolders,
+        watchExcludes(w),
+        Math.max(200, w.options.delay * 1000),
+        onWatchBatch,
+      )
       .then(() => {
         if (w.options.syncOnStart) {
           synced.delete(id);
@@ -55,7 +63,19 @@ export function reconcileWatches(s: AppState) {
 function watchTransfer(w: Watch, source: string, size: number, existing?: string): Transfer {
   // An existing file on the server keeps its exact name (also its Unicode form).
   const target = existing ?? remoteOf(w, source);
-  return { id: uid('t'), name: basename(source), direction: 'up', serverId: w.serverId, folder: relFolder(w.remotePath, target), source, target, size, done: 0, state: 'queued', watchId: w.id };
+  return {
+    id: uid('t'),
+    name: basename(source),
+    direction: 'up',
+    serverId: w.serverId,
+    folder: relFolder(w.remotePath, target),
+    source,
+    target,
+    size,
+    done: 0,
+    state: 'queued',
+    watchId: w.id,
+  };
 }
 
 /** True when a path (relative to the watched folder) lies in the selected subfolders. */
@@ -71,10 +91,25 @@ function relOf(w: Watch, localPath: string) {
 }
 const remoteOf = (w: Watch, localPath: string) => join(w.remotePath, remoteRel(w.serverId, relOf(w, localPath)));
 
-async function onWatchBatch(b: { watchId: string; changed: string[]; removed: string[]; renamed?: Array<[string, string]> }) {
+async function onWatchBatch(b: {
+  watchId: string;
+  changed: string[];
+  removed: string[];
+  renamed?: Array<[string, string]>;
+}) {
   const w = getState().watches.find((x) => x.id === b.watchId);
   if (!w || w.state === 'paused') return;
-  addLog('debug', $t('Überwachung „{0}“: {1} geändert, {2} gelöscht, {3} umbenannt', w.name, b.changed.length, b.removed.length, b.renamed?.length ?? 0), w.serverId);
+  addLog(
+    'debug',
+    $t(
+      'Überwachung „{0}“: {1} geändert, {2} gelöscht, {3} umbenannt',
+      w.name,
+      b.changed.length,
+      b.removed.length,
+      b.renamed?.length ?? 0,
+    ),
+    w.serverId,
+  );
   const items: Transfer[] = [];
   const addFile = async (p: string) => {
     if (!inSelection(w, relOf(w, p))) return;
@@ -86,7 +121,8 @@ async function onWatchBatch(b: { watchId: string; changed: string[]; removed: st
       else if (st.kind === 'dir') {
         // A whole folder appeared (moved in or renamed): upload its files.
         for (const f of await backend.localWalk(p)) {
-          if (!isExcluded(relOf(w, f.path), watchExcludes(w)) && inSelection(w, relOf(w, f.path))) items.push(watchTransfer(w, f.path, f.size));
+          if (!isExcluded(relOf(w, f.path), watchExcludes(w)) && inSelection(w, relOf(w, f.path)))
+            items.push(watchTransfer(w, f.path, f.size));
         }
       }
     } catch {
@@ -108,21 +144,33 @@ async function onWatchBatch(b: { watchId: string; changed: string[]; removed: st
         continue;
       } catch (e) {
         // Not on the server (yet) or the new name exists: fall back to uploading.
-        addLog('info', $t('Umbenennen auf dem Server nicht möglich, lade neu hoch: {0}', remoteOf(w, to)), w.serverId, toBackendError(e).message);
+        addLog(
+          'info',
+          $t('Umbenennen auf dem Server nicht möglich, lade neu hoch: {0}', remoteOf(w, to)),
+          w.serverId,
+          toBackendError(e).message,
+        );
       }
     }
     await addFile(to);
   }
 
   if (items.length) {
-    addLog('info', items.length === 1 ? $t('Änderung erkannt: {0}', relOf(w, items[0].source)) : $t('{0} Änderungen erkannt', items.length), w.serverId);
+    addLog(
+      'info',
+      items.length === 1
+        ? $t('Änderung erkannt: {0}', relOf(w, items[0].source))
+        : $t('{0} Änderungen erkannt', items.length),
+      w.serverId,
+    );
     pendingCommand.add(w.id);
     enqueue(items);
   }
   const removed = b.removed.filter((p) => inSelection(w, relOf(w, p)));
   if (w.options.mirrorDeletes && removed.length && connected.has(w.serverId)) {
     const targets = removed.map((p) => remoteOf(w, p));
-    backend.remoteRemove(w.serverId, targets)
+    backend
+      .remoteRemove(w.serverId, targets)
       .then(() => {
         targets.forEach((t) => {
           invalidate('remote', w.serverId, parent(t));
@@ -145,9 +193,14 @@ export async function initialSync(w: Watch, manual = false) {
   if (synced.has(w.id) && !manual) return;
   synced.add(w.id);
   try {
-    const [local, remote] = await Promise.all([backend.localWalk(w.localPath), backend.remoteWalk(w.serverId, w.remotePath).catch(() => [] as WalkItem[])]);
+    const [local, remote] = await Promise.all([
+      backend.localWalk(w.localPath),
+      backend.remoteWalk(w.serverId, w.remotePath).catch(() => [] as WalkItem[]),
+    ]);
     // Compared in NFC form, so a name decomposed on one side still meets its counterpart.
-    const remoteByRel = new Map(remote.map((r) => [r.path.slice(w.remotePath.length + 1).normalize('NFC'), r] as const));
+    const remoteByRel = new Map(
+      remote.map((r) => [r.path.slice(w.remotePath.length + 1).normalize('NFC'), r] as const),
+    );
     const items: Transfer[] = [];
     for (const f of local) {
       const rel = relOf(w, f.path);
@@ -159,7 +212,11 @@ export async function initialSync(w: Watch, manual = false) {
     if (items.length) {
       pendingCommand.add(w.id);
       enqueue(items);
-      showToast(items.length === 1 ? $t('„{0}“: 1 Datei ist neuer als auf dem Server und wird hochgeladen.', w.name) : $t('„{0}“: {1} Dateien sind neuer als auf dem Server und werden hochgeladen.', w.name, items.length));
+      showToast(
+        items.length === 1
+          ? $t('„{0}“: 1 Datei ist neuer als auf dem Server und wird hochgeladen.', w.name)
+          : $t('„{0}“: {1} Dateien sind neuer als auf dem Server und werden hochgeladen.', w.name, items.length),
+      );
     } else if (manual) {
       showToast($t('„{0}“ ist auf dem Server aktuell.', w.name), 'ok');
     }
@@ -184,7 +241,21 @@ export function runCommandNow(watchId: string) {
     showToast($t('Für diese Überwachung ist kein Befehl eingetragen.'));
     return;
   }
-  enqueue([{ id: uid('t'), name: w.options.command.trim(), direction: 'command', serverId: w.serverId, folder: '', source: '', target: '', size: 1, done: 0, state: 'queued', watchId: w.id }]);
+  enqueue([
+    {
+      id: uid('t'),
+      name: w.options.command.trim(),
+      direction: 'command',
+      serverId: w.serverId,
+      folder: '',
+      source: '',
+      target: '',
+      size: 1,
+      done: 0,
+      state: 'queued',
+      watchId: w.id,
+    },
+  ]);
 }
 
 /** Deletes chosen in "Ordner abgleichen" (server files removed, local ones to the trash). */
@@ -193,7 +264,10 @@ export async function copyLocalFiles(pairs: Array<[string, string]>) {
   if (!pairs.length) return;
   try {
     await backend.localCopyFiles(pairs);
-    pairs.forEach(([, to]) => { invalidate('local', '', parent(to)); addLog('ok', $t('Beim Abgleich kopiert: {0}', to)); });
+    pairs.forEach(([, to]) => {
+      invalidate('local', '', parent(to));
+      addLog('ok', $t('Beim Abgleich kopiert: {0}', to));
+    });
     bump();
     showToast(pairs.length === 1 ? $t('1 Datei kopiert.') : $t('{0} Dateien kopiert.', pairs.length), 'ok');
   } catch (e) {
@@ -205,11 +279,17 @@ export async function syncDeletes(serverId: string, remote: string[], local: str
   try {
     if (remote.length) {
       await backend.remoteRemove(serverId, remote);
-      remote.forEach((p) => { invalidate('remote', serverId, parent(p)); addLog('ok', $t('Beim Abgleich gelöscht: {0}', p), serverId); });
+      remote.forEach((p) => {
+        invalidate('remote', serverId, parent(p));
+        addLog('ok', $t('Beim Abgleich gelöscht: {0}', p), serverId);
+      });
     }
     if (local.length) {
       await backend.localTrash(local);
-      local.forEach((p) => { invalidate('local', serverId, parent(p)); addLog('ok', $t('Beim Abgleich in den Papierkorb: {0}', p)); });
+      local.forEach((p) => {
+        invalidate('local', serverId, parent(p));
+        addLog('ok', $t('Beim Abgleich in den Papierkorb: {0}', p));
+      });
     }
     bump();
   } catch (e) {
@@ -218,7 +298,10 @@ export async function syncDeletes(serverId: string, remote: string[], local: str
 }
 
 /** "Jetzt testen" in the watch dialog: runs the command once on the server. */
-export async function testCommand(serverId: string, command: string): Promise<{ code: number; output: string } | { error: string }> {
+export async function testCommand(
+  serverId: string,
+  command: string,
+): Promise<{ code: number; output: string } | { error: string }> {
   if (!connected.has(serverId)) {
     const ok = await connectServer(serverId);
     if (!ok) return { error: $t('Keine Verbindung zum Server.') };
@@ -226,7 +309,12 @@ export async function testCommand(serverId: string, command: string): Promise<{ 
   try {
     addLog('info', $t('Befehl testen: {0}', command), serverId);
     const r = await backend.remoteExec(serverId, command);
-    addLog(r.code === 0 ? 'ok' : 'error', $t('Test endete mit Code {0}', r.code), serverId, r.output.trim() || undefined);
+    addLog(
+      r.code === 0 ? 'ok' : 'error',
+      $t('Test endete mit Code {0}', r.code),
+      serverId,
+      r.output.trim() || undefined,
+    );
     return r;
   } catch (e) {
     return { error: toBackendError(e).message };
@@ -234,7 +322,10 @@ export async function testCommand(serverId: string, command: string): Promise<{ 
 }
 
 /** Runs a command on the server (own commands from the context menu); connects first when needed. */
-export async function runRemoteCommand(serverId: string, command: string): Promise<{ code: number; output: string } | { error: string }> {
+export async function runRemoteCommand(
+  serverId: string,
+  command: string,
+): Promise<{ code: number; output: string } | { error: string }> {
   if (!connected.has(serverId)) {
     const ok = await connectServer(serverId);
     if (!ok) return { error: $t('Keine Verbindung zum Server.') };
@@ -242,7 +333,12 @@ export async function runRemoteCommand(serverId: string, command: string): Promi
   try {
     addLog('info', $t('Befehl: {0}', command), serverId);
     const r = await backend.remoteExec(serverId, command);
-    addLog(r.code === 0 ? 'ok' : 'error', $t('Befehl endete mit Code {0}', r.code), serverId, r.output.trim() || undefined);
+    addLog(
+      r.code === 0 ? 'ok' : 'error',
+      $t('Befehl endete mit Code {0}', r.code),
+      serverId,
+      r.output.trim() || undefined,
+    );
     return r;
   } catch (e) {
     return { error: toBackendError(e).message };
@@ -252,7 +348,9 @@ export async function runRemoteCommand(serverId: string, command: string): Promi
 /** "Testlauf": tells the user how many files the watch would cover. */
 export async function testRun(localPath: string, excludes: string[]) {
   try {
-    const files = (await backend.localWalk(localPath)).filter((f) => !isExcluded(f.path.slice(localPath.length + 1), excludes));
+    const files = (await backend.localWalk(localPath)).filter(
+      (f) => !isExcluded(f.path.slice(localPath.length + 1), excludes),
+    );
     showToast($t('Testlauf: {0} Dateien würden beobachtet. Es wurde nichts übertragen.', files.length));
   } catch (e) {
     showError(e);

@@ -107,7 +107,12 @@ export async function installOnQuit(): Promise<boolean> {
     await pending.install({ restartAfterInstall: false });
     return true;
   } catch (e) {
-    addLog('error', $t('Update konnte nicht installiert werden.'), undefined, e instanceof Error ? e.message : String(e));
+    addLog(
+      'error',
+      $t('Update konnte nicht installiert werden.'),
+      undefined,
+      e instanceof Error ? e.message : String(e),
+    );
     return false;
   }
 }
@@ -117,7 +122,9 @@ async function markRestart() {
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('mark_update_restart');
-  } catch { /* the window may then stay in the notification area; the update still runs */ }
+  } catch {
+    /* the window may then stay in the notification area; the update still runs */
+  }
 }
 
 /** Downloads (unless already done) and installs the update, then restarts Bitcrane. */

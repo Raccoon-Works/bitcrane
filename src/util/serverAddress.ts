@@ -9,7 +9,12 @@ export function addressOf(x: Server): string {
   if (isCloudProtocol(x.protocol)) return x.user || x.host;
   // S3: bucket and service; the access key is no user name worth showing.
   if (x.protocol === 's3') return `${x.s3Bucket ? `${x.s3Bucket} · ` : ''}${x.host}`;
-  const defaults: Record<string, number> = { sftp: 22, ftp: 21, ftps: x.implicitTls ? 990 : 21, webdav: x.davHttps === false ? 80 : 443 };
+  const defaults: Record<string, number> = {
+    sftp: 22,
+    ftp: 21,
+    ftps: x.implicitTls ? 990 : 21,
+    webdav: x.davHttps === false ? 80 : 443,
+  };
   const port = x.port !== defaults[x.protocol ?? 'sftp'] ? `:${x.port}` : '';
   return `${x.user ? `${x.user}@` : ''}${x.host}${port}`;
 }

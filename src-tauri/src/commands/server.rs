@@ -2,12 +2,16 @@
 
 use crate::error::{AppError, AppResult};
 use crate::model::{FileEntry, WalkItem};
-use crate::{AppState, local, model, paths};
+use crate::{local, model, paths, AppState};
 use serde::Serialize;
 use tauri::State;
 
 #[tauri::command]
-pub(crate) async fn remote_list(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<Vec<FileEntry>> {
+pub(crate) async fn remote_list(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+) -> AppResult<Vec<FileEntry>> {
     remote!(state, server_id, |c| c.list(&path))
 }
 
@@ -27,7 +31,12 @@ pub(crate) async fn remote_new_file(state: State<'_, AppState>, server_id: Strin
 }
 
 #[tauri::command]
-pub(crate) async fn remote_rename(state: State<'_, AppState>, server_id: String, path: String, new_name: String) -> AppResult<()> {
+pub(crate) async fn remote_rename(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+    new_name: String,
+) -> AppResult<()> {
     let to = paths::remote_join(&paths::remote_parent(&path), &new_name);
     remote!(state, server_id, |c| c.rename(&path, &to))
 }
@@ -35,7 +44,12 @@ pub(crate) async fn remote_rename(state: State<'_, AppState>, server_id: String,
 /// Moves or renames a file or folder to any path on the same server
 /// (used when a watched file is renamed or moved locally).
 #[tauri::command]
-pub(crate) async fn remote_move(state: State<'_, AppState>, server_id: String, from: String, to: String) -> AppResult<()> {
+pub(crate) async fn remote_move(
+    state: State<'_, AppState>,
+    server_id: String,
+    from: String,
+    to: String,
+) -> AppResult<()> {
     remote!(state, server_id, |c| async {
         let parent = paths::remote_parent(&to);
         if !c.exists(&parent).await {
@@ -57,14 +71,25 @@ pub(crate) async fn remote_remove(state: State<'_, AppState>, server_id: String,
 }
 
 #[tauri::command]
-pub(crate) async fn remote_chmod(state: State<'_, AppState>, server_id: String, path: String, perms: String, recursive: bool) -> AppResult<()> {
-    let mode = u32::from_str_radix(&perms, 8).map_err(|_| AppError::other("Rechte müssen drei Ziffern von 0 bis 7 sein."))?;
+pub(crate) async fn remote_chmod(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+    perms: String,
+    recursive: bool,
+) -> AppResult<()> {
+    let mode =
+        u32::from_str_radix(&perms, 8).map_err(|_| AppError::other("Rechte müssen drei Ziffern von 0 bis 7 sein."))?;
     remote!(state, server_id, |c| c.chmod(&path, mode, recursive))
 }
 
 /// Link to share a file or folder on a cloud service.
 #[tauri::command]
-pub(crate) async fn remote_share_link(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
+pub(crate) async fn remote_share_link(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+) -> AppResult<String> {
     remote!(state, server_id, |c| c.share_link(&path))
 }
 
@@ -83,7 +108,9 @@ pub(crate) fn drag_out(window: tauri::WebviewWindow, paths: Vec<String>) -> AppR
         window
             .run_on_main_thread(move || {
                 let icon = drag::Image::Raw(include_bytes!("../../icons/64x64.png").to_vec());
-                if let Err(e) = drag::start_drag(&w, drag::DragItem::Files(files), icon, |_, _| {}, drag::Options::default()) {
+                if let Err(e) =
+                    drag::start_drag(&w, drag::DragItem::Files(files), icon, |_, _| {}, drag::Options::default())
+                {
                     log::warn!("drag out failed: {e}");
                 }
             })
@@ -100,7 +127,11 @@ pub(crate) fn drag_out(window: tauri::WebviewWindow, paths: Vec<String>) -> AppR
 /// Copies server files into a temporary folder so they can be dragged out of
 /// the window (the drag needs real files). Removed when Bitcrane ends.
 #[tauri::command]
-pub(crate) async fn remote_drag_prepare(state: State<'_, AppState>, server_id: String, paths: Vec<String>) -> AppResult<Vec<String>> {
+pub(crate) async fn remote_drag_prepare(
+    state: State<'_, AppState>,
+    server_id: String,
+    paths: Vec<String>,
+) -> AppResult<Vec<String>> {
     use tokio::io::AsyncWriteExt;
     let dir = std::env::temp_dir().join("bitcrane-drag").join(uuid::Uuid::new_v4().simple().to_string());
     std::fs::create_dir_all(&dir)?;
@@ -121,19 +152,34 @@ pub(crate) async fn remote_drag_prepare(state: State<'_, AppState>, server_id: S
 
 /// "Inhalt durchsuchen" on an SSH server.
 #[tauri::command]
-pub(crate) async fn remote_grep(state: State<'_, AppState>, server_id: String, path: String, query: String, max: Option<usize>) -> AppResult<Vec<model::GrepHit>> {
+pub(crate) async fn remote_grep(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+    query: String,
+    max: Option<usize>,
+) -> AppResult<Vec<model::GrepHit>> {
     let max = max.unwrap_or(500);
     remote!(state, server_id, |c| c.grep(&path, &query, max))
 }
 
 /// S3: a download link valid for `secs` seconds (at most 7 days).
 #[tauri::command]
-pub(crate) async fn remote_presign(state: State<'_, AppState>, server_id: String, path: String, secs: u64) -> AppResult<String> {
+pub(crate) async fn remote_presign(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+    secs: u64,
+) -> AppResult<String> {
     remote!(state, server_id, |c| c.presigned_url(&path, secs))
 }
 
 #[tauri::command]
-pub(crate) async fn remote_walk(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<Vec<WalkItem>> {
+pub(crate) async fn remote_walk(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+) -> AppResult<Vec<WalkItem>> {
     remote!(state, server_id, |c| c.walk(&path))
 }
 
@@ -145,23 +191,42 @@ pub(crate) struct ExecResult {
 }
 
 #[tauri::command]
-pub(crate) async fn remote_checksum(state: State<'_, AppState>, server_id: String, path: String, algo: Option<String>) -> AppResult<String> {
+pub(crate) async fn remote_checksum(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+    algo: Option<String>,
+) -> AppResult<String> {
     let algo = local::Algo::parse(algo.as_deref());
     remote!(state, server_id, |c| c.checksum_with(&path, algo))
 }
 
 #[tauri::command]
-pub(crate) async fn remote_symlink(state: State<'_, AppState>, server_id: String, link: String, target: String) -> AppResult<()> {
+pub(crate) async fn remote_symlink(
+    state: State<'_, AppState>,
+    server_id: String,
+    link: String,
+    target: String,
+) -> AppResult<()> {
     remote!(state, server_id, |c| c.symlink(&link, &target))
 }
 
 #[tauri::command]
-pub(crate) async fn remote_copy(state: State<'_, AppState>, server_id: String, paths: Vec<String>, dest_dir: String) -> AppResult<Vec<String>> {
+pub(crate) async fn remote_copy(
+    state: State<'_, AppState>,
+    server_id: String,
+    paths: Vec<String>,
+    dest_dir: String,
+) -> AppResult<Vec<String>> {
     remote!(state, server_id, |c| c.copy_within(&paths, &dest_dir))
 }
 
 #[tauri::command]
-pub(crate) async fn remote_exec(state: State<'_, AppState>, server_id: String, command: String) -> AppResult<ExecResult> {
+pub(crate) async fn remote_exec(
+    state: State<'_, AppState>,
+    server_id: String,
+    command: String,
+) -> AppResult<ExecResult> {
     let (code, output) = remote!(state, server_id, |c| c.exec(&command))?;
     Ok(ExecResult { code, output })
 }

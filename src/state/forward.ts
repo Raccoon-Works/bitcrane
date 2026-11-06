@@ -31,7 +31,17 @@ export async function startForward(serverId: string, f: PortForward): Promise<bo
     return true;
   }
   try {
-    await invoke('forward_start', { serverId, spec: { id: f.id, kind: f.kind, bindHost: f.bindHost, bindPort: f.bindPort, destHost: f.destHost, destPort: f.destPort } });
+    await invoke('forward_start', {
+      serverId,
+      spec: {
+        id: f.id,
+        kind: f.kind,
+        bindHost: f.bindHost,
+        bindPort: f.bindPort,
+        destHost: f.destHost,
+        destPort: f.destPort,
+      },
+    });
     addLog('ok', $t('Tunnel gestartet: {0}', describeForward(f)), serverId);
     return true;
   } catch (e) {

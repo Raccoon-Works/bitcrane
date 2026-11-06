@@ -29,10 +29,14 @@ type Props = {
 export function Thumb({ side, serverId, path, name, bytes, mtime, size }: Props) {
   const [failed, setFailed] = useState(false);
   const remoteThumbs = useStore((s) => !!s.settings.remoteThumbs);
-  const src = !LIVE || failed || !IMAGE.test(name) ? null
-    : side === 'local' ? convertFileSrc(path, 'thumb')
-      : remoteThumbs && bytes <= REMOTE_MAX_BYTES ? `${convertFileSrc(`${serverId}/${path}`, 'rthumb')}?m=${mtime}`
-        : null;
+  const src =
+    !LIVE || failed || !IMAGE.test(name)
+      ? null
+      : side === 'local'
+        ? convertFileSrc(path, 'thumb')
+        : remoteThumbs && bytes <= REMOTE_MAX_BYTES
+          ? `${convertFileSrc(`${serverId}/${path}`, 'rthumb')}?m=${mtime}`
+          : null;
   if (!src) return <FileGlyph size={size} name={name} />;
   return (
     <img

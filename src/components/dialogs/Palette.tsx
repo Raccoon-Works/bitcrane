@@ -7,12 +7,30 @@ import { CornerDownLeft, Search } from '../glyphs';
 import { useMemo, useRef, useState } from 'react';
 import { ACTIONS, formatCombo, keysFor } from '../../state/keys';
 import {
-  activeTab, closeDialog, getState, placesFor, paneShowsServers, navigate, openDialog, openServer, openSyncFavorite, openWatchFolders, pauseAllTransfers, useStore,
+  activeTab,
+  closeDialog,
+  getState,
+  placesFor,
+  paneShowsServers,
+  navigate,
+  openDialog,
+  openServer,
+  openSyncFavorite,
+  openWatchFolders,
+  pauseAllTransfers,
+  useStore,
 } from '../../state/store';
 import { Dialog } from './Dialog';
 import { $t, tr } from '../../i18n';
 
-interface Entry { id: string; group: string; label: string; hint?: string; keys?: string; run: () => void }
+interface Entry {
+  id: string;
+  group: string;
+  label: string;
+  hint?: string;
+  keys?: string;
+  run: () => void;
+}
 
 export function Palette() {
   const platform = useStore((s) => s.platform);
@@ -24,17 +42,51 @@ export function Palette() {
     const s = getState();
     const t = activeTab(s);
     const out: Entry[] = [];
-    for (const x of s.servers) out.push({ id: `srv:${x.id}`, group: 'Server', label: $t('{0} öffnen', x.name), hint: `${x.user}@${x.host}`, run: () => openServer(x.id) });
+    for (const x of s.servers)
+      out.push({
+        id: `srv:${x.id}`,
+        group: 'Server',
+        label: $t('{0} öffnen', x.name),
+        hint: `${x.user}@${x.host}`,
+        run: () => openServer(x.id),
+      });
     for (const side of ['local', 'remote'] as const) {
       if (!t || paneShowsServers(side, t)) continue;
-      for (const p of placesFor(side, s, t)) out.push({ id: `pl:${side}:${p.path}`, group: $t('Orte'), label: tr(p.name), hint: p.path, run: () => navigate(side, p.path) });
+      for (const p of placesFor(side, s, t))
+        out.push({
+          id: `pl:${side}:${p.path}`,
+          group: $t('Orte'),
+          label: tr(p.name),
+          hint: p.path,
+          run: () => navigate(side, p.path),
+        });
     }
-    for (const f of s.settings.syncFavorites) out.push({ id: `sync:${f.id}`, group: 'Abgleiche', label: $t('Abgleich „{0}“', f.name), hint: f.remote, run: () => openSyncFavorite(f.id) });
-    for (const w of s.watches) out.push({ id: `w:${w.id}`, group: 'Überwachungen', label: $t('Überwachung „{0}“ zeigen', w.name), hint: w.localPath, run: () => openWatchFolders(w.id) });
+    for (const f of s.settings.syncFavorites)
+      out.push({
+        id: `sync:${f.id}`,
+        group: 'Abgleiche',
+        label: $t('Abgleich „{0}“', f.name),
+        hint: f.remote,
+        run: () => openSyncFavorite(f.id),
+      });
+    for (const w of s.watches)
+      out.push({
+        id: `w:${w.id}`,
+        group: 'Überwachungen',
+        label: $t('Überwachung „{0}“ zeigen', w.name),
+        hint: w.localPath,
+        run: () => openWatchFolders(w.id),
+      });
     for (const a of ACTIONS) {
       if (a.id === 'palette') continue;
       const k = keysFor(a.id, platform)[0];
-      out.push({ id: `a:${a.id}`, group: a.group, label: a.label, keys: k ? formatCombo(k, platform) : undefined, run: a.run });
+      out.push({
+        id: `a:${a.id}`,
+        group: a.group,
+        label: a.label,
+        keys: k ? formatCombo(k, platform) : undefined,
+        run: a.run,
+      });
     }
     const more: Array<[string, () => void]> = [
       [$t('Server hinzufügen …'), () => openDialog({ type: 'serverEdit' })],
@@ -52,7 +104,9 @@ export function Palette() {
   }, [platform]);
 
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = entries.filter((e) => words.every((w) => `${e.label} ${e.hint ?? ''} ${e.group}`.toLowerCase().includes(w))).slice(0, 60);
+  const shown = entries
+    .filter((e) => words.every((w) => `${e.label} ${e.hint ?? ''} ${e.group}`.toLowerCase().includes(w)))
+    .slice(0, 60);
   const pick = (e: Entry | undefined) => {
     if (!e) return;
     closeDialog();
@@ -77,18 +131,38 @@ export function Palette() {
           aria-controls="palette-list"
           aria-activedescendant={shown[cursor] ? `pal-${cursor}` : undefined}
           spellCheck={false}
-          onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setCursor(0);
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
-            if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-            if (e.key === 'Enter') { e.preventDefault(); pick(shown[cursor]); }
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              move(1);
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              move(-1);
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              pick(shown[cursor]);
+            }
           }}
         />
       </div>
       <div id="palette-list" ref={listRef} className="palette-list" role="listbox" aria-label={$t('Treffer')}>
         {shown.map((e, i) => (
-          <div key={e.id} id={`pal-${i}`} data-i={i} role="option" aria-selected={i === cursor} className={`palette-item${i === cursor ? ' is-sel' : ''}`}
-            onMouseMove={() => setCursor(i)} onClick={() => pick(e)}>
+          <div
+            key={e.id}
+            id={`pal-${i}`}
+            data-i={i}
+            role="option"
+            aria-selected={i === cursor}
+            className={`palette-item${i === cursor ? ' is-sel' : ''}`}
+            onMouseMove={() => setCursor(i)}
+            onClick={() => pick(e)}
+          >
             <span className="flex-1 min-w-0 col-text">
               <span className="ellipsis">{e.label}</span>
               {e.hint && <span className="small muted mono ellipsis">{e.hint}</span>}

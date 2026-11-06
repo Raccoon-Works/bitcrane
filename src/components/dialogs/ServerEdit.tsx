@@ -11,7 +11,20 @@ import type { KeyInfo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { isCloudProtocol, type AuthMethod, type Protocol, type Server, type ServerColor } from '../../backend/types';
 import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/live';
-import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplate, openDialog, openExternal, saveServer, showToast, updateSettings, useStore } from '../../state/store';
+import {
+  askRemoveServer,
+  closeDialog,
+  getState,
+  LIVE,
+  monoFor,
+  newServerTemplate,
+  openDialog,
+  openExternal,
+  saveServer,
+  showToast,
+  updateSettings,
+  useStore,
+} from '../../state/store';
 import { CLOUD_NAMES, GDRIVE_GUIDE_URL, googleKey, saveGoogleKey, showCloudNotSetUp } from '../../state/cloud';
 import { KeyPanel } from '../KeyPanel';
 import { ServerTile } from '../ServerTile';
@@ -35,7 +48,10 @@ function pictureFromFile(file: File): Promise<string> {
       canvas.width = side;
       canvas.height = side;
       const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('canvas')); return; }
+      if (!ctx) {
+        reject(new Error('canvas'));
+        return;
+      }
       const scale = Math.min(side / img.width, side / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -44,7 +60,10 @@ function pictureFromFile(file: File): Promise<string> {
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('image'));
+    };
     img.src = url;
   });
 }
@@ -57,45 +76,132 @@ type Fam = 'sftp' | 'ftp' | 'webdav' | 'smb' | 's3' | 'cloud';
  * and the region fills it in. "other" is any S3-compatible service (MinIO,
  * Ceph, a NAS ...); R2 needs the account id in the address.
  */
-const S3_PROVIDERS: Record<string, { label: string; region: string; host: (region: string) => string; regions?: string[] }> = {
-  aws: { label: 'Amazon S3', region: 'eu-central-1', host: (r) => `s3.${r}.amazonaws.com`, regions: ['eu-central-1', 'eu-central-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-north-1', 'eu-south-1', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'ca-central-1', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1', 'sa-east-1'] },
-  b2: { label: 'Backblaze B2', region: 'eu-central-003', host: (r) => `s3.${r}.backblazeb2.com`, regions: ['eu-central-003', 'us-west-000', 'us-west-001', 'us-west-002', 'us-west-004', 'us-east-005'] },
+const S3_PROVIDERS: Record<
+  string,
+  { label: string; region: string; host: (region: string) => string; regions?: string[] }
+> = {
+  aws: {
+    label: 'Amazon S3',
+    region: 'eu-central-1',
+    host: (r) => `s3.${r}.amazonaws.com`,
+    regions: [
+      'eu-central-1',
+      'eu-central-2',
+      'eu-west-1',
+      'eu-west-2',
+      'eu-west-3',
+      'eu-north-1',
+      'eu-south-1',
+      'us-east-1',
+      'us-east-2',
+      'us-west-1',
+      'us-west-2',
+      'ca-central-1',
+      'ap-southeast-1',
+      'ap-southeast-2',
+      'ap-northeast-1',
+      'sa-east-1',
+    ],
+  },
+  b2: {
+    label: 'Backblaze B2',
+    region: 'eu-central-003',
+    host: (r) => `s3.${r}.backblazeb2.com`,
+    regions: ['eu-central-003', 'us-west-000', 'us-west-001', 'us-west-002', 'us-west-004', 'us-east-005'],
+  },
   r2: { label: 'Cloudflare R2', region: 'auto', host: () => '' },
-  wasabi: { label: 'Wasabi', region: 'eu-central-1', host: (r) => `s3.${r}.wasabisys.com`, regions: ['eu-central-1', 'eu-central-2', 'eu-west-1', 'eu-west-2', 'us-east-1', 'us-east-2', 'us-west-1', 'ap-northeast-1'] },
-  hetzner: { label: 'Hetzner Object Storage', region: 'fsn1', host: (r) => `${r}.your-objectstorage.com`, regions: ['fsn1', 'nbg1', 'hel1'] },
+  wasabi: {
+    label: 'Wasabi',
+    region: 'eu-central-1',
+    host: (r) => `s3.${r}.wasabisys.com`,
+    regions: [
+      'eu-central-1',
+      'eu-central-2',
+      'eu-west-1',
+      'eu-west-2',
+      'us-east-1',
+      'us-east-2',
+      'us-west-1',
+      'ap-northeast-1',
+    ],
+  },
+  hetzner: {
+    label: 'Hetzner Object Storage',
+    region: 'fsn1',
+    host: (r) => `${r}.your-objectstorage.com`,
+    regions: ['fsn1', 'nbg1', 'hel1'],
+  },
   other: { label: 'Anderer Dienst (MinIO, Ceph …)', region: '', host: () => '' },
 };
 
 const colors: ServerColor[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'orange', 'red'];
 
 /** Time zones for FTP servers that list local times (UTC-12 to UTC+14). */
-const TIMEZONES = Array.from({ length: 27 }, (_, i) => i - 12).map((h) => ({ value: String(h * 60), label: h === 0 ? $t('UTC (Standard)') : `UTC${h > 0 ? '+' : '−'}${Math.abs(h)}${h === 1 ? $t(' (Winterzeit Deutschland)') : h === 2 ? $t(' (Sommerzeit Deutschland)') : ''}` }));
+const TIMEZONES = Array.from({ length: 27 }, (_, i) => i - 12).map((h) => ({
+  value: String(h * 60),
+  label:
+    h === 0
+      ? $t('UTC (Standard)')
+      : `UTC${h > 0 ? '+' : '−'}${Math.abs(h)}${h === 1 ? $t(' (Winterzeit Deutschland)') : h === 2 ? $t(' (Sommerzeit Deutschland)') : ''}`,
+}));
 
 /** Fixed fields of a cloud service entry (no address, port or password of its own). */
 function cloudDefaults(service: Protocol): Partial<Server> {
-  return { protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com', port: 443, auth: 'agent', remoteStart: '' };
+  return {
+    protocol: service,
+    host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : 'dropbox.com',
+    port: 443,
+    auth: 'agent',
+    remoteStart: '',
+  };
 }
 
-
 /** Names of the server colours for screen readers and tooltips. */
-const COLOR_NAMES: Record<ServerColor, string> = { gray: $t('Keine Farbe'), blue: $t('Blau'), purple: $t('Lila'), green: $t('Grün'), yellow: $t('Gelb'), orange: $t('Orange'), red: $t('Rot') };
+const COLOR_NAMES: Record<ServerColor, string> = {
+  gray: $t('Keine Farbe'),
+  blue: $t('Blau'),
+  purple: $t('Lila'),
+  green: $t('Grün'),
+  yellow: $t('Gelb'),
+  orange: $t('Orange'),
+  red: $t('Rot'),
+};
 /**
  * SFTP with root rights: sudo starts the system's SFTP server (WinSCP "SFTP server").
  * The places differ between Linux distributions, so the first one that exists is taken.
  */
-const SUDO_SFTP = "sudo -n sh -c 'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server; do [ -x \"$p\" ] && exec \"$p\"; done; exit 127'";
+const SUDO_SFTP =
+  'sudo -n sh -c \'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server; do [ -x "$p" ] && exec "$p"; done; exit 127\'';
 
-export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: { serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }) {
+export function ServerEdit({
+  serverId,
+  cloud: presetCloud,
+  terminal,
+  preset,
+}: {
+  serverId?: string;
+  cloud?: Protocol;
+  terminal?: boolean;
+  preset?: Partial<Server>;
+}) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const rules = useStore((s) => s.settings.rules) ?? NO_RULES;
   const platform = useStore((s) => s.platform);
   const [currentId, setCurrentId] = useState<string | undefined>(serverId);
-  const [draft, setDraft] = useState<Server>(() => servers.find((x) => x.id === serverId) ?? (presetCloud ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) } : { ...newServerTemplate(), ...(terminal ? { openAs: 'terminal' as const } : {}), ...(preset ?? {}) }));
+  const [draft, setDraft] = useState<Server>(
+    () =>
+      servers.find((x) => x.id === serverId) ??
+      (presetCloud
+        ? { ...newServerTemplate(), ...cloudDefaults(presetCloud) }
+        : { ...newServerTemplate(), ...(terminal ? { openAs: 'terminal' as const } : {}), ...(preset ?? {}) }),
+  );
   // The user's own Google app key (Google Drive only): the id from the settings, the secret only typed here.
   const [googleId, setGoogleId] = useState(() => getState().settings.googleClientId ?? '');
   const [googleSecret, setGoogleSecret] = useState('');
   const [googleStored, setGoogleStored] = useState(false);
-  useEffect(() => { void googleKey().then((k) => setGoogleStored(!!k?.clientSecret)); }, []);
+  useEffect(() => {
+    void googleKey().then((k) => setGoogleStored(!!k?.clientSecret));
+  }, []);
   const [query, setQuery] = useState('');
   const [test, setTest] = useState<'idle' | 'running' | 'ok' | 'fail'>('idle');
   const [testText, setTestText] = useState('');
@@ -109,8 +215,14 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
   const parallel = useStore((s) => s.settings.parallel);
   useEffect(() => {
     const p = draft.proxy;
-    if (!LIVE || !p?.user || !p.host) { setProxyStored(false); return; }
-    backend.secretGet(proxyAccount(p)).then((v) => setProxyStored(v !== null)).catch(() => setProxyStored(false));
+    if (!LIVE || !p?.user || !p.host) {
+      setProxyStored(false);
+      return;
+    }
+    backend
+      .secretGet(proxyAccount(p))
+      .then((v) => setProxyStored(v !== null))
+      .catch(() => setProxyStored(false));
   }, [draft.proxy]);
   const store = platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Anmeldeinformationsverwaltung');
 
@@ -119,15 +231,29 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
     if (!LIVE || (draft.auth !== 'key' && draft.auth !== 'auto')) return;
     let cancelled = false;
     const t = window.setTimeout(() => {
-      backend.keyInfo(draft.keyPath).then((k) => { if (!cancelled) setKeyInfo(k); }).catch(() => undefined);
-      hasStoredSecret(draft).then((v) => { if (!cancelled) setSecretStored(v); }).catch(() => undefined);
+      backend
+        .keyInfo(draft.keyPath)
+        .then((k) => {
+          if (!cancelled) setKeyInfo(k);
+        })
+        .catch(() => undefined);
+      hasStoredSecret(draft)
+        .then((v) => {
+          if (!cancelled) setSecretStored(v);
+        })
+        .catch(() => undefined);
     }, 250);
-    return () => { cancelled = true; window.clearTimeout(t); };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.keyPath, draft.auth]);
 
   const chooseKey = async () => {
-    const picked = await openFileDialog({ multiple: false, directory: false, title: $t('SSH-Schlüssel wählen') }).catch(() => null);
+    const picked = await openFileDialog({ multiple: false, directory: false, title: $t('SSH-Schlüssel wählen') }).catch(
+      () => null,
+    );
     if (typeof picked === 'string') set('keyPath', await invoke<string>('path_to_ui', { path: picked }));
   };
   const isNew = !servers.some((x) => x.id === draft.id);
@@ -136,11 +262,24 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
     const service = draft.protocol;
     if (!service) return;
     if (service === 'gdrive') await saveGoogleKey(googleId, googleSecret);
-    if ((service === 'dropbox' || service === 'onedrive') && LIVE && !getState().cloudAvailable[service]) { showCloudNotSetUp(service); return; }
+    if ((service === 'dropbox' || service === 'onedrive') && LIVE && !getState().cloudAvailable[service]) {
+      showCloudNotSetUp(service);
+      return;
+    }
     openDialog({ type: 'cloudSignIn', service });
   };
   const cloud = isCloudProtocol(draft.protocol);
-  const family: Fam = cloud ? 'cloud' : draft.protocol === 'ftp' || draft.protocol === 'ftps' ? 'ftp' : draft.protocol === 'webdav' ? 'webdav' : draft.protocol === 'smb' ? 'smb' : draft.protocol === 's3' ? 's3' : 'sftp';
+  const family: Fam = cloud
+    ? 'cloud'
+    : draft.protocol === 'ftp' || draft.protocol === 'ftps'
+      ? 'ftp'
+      : draft.protocol === 'webdav'
+        ? 'webdav'
+        : draft.protocol === 'smb'
+          ? 'smb'
+          : draft.protocol === 's3'
+            ? 's3'
+            : 'sftp';
   /** Default ports per protocol; a port the user chose stays. */
   const STANDARD_PORTS = [22, 21, 990, 443, 80, 445];
   const setFamily = (f: Fam) => {
@@ -149,22 +288,49 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
       // Cloud services (Transmit lists them with the protocols): signed in through the browser, no address or password.
       if (f === 'cloud') return { ...d, ...cloudDefaults('dropbox') };
       const port = (p: number) => (STANDARD_PORTS.includes(d.port) ? p : d.port);
-      if (f === 'sftp') return { ...d, protocol: 'sftp', host: isCloudProtocol(d.protocol) ? '' : d.host, port: isCloudProtocol(d.protocol) ? 22 : port(22), auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth };
+      if (f === 'sftp')
+        return {
+          ...d,
+          protocol: 'sftp',
+          host: isCloudProtocol(d.protocol) ? '' : d.host,
+          port: isCloudProtocol(d.protocol) ? 22 : port(22),
+          auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth,
+        };
       if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
       if (f === 'smb') return { ...d, protocol: 'smb', port: port(445), auth: 'password', proxy: undefined };
       if (f === 's3') {
         const provider = d.s3Provider ?? 'aws';
         const region = d.s3Region ?? S3_PROVIDERS[provider].region;
-        return { ...d, protocol: 's3', port: port(443), auth: 'password', s3Provider: provider, s3Region: region, host: S3_PROVIDERS[provider].host(region) || d.host };
+        return {
+          ...d,
+          protocol: 's3',
+          port: port(443),
+          auth: 'password',
+          s3Provider: provider,
+          s3Region: region,
+          host: S3_PROVIDERS[provider].host(region) || d.host,
+        };
       }
-      return { ...d, protocol: 'webdav', davHttps: d.davHttps ?? true, port: port(d.davHttps === false ? 80 : 443), auth: 'password' };
+      return {
+        ...d,
+        protocol: 'webdav',
+        davHttps: d.davHttps ?? true,
+        port: port(d.davHttps === false ? 80 : 443),
+        auth: 'password',
+      };
     });
   };
   /** S3: a provider or region change fills in the address of known providers. */
   const setS3 = (provider: string, region: string) => {
     setTest('idle');
     const p = S3_PROVIDERS[provider] ?? S3_PROVIDERS.other;
-    setDraft((d) => ({ ...d, s3Provider: provider, s3Region: region, host: p.host(region) || (S3_PROVIDERS[d.s3Provider ?? '']?.host(d.s3Region ?? '') === d.host ? '' : d.host), s3PathStyle: provider === 'other' ? d.s3PathStyle ?? true : undefined }));
+    setDraft((d) => ({
+      ...d,
+      s3Provider: provider,
+      s3Region: region,
+      host: p.host(region) || (S3_PROVIDERS[d.s3Provider ?? '']?.host(d.s3Region ?? '') === d.host ? '' : d.host),
+      s3PathStyle: provider === 'other' ? (d.s3PathStyle ?? true) : undefined,
+    }));
   };
   const setFtpTls = (v: 'explicit' | 'implicit' | 'none') => {
     setTest('idle');
@@ -183,7 +349,10 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
     setDraft(srv);
     setTest('idle');
   };
-  const set = <K extends keyof Server>(k: K, v: Server[K]) => { setDraft((d) => ({ ...d, [k]: v })); setTest('idle'); };
+  const set = <K extends keyof Server>(k: K, v: Server[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }));
+    setTest('idle');
+  };
 
   const groups = useMemo(() => {
     const q = query.toLowerCase();
@@ -203,12 +372,27 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
     const mono = draft.mono || monoFor(name);
     // In the app an empty start folder means the user's home folder on the server.
     // The proxy password goes to the keychain only.
-    if (LIVE && draft.proxy?.user && proxyPassword) void backend.secretSet(proxyAccount(draft.proxy), proxyPassword).catch(() => showToast($t('Proxy-Passwort konnte nicht gespeichert werden.'), 'error'));
-    saveServer({ ...draft, name, mono, proxy: draft.proxy?.host ? draft.proxy : undefined, remoteStart: draft.remoteStart || (LIVE ? '' : `/home/${draft.user}`) }, connect);
+    if (LIVE && draft.proxy?.user && proxyPassword)
+      void backend
+        .secretSet(proxyAccount(draft.proxy), proxyPassword)
+        .catch(() => showToast($t('Proxy-Passwort konnte nicht gespeichert werden.'), 'error'));
+    saveServer(
+      {
+        ...draft,
+        name,
+        mono,
+        proxy: draft.proxy?.host ? draft.proxy : undefined,
+        remoteStart: draft.remoteStart || (LIVE ? '' : `/home/${draft.user}`),
+      },
+      connect,
+    );
   };
 
   const runTest = () => {
-    if (!valid) { showToast($t('Bitte Server und Benutzer eintragen.'), 'error'); return; }
+    if (!valid) {
+      showToast($t('Bitte Server und Benutzer eintragen.'), 'error');
+      return;
+    }
     setTest('running');
     if (LIVE) {
       void testServer({ ...draft, host: draft.host.trim(), user: draft.user.trim() }).then((r) => {
@@ -220,47 +404,106 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
     window.setTimeout(() => {
       const ok = !draft.host.includes('fehler');
       setTest(ok ? 'ok' : 'fail');
-      setTestText(ok ? $t('Erreichbar, Anmeldung erfolgreich') : $t('Server nicht erreichbar. Adresse und Port prüfen.'));
+      setTestText(
+        ok ? $t('Erreichbar, Anmeldung erfolgreich') : $t('Server nicht erreichbar. Adresse und Port prüfen.'),
+      );
     }, 900);
   };
 
   const footer = (
     <>
-      {cloud
-        ? (!isNew && <Button onClick={() => draft.protocol && openDialog({ type: 'cloudSignIn', service: draft.protocol, serverId: draft.id })}>{$t('Neu anmelden …')}</Button>)
-        : <Button onClick={runTest} disabled={test === 'running'}>{test === 'running' ? $t('Teste …') : $t('Verbindung testen')}</Button>}
-      {test === 'ok' && <span className="small tone-ok row-inline test-result"><Check size={13} strokeWidth={2.2} aria-hidden="true" />{testText}</span>}
+      {cloud ? (
+        !isNew && (
+          <Button
+            onClick={() =>
+              draft.protocol && openDialog({ type: 'cloudSignIn', service: draft.protocol, serverId: draft.id })
+            }
+          >
+            {$t('Neu anmelden …')}
+          </Button>
+        )
+      ) : (
+        <Button onClick={runTest} disabled={test === 'running'}>
+          {test === 'running' ? $t('Teste …') : $t('Verbindung testen')}
+        </Button>
+      )}
+      {test === 'ok' && (
+        <span className="small tone-ok row-inline test-result">
+          <Check size={13} strokeWidth={2.2} aria-hidden="true" />
+          {testText}
+        </span>
+      )}
       {test === 'fail' && <span className="small tone-danger test-result">{testText}</span>}
       <span className="flex-1" />
-      {!isNew && <Button variant="danger" onClick={() => askRemoveServer(draft.id)}><Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />{$t('Entfernen')}</Button>}
+      {!isNew && (
+        <Button variant="danger" onClick={() => askRemoveServer(draft.id)}>
+          <Trash2 size={13} strokeWidth={1.75} aria-hidden="true" />
+          {$t('Entfernen')}
+        </Button>
+      )}
       <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
-      {cloud && isNew
+      {cloud && isNew ? (
         // A new cloud service is created by signing in (the browser gives Bitcrane the account).
-        ? <Button variant="primary" disabled={draft.protocol === 'gdrive' && (!googleId.trim() || (!googleSecret.trim() && !googleStored))} onClick={() => void signIn()}>{$t('Bei {0} anmelden …', CLOUD_NAMES[draft.protocol ?? ''] ?? '')}</Button>
-        : <>
+        <Button
+          variant="primary"
+          disabled={draft.protocol === 'gdrive' && (!googleId.trim() || (!googleSecret.trim() && !googleStored))}
+          onClick={() => void signIn()}
+        >
+          {$t('Bei {0} anmelden …', CLOUD_NAMES[draft.protocol ?? ''] ?? '')}
+        </Button>
+      ) : (
+        <>
           <Button onClick={() => finish(false)}>{$t('Sichern')}</Button>
-          <Button variant="primary" onClick={() => finish(true)}>{$t('Verbinden')}</Button>
-        </>}
+          <Button variant="primary" onClick={() => finish(true)}>
+            {$t('Verbinden')}
+          </Button>
+        </>
+      )}
     </>
   );
 
   return (
-    <Dialog label={$t('Server verwalten')} windowLike windowTitle={$t('Server')} width={1000} maxHeight={680} footer={footer} className="server-dialog">
+    <Dialog
+      label={$t('Server verwalten')}
+      windowLike
+      windowTitle={$t('Server')}
+      width={1000}
+      maxHeight={680}
+      footer={footer}
+      className="server-dialog"
+    >
       <div className="split">
         <div className="split-list">
           <label className="search small-search">
             <Search size={13} strokeWidth={1.5} aria-hidden="true" />
             <span className="vh">{$t('Server suchen')}</span>
-            <input type="search" placeholder={$t('Server suchen')} value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              type="search"
+              placeholder={$t('Server suchen')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </label>
           <div className="split-scroll" role="listbox" aria-label={$t('Gespeicherte Server')}>
             {groups.map(([g, list]) => (
               <div key={g} className="split-group">
                 <span className="side-title">{g}</span>
                 {list.map((x) => (
-                  <button key={x.id} type="button" role="option" aria-selected={x.id === currentId} className={`split-item${x.id === currentId ? ' is-sel' : ''}`} onClick={() => pick(x.id)}>
+                  <button
+                    key={x.id}
+                    type="button"
+                    role="option"
+                    aria-selected={x.id === currentId}
+                    className={`split-item${x.id === currentId ? ' is-sel' : ''}`}
+                    onClick={() => pick(x.id)}
+                  >
                     <ServerTile server={x} size={24} />
-                    <span className="split-text"><span className="strong-500 ellipsis">{x.name}</span><span className="small sub ellipsis">{x.user}@{x.host}</span></span>
+                    <span className="split-text">
+                      <span className="strong-500 ellipsis">{x.name}</span>
+                      <span className="small sub ellipsis">
+                        {x.user}@{x.host}
+                      </span>
+                    </span>
                     {x.online && <span className="dot is-ok" />}
                   </button>
                 ))}
@@ -269,15 +512,48 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
             {isNew && (
               <div className="split-group">
                 <span className="side-title">{$t('Neu')}</span>
-                <div className="split-item is-sel"><ServerTile mono={draft.mono || '?'} color={draft.color} image={draft.image} protocol={draft.protocol} size={24} /><span className="split-text"><span className="strong-500">{draft.name || $t('Neuer Server')}</span><span className="small sub">{draft.host || $t('noch nicht gespeichert')}</span></span></div>
+                <div className="split-item is-sel">
+                  <ServerTile
+                    mono={draft.mono || '?'}
+                    color={draft.color}
+                    image={draft.image}
+                    protocol={draft.protocol}
+                    size={24}
+                  />
+                  <span className="split-text">
+                    <span className="strong-500">{draft.name || $t('Neuer Server')}</span>
+                    <span className="small sub">{draft.host || $t('noch nicht gespeichert')}</span>
+                  </span>
+                </div>
               </div>
             )}
           </div>
           <div className="split-foot">
-            <button type="button" className="icon-btn" aria-label={$t('Neuer Server')} onClick={() => { setCurrentId(undefined); setDraft(newServerTemplate()); setTest('idle'); }}><Plus size={15} strokeWidth={1.75} /></button>
-            <button type="button" className="icon-btn" aria-label={$t('Neue Gruppe')} title={$t('Gruppe: im Feld „Gruppe“ einen Namen eintragen')} onClick={() => document.getElementById('s-group')?.focus()}><FolderPlus size={15} strokeWidth={1.75} /></button>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={$t('Neuer Server')}
+              onClick={() => {
+                setCurrentId(undefined);
+                setDraft(newServerTemplate());
+                setTest('idle');
+              }}
+            >
+              <Plus size={15} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={$t('Neue Gruppe')}
+              title={$t('Gruppe: im Feld „Gruppe“ einen Namen eintragen')}
+              onClick={() => document.getElementById('s-group')?.focus()}
+            >
+              <FolderPlus size={15} strokeWidth={1.75} />
+            </button>
             <span className="flex-1" />
-            <Button variant="ghost" small onClick={() => openDialog({ type: 'import' })}>{$t('Importieren …')}</Button>
+            <Button variant="ghost" small onClick={() => openDialog({ type: 'import' })}>
+              {$t('Importieren …')}
+            </Button>
           </div>
         </div>
 
@@ -285,22 +561,63 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
           <div className="detail-head">
             {/* Own picture (Transmit): click the symbol to choose one; it is shrunk to 64 px and kept in the settings. */}
             <label className="server-picture" title={$t('Eigenes Bild wählen')}>
-              <ServerTile mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()} color={draft.color} image={draft.image} protocol={draft.protocol} size={48} />
-              <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" className="vh" aria-label={$t('Eigenes Bild wählen')}
-                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pictureFromFile(f).then((url) => set('image', url)).catch(() => showToast($t('Das Bild ließ sich nicht lesen.'), 'error')); }} />
+              <ServerTile
+                mono={draft.mono || (draft.name || draft.host || '?').slice(0, 2).toUpperCase()}
+                color={draft.color}
+                image={draft.image}
+                protocol={draft.protocol}
+                size={48}
+              />
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                className="vh"
+                aria-label={$t('Eigenes Bild wählen')}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f)
+                    void pictureFromFile(f)
+                      .then((url) => set('image', url))
+                      .catch(() => showToast($t('Das Bild ließ sich nicht lesen.'), 'error'));
+                }}
+              />
             </label>
             <div className="detail-head-fields">
-              <TextField value={draft.name} onChange={(v) => set('name', v)} placeholder={$t('Name, z. B. Webshop · Live')} className="name-field" />
+              <TextField
+                value={draft.name}
+                onChange={(v) => set('name', v)}
+                placeholder={$t('Name, z. B. Webshop · Live')}
+                className="name-field"
+              />
               <div className="swatches" role="radiogroup" aria-label={$t('Farbe')}>
-                <span className="small muted" title={$t('Die Farbe erscheint im Tab und über der Serverhälfte, z. B. Rot für den Produktivserver.')}>{$t('Farbe')}</span>
+                <span
+                  className="small muted"
+                  title={$t('Die Farbe erscheint im Tab und über der Serverhälfte, z. B. Rot für den Produktivserver.')}
+                >
+                  {$t('Farbe')}
+                </span>
                 {colors.map((c) => (
                   // "gray" means no colour: shown as an empty ring and listed first.
-                  <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={COLOR_NAMES[c]} title={COLOR_NAMES[c]}
-                    className={`swatch${c === 'gray' ? ' is-none' : ''}${draft.color === c ? ' is-on' : ''}`} style={c === 'gray' ? undefined : { background: swatch[c] }} onClick={() => set('color', c)} />
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.color === c}
+                    aria-label={COLOR_NAMES[c]}
+                    title={COLOR_NAMES[c]}
+                    className={`swatch${c === 'gray' ? ' is-none' : ''}${draft.color === c ? ' is-on' : ''}`}
+                    style={c === 'gray' ? undefined : { background: swatch[c] }}
+                    onClick={() => set('color', c)}
+                  />
                 ))}
-                {draft.image
-                  ? <button type="button" className="link small" onClick={() => set('image', undefined)}>{$t('Bild entfernen')}</button>
-                  : <span className="small muted">{$t('Klick aufs Symbol: eigenes Bild')}</span>}
+                {draft.image ? (
+                  <button type="button" className="link small" onClick={() => set('image', undefined)}>
+                    {$t('Bild entfernen')}
+                  </button>
+                ) : (
+                  <span className="small muted">{$t('Klick aufs Symbol: eigenes Bild')}</span>
+                )}
               </div>
             </div>
           </div>
@@ -310,173 +627,468 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
               <>
                 <span>{$t('Protokoll#protocol')}</span>
                 <div className="row-inline">
-                  <Segmented<Fam> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={isNew ? [{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 's3', label: 'S3' }, { value: 'cloud', label: $t('Cloud-Dienst') }] : [{ value: 'cloud', label: $t('Cloud-Dienst') }]} />
+                  <Segmented<Fam>
+                    label={$t('Protokoll#protocol')}
+                    value={family}
+                    onChange={setFamily}
+                    options={
+                      isNew
+                        ? [
+                            { value: 'sftp', label: 'SFTP / SSH' },
+                            { value: 'ftp', label: 'FTP' },
+                            { value: 'webdav', label: 'WebDAV' },
+                            { value: 'smb', label: 'SMB' },
+                            { value: 's3', label: 'S3' },
+                            { value: 'cloud', label: $t('Cloud-Dienst') },
+                          ]
+                        : [{ value: 'cloud', label: $t('Cloud-Dienst') }]
+                    }
+                  />
                 </div>
                 <span>{$t('Dienst')}</span>
                 <div className="col-text">
-                  <Select<'dropbox' | 'gdrive' | 'onedrive'> label={$t('Dienst')} value={draft.protocol === 'gdrive' || draft.protocol === 'onedrive' ? draft.protocol : 'dropbox'} onChange={(v) => isNew && setDraft((d) => ({ ...d, ...cloudDefaults(v) }))} options={isNew ? [{ value: 'dropbox', label: 'Dropbox' }, { value: 'gdrive', label: 'Google Drive' }, { value: 'onedrive', label: 'OneDrive' }] : [{ value: draft.protocol === 'gdrive' || draft.protocol === 'onedrive' ? draft.protocol : 'dropbox', label: CLOUD_NAMES[draft.protocol ?? ''] ?? '' }]} />
+                  <Select<'dropbox' | 'gdrive' | 'onedrive'>
+                    label={$t('Dienst')}
+                    value={draft.protocol === 'gdrive' || draft.protocol === 'onedrive' ? draft.protocol : 'dropbox'}
+                    onChange={(v) => isNew && setDraft((d) => ({ ...d, ...cloudDefaults(v) }))}
+                    options={
+                      isNew
+                        ? [
+                            { value: 'dropbox', label: 'Dropbox' },
+                            { value: 'gdrive', label: 'Google Drive' },
+                            { value: 'onedrive', label: 'OneDrive' },
+                          ]
+                        : [
+                            {
+                              value:
+                                draft.protocol === 'gdrive' || draft.protocol === 'onedrive'
+                                  ? draft.protocol
+                                  : 'dropbox',
+                              label: CLOUD_NAMES[draft.protocol ?? ''] ?? '',
+                            },
+                          ]
+                    }
+                  />
                 </div>
                 {draft.protocol === 'gdrive' && (
                   <>
                     <span>{$t('Client-ID')}</span>
                     <div className="col-text">
-                      <TextField mono value={googleId} onChange={setGoogleId} placeholder="123456789-abc….apps.googleusercontent.com" label={$t('Client-ID')} />
+                      <TextField
+                        mono
+                        value={googleId}
+                        onChange={setGoogleId}
+                        placeholder="123456789-abc….apps.googleusercontent.com"
+                        label={$t('Client-ID')}
+                      />
                     </div>
                     <span>{$t('Client-Schlüssel')}</span>
                     <div className="col-text">
-                      <TextField mono type="password" value={googleSecret} onChange={setGoogleSecret} placeholder={googleStored ? $t('gespeichert {0}', store) : 'GOCSPX-…'} label={$t('Client-Schlüssel')} />
-                      <span className="small muted">{$t('Google Drive braucht einen eigenen, kostenlosen App-Schlüssel aus deinem Google-Konto. Einmal einrichten, etwa 10 Minuten.')}{' '}
-                        <button type="button" className="link small" onClick={() => openExternal(GDRIVE_GUIDE_URL)}>{$t('Zur Anleitung')}</button></span>
+                      <TextField
+                        mono
+                        type="password"
+                        value={googleSecret}
+                        onChange={setGoogleSecret}
+                        placeholder={googleStored ? $t('gespeichert {0}', store) : 'GOCSPX-…'}
+                        label={$t('Client-Schlüssel')}
+                      />
+                      <span className="small muted">
+                        {$t(
+                          'Google Drive braucht einen eigenen, kostenlosen App-Schlüssel aus deinem Google-Konto. Einmal einrichten, etwa 10 Minuten.',
+                        )}{' '}
+                        <button type="button" className="link small" onClick={() => openExternal(GDRIVE_GUIDE_URL)}>
+                          {$t('Zur Anleitung')}
+                        </button>
+                      </span>
                     </div>
                     <label htmlFor="s-gdoc">{$t('Google-Dokumente')}</label>
                     <div className="col-text">
-                      <Select<'office' | 'pdf'> id="s-gdoc" label={$t('Google-Dokumente')} value={draft.gdocExport ?? 'office'} onChange={(v) => set('gdocExport', v === 'office' ? undefined : v)}
-                        options={[{ value: 'office', label: $t('Als Word, Excel und PowerPoint (Standard)') }, { value: 'pdf', label: $t('Als PDF') }]} />
-                      <span className="small muted">{$t('Docs, Tabellen, Präsentationen und Zeichnungen werden beim Herunterladen umgewandelt. In der Liste stehen sie schon mit der passenden Endung.')}</span>
+                      <Select<'office' | 'pdf'>
+                        id="s-gdoc"
+                        label={$t('Google-Dokumente')}
+                        value={draft.gdocExport ?? 'office'}
+                        onChange={(v) => set('gdocExport', v === 'office' ? undefined : v)}
+                        options={[
+                          { value: 'office', label: $t('Als Word, Excel und PowerPoint (Standard)') },
+                          { value: 'pdf', label: $t('Als PDF') },
+                        ]}
+                      />
+                      <span className="small muted">
+                        {$t(
+                          'Docs, Tabellen, Präsentationen und Zeichnungen werden beim Herunterladen umgewandelt. In der Liste stehen sie schon mit der passenden Endung.',
+                        )}
+                      </span>
                     </div>
                   </>
                 )}
                 <span>{$t('Konto')}</span>
                 <span className="small muted">{draft.user || '–'}</span>
                 <span>{$t('Anmeldung')}</span>
-                <span className="small muted">{$t('Über den Browser; gespeichert {0}. „Neu anmelden …“ unten, falls der Zugriff entzogen wurde.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
+                <span className="small muted">
+                  {$t(
+                    'Über den Browser; gespeichert {0}. „Neu anmelden …“ unten, falls der Zugriff entzogen wurde.',
+                    platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'),
+                  )}
+                </span>
               </>
             ) : (
-            <>
-            <span>{$t('Protokoll#protocol')}</span>
-            <div className="row-inline">
-              <Segmented<Fam> label={$t('Protokoll#protocol')} value={family} onChange={setFamily} options={[{ value: 'sftp', label: 'SFTP / SSH' }, { value: 'ftp', label: 'FTP' }, { value: 'webdav', label: 'WebDAV' }, { value: 'smb', label: 'SMB' }, { value: 's3', label: 'S3' }, ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : [])]} />
-            </div>
-
-            {family === 'ftp' && (
               <>
-                <label htmlFor="s-tls">{$t('Verschlüsselung')}</label>
-                <div className="col-text">
-                  <Select<'explicit' | 'implicit' | 'none'> id="s-tls" label={$t('Verschlüsselung')} value={draft.protocol === 'ftp' ? 'none' : draft.implicitTls ? 'implicit' : 'explicit'} onChange={setFtpTls}
-                    options={[{ value: 'explicit', label: $t('FTPS: TLS anfordern (empfohlen)') }, { value: 'implicit', label: $t('FTPS: implizites TLS (eigener Port, meist 990)') }, { value: 'none', label: $t('Keine (unverschlüsselt)') }]} />
-                  {draft.protocol === 'ftp' && <span className="small tone-warn">{$t('Ohne Verschlüsselung gehen Passwort und Dateien lesbar durchs Netz. Nur nutzen, wenn der Server nichts anderes kann.')}</span>}
+                <span>{$t('Protokoll#protocol')}</span>
+                <div className="row-inline">
+                  <Segmented<Fam>
+                    label={$t('Protokoll#protocol')}
+                    value={family}
+                    onChange={setFamily}
+                    options={[
+                      { value: 'sftp', label: 'SFTP / SSH' },
+                      { value: 'ftp', label: 'FTP' },
+                      { value: 'webdav', label: 'WebDAV' },
+                      { value: 'smb', label: 'SMB' },
+                      { value: 's3', label: 'S3' },
+                      ...(isNew ? [{ value: 'cloud' as const, label: $t('Cloud-Dienst') }] : []),
+                    ]}
+                  />
                 </div>
-              </>
-            )}
 
-            {family === 's3' && (
-              <>
-                <label htmlFor="s-s3p">{$t('Anbieter')}</label>
+                {family === 'ftp' && (
+                  <>
+                    <label htmlFor="s-tls">{$t('Verschlüsselung')}</label>
+                    <div className="col-text">
+                      <Select<'explicit' | 'implicit' | 'none'>
+                        id="s-tls"
+                        label={$t('Verschlüsselung')}
+                        value={draft.protocol === 'ftp' ? 'none' : draft.implicitTls ? 'implicit' : 'explicit'}
+                        onChange={setFtpTls}
+                        options={[
+                          { value: 'explicit', label: $t('FTPS: TLS anfordern (empfohlen)') },
+                          { value: 'implicit', label: $t('FTPS: implizites TLS (eigener Port, meist 990)') },
+                          { value: 'none', label: $t('Keine (unverschlüsselt)') },
+                        ]}
+                      />
+                      {draft.protocol === 'ftp' && (
+                        <span className="small tone-warn">
+                          {$t(
+                            'Ohne Verschlüsselung gehen Passwort und Dateien lesbar durchs Netz. Nur nutzen, wenn der Server nichts anderes kann.',
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {family === 's3' && (
+                  <>
+                    <label htmlFor="s-s3p">{$t('Anbieter')}</label>
+                    <div className="field-row">
+                      <Select
+                        id="s-s3p"
+                        label={$t('Anbieter')}
+                        value={draft.s3Provider ?? 'aws'}
+                        onChange={(v) => setS3(v, S3_PROVIDERS[v]?.region ?? '')}
+                        options={Object.entries(S3_PROVIDERS).map(([value, p]) => ({
+                          value,
+                          label: value === 'other' ? $t('Anderer Dienst (MinIO, Ceph …)') : p.label,
+                        }))}
+                      />
+                      {S3_PROVIDERS[draft.s3Provider ?? 'aws']?.regions ? (
+                        <Select
+                          label={$t('Region')}
+                          value={draft.s3Region ?? ''}
+                          onChange={(v) => setS3(draft.s3Provider ?? 'aws', v)}
+                          options={(S3_PROVIDERS[draft.s3Provider ?? 'aws'].regions ?? []).map((r) => ({
+                            value: r,
+                            label: r,
+                          }))}
+                        />
+                      ) : (
+                        <TextField
+                          label={$t('Region')}
+                          value={draft.s3Region ?? ''}
+                          onChange={(v) => set('s3Region', v.trim() || undefined)}
+                          placeholder={draft.s3Provider === 'r2' ? 'auto' : 'us-east-1'}
+                          mono
+                          className="flex-1"
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <label htmlFor="s-host">{family === 's3' ? $t('Endpunkt') : $t('Server')}</label>
                 <div className="field-row">
-                  <Select id="s-s3p" label={$t('Anbieter')} value={draft.s3Provider ?? 'aws'} onChange={(v) => setS3(v, S3_PROVIDERS[v]?.region ?? '')}
-                    options={Object.entries(S3_PROVIDERS).map(([value, p]) => ({ value, label: value === 'other' ? $t('Anderer Dienst (MinIO, Ceph …)') : p.label }))} />
-                  {S3_PROVIDERS[draft.s3Provider ?? 'aws']?.regions
-                    ? <Select label={$t('Region')} value={draft.s3Region ?? ''} onChange={(v) => setS3(draft.s3Provider ?? 'aws', v)} options={(S3_PROVIDERS[draft.s3Provider ?? 'aws'].regions ?? []).map((r) => ({ value: r, label: r }))} />
-                    : <TextField label={$t('Region')} value={draft.s3Region ?? ''} onChange={(v) => set('s3Region', v.trim() || undefined)} placeholder={draft.s3Provider === 'r2' ? 'auto' : 'us-east-1'} mono className="flex-1" />}
+                  <TextField
+                    id="s-host"
+                    value={draft.host}
+                    onChange={(v) => set('host', v)}
+                    placeholder={
+                      family === 'smb'
+                        ? $t('nas.local oder 192.168.1.20')
+                        : family === 's3'
+                          ? draft.s3Provider === 'r2'
+                            ? $t('KONTO-ID.r2.cloudflarestorage.com')
+                            : 'minio.example'
+                          : $t('server.example oder 203.0.113.10')
+                    }
+                    className="flex-1"
+                    invalid={!draft.host && test === 'fail'}
+                    mono={family === 's3'}
+                  />
+                  <TextField
+                    value={String(draft.port)}
+                    onChange={(v) => set('port', Number(v.replace(/\D/g, '')) || 22)}
+                    className="port-field"
+                  />
                 </div>
-              </>
-            )}
 
-            <label htmlFor="s-host">{family === 's3' ? $t('Endpunkt') : $t('Server')}</label>
-            <div className="field-row">
-              <TextField id="s-host" value={draft.host} onChange={(v) => set('host', v)} placeholder={family === 'smb' ? $t('nas.local oder 192.168.1.20') : family === 's3' ? (draft.s3Provider === 'r2' ? $t('KONTO-ID.r2.cloudflarestorage.com') : 'minio.example') : $t('server.example oder 203.0.113.10')} className="flex-1" invalid={!draft.host && test === 'fail'} mono={family === 's3'} />
-              <TextField value={String(draft.port)} onChange={(v) => set('port', Number(v.replace(/\D/g, '')) || 22)} className="port-field" />
-            </div>
+                {family === 's3' && (
+                  <>
+                    <label htmlFor="s-bucket">{$t('Bucket')}</label>
+                    <div className="col-text">
+                      <TextField
+                        id="s-bucket"
+                        value={draft.s3Bucket ?? ''}
+                        onChange={(v) => set('s3Bucket', v.trim() || undefined)}
+                        placeholder={$t('leer lassen für die Liste aller Buckets')}
+                        mono
+                      />
+                      {draft.s3Provider === 'other' && (
+                        <span className="row-inline wrap-row">
+                          <Switch
+                            checked={draft.s3PathStyle ?? true}
+                            onChange={(v) => set('s3PathStyle', v)}
+                            label={$t('Bucket im Pfad (für MinIO und IP-Adressen)')}
+                          />
+                          <span className="small">{$t('Bucket im Pfad (für MinIO und IP-Adressen)')}</span>
+                          <Switch
+                            checked={!!draft.s3Http}
+                            onChange={(v) =>
+                              setDraft((d) => ({
+                                ...d,
+                                s3Http: v || undefined,
+                                port: d.port === (v ? 443 : 80) ? (v ? 80 : 443) : d.port,
+                              }))
+                            }
+                            label={$t('Unverschlüsselt (http)')}
+                          />
+                          <span className="small">{$t('Unverschlüsselt (http)')}</span>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
 
-            {family === 's3' && (
-              <>
-                <label htmlFor="s-bucket">{$t('Bucket')}</label>
-                <div className="col-text">
-                  <TextField id="s-bucket" value={draft.s3Bucket ?? ''} onChange={(v) => set('s3Bucket', v.trim() || undefined)} placeholder={$t('leer lassen für die Liste aller Buckets')} mono />
-                  {draft.s3Provider === 'other' && (
-                    <span className="row-inline wrap-row">
-                      <Switch checked={draft.s3PathStyle ?? true} onChange={(v) => set('s3PathStyle', v)} label={$t('Bucket im Pfad (für MinIO und IP-Adressen)')} />
-                      <span className="small">{$t('Bucket im Pfad (für MinIO und IP-Adressen)')}</span>
-                      <Switch checked={!!draft.s3Http} onChange={(v) => setDraft((d) => ({ ...d, s3Http: v || undefined, port: d.port === (v ? 443 : 80) ? (v ? 80 : 443) : d.port }))} label={$t('Unverschlüsselt (http)')} />
-                      <span className="small">{$t('Unverschlüsselt (http)')}</span>
+                {family === 'webdav' && (
+                  <>
+                    <label htmlFor="s-davpath">{$t('Pfad')}</label>
+                    <div className="col-text">
+                      <div className="field-row">
+                        <Select<'https' | 'http'>
+                          label={$t('https oder http')}
+                          value={draft.davHttps === false ? 'http' : 'https'}
+                          onChange={(v) =>
+                            setDraft((d) => ({
+                              ...d,
+                              davHttps: v === 'https',
+                              port: d.port === (v === 'https' ? 80 : 443) ? (v === 'https' ? 443 : 80) : d.port,
+                            }))
+                          }
+                          options={[
+                            { value: 'https', label: 'https' },
+                            { value: 'http', label: $t('http (unverschlüsselt)') },
+                          ]}
+                        />
+                        <TextField
+                          id="s-davpath"
+                          mono
+                          value={draft.davPath ?? ''}
+                          onChange={(v) => set('davPath', v.trim() || undefined)}
+                          placeholder="/remote.php/dav/files/name"
+                          className="flex-1"
+                        />
+                      </div>
+                      <span className="small muted mono ellipsis">
+                        {draft.host ? davUrl(draft) : $t('Adresse erscheint, sobald der Server eingetragen ist.')}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {family === 'smb' && (
+                  <>
+                    <label htmlFor="s-share">{$t('Freigabe')}</label>
+                    <div className="col-text">
+                      <TextField
+                        id="s-share"
+                        value={draft.smbShare ?? ''}
+                        onChange={(v) => set('smbShare', v.trim().replace(/^[\\/]+|[\\/]+$/g, '') || undefined)}
+                        placeholder={$t('z. B. daten')}
+                      />
+                      <span className="small muted">
+                        {$t('Leer lassen, um mit der Liste aller Freigaben zu beginnen.')}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                <label htmlFor="s-user">{family === 's3' ? $t('Zugriffsschlüssel') : $t('Benutzer')}</label>
+                <TextField
+                  id="s-user"
+                  value={draft.user}
+                  onChange={(v) => set('user', v)}
+                  placeholder={
+                    family === 'ftp'
+                      ? $t('leer lassen für anonym')
+                      : family === 'smb'
+                        ? $t('leer lassen für Gast')
+                        : family === 's3'
+                          ? 'Access Key ID'
+                          : 'ubuntu'
+                  }
+                  mono={family === 's3'}
+                />
+
+                {family !== 'sftp' && (
+                  <>
+                    <span>{$t('Anmeldung')}</span>
+                    <span className="small muted">
+                      {family === 'ftp' && !draft.user
+                        ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.')
+                        : family === 'smb' && !draft.user
+                          ? $t(
+                              'Ohne Benutzer meldet sich Bitcrane als Gast an. Für Domänenkonten DOMÄNE\\name eintragen.',
+                            )
+                          : family === 's3'
+                            ? $t(
+                                'Mit dem geheimen Schlüssel (Secret Access Key). Bitcrane fragt beim ersten Verbinden und speichert ihn {0}.',
+                                platform === 'mac'
+                                  ? $t('im Schlüsselbund')
+                                  : $t('in der Windows-Anmeldeinformationsverwaltung'),
+                              )
+                            : $t(
+                                'Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.',
+                                platform === 'mac'
+                                  ? $t('im Schlüsselbund')
+                                  : $t('in der Windows-Anmeldeinformationsverwaltung'),
+                              )}
                     </span>
-                  )}
-                </div>
-              </>
-            )}
-
-            {family === 'webdav' && (
-              <>
-                <label htmlFor="s-davpath">{$t('Pfad')}</label>
-                <div className="col-text">
-                  <div className="field-row">
-                    <Select<'https' | 'http'> label={$t('https oder http')} value={draft.davHttps === false ? 'http' : 'https'} onChange={(v) => setDraft((d) => ({ ...d, davHttps: v === 'https', port: d.port === (v === 'https' ? 80 : 443) ? (v === 'https' ? 443 : 80) : d.port }))}
-                      options={[{ value: 'https', label: 'https' }, { value: 'http', label: $t('http (unverschlüsselt)') }]} />
-                    <TextField id="s-davpath" mono value={draft.davPath ?? ''} onChange={(v) => set('davPath', v.trim() || undefined)} placeholder="/remote.php/dav/files/name" className="flex-1" />
+                  </>
+                )}
+                {family === 'sftp' && <span>{$t('Anmeldung')}</span>}
+                {family === 'sftp' && (
+                  <div className="row-inline">
+                    <Segmented<AuthMethod>
+                      label={$t('Anmeldung')}
+                      value={draft.auth}
+                      onChange={(v) => set('auth', v)}
+                      options={[
+                        { value: 'auto', label: $t('Automatisch') },
+                        { value: 'key', label: $t('SSH-Schlüssel') },
+                        { value: 'agent', label: 'SSH-Agent' },
+                        { value: 'password', label: $t('Passwort') },
+                      ]}
+                    />
                   </div>
-                  <span className="small muted mono ellipsis">{draft.host ? davUrl(draft) : $t('Adresse erscheint, sobald der Server eingetragen ist.')}</span>
-                </div>
-              </>
-            )}
+                )}
 
-            {family === 'smb' && (
-              <>
-                <label htmlFor="s-share">{$t('Freigabe')}</label>
-                <div className="col-text">
-                  <TextField id="s-share" value={draft.smbShare ?? ''} onChange={(v) => set('smbShare', v.trim().replace(/^[\\/]+|[\\/]+$/g, '') || undefined)} placeholder={$t('z. B. daten')} />
-                  <span className="small muted">{$t('Leer lassen, um mit der Liste aller Freigaben zu beginnen.')}</span>
-                </div>
-              </>
-            )}
-
-            <label htmlFor="s-user">{family === 's3' ? $t('Zugriffsschlüssel') : $t('Benutzer')}</label>
-            <TextField id="s-user" value={draft.user} onChange={(v) => set('user', v)} placeholder={family === 'ftp' ? $t('leer lassen für anonym') : family === 'smb' ? $t('leer lassen für Gast') : family === 's3' ? 'Access Key ID' : 'ubuntu'} mono={family === 's3'} />
-
-            {family !== 'sftp' && (
-              <>
-                <span>{$t('Anmeldung')}</span>
-                <span className="small muted">{family === 'ftp' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane anonym an.') : family === 'smb' && !draft.user ? $t('Ohne Benutzer meldet sich Bitcrane als Gast an. Für Domänenkonten DOMÄNE\\name eintragen.') : family === 's3' ? $t('Mit dem geheimen Schlüssel (Secret Access Key). Bitcrane fragt beim ersten Verbinden und speichert ihn {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung')) : $t('Mit Passwort. Bitcrane fragt beim ersten Verbinden und speichert es {0}.', platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung'))}</span>
-              </>
-            )}
-            {family === 'sftp' && <span>{$t('Anmeldung')}</span>}
-            {family === 'sftp' && <div className="row-inline">
-              <Segmented<AuthMethod> label={$t('Anmeldung')} value={draft.auth} onChange={(v) => set('auth', v)} options={[{ value: 'auto', label: $t('Automatisch') }, { value: 'key', label: $t('SSH-Schlüssel') }, { value: 'agent', label: 'SSH-Agent' }, { value: 'password', label: $t('Passwort') }]} />
-            </div>}
-
-            {family === 'sftp' && draft.auth === 'auto' && (
-              <>
-                <span>{$t('Reihenfolge')}</span>
-                <span className="small muted">{$t('Erst der SSH-Agent, dann der Schlüssel unten und die üblichen Schlüssel aus ~/.ssh, zuletzt das Passwort. Fragt der Server nach einem Einmalcode, fragt Bitcrane dich.')}</span>
-              </>
-            )}
-            {family === 'sftp' && (draft.auth === 'key' || draft.auth === 'auto') && (
-              <>
-                <label htmlFor="s-key">{$t('Schlüssel')}</label>
-                <div className="col-text">
-                  <div className="field-row">
-                    <TextField id="s-key" mono value={draft.keyPath} onChange={(v) => set('keyPath', v)} className="flex-1" />
-                    <Button onClick={() => (LIVE ? void chooseKey() : undefined)}>{$t('Auswählen …')}</Button>
-                    <Button onClick={() => setKeyPanel(!keyPanel)} aria-expanded={keyPanel}>{$t('Neu …')}</Button>
-                  </div>
-                  {keyPanel && <KeyPanel server={draft} onCreated={(p) => set('keyPath', p)} onClose={() => setKeyPanel(false)} />}
-                  {!LIVE && <span className="small tone-ok row-inline"><Check size={12} strokeWidth={2.2} aria-hidden="true" />{$t('ED25519 · Passphrase {0} gespeichert', store)}</span>}
-                  {/* "Automatisch" only tries the key; a missing one is normal there (agent or password follow). */}
-                  {LIVE && keyInfo && !keyInfo.exists && (draft.auth === 'auto'
-                    ? <span className="small muted">{$t('Kein Schlüssel unter diesem Pfad. Dann versucht Bitcrane den Agent und das Passwort.')}</span>
-                    : <span className="small tone-danger row-inline"><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />{$t('Datei nicht gefunden')}</span>)}
-                  {LIVE && keyInfo?.invalid && <span className="small tone-danger row-inline"><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />{$t('Das ist kein privater SSH-Schlüssel')}</span>}
-                  {LIVE && keyInfo?.exists && !keyInfo.invalid && (
-                    <span className="small muted row-inline"><KeyRound size={12} strokeWidth={1.75} aria-hidden="true" />
-                      {[keyInfo.algorithm, keyInfo.encrypted ? (secretStored ? $t('Passphrase {0} gespeichert', store) : $t('mit Passphrase, wird beim Verbinden abgefragt')) : $t('ohne Passphrase')].filter(Boolean).join(' · ')}
+                {family === 'sftp' && draft.auth === 'auto' && (
+                  <>
+                    <span>{$t('Reihenfolge')}</span>
+                    <span className="small muted">
+                      {$t(
+                        'Erst der SSH-Agent, dann der Schlüssel unten und die üblichen Schlüssel aus ~/.ssh, zuletzt das Passwort. Fragt der Server nach einem Einmalcode, fragt Bitcrane dich.',
+                      )}
                     </span>
-                  )}
-                </div>
+                  </>
+                )}
+                {family === 'sftp' && (draft.auth === 'key' || draft.auth === 'auto') && (
+                  <>
+                    <label htmlFor="s-key">{$t('Schlüssel')}</label>
+                    <div className="col-text">
+                      <div className="field-row">
+                        <TextField
+                          id="s-key"
+                          mono
+                          value={draft.keyPath}
+                          onChange={(v) => set('keyPath', v)}
+                          className="flex-1"
+                        />
+                        <Button onClick={() => (LIVE ? void chooseKey() : undefined)}>{$t('Auswählen …')}</Button>
+                        <Button onClick={() => setKeyPanel(!keyPanel)} aria-expanded={keyPanel}>
+                          {$t('Neu …')}
+                        </Button>
+                      </div>
+                      {keyPanel && (
+                        <KeyPanel
+                          server={draft}
+                          onCreated={(p) => set('keyPath', p)}
+                          onClose={() => setKeyPanel(false)}
+                        />
+                      )}
+                      {!LIVE && (
+                        <span className="small tone-ok row-inline">
+                          <Check size={12} strokeWidth={2.2} aria-hidden="true" />
+                          {$t('ED25519 · Passphrase {0} gespeichert', store)}
+                        </span>
+                      )}
+                      {/* "Automatisch" only tries the key; a missing one is normal there (agent or password follow). */}
+                      {LIVE &&
+                        keyInfo &&
+                        !keyInfo.exists &&
+                        (draft.auth === 'auto' ? (
+                          <span className="small muted">
+                            {$t('Kein Schlüssel unter diesem Pfad. Dann versucht Bitcrane den Agent und das Passwort.')}
+                          </span>
+                        ) : (
+                          <span className="small tone-danger row-inline">
+                            <AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />
+                            {$t('Datei nicht gefunden')}
+                          </span>
+                        ))}
+                      {LIVE && keyInfo?.invalid && (
+                        <span className="small tone-danger row-inline">
+                          <AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />
+                          {$t('Das ist kein privater SSH-Schlüssel')}
+                        </span>
+                      )}
+                      {LIVE && keyInfo?.exists && !keyInfo.invalid && (
+                        <span className="small muted row-inline">
+                          <KeyRound size={12} strokeWidth={1.75} aria-hidden="true" />
+                          {[
+                            keyInfo.algorithm,
+                            keyInfo.encrypted
+                              ? secretStored
+                                ? $t('Passphrase {0} gespeichert', store)
+                                : $t('mit Passphrase, wird beim Verbinden abgefragt')
+                              : $t('ohne Passphrase'),
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+                {family === 'sftp' && draft.auth === 'password' && (
+                  <>
+                    <span>{$t('Passwort')}</span>
+                    <span className="small muted">
+                      {$t('Wird beim ersten Verbinden abgefragt und')}{' '}
+                      {platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung')}{' '}
+                      {$t('gespeichert, nie in Bitcrane selbst.')}
+                    </span>
+                  </>
+                )}
+                {family === 'sftp' && draft.auth === 'agent' && (
+                  <>
+                    <span>{$t('Agent')}</span>
+                    <span className="small muted">
+                      {$t(
+                        'Nutzt die Schlüssel, die im SSH-Agent geladen sind (z. B. aus 1Password, Bitwarden oder ssh-agent).',
+                      )}
+                    </span>
+                  </>
+                )}
               </>
-            )}
-            {family === 'sftp' && draft.auth === 'password' && (
-              <>
-                <span>{$t('Passwort')}</span>
-                <span className="small muted">{$t('Wird beim ersten Verbinden abgefragt und')}{' '}{platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung')} {$t('gespeichert, nie in Bitcrane selbst.')}</span>
-              </>
-            )}
-            {family === 'sftp' && draft.auth === 'agent' && (
-              <>
-                <span>{$t('Agent')}</span>
-                <span className="small muted">{$t('Nutzt die Schlüssel, die im SSH-Agent geladen sind (z. B. aus 1Password, Bitwarden oder ssh-agent).')}</span>
-              </>
-            )}
-
-            </>
             )}
 
             <span>{$t('Startordner')}</span>
@@ -484,35 +1096,85 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
               <span className="small muted">{$t('Lokal')}</span>
               <TextField mono value={draft.localStart} onChange={(v) => set('localStart', v)} />
               <span className="small muted">{$t('Server')}</span>
-              <TextField mono value={draft.remoteStart} onChange={(v) => set('remoteStart', v)} placeholder={cloud || family === 's3' ? '/' : `/home/${draft.user || 'benutzer'}`} />
+              <TextField
+                mono
+                value={draft.remoteStart}
+                onChange={(v) => set('remoteStart', v)}
+                placeholder={cloud || family === 's3' ? '/' : `/home/${draft.user || 'benutzer'}`}
+              />
             </div>
 
             {family === 'sftp' && <label htmlFor="s-jump">{$t('Sprungserver')}</label>}
-            {family === 'sftp' && <div className="col-text">
-              <Select id="s-jump" label={$t('Sprungserver')} value={draft.jumpServerId ?? ''} onChange={(v) => set('jumpServerId', v || undefined)}
-                options={[{ value: '', label: $t('Keiner, direkt verbinden') }, ...servers.filter((x) => x.id !== draft.id).map((x) => ({ value: x.id, label: $t('Über {0}', x.name) }))]} />
-              <span className="small muted">{$t('Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).')}</span>
-            </div>}
+            {family === 'sftp' && (
+              <div className="col-text">
+                <Select
+                  id="s-jump"
+                  label={$t('Sprungserver')}
+                  value={draft.jumpServerId ?? ''}
+                  onChange={(v) => set('jumpServerId', v || undefined)}
+                  options={[
+                    { value: '', label: $t('Keiner, direkt verbinden') },
+                    ...servers
+                      .filter((x) => x.id !== draft.id)
+                      .map((x) => ({ value: x.id, label: $t('Über {0}', x.name) })),
+                  ]}
+                />
+                <span className="small muted">
+                  {$t(
+                    'Für Server, die nur über einen anderen Server erreichbar sind (wie ProxyJump in der SSH-Konfiguration).',
+                  )}
+                </span>
+              </div>
+            )}
 
             {family === 'sftp' && <span>{$t('Beim Öffnen')}</span>}
-            {family === 'sftp' && <div className="col-text">
-              <div className="row-inline">
-                <Segmented<'files' | 'terminal'> label={$t('Beim Öffnen')} value={draft.openAs ?? 'files'} onChange={(v) => set('openAs', v === 'terminal' ? 'terminal' : undefined)}
-                  options={[{ value: 'files', label: $t('Dateien') }, { value: 'terminal', label: $t('Nur Terminal') }]} />
+            {family === 'sftp' && (
+              <div className="col-text">
+                <div className="row-inline">
+                  <Segmented<'files' | 'terminal'>
+                    label={$t('Beim Öffnen')}
+                    value={draft.openAs ?? 'files'}
+                    onChange={(v) => set('openAs', v === 'terminal' ? 'terminal' : undefined)}
+                    options={[
+                      { value: 'files', label: $t('Dateien') },
+                      { value: 'terminal', label: $t('Nur Terminal') },
+                    ]}
+                  />
+                </div>
+                <span className="small muted">
+                  {draft.openAs === 'terminal'
+                    ? $t(
+                        'Ein Doppelklick öffnet eine SSH-Konsole im eigenen Tab. Die Dateien erreichst du per Rechtsklick › Dateien öffnen.',
+                      )
+                    : $t(
+                        'Derselbe Server kann beides: Dateien hier, SSH-Terminal über den Terminal-Knopf oder per Rechtsklick.',
+                      )}
+                </span>
               </div>
-              <span className="small muted">{draft.openAs === 'terminal'
-                ? $t('Ein Doppelklick öffnet eine SSH-Konsole im eigenen Tab. Die Dateien erreichst du per Rechtsklick › Dateien öffnen.')
-                : $t('Derselbe Server kann beides: Dateien hier, SSH-Terminal über den Terminal-Knopf oder per Rechtsklick.')}</span>
-            </div>}
+            )}
 
             <label htmlFor="s-group">{$t('Gruppe')}</label>
-            <TextField id="s-group" value={draft.group} onChange={(v) => set('group', v)} placeholder={$t('z. B. Kunden')} className="group-field" />
+            <TextField
+              id="s-group"
+              value={draft.group}
+              onChange={(v) => set('group', v)}
+              placeholder={$t('z. B. Kunden')}
+              className="group-field"
+            />
 
             {/* Transfer rule for this server's manual transfers and watches (settings > Regeln). */}
             <label htmlFor="s-rule">{$t('Regel')}</label>
             <div className="col-text">
-              <Select id="s-rule" label={$t('Regel')} value={draft.ruleId ?? ''} onChange={(v) => set('ruleId', v || undefined)}
-                options={[{ value: '', label: $t('Keine, allgemeine Einstellungen') }, ...rules.map((r) => ({ value: r.id, label: r.name || $t('Ohne Namen') }))]} />
+              <Select
+                id="s-rule"
+                label={$t('Regel')}
+                value={draft.ruleId ?? ''}
+                onChange={(v) => set('ruleId', v || undefined)}
+                options={[
+                  { value: '', label: $t('Keine, allgemeine Einstellungen') },
+                  ...rules.map((r) => ({ value: r.id, label: r.name || $t('Ohne Namen') })),
+                ]}
+              />
               <span className="small muted">{$t('Regeln legst du unter Einstellungen › Regeln an.')}</span>
             </div>
           </div>
@@ -521,45 +1183,136 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
             <button type="button" className="disclosure-head" aria-expanded={more} onClick={() => setMore(!more)}>
               <ChevronRight size={13} strokeWidth={2} className={`chev${more ? ' is-open' : ''}`} aria-hidden="true" />
               <span className="strong">{$t('Weitere Einstellungen')}</span>
-              <span className="small muted ellipsis">{[draft.proxy?.host && $t('Proxy'), draft.forwards?.length && (draft.forwards.length === 1 ? $t('1 Tunnel') : $t('{0} Tunnel', draft.forwards.length)), (draft.maxTransfers || draft.connectTimeout) && $t('Verbindung'), draft.syncBrowseOnOpen && $t('Synchron blättern'), draft.webUrl && $t('Web-Adresse'), draft.note && $t('Notiz')].filter(Boolean).join(', ') || (family === 'ftp' ? $t('Proxy, TLS-Version, Dateinamen, Zeitzone, Verbindung, Notiz') : family === 'sftp' ? $t('Proxy, Terminal, Tunnel, Verbindung, Notiz') : $t('Proxy, Verbindung, Web-Adresse, Notiz'))}</span>
+              <span className="small muted ellipsis">
+                {[
+                  draft.proxy?.host && $t('Proxy'),
+                  draft.forwards?.length &&
+                    (draft.forwards.length === 1 ? $t('1 Tunnel') : $t('{0} Tunnel', draft.forwards.length)),
+                  (draft.maxTransfers || draft.connectTimeout) && $t('Verbindung'),
+                  draft.syncBrowseOnOpen && $t('Synchron blättern'),
+                  draft.webUrl && $t('Web-Adresse'),
+                  draft.note && $t('Notiz'),
+                ]
+                  .filter(Boolean)
+                  .join(', ') ||
+                  (family === 'ftp'
+                    ? $t('Proxy, TLS-Version, Dateinamen, Zeitzone, Verbindung, Notiz')
+                    : family === 'sftp'
+                      ? $t('Proxy, Terminal, Tunnel, Verbindung, Notiz')
+                      : $t('Proxy, Verbindung, Web-Adresse, Notiz'))}
+              </span>
             </button>
             {more && (
               <div className="disclosure-body form-grid">
                 {family !== 'smb' && <label htmlFor="s-proxy">{$t('Proxy')}</label>}
-                {family !== 'smb' && <div className="col-text">
-                  <div className="field-row">
-                    <Select id="s-proxy" label={$t('Proxy')} value={draft.proxy?.kind ?? 'none'} onChange={(v) => set('proxy', v === 'none' ? undefined : { host: '', port: v === 'http' ? 8080 : 1080, ...draft.proxy, kind: v as 'socks5' | 'http' })}
-                      options={[{ value: 'none', label: $t('Kein Proxy') }, { value: 'socks5', label: 'SOCKS5' }, { value: 'http', label: 'HTTP (CONNECT)' }]} />
+                {family !== 'smb' && (
+                  <div className="col-text">
+                    <div className="field-row">
+                      <Select
+                        id="s-proxy"
+                        label={$t('Proxy')}
+                        value={draft.proxy?.kind ?? 'none'}
+                        onChange={(v) =>
+                          set(
+                            'proxy',
+                            v === 'none'
+                              ? undefined
+                              : {
+                                  host: '',
+                                  port: v === 'http' ? 8080 : 1080,
+                                  ...draft.proxy,
+                                  kind: v as 'socks5' | 'http',
+                                },
+                          )
+                        }
+                        options={[
+                          { value: 'none', label: $t('Kein Proxy') },
+                          { value: 'socks5', label: 'SOCKS5' },
+                          { value: 'http', label: 'HTTP (CONNECT)' },
+                        ]}
+                      />
+                      {draft.proxy && (
+                        <>
+                          <TextField
+                            label={$t('Proxy-Adresse')}
+                            value={draft.proxy.host}
+                            onChange={(v) => set('proxy', { ...draft.proxy!, host: v.trim() })}
+                            placeholder="proxy.example"
+                            className="flex-1"
+                          />
+                          <TextField
+                            label={$t('Proxy-Port')}
+                            value={String(draft.proxy.port)}
+                            onChange={(v) =>
+                              set('proxy', { ...draft.proxy!, port: Number(v.replace(/\D/g, '')) || 1080 })
+                            }
+                            className="port-field"
+                          />
+                        </>
+                      )}
+                    </div>
                     {draft.proxy && (
-                      <>
-                        <TextField label={$t('Proxy-Adresse')} value={draft.proxy.host} onChange={(v) => set('proxy', { ...draft.proxy!, host: v.trim() })} placeholder="proxy.example" className="flex-1" />
-                        <TextField label={$t('Proxy-Port')} value={String(draft.proxy.port)} onChange={(v) => set('proxy', { ...draft.proxy!, port: Number(v.replace(/\D/g, '')) || 1080 })} className="port-field" />
-                      </>
+                      <div className="field-row">
+                        <TextField
+                          label={$t('Proxy-Benutzer')}
+                          value={draft.proxy.user ?? ''}
+                          onChange={(v) => set('proxy', { ...draft.proxy!, user: v.trim() || undefined })}
+                          placeholder={$t('Benutzer (falls nötig)')}
+                          className="flex-1"
+                        />
+                        {draft.proxy.user && (
+                          <TextField
+                            type="password"
+                            label={$t('Proxy-Passwort')}
+                            value={proxyPassword}
+                            onChange={setProxyPassword}
+                            placeholder={proxyStored ? $t('{0} gespeichert', store) : $t('Passwort')}
+                            className="flex-1"
+                          />
+                        )}
+                      </div>
+                    )}
+                    {draft.jumpServerId && draft.proxy && (
+                      <span className="small muted">{$t('Mit Sprungserver gilt dessen Proxy-Einstellung.')}</span>
                     )}
                   </div>
-                  {draft.proxy && (
-                    <div className="field-row">
-                      <TextField label={$t('Proxy-Benutzer')} value={draft.proxy.user ?? ''} onChange={(v) => set('proxy', { ...draft.proxy!, user: v.trim() || undefined })} placeholder={$t('Benutzer (falls nötig)')} className="flex-1" />
-                      {draft.proxy.user && <TextField type="password" label={$t('Proxy-Passwort')} value={proxyPassword} onChange={setProxyPassword} placeholder={proxyStored ? $t('{0} gespeichert', store) : $t('Passwort')} className="flex-1" />}
-                    </div>
-                  )}
-                  {draft.jumpServerId && draft.proxy && <span className="small muted">{$t('Mit Sprungserver gilt dessen Proxy-Einstellung.')}</span>}
-                </div>}
+                )}
 
                 {family === 'sftp' && (
                   <>
                     <label htmlFor="s-scp">{$t('Dateiübertragung')}</label>
                     <div className="col-text">
-                      <Select<'sftp' | 'sudo' | 'scp'> id="s-scp" label={$t('Dateiübertragung')}
+                      <Select<'sftp' | 'sudo' | 'scp'>
+                        id="s-scp"
+                        label={$t('Dateiübertragung')}
                         value={draft.scp ? 'scp' : draft.sftpCommand !== undefined ? 'sudo' : 'sftp'}
-                        onChange={(v) => { set('scp', v === 'scp' || undefined); set('sftpCommand', v === 'sudo' ? SUDO_SFTP : undefined); }}
-                        options={[{ value: 'sftp', label: $t('SFTP (Standard)') }, { value: 'sudo', label: $t('SFTP mit Root-Rechten (sudo)') }, { value: 'scp', label: $t('SCP über Shell-Befehle') }]} />
+                        onChange={(v) => {
+                          set('scp', v === 'scp' || undefined);
+                          set('sftpCommand', v === 'sudo' ? SUDO_SFTP : undefined);
+                        }}
+                        options={[
+                          { value: 'sftp', label: $t('SFTP (Standard)') },
+                          { value: 'sudo', label: $t('SFTP mit Root-Rechten (sudo)') },
+                          { value: 'scp', label: $t('SCP über Shell-Befehle') },
+                        ]}
+                      />
                       {draft.sftpCommand !== undefined && !draft.scp && (
-                        <TextField label={$t('SFTP-Befehl')} value={draft.sftpCommand} onChange={(v) => set('sftpCommand', v)} mono />
+                        <TextField
+                          label={$t('SFTP-Befehl')}
+                          value={draft.sftpCommand}
+                          onChange={(v) => set('sftpCommand', v)}
+                          mono
+                        />
                       )}
-                      <span className="small muted">{draft.sftpCommand !== undefined && !draft.scp
-                        ? $t('Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.')
-                        : $t('Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.')}</span>
+                      <span className="small muted">
+                        {draft.sftpCommand !== undefined && !draft.scp
+                          ? $t(
+                              'Bitcrane startet den SFTP-Server über sudo und darf dann alles, was root darf, auch in /etc. Der Benutzer muss den Befehl ohne Passwort ausführen dürfen (NOPASSWD in sudoers). Vorsicht: Fehler treffen dann auch Systemdateien.',
+                            )
+                          : $t(
+                              'Hat der Server kein SFTP, nimmt Bitcrane von selbst SCP. Nur für Router, NAS und sehr alte Server nötig.',
+                            )}
+                      </span>
                     </div>
                   </>
                 )}
@@ -568,13 +1321,27 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                     <span>{$t('Papierkorb')}</span>
                     <div className="col-text">
                       <span className="row-inline">
-                        <Switch checked={draft.trashDir !== undefined} onChange={(v) => set('trashDir', v ? '.bitcrane-papierkorb' : undefined)} label={$t('Papierkorb auf dem Server')} />
+                        <Switch
+                          checked={draft.trashDir !== undefined}
+                          onChange={(v) => set('trashDir', v ? '.bitcrane-papierkorb' : undefined)}
+                          label={$t('Papierkorb auf dem Server')}
+                        />
                         <span>{$t('Papierkorb auf dem Server')}</span>
                       </span>
                       {draft.trashDir !== undefined && (
-                        <TextField label={$t('Ordner des Papierkorbs')} value={draft.trashDir} onChange={(v) => set('trashDir', v)} mono placeholder=".bitcrane-papierkorb" />
+                        <TextField
+                          label={$t('Ordner des Papierkorbs')}
+                          value={draft.trashDir}
+                          onChange={(v) => set('trashDir', v)}
+                          mono
+                          placeholder=".bitcrane-papierkorb"
+                        />
                       )}
-                      <span className="small muted">{$t('Gelöschtes wird in diesen Ordner verschoben statt sofort entfernt. Ohne / am Anfang liegt er im Startordner. Im Papierkorb selbst löscht Bitcrane endgültig.')}</span>
+                      <span className="small muted">
+                        {$t(
+                          'Gelöschtes wird in diesen Ordner verschoben statt sofort entfernt. Ohne / am Anfang liegt er im Startordner. Im Papierkorb selbst löscht Bitcrane endgültig.',
+                        )}
+                      </span>
                     </div>
                   </>
                 )}
@@ -583,58 +1350,146 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                     <label htmlFor="s-termscheme">{$t('Terminal')}</label>
                     <div className="col-text">
                       <div className="field-row">
-                        <Select id="s-termscheme" label={$t('Farbschema des Terminals')} value={draft.termScheme ?? ''} onChange={(v) => set('termScheme', v || undefined)}
-                          options={[{ value: '', label: $t('Farbschema wie eingestellt') }, ...SCHEMES.map((x) => ({ value: x.id, label: $t(x.name) }))]} />
-                        <TextField label={$t('Befehl beim Start')} value={draft.termStart ?? ''} onChange={(v) => set('termStart', v || undefined)} placeholder={$t('Befehl beim Start, z. B. tmux attach')} mono className="flex-1" />
+                        <Select
+                          id="s-termscheme"
+                          label={$t('Farbschema des Terminals')}
+                          value={draft.termScheme ?? ''}
+                          onChange={(v) => set('termScheme', v || undefined)}
+                          options={[
+                            { value: '', label: $t('Farbschema wie eingestellt') },
+                            ...SCHEMES.map((x) => ({ value: x.id, label: $t(x.name) })),
+                          ]}
+                        />
+                        <TextField
+                          label={$t('Befehl beim Start')}
+                          value={draft.termStart ?? ''}
+                          onChange={(v) => set('termStart', v || undefined)}
+                          placeholder={$t('Befehl beim Start, z. B. tmux attach')}
+                          mono
+                          className="flex-1"
+                        />
                       </div>
-                      <span className="small muted">{$t('Für das eingebaute Terminal. Ein eigenes Farbschema (z. B. rot) zeigt sofort, auf welchem Server du tippst.')}</span>
+                      <span className="small muted">
+                        {$t(
+                          'Für das eingebaute Terminal. Ein eigenes Farbschema (z. B. rot) zeigt sofort, auf welchem Server du tippst.',
+                        )}
+                      </span>
                     </div>
                     <span>{$t('SSH-Agent')}</span>
                     <div className="col-text">
-                      <span className="row-inline"><Switch checked={!!draft.forwardAgent} onChange={(v) => set('forwardAgent', v || undefined)} label={$t('SSH-Agent an den Server weiterleiten')} /><span>{$t('SSH-Agent an den Server weiterleiten')}</span></span>
-                      <span className="small muted">{$t('Im Terminal auf dem Server können Programme wie git deine Schlüssel von diesem Computer nutzen, ohne dass dort ein Schlüssel liegt. Nur bei Servern einschalten, denen du vertraust.')}</span>
+                      <span className="row-inline">
+                        <Switch
+                          checked={!!draft.forwardAgent}
+                          onChange={(v) => set('forwardAgent', v || undefined)}
+                          label={$t('SSH-Agent an den Server weiterleiten')}
+                        />
+                        <span>{$t('SSH-Agent an den Server weiterleiten')}</span>
+                      </span>
+                      <span className="small muted">
+                        {$t(
+                          'Im Terminal auf dem Server können Programme wie git deine Schlüssel von diesem Computer nutzen, ohne dass dort ein Schlüssel liegt. Nur bei Servern einschalten, denen du vertraust.',
+                        )}
+                      </span>
                     </div>
                   </>
                 )}
                 {family === 'sftp' && (
                   <>
                     <label>{$t('Tunnel')}</label>
-                    <ForwardEditor serverId={draft.id} value={draft.forwards ?? []} onChange={(v) => set('forwards', v.length ? v : undefined)} />
+                    <ForwardEditor
+                      serverId={draft.id}
+                      value={draft.forwards ?? []}
+                      onChange={(v) => set('forwards', v.length ? v : undefined)}
+                    />
                   </>
                 )}
                 {family === 'smb' && (
                   <>
                     <label htmlFor="s-smbenc">{$t('Verschlüsselung')}</label>
                     <div className="col-text">
-                      <Select<'auto' | 'required'> id="s-smbenc" label={$t('Verschlüsselung')} value={draft.smbEncrypt ? 'required' : 'auto'} onChange={(v) => set('smbEncrypt', v === 'required' || undefined)}
-                        options={[{ value: 'auto', label: $t('Wie der Server es verlangt (Standard)') }, { value: 'required', label: $t('Immer verschlüsseln (SMB 3)') }]} />
-                      <span className="small muted">{$t('Älteren NAS-Geräten fehlt SMB 3; dann kommt keine Verbindung zustande.')}</span>
+                      <Select<'auto' | 'required'>
+                        id="s-smbenc"
+                        label={$t('Verschlüsselung')}
+                        value={draft.smbEncrypt ? 'required' : 'auto'}
+                        onChange={(v) => set('smbEncrypt', v === 'required' || undefined)}
+                        options={[
+                          { value: 'auto', label: $t('Wie der Server es verlangt (Standard)') },
+                          { value: 'required', label: $t('Immer verschlüsseln (SMB 3)') },
+                        ]}
+                      />
+                      <span className="small muted">
+                        {$t('Älteren NAS-Geräten fehlt SMB 3; dann kommt keine Verbindung zustande.')}
+                      </span>
                     </div>
                   </>
                 )}
 
-                {(draft.protocol === 'ftps' || (draft.protocol === 'webdav' && draft.davHttps !== false) || (draft.protocol === 's3' && !draft.s3Http)) && (
+                {(draft.protocol === 'ftps' ||
+                  (draft.protocol === 'webdav' && draft.davHttps !== false) ||
+                  (draft.protocol === 's3' && !draft.s3Http)) && (
                   <>
                     <label htmlFor="s-tlsver">TLS-Version</label>
-                    <Select<'any' | '13'> id="s-tlsver" label="TLS-Version" value={draft.tls13Only ? '13' : 'any'} onChange={(v) => set('tls13Only', v === '13' || undefined)} options={[{ value: 'any', label: $t('TLS 1.2 und 1.3') }, { value: '13', label: $t('Nur TLS 1.3') }]} />
+                    <Select<'any' | '13'>
+                      id="s-tlsver"
+                      label="TLS-Version"
+                      value={draft.tls13Only ? '13' : 'any'}
+                      onChange={(v) => set('tls13Only', v === '13' || undefined)}
+                      options={[
+                        { value: 'any', label: $t('TLS 1.2 und 1.3') },
+                        { value: '13', label: $t('Nur TLS 1.3') },
+                      ]}
+                    />
                   </>
                 )}
                 {family === 'ftp' && (
                   <>
                     <label htmlFor="s-enc">{$t('Dateinamen')}</label>
                     <div className="col-text">
-                      <Select<'utf8' | 'latin1'> id="s-enc" label={$t('Zeichensatz der Dateinamen')} value={draft.ftpEncoding ?? 'utf8'} onChange={(v) => set('ftpEncoding', v === 'utf8' ? undefined : v)} options={[{ value: 'utf8', label: $t('UTF-8 (Standard)') }, { value: 'latin1', label: $t('Latin-1 / Windows (ältere Server)') }]} />
-                      <span className="small muted">{$t('Wenn Umlaute in Dateinamen falsch aussehen, Latin-1 wählen.')}</span>
+                      <Select<'utf8' | 'latin1'>
+                        id="s-enc"
+                        label={$t('Zeichensatz der Dateinamen')}
+                        value={draft.ftpEncoding ?? 'utf8'}
+                        onChange={(v) => set('ftpEncoding', v === 'utf8' ? undefined : v)}
+                        options={[
+                          { value: 'utf8', label: $t('UTF-8 (Standard)') },
+                          { value: 'latin1', label: $t('Latin-1 / Windows (ältere Server)') },
+                        ]}
+                      />
+                      <span className="small muted">
+                        {$t('Wenn Umlaute in Dateinamen falsch aussehen, Latin-1 wählen.')}
+                      </span>
                     </div>
                     <label htmlFor="s-tz">{$t('Zeitzone des Servers')}</label>
                     <div className="col-text">
-                      <Select id="s-tz" label={$t('Zeitzone des Servers')} value={String(draft.ftpTimezone ?? 0)} onChange={(v) => set('ftpTimezone', Number(v) || undefined)} options={TIMEZONES} />
-                      <span className="small muted">{$t('Nur für Server ohne genaue Zeitangaben (kein MLSD): ihre Uhrzeiten sind Ortszeit.')}</span>
+                      <Select
+                        id="s-tz"
+                        label={$t('Zeitzone des Servers')}
+                        value={String(draft.ftpTimezone ?? 0)}
+                        onChange={(v) => set('ftpTimezone', Number(v) || undefined)}
+                        options={TIMEZONES}
+                      />
+                      <span className="small muted">
+                        {$t('Nur für Server ohne genaue Zeitangaben (kein MLSD): ihre Uhrzeiten sind Ortszeit.')}
+                      </span>
                     </div>
                     <label htmlFor="s-mode">{$t('Übertragungsart')}</label>
                     <div className="col-text">
-                      <Select<'binary' | 'ascii' | 'auto'> id="s-mode" label={$t('Übertragungsart')} value={draft.ftpMode ?? 'binary'} onChange={(v) => set('ftpMode', v === 'binary' ? undefined : v)} options={[{ value: 'binary', label: $t('Binär (Standard, Dateien bleiben unverändert)') }, { value: 'auto', label: $t('Automatisch (Textdateien als Text)') }, { value: 'ascii', label: $t('Text (Zeilenenden anpassen)') }]} />
-                      <span className="small muted">{$t('Text passt Zeilenenden zwischen Windows und Linux an. Abgebrochene Textübertragungen beginnen neu.')}</span>
+                      <Select<'binary' | 'ascii' | 'auto'>
+                        id="s-mode"
+                        label={$t('Übertragungsart')}
+                        value={draft.ftpMode ?? 'binary'}
+                        onChange={(v) => set('ftpMode', v === 'binary' ? undefined : v)}
+                        options={[
+                          { value: 'binary', label: $t('Binär (Standard, Dateien bleiben unverändert)') },
+                          { value: 'auto', label: $t('Automatisch (Textdateien als Text)') },
+                          { value: 'ascii', label: $t('Text (Zeilenenden anpassen)') },
+                        ]}
+                      />
+                      <span className="small muted">
+                        {$t(
+                          'Text passt Zeilenenden zwischen Windows und Linux an. Abgebrochene Textübertragungen beginnen neu.',
+                        )}
+                      </span>
                     </div>
                   </>
                 )}
@@ -644,26 +1499,71 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                     <label htmlFor="s-maxtr">{$t('Verbindung')}</label>
                     <div className="col-text">
                       <div className="field-row">
-                        <Select id="s-maxtr" label={$t('Gleichzeitige Übertragungen')} value={String(draft.maxTransfers ?? 0)} onChange={(v) => set('maxTransfers', Number(v) || undefined)}
-                          options={[{ value: '0', label: $t('Übertragungen: wie eingestellt ({0})', parallel) }, ...[1, 2, 3, 4, 6, 8].map((n) => ({ value: String(n), label: n === 1 ? $t('Übertragungen: höchstens 1') : $t('Übertragungen: höchstens {0}', n) }))]} />
-                        <Select id="s-timeout" label={$t('Zeitlimit beim Verbinden')} value={String(draft.connectTimeout ?? 0)} onChange={(v) => set('connectTimeout', Number(v) || undefined)}
-                          options={[{ value: '0', label: $t('Zeitlimit: 15 s (Standard)') }, ...[30, 60, 120].map((n) => ({ value: String(n), label: $t('Zeitlimit: {0} s', n) }))]} />
+                        <Select
+                          id="s-maxtr"
+                          label={$t('Gleichzeitige Übertragungen')}
+                          value={String(draft.maxTransfers ?? 0)}
+                          onChange={(v) => set('maxTransfers', Number(v) || undefined)}
+                          options={[
+                            { value: '0', label: $t('Übertragungen: wie eingestellt ({0})', parallel) },
+                            ...[1, 2, 3, 4, 6, 8].map((n) => ({
+                              value: String(n),
+                              label: n === 1 ? $t('Übertragungen: höchstens 1') : $t('Übertragungen: höchstens {0}', n),
+                            })),
+                          ]}
+                        />
+                        <Select
+                          id="s-timeout"
+                          label={$t('Zeitlimit beim Verbinden')}
+                          value={String(draft.connectTimeout ?? 0)}
+                          onChange={(v) => set('connectTimeout', Number(v) || undefined)}
+                          options={[
+                            { value: '0', label: $t('Zeitlimit: 15 s (Standard)') },
+                            ...[30, 60, 120].map((n) => ({ value: String(n), label: $t('Zeitlimit: {0} s', n) })),
+                          ]}
+                        />
                       </div>
-                      <span className="small muted">{$t('Manche Anbieter erlauben nur wenige gleichzeitige Verbindungen; dann hier begrenzen. Ein längeres Zeitlimit hilft bei langsamen oder weit entfernten Servern.')}</span>
+                      <span className="small muted">
+                        {$t(
+                          'Manche Anbieter erlauben nur wenige gleichzeitige Verbindungen; dann hier begrenzen. Ein längeres Zeitlimit hilft bei langsamen oder weit entfernten Servern.',
+                        )}
+                      </span>
                     </div>
                   </>
                 )}
 
                 <span>{$t('Umlaute')}</span>
                 <div className="col-text">
-                  <span className="row-inline"><Switch checked={!draft.keepNameForm} onChange={(v) => set('keepNameForm', !v || undefined)} label={$t('Dateinamen einheitlich speichern (empfohlen)')} /><span>{$t('Dateinamen einheitlich speichern (empfohlen)')}</span></span>
-                  <span className="small muted">{$t('Der Mac speichert Umlaute manchmal zerlegt (u + ¨). Bitcrane lädt sie in der üblichen Form hoch (Unicode NFC), sonst sieht der Server zwei verschiedene Namen.')}</span>
+                  <span className="row-inline">
+                    <Switch
+                      checked={!draft.keepNameForm}
+                      onChange={(v) => set('keepNameForm', !v || undefined)}
+                      label={$t('Dateinamen einheitlich speichern (empfohlen)')}
+                    />
+                    <span>{$t('Dateinamen einheitlich speichern (empfohlen)')}</span>
+                  </span>
+                  <span className="small muted">
+                    {$t(
+                      'Der Mac speichert Umlaute manchmal zerlegt (u + ¨). Bitcrane lädt sie in der üblichen Form hoch (Unicode NFC), sonst sieht der Server zwei verschiedene Namen.',
+                    )}
+                  </span>
                 </div>
 
                 <span>{$t('Synchron blättern')}</span>
                 <div className="col-text">
-                  <span className="row-inline"><Switch checked={!!draft.syncBrowseOnOpen} onChange={(v) => set('syncBrowseOnOpen', v || undefined)} label={$t('Beim Öffnen synchron blättern')} /><span>{$t('Beim Öffnen synchron blättern')}</span></span>
-                  <span className="small muted">{$t('Lokaler Ordner und Ordner auf dem Server (oben unter Startordner) wandern gemeinsam: ein Ordnerwechsel auf einer Seite gilt auch für die andere.')}</span>
+                  <span className="row-inline">
+                    <Switch
+                      checked={!!draft.syncBrowseOnOpen}
+                      onChange={(v) => set('syncBrowseOnOpen', v || undefined)}
+                      label={$t('Beim Öffnen synchron blättern')}
+                    />
+                    <span>{$t('Beim Öffnen synchron blättern')}</span>
+                  </span>
+                  <span className="small muted">
+                    {$t(
+                      'Lokaler Ordner und Ordner auf dem Server (oben unter Startordner) wandern gemeinsam: ein Ordnerwechsel auf einer Seite gilt auch für die andere.',
+                    )}
+                  </span>
                 </div>
 
                 {family !== 'cloud' && (
@@ -672,11 +1572,26 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                     <div className="col-text">
                       {platform === 'win' ? (
                         <>
-                          <span className="row-inline"><Switch checked={!!draft.mountExplorer} onChange={(v) => set('mountExplorer', v || undefined)} label={$t('Im Explorer als Ordner zeigen')} /><span>{$t('Im Explorer als Ordner zeigen')}</span></span>
-                          <span className="small muted">{$t('Wie OneDrive: Der Server erscheint links im Explorer, Dateien werden erst beim Öffnen geladen, Änderungen gehen von selbst zurück auf den Server. Braucht ein gespeichertes Passwort.')}</span>
+                          <span className="row-inline">
+                            <Switch
+                              checked={!!draft.mountExplorer}
+                              onChange={(v) => set('mountExplorer', v || undefined)}
+                              label={$t('Im Explorer als Ordner zeigen')}
+                            />
+                            <span>{$t('Im Explorer als Ordner zeigen')}</span>
+                          </span>
+                          <span className="small muted">
+                            {$t(
+                              'Wie OneDrive: Der Server erscheint links im Explorer, Dateien werden erst beim Öffnen geladen, Änderungen gehen von selbst zurück auf den Server. Braucht ein gespeichertes Passwort.',
+                            )}
+                          </span>
                         </>
                       ) : (
-                        <span className="small muted">{$t('Server als Ordner im Finder kommen mit einer von Apple signierten Version von Bitcrane. Unter Windows gibt es das schon.')}</span>
+                        <span className="small muted">
+                          {$t(
+                            'Server als Ordner im Finder kommen mit einer von Apple signierten Version von Bitcrane. Unter Windows gibt es das schon.',
+                          )}
+                        </span>
                       )}
                     </div>
                   </>
@@ -685,19 +1600,72 @@ export function ServerEdit({ serverId, cloud: presetCloud, terminal, preset }: {
                 <label htmlFor="s-web">{$t('Web-Adresse')}</label>
                 <div className="col-text">
                   <div className="field-row">
-                    <TextField id="s-web" value={draft.webUrl ?? ''} onChange={(v) => set('webUrl', v.trim() || undefined)} placeholder="https://example.com" className="flex-1" />
-                    <TextField label={$t('Passender Ordner auf dem Server')} mono value={draft.webRoot ?? ''} onChange={(v) => set('webRoot', v.trim() || undefined)} placeholder="/var/www/html" className="flex-1" />
+                    <TextField
+                      id="s-web"
+                      value={draft.webUrl ?? ''}
+                      onChange={(v) => set('webUrl', v.trim() || undefined)}
+                      placeholder="https://example.com"
+                      className="flex-1"
+                    />
+                    <TextField
+                      label={$t('Passender Ordner auf dem Server')}
+                      mono
+                      value={draft.webRoot ?? ''}
+                      onChange={(v) => set('webRoot', v.trim() || undefined)}
+                      placeholder="/var/www/html"
+                      className="flex-1"
+                    />
                   </div>
-                  <span className="small muted">{$t('Damit gibt es bei Dateien „Web-Adresse kopieren“ und „Im Browser öffnen“.')}</span>
+                  <span className="small muted">
+                    {$t('Damit gibt es bei Dateien „Web-Adresse kopieren“ und „Im Browser öffnen“.')}
+                  </span>
                 </div>
 
                 <label htmlFor="s-note">{$t('Notiz')}</label>
-                <textarea id="s-note" className="note-field" rows={3} value={draft.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} placeholder={$t('Was läuft hier? Wen fragen?')} />
+                <textarea
+                  id="s-note"
+                  className="note-field"
+                  rows={3}
+                  value={draft.note ?? ''}
+                  onChange={(e) => set('note', e.target.value || undefined)}
+                  placeholder={$t('Was läuft hier? Wen fragen?')}
+                />
 
                 <span>{$t('Vorlage')}</span>
                 <div className="row-inline">
-                  <Button small onClick={() => { updateSettings({ serverDefaults: { port: draft.port, user: draft.user, auth: draft.auth, keyPath: draft.keyPath, localStart: draft.localStart, group: draft.group, color: draft.color, jumpServerId: draft.jumpServerId, proxy: draft.proxy } }); showToast($t('Neue Server beginnen jetzt mit diesen Einstellungen.'), 'ok'); }}>{$t('Als Vorlage für neue Server')}</Button>
-                  {Object.keys(defaults).length > 0 && <Button small variant="ghost" onClick={() => { updateSettings({ serverDefaults: {} }); showToast($t('Vorlage entfernt.')); }}>{$t('Vorlage entfernen')}</Button>}
+                  <Button
+                    small
+                    onClick={() => {
+                      updateSettings({
+                        serverDefaults: {
+                          port: draft.port,
+                          user: draft.user,
+                          auth: draft.auth,
+                          keyPath: draft.keyPath,
+                          localStart: draft.localStart,
+                          group: draft.group,
+                          color: draft.color,
+                          jumpServerId: draft.jumpServerId,
+                          proxy: draft.proxy,
+                        },
+                      });
+                      showToast($t('Neue Server beginnen jetzt mit diesen Einstellungen.'), 'ok');
+                    }}
+                  >
+                    {$t('Als Vorlage für neue Server')}
+                  </Button>
+                  {Object.keys(defaults).length > 0 && (
+                    <Button
+                      small
+                      variant="ghost"
+                      onClick={() => {
+                        updateSettings({ serverDefaults: {} });
+                        showToast($t('Vorlage entfernt.'));
+                      }}
+                    >
+                      {$t('Vorlage entfernen')}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

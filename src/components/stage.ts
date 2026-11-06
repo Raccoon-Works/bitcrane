@@ -10,5 +10,10 @@ export function stagePoint(clientX: number, clientY: number): { x: number; y: nu
   if (!el) return { x: clientX, y: clientY, w: window.innerWidth, h: window.innerHeight };
   const rect = el.getBoundingClientRect();
   const scale = Number(el.dataset.scale || '1');
-  return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale, w: rect.width / scale, h: rect.height / scale };
+  return {
+    x: (clientX - rect.left) / scale,
+    y: (clientY - rect.top) / scale,
+    w: rect.width / scale,
+    h: rect.height / scale,
+  };
 }

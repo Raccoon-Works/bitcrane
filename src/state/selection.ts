@@ -39,7 +39,11 @@ export function clickRow(side: PaneSide, index: number, mod: { shift?: boolean; 
     names = [entry.name];
     anchor = index;
   }
-  setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names, cursor: index, anchor } }, renaming: null }));
+  setState((s) => ({
+    focusSide: side,
+    selection: { ...s.selection, [side]: { names, cursor: index, anchor } },
+    renaming: null,
+  }));
 }
 
 export function clearPaneSelection(side: PaneSide) {
@@ -51,12 +55,22 @@ export function moveCursor(side: PaneSide, delta: number, extend: boolean) {
   const entries = paneEntries(side);
   if (!entries.length) return;
   const sel = state.selection[side];
-  const cursor = Math.max(0, Math.min(entries.length - 1, (sel.cursor < 0 ? (delta > 0 ? -1 : entries.length) : sel.cursor) + delta));
+  const cursor = Math.max(
+    0,
+    Math.min(entries.length - 1, (sel.cursor < 0 ? (delta > 0 ? -1 : entries.length) : sel.cursor) + delta),
+  );
   if (extend && sel.anchor >= 0) {
     const [a, b] = [Math.min(sel.anchor, cursor), Math.max(sel.anchor, cursor)];
-    setState((s) => ({ selection: { ...s.selection, [side]: { names: entries.slice(a, b + 1).map((e) => e.name), cursor, anchor: sel.anchor } } }));
+    setState((s) => ({
+      selection: {
+        ...s.selection,
+        [side]: { names: entries.slice(a, b + 1).map((e) => e.name), cursor, anchor: sel.anchor },
+      },
+    }));
   } else {
-    setState((s) => ({ selection: { ...s.selection, [side]: { names: [entries[cursor].name], cursor, anchor: cursor } } }));
+    setState((s) => ({
+      selection: { ...s.selection, [side]: { names: [entries[cursor].name], cursor, anchor: cursor } },
+    }));
   }
 }
 
@@ -73,12 +87,20 @@ export function toggleAtCursor(side: PaneSide = state.focusSide) {
 
 export function selectAll(side: PaneSide) {
   const entries = paneEntries(side);
-  setState((s) => ({ selection: { ...s.selection, [side]: { names: entries.map((e) => e.name), cursor: s.selection[side].cursor, anchor: 0 } } }));
+  setState((s) => ({
+    selection: {
+      ...s.selection,
+      [side]: { names: entries.map((e) => e.name), cursor: s.selection[side].cursor, anchor: 0 },
+    },
+  }));
 }
 
 /** Type-to-select: jumps to the first entry starting with the typed text. */
 export function jumpTo(side: PaneSide, prefix: string) {
   const entries = paneEntries(side);
   const idx = entries.findIndex((e) => e.name.toLowerCase().replace(/^\./, '').startsWith(prefix.toLowerCase()));
-  if (idx >= 0) setState((s) => ({ selection: { ...s.selection, [side]: { names: [entries[idx].name], cursor: idx, anchor: idx } } }));
+  if (idx >= 0)
+    setState((s) => ({
+      selection: { ...s.selection, [side]: { names: [entries[idx].name], cursor: idx, anchor: idx } },
+    }));
 }

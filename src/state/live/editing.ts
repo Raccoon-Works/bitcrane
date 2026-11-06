@@ -32,7 +32,13 @@ function publishEdits(patch?: { localPath: string; lastUpload: number }) {
   setState((st) => ({
     edits: [...editSessions.values()].map((e) => {
       const prev = st.edits.find((x) => x.localPath === e.localPath);
-      return { localPath: e.localPath, serverId: e.serverId, remotePath: e.remotePath, openedAt: prev?.openedAt ?? Date.now(), lastUpload: patch?.localPath === e.localPath ? patch.lastUpload : prev?.lastUpload };
+      return {
+        localPath: e.localPath,
+        serverId: e.serverId,
+        remotePath: e.remotePath,
+        openedAt: prev?.openedAt ?? Date.now(),
+        lastUpload: patch?.localPath === e.localPath ? patch.lastUpload : prev?.lastUpload,
+      };
     }),
   }));
 }
@@ -72,9 +78,23 @@ export async function editRemote(serverId: string, remotePath: string, app?: str
     const st = await backend.remoteStat(serverId, remotePath);
     const known = editSessions.get(localPath);
     if (known) known.quietUntil = Date.now() + 2000;
-    await backend.download(uid('edit'), serverId, remotePath, localPath, { keepMtime: true, resume: false }, () => undefined);
+    await backend.download(
+      uid('edit'),
+      serverId,
+      remotePath,
+      localPath,
+      { keepMtime: true, resume: false },
+      () => undefined,
+    );
     const watchId = known?.watchId ?? `edit-${uid('w')}`;
-    editSessions.set(localPath, { serverId, remotePath, localPath, remoteMtime: st.mtime, quietUntil: Date.now() + 1500, watchId });
+    editSessions.set(localPath, {
+      serverId,
+      remotePath,
+      localPath,
+      remoteMtime: st.mtime,
+      quietUntil: Date.now() + 1500,
+      watchId,
+    });
     if (!known) {
       // One watcher per working copy; it reports each save of the editor.
       await backend.watchStart(watchId, parent(localPath), false, [], 400, (b) => {
@@ -84,7 +104,9 @@ export async function editRemote(serverId: string, remotePath: string, app?: str
     publishEdits();
     backend.localOpen(localPath, app ?? editorFor(localPath)).catch((e) => showError(e));
     addLog('info', $t('Im Editor geöffnet: {0}', remotePath), serverId);
-    showToast($t('„{0}“ ist im Editor geöffnet. Beim Sichern lädt Bitcrane die Datei wieder hoch.', basename(remotePath)));
+    showToast(
+      $t('„{0}“ ist im Editor geöffnet. Beim Sichern lädt Bitcrane die Datei wieder hoch.', basename(remotePath)),
+    );
   } catch (e) {
     const err = toBackendError(e);
     handleRemoteError(serverId, err);
@@ -95,20 +117,36 @@ export async function editRemote(serverId: string, remotePath: string, app?: str
 function uploadEdited(localPath: string) {
   const s = editSessions.get(localPath);
   if (!s || Date.now() < s.quietUntil) return;
-  const pending = getState().transfers.filter((x) => x.source === localPath && (x.state === 'queued' || x.state === 'running'));
+  const pending = getState().transfers.filter(
+    (x) => x.source === localPath && (x.state === 'queued' || x.state === 'running'),
+  );
   // A queued upload reads the file when it starts, so it carries this save too.
   if (pending.some((x) => x.state === 'queued')) return;
   if (pending.length) {
     s.dirty = true;
     return;
   }
-  backend.localStat(localPath).then((st) => {
-    addLog('info', $t('Im Editor gesichert: {0}', s.remotePath), s.serverId);
-    enqueue([{
-      id: uid('t'), name: basename(s.remotePath), direction: 'up', serverId: s.serverId, folder: relFolder(parent(s.remotePath), s.remotePath),
-      source: localPath, target: s.remotePath, size: st.size, done: 0, state: 'queued', editMtime: s.remoteMtime,
-    }]);
-  }).catch(() => undefined);
+  backend
+    .localStat(localPath)
+    .then((st) => {
+      addLog('info', $t('Im Editor gesichert: {0}', s.remotePath), s.serverId);
+      enqueue([
+        {
+          id: uid('t'),
+          name: basename(s.remotePath),
+          direction: 'up',
+          serverId: s.serverId,
+          folder: relFolder(parent(s.remotePath), s.remotePath),
+          source: localPath,
+          target: s.remotePath,
+          size: st.size,
+          done: 0,
+          state: 'queued',
+          editMtime: s.remoteMtime,
+        },
+      ]);
+    })
+    .catch(() => undefined);
 }
 
 /** After an edited file went up: remember the new server time for the next save. */
@@ -116,9 +154,15 @@ export function editUploaded(tr: Transfer) {
   const s = editSessions.get(tr.source);
   if (!s) return;
   publishEdits({ localPath: s.localPath, lastUpload: Date.now() });
-  backend.remoteStat(tr.serverId, tr.target).then((st) => { s.remoteMtime = st.mtime; }).catch(() => undefined).finally(() => {
-    if (!s.dirty) return;
-    s.dirty = false;
-    uploadEdited(s.localPath);
-  });
+  backend
+    .remoteStat(tr.serverId, tr.target)
+    .then((st) => {
+      s.remoteMtime = st.mtime;
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      if (!s.dirty) return;
+      s.dirty = false;
+      uploadEdited(s.localPath);
+    });
 }

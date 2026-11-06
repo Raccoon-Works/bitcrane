@@ -40,7 +40,13 @@ where
 async fn many_files(conn: &Remote, base: &str, count: usize) {
     let local = tempfile::tempdir().unwrap();
     // Half the files in one big folder, the rest spread over 40 folders.
-    let rel = |i: usize| if i % 2 == 0 { format!("flach/f{i:06}.txt") } else { format!("tief/d{:02}/u{:02}/f{i:06}.bin", i % 40, i % 7) };
+    let rel = |i: usize| {
+        if i % 2 == 0 {
+            format!("flach/f{i:06}.txt")
+        } else {
+            format!("tief/d{:02}/u{:02}/f{i:06}.bin", i % 40, i % 7)
+        }
+    };
     for i in 0..count {
         let p = local.path().join(rel(i));
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -54,7 +60,9 @@ async fn many_files(conn: &Remote, base: &str, count: usize) {
         let opts = &opts;
         let failed = &failed;
         async move {
-            if let Err(e) = crate::transfer::upload(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await {
+            if let Err(e) =
+                crate::transfer::upload(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await
+            {
                 eprintln!("upload {dst}: {e:?}");
                 failed.fetch_add(1, Ordering::Relaxed);
             }
@@ -81,7 +89,9 @@ async fn many_files(conn: &Remote, base: &str, count: usize) {
         let opts = &opts;
         let failed = &failed;
         async move {
-            if let Err(e) = crate::transfer::download(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await {
+            if let Err(e) =
+                crate::transfer::download(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await
+            {
                 eprintln!("download {src}: {e:?}");
                 failed.fetch_add(1, Ordering::Relaxed);
             }
@@ -91,7 +101,12 @@ async fn many_files(conn: &Remote, base: &str, count: usize) {
     let down = t.elapsed();
     assert_eq!(failed.load(Ordering::Relaxed), 0, "{}: downloads failed", conn.protocol());
     for i in 0..count {
-        assert_eq!(std::fs::read(back.path().join(rel(i))).unwrap(), content(i), "{}: file {i} intact", conn.protocol());
+        assert_eq!(
+            std::fs::read(back.path().join(rel(i))).unwrap(),
+            content(i),
+            "{}: file {i} intact",
+            conn.protocol()
+        );
     }
     eprintln!(
         "{}: {count} files up {:.1}s ({:.0}/s), list of {} {:.2}s, walk {:.2}s, down {:.1}s ({:.0}/s)",
@@ -116,7 +131,8 @@ fn big_file(dir: &std::path::Path, gb: u64) -> std::path::PathBuf {
     for (at, seed) in [(0u64, 1u8), ((1u64 << 32) + 777, 2), (size - 4096, 3)] {
         if at + 4096 <= size {
             f.seek(SeekFrom::Start(at)).unwrap();
-            f.write_all(&(0..4096u32).map(|j| (j as u8).wrapping_mul(seed).wrapping_add(seed)).collect::<Vec<u8>>()).unwrap();
+            f.write_all(&(0..4096u32).map(|j| (j as u8).wrapping_mul(seed).wrapping_add(seed)).collect::<Vec<u8>>())
+                .unwrap();
         }
     }
     path
@@ -134,14 +150,41 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
     let f2 = flag.clone();
     let t = Instant::now();
     let pause_at = size / 3;
-    let paused = crate::transfer::upload(conn, &ui(&local), &target, &opts, &move |d, _| if d >= pause_at { f2.store(PAUSE, Ordering::Relaxed) }, flag).await;
+    let paused = crate::transfer::upload(
+        conn,
+        &ui(&local),
+        &target,
+        &opts,
+        &move |d, _| {
+            if d >= pause_at {
+                f2.store(PAUSE, Ordering::Relaxed)
+            }
+        },
+        flag,
+    )
+    .await;
     assert_eq!(paused.err().map(|e| e.kind), Some(ErrorKind::Cancelled), "{}: paused", conn.protocol());
     let first = AtomicU64::new(u64::MAX);
-    crate::transfer::upload(conn, &ui(&local), &target, &opts, &|d, _| { let _ = first.compare_exchange(u64::MAX, d, Ordering::Relaxed, Ordering::Relaxed); }, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+    crate::transfer::upload(
+        conn,
+        &ui(&local),
+        &target,
+        &opts,
+        &|d, _| {
+            let _ = first.compare_exchange(u64::MAX, d, Ordering::Relaxed, Ordering::Relaxed);
+        },
+        Arc::new(AtomicU8::new(RUN)),
+    )
+    .await
+    .unwrap();
     let up = t.elapsed();
     let resumed = first.load(Ordering::Relaxed);
     if conn.can_append(&target) {
-        assert!(resumed >= pause_at - 64 * 1024 * 1024, "{}: continued at {resumed}, paused at {pause_at}", conn.protocol());
+        assert!(
+            resumed >= pause_at - 64 * 1024 * 1024,
+            "{}: continued at {resumed}, paused at {pause_at}",
+            conn.protocol()
+        );
     }
     assert_eq!(conn.stat(&target).await.unwrap().size, size, "{}: full size on the server", conn.protocol());
 
@@ -151,15 +194,42 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
     let f2 = flag.clone();
     let t = Instant::now();
     let pause_at = size / 2;
-    let paused = crate::transfer::download(conn, &target, &ui(&back), &opts, &move |d, _| if d >= pause_at { f2.store(PAUSE, Ordering::Relaxed) }, flag).await;
+    let paused = crate::transfer::download(
+        conn,
+        &target,
+        &ui(&back),
+        &opts,
+        &move |d, _| {
+            if d >= pause_at {
+                f2.store(PAUSE, Ordering::Relaxed)
+            }
+        },
+        flag,
+    )
+    .await;
     assert_eq!(paused.err().map(|e| e.kind), Some(ErrorKind::Cancelled), "{}: download paused", conn.protocol());
-    crate::transfer::download(conn, &target, &ui(&back), &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+    crate::transfer::download(conn, &target, &ui(&back), &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN)))
+        .await
+        .unwrap();
     let down = t.elapsed();
     assert_eq!(std::fs::metadata(&back).unwrap().len(), size);
-    assert_eq!(crate::local::checksum(&ui(&back)).unwrap(), crate::local::checksum(&ui(&local)).unwrap(), "{}: big file intact", conn.protocol());
+    assert_eq!(
+        crate::local::checksum(&ui(&back)).unwrap(),
+        crate::local::checksum(&ui(&local)).unwrap(),
+        "{}: big file intact",
+        conn.protocol()
+    );
     conn.remove_file(&target).await.unwrap();
     let mb = size as f64 / 1e6;
-    eprintln!("{}: {:.2} GB up {:.1}s ({:.0} MB/s, with a pause), down {:.1}s ({:.0} MB/s)", conn.protocol(), size as f64 / 1e9, up.as_secs_f64(), mb / up.as_secs_f64(), down.as_secs_f64(), mb / down.as_secs_f64());
+    eprintln!(
+        "{}: {:.2} GB up {:.1}s ({:.0} MB/s, with a pause), down {:.1}s ({:.0} MB/s)",
+        conn.protocol(),
+        size as f64 / 1e9,
+        up.as_secs_f64(),
+        mb / up.as_secs_f64(),
+        down.as_secs_f64(),
+        mb / down.as_secs_f64()
+    );
 }
 
 async fn run(conn: Remote, home: &str, files: usize, gb: u64) {
@@ -188,15 +258,30 @@ async fn load_sftp() {
     let (host, port) = target.split_once(':').unwrap();
     let dir = tempfile::tempdir().unwrap();
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-    let p = |trust: Option<String>| ConnectParams { sftp_command: None, timeout: None, forward_agent: false,
-        host: host.into(), port: port.parse().unwrap(), user: "test".into(),
+    let p = |trust: Option<String>| ConnectParams {
+        sftp_command: None,
+        timeout: None,
+        forward_agent: false,
+        host: host.into(),
+        port: port.parse().unwrap(),
+        user: "test".into(),
         auth: AuthParams::Key { path: std::env::var("BITCRANE_TEST_KEY").unwrap(), passphrase: None },
-        trust, keepalive: true, scp: false, jump: None, proxy: None,
+        trust,
+        keepalive: true,
+        scp: false,
+        jump: None,
+        proxy: None,
     };
     let fp = crate::ssh::connect(&p(None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
     let c = crate::ssh::connect(&p(Some(fp)), known).await.unwrap();
     let home = c.home.clone();
-    run(Remote::Sftp(Box::new(c)), &home, env_num("BITCRANE_LOAD_FILES", 20_000) as usize, env_num("BITCRANE_LOAD_GB", 5)).await;
+    run(
+        Remote::Sftp(Box::new(c)),
+        &home,
+        env_num("BITCRANE_LOAD_FILES", 20_000) as usize,
+        env_num("BITCRANE_LOAD_GB", 5),
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -210,13 +295,29 @@ async fn load_ftp() {
     let port: u16 = ports.split(',').next().unwrap().parse().unwrap();
     let dir = tempfile::tempdir().unwrap();
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-    let p = crate::ftp::FtpParams { timeout: None,
-        host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: "none".into(), tls13_only: false,
-        encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
+    let p = crate::ftp::FtpParams {
+        timeout: None,
+        host: host.into(),
+        port,
+        user: "test".into(),
+        password: Some("geheim123".into()),
+        tls: "none".into(),
+        tls13_only: false,
+        encoding: "utf8".into(),
+        tz_offset_min: 0,
+        mode: "binary".into(),
+        trust: None,
+        proxy: None,
     };
     let c = crate::ftp::FtpConn::connect(p, known).await.unwrap();
     let home = c.home.clone();
-    run(Remote::Ftp(Arc::new(c)), &home, env_num("BITCRANE_LOAD_FTP_FILES", 3_000) as usize, env_num("BITCRANE_LOAD_GB", 5)).await;
+    run(
+        Remote::Ftp(Arc::new(c)),
+        &home,
+        env_num("BITCRANE_LOAD_FTP_FILES", 3_000) as usize,
+        env_num("BITCRANE_LOAD_GB", 5),
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -229,15 +330,45 @@ async fn load_dav_and_s3() {
     let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
     if let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") {
         let url = urls.split(',').next().unwrap();
-        let p = crate::dav::DavParams { timeout: None, url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None };
+        let p = crate::dav::DavParams {
+            timeout: None,
+            url: url.into(),
+            user: "test".into(),
+            password: Some("geheim123".into()),
+            tls13_only: false,
+            trust: None,
+            proxy: None,
+        };
         let c = crate::dav::DavConn::connect(p, known.clone()).await.unwrap();
         let home = c.home.clone();
-        run(Remote::Dav(c), &home, env_num("BITCRANE_LOAD_DAV_FILES", 1_000) as usize, env_num("BITCRANE_LOAD_DAV_GB", 1)).await;
+        run(
+            Remote::Dav(c),
+            &home,
+            env_num("BITCRANE_LOAD_DAV_FILES", 1_000) as usize,
+            env_num("BITCRANE_LOAD_DAV_GB", 1),
+        )
+        .await;
     }
     if let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") {
-        let params = |bucket: &str| crate::s3::S3Params { timeout: None, endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+        let params = |bucket: &str| crate::s3::S3Params {
+            timeout: None,
+            endpoint: endpoint.clone(),
+            region: "eu-central-1".into(),
+            bucket: bucket.into(),
+            access_key: "test".into(),
+            secret: Some("geheim".into()),
+            path_style: true,
+            tls13_only: false,
+            trust: None,
+            proxy: None,
+        };
         let bucket = format!("bitcrane-last-{}", uuid::Uuid::new_v4().simple());
-        crate::s3::S3Conn::connect(params(""), known.clone()).await.unwrap().mkdir(&format!("/{bucket}")).await.unwrap();
+        crate::s3::S3Conn::connect(params(""), known.clone())
+            .await
+            .unwrap()
+            .mkdir(&format!("/{bucket}"))
+            .await
+            .unwrap();
         let c = crate::s3::S3Conn::connect(params(&bucket), known.clone()).await.unwrap();
         // The S3 test server keeps everything in memory: many files, no giant file.
         run(Remote::S3(Arc::new(c)), "/", env_num("BITCRANE_LOAD_S3_FILES", 1_000) as usize, 0).await;

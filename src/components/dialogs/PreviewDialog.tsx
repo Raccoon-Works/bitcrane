@@ -28,19 +28,49 @@ export function PreviewDialog({ side }: { side: PaneSide }) {
     const openedAt = performance.now();
     const onKey = (e: KeyboardEvent) => {
       if (e.timeStamp <= openedAt) return;
-      if (e.key === ' ') { e.preventDefault(); closeDialog(); }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); moveCursor(side, e.key === 'ArrowDown' ? 1 : -1, false); }
+      if (e.key === ' ') {
+        e.preventDefault();
+        closeDialog();
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveCursor(side, e.key === 'ArrowDown' ? 1 : -1, false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [side]);
 
   return (
-    <Dialog label={$t('Vorschau')} title={entry?.name ?? $t('Vorschau')} subtitle={entry ? `${formatSize(entry.size)} · ${formatDate(entry.mtime)}` : undefined} width={860} maxHeight={720} className="preview-dialog"
-      footer={<><span className="small muted">{$t('Leertaste oder Esc schließt, Pfeiltasten blättern.')}</span><span className="flex-1" /><Button variant="primary" autoFocus onClick={closeDialog}>{$t('Fertig')}</Button></>}>
+    <Dialog
+      label={$t('Vorschau')}
+      title={entry?.name ?? $t('Vorschau')}
+      subtitle={entry ? `${formatSize(entry.size)} · ${formatDate(entry.mtime)}` : undefined}
+      width={860}
+      maxHeight={720}
+      className="preview-dialog"
+      footer={
+        <>
+          <span className="small muted">{$t('Leertaste oder Esc schließt, Pfeiltasten blättern.')}</span>
+          <span className="flex-1" />
+          <Button variant="primary" autoFocus onClick={closeDialog}>
+            {$t('Fertig')}
+          </Button>
+        </>
+      }
+    >
       <div className="preview-body">
-        {!path && <p className="muted">{entry?.kind === 'dir' ? $t('Ordner haben keine Vorschau.') : $t('Keine Datei ausgewählt.')}</p>}
-        {path && !preview && !error && <span className="row-inline muted"><Loader2 size={14} className="spin" aria-hidden="true" />{$t('Wird geladen …')}</span>}
+        {!path && (
+          <p className="muted">
+            {entry?.kind === 'dir' ? $t('Ordner haben keine Vorschau.') : $t('Keine Datei ausgewählt.')}
+          </p>
+        )}
+        {path && !preview && !error && (
+          <span className="row-inline muted">
+            <Loader2 size={14} className="spin" aria-hidden="true" />
+            {$t('Wird geladen …')}
+          </span>
+        )}
         {error && <p className="tone-danger">{error}</p>}
         {preview && <PreviewView preview={preview} />}
       </div>

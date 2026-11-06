@@ -26,7 +26,14 @@ export type AuthParams =
   | { method: 'auto'; keyPath?: string; passphrase?: string; password?: string };
 
 /** A file whose content matches "Im Inhalt suchen". */
-export interface GrepHit { path: string; rel: string; size: number; mtime: number; line: string; lineNo: number }
+export interface GrepHit {
+  path: string;
+  rel: string;
+  size: number;
+  mtime: number;
+  line: string;
+  lineNo: number;
+}
 
 /** Checksum algorithms offered in "Prüfsumme". */
 export type ChecksumAlgo = 'md5' | 'sha1' | 'sha256' | 'sha512';
@@ -143,8 +150,19 @@ export interface KnownHost {
 }
 
 export type ErrorKind =
-  | 'hostKeyUnknown' | 'hostKeyChanged' | 'authFailed' | 'passphraseRequired' | 'passwordRequired' | 'unreachable' | 'notConnected'
-  | 'connectionLost' | 'permissionDenied' | 'notFound' | 'alreadyExists' | 'cancelled' | 'other';
+  | 'hostKeyUnknown'
+  | 'hostKeyChanged'
+  | 'authFailed'
+  | 'passphraseRequired'
+  | 'passwordRequired'
+  | 'unreachable'
+  | 'notConnected'
+  | 'connectionLost'
+  | 'permissionDenied'
+  | 'notFound'
+  | 'alreadyExists'
+  | 'cancelled'
+  | 'other';
 
 /** Error shape returned by every backend call. */
 export interface BackendError {
@@ -189,7 +207,6 @@ export interface SshConfigHost {
 }
 
 export interface Backend {
-
   localList(path: string): Promise<FileEntry[]>;
   localStat(path: string): Promise<FileEntry>;
   localMkdir(path: string): Promise<void>;
@@ -253,20 +270,38 @@ export interface Backend {
   connectS3(serverId: string, params: S3ConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   connectSmb(serverId: string, params: SmbConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Unlocks a Cryptomator vault in `location` (on the server `storageId`, or this computer) under `serverId`. */
-  vaultOpen(serverId: string, location: string, storageId: string | undefined, password: string): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  vaultOpen(
+    serverId: string,
+    location: string,
+    storageId: string | undefined,
+    password: string,
+  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Creates an empty Cryptomator vault in the new folder `location`. */
   vaultCreate(location: string, storageId: string | undefined, password: string): Promise<void>;
   /** Dropbox with the refresh token from the sign-in (kept in the keychain). */
-  connectDropbox(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  connectDropbox(
+    serverId: string,
+    params: { refreshToken: string },
+  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Which cloud services this build has app keys for. */
   cloudServices(): Promise<{ dropbox: boolean; onedrive: boolean }>;
   /** Sign-in in the browser; resolves with the refresh token and the account name. */
   /** Google Drive needs the user's own app key (client id and secret). */
-  cloudSignIn(service: string, clientId?: string, clientSecret?: string): Promise<{ refreshToken: string; account: string }>;
+  cloudSignIn(
+    service: string,
+    clientId?: string,
+    clientSecret?: string,
+  ): Promise<{ refreshToken: string; account: string }>;
   /** OneDrive; `refreshToken` in the answer is the renewed sign-in to keep. */
-  connectOneDrive(serverId: string, params: { refreshToken: string }): Promise<{ home: string; clockOffsetMs?: number | null; refreshToken?: string }>;
+  connectOneDrive(
+    serverId: string,
+    params: { refreshToken: string },
+  ): Promise<{ home: string; clockOffsetMs?: number | null; refreshToken?: string }>;
   /** Google Drive with the refresh token and the user's own app key. */
-  connectGDrive(serverId: string, params: { refreshToken: string; clientId: string; clientSecret: string; pdfExport?: boolean }): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  connectGDrive(
+    serverId: string,
+    params: { refreshToken: string; clientId: string; clientSecret: string; pdfExport?: boolean },
+  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   cloudSignInCancel(): Promise<void>;
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;
@@ -281,18 +316,47 @@ export interface Backend {
   remoteWalk(serverId: string, path: string): Promise<WalkItem[]>;
   remoteExec(serverId: string, command: string): Promise<{ code: number; output: string }>;
 
-  upload(id: string, serverId: string, localPath: string, remotePath: string, options: TransferOptions, onProgress: (done: number, total: number) => void): Promise<number>;
-  download(id: string, serverId: string, remotePath: string, localPath: string, options: TransferOptions, onProgress: (done: number, total: number) => void): Promise<number>;
+  upload(
+    id: string,
+    serverId: string,
+    localPath: string,
+    remotePath: string,
+    options: TransferOptions,
+    onProgress: (done: number, total: number) => void,
+  ): Promise<number>;
+  download(
+    id: string,
+    serverId: string,
+    remotePath: string,
+    localPath: string,
+    options: TransferOptions,
+    onProgress: (done: number, total: number) => void,
+  ): Promise<number>;
   /** True while the backend holds a working connection to the server. */
   isConnected(serverId: string): Promise<boolean>;
   /** Server to server: streams a file from one connected server to another. */
-  cross(id: string, fromServerId: string, fromPath: string, serverId: string, remotePath: string, options: TransferOptions, onProgress: (done: number, total: number) => void): Promise<number>;
+  cross(
+    id: string,
+    fromServerId: string,
+    fromPath: string,
+    serverId: string,
+    remotePath: string,
+    options: TransferOptions,
+    onProgress: (done: number, total: number) => void,
+  ): Promise<number>;
   /** Stops a running transfer; `discard` also deletes its partial file. */
   cancel(id: string, discard: boolean): Promise<void>;
   /** Deletes the partial file of a transfer that will not continue. */
   discardPartial(serverId: string, direction: 'up' | 'down', localPath: string, remotePath: string): Promise<void>;
 
-  watchStart(watchId: string, localPath: string, recursive: boolean, excludes: string[], delayMs: number, onBatch: (b: WatchBatch) => void): Promise<void>;
+  watchStart(
+    watchId: string,
+    localPath: string,
+    recursive: boolean,
+    excludes: string[],
+    delayMs: number,
+    onBatch: (b: WatchBatch) => void,
+  ): Promise<void>;
   watchStop(watchId: string): Promise<void>;
 
   configLoad(): Promise<unknown>;
@@ -310,7 +374,11 @@ export interface Backend {
   localReadText(path: string): Promise<TextContent>;
   remoteReadText(serverId: string, path: string): Promise<TextContent>;
   /** Status icon: shown or not, tooltip, and the whole menu (see src-tauri/src/tray.rs). */
-  trayUpdate(visible: boolean, tooltip: string, items: Array<{ id?: string; label?: string; enabled?: boolean; checked?: boolean; items?: unknown[] }>): Promise<void>;
+  trayUpdate(
+    visible: boolean,
+    tooltip: string,
+    items: Array<{ id?: string; label?: string; enabled?: boolean; checked?: boolean; items?: unknown[] }>,
+  ): Promise<void>;
   appQuit(): Promise<void>;
 
   localPreview(path: string): Promise<Preview>;
@@ -336,7 +404,8 @@ export interface TextContent {
 /** Normalises anything thrown by a backend call into a `BackendError`. */
 export function toBackendError(e: unknown): BackendError {
   // Messages from the Rust side are German; tr() gives the English version if needed.
-  if (e && typeof e === 'object' && 'kind' in e && 'message' in e) return { ...(e as BackendError), message: tr((e as BackendError).message) };
+  if (e && typeof e === 'object' && 'kind' in e && 'message' in e)
+    return { ...(e as BackendError), message: tr((e as BackendError).message) };
   if (typeof e === 'string') return { kind: 'other', message: tr(e) };
   if (e instanceof Error) return { kind: 'other', message: e.message };
   return { kind: 'other', message: $t('Unerwarteter Fehler.') };

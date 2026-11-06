@@ -2,7 +2,36 @@
  * Kinds of files by extension: the symbol and colour tone the file lists show
  * for each.
  */
-import { FileAudio, FileC, FileCode, FileCpp, FileCSharp, FileCss, FileCsv, FileDoc, FileHtml, FileImage, FileIni, FileJs, FileJsx, FileLock, FileMd, FilePdf, FilePpt, FilePy, FileRs, FileSql, FileTs, FileTsx, FileTxt, FileVideo, FileVue, FileXls, FileZip, type Icon } from '@phosphor-icons/react';
+import {
+  FileAudio,
+  FileC,
+  FileCode,
+  FileCpp,
+  FileCSharp,
+  FileCss,
+  FileCsv,
+  FileDoc,
+  FileHtml,
+  FileImage,
+  FileIni,
+  FileJs,
+  FileJsx,
+  FileLock,
+  FileMd,
+  FilePdf,
+  FilePpt,
+  FilePy,
+  FileRs,
+  FileSql,
+  FileTs,
+  FileTsx,
+  FileTxt,
+  FileVideo,
+  FileVue,
+  FileXls,
+  FileZip,
+  type Icon,
+} from '@phosphor-icons/react';
 
 /** Symbol and colour per kind of file (by extension), shown in the file lists. */
 type TypeIcon = { Icon: Icon; tone: string };

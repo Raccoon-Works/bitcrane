@@ -64,11 +64,25 @@ export function describeFile(name: string, kind: 'dir' | 'file'): string {
   if (kind === 'dir') return $t('Ordner');
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
   const map: Record<string, string> = {
-    py: $t('Python-Skript'), js: 'JavaScript', ts: 'TypeScript', css: $t('Stylesheet'), html: $t('HTML-Seite'), php: $t('PHP-Skript'),
-    md: $t('Markdown-Text'), txt: $t('Textdatei'), json: $t('JSON-Daten'), png: $t('PNG-Bild'), jpg: $t('JPEG-Bild'), db: $t('Datenbank'),
-    log: $t('Protokoll'), zip: $t('ZIP-Archiv'), msi: $t('Windows-Installer'), env: $t('Umgebungsvariablen'),
+    py: $t('Python-Skript'),
+    js: 'JavaScript',
+    ts: 'TypeScript',
+    css: $t('Stylesheet'),
+    html: $t('HTML-Seite'),
+    php: $t('PHP-Skript'),
+    md: $t('Markdown-Text'),
+    txt: $t('Textdatei'),
+    json: $t('JSON-Daten'),
+    png: $t('PNG-Bild'),
+    jpg: $t('JPEG-Bild'),
+    db: $t('Datenbank'),
+    log: $t('Protokoll'),
+    zip: $t('ZIP-Archiv'),
+    msi: $t('Windows-Installer'),
+    env: $t('Umgebungsvariablen'),
   };
-  if (name.startsWith('.') && !name.slice(1).includes('.')) return name === '.env' ? $t('Umgebungsvariablen') : $t('Versteckte Datei');
+  if (name.startsWith('.') && !name.slice(1).includes('.'))
+    return name === '.env' ? $t('Umgebungsvariablen') : $t('Versteckte Datei');
   return map[ext] ?? (ext ? $t('{0}-Datei', ext.toUpperCase()) : $t('Datei'));
 }
 
@@ -81,7 +95,10 @@ export function extLabel(name: string): string {
 /** Converts "644" into "rw-r--r--" (with a leading type char omitted). */
 export function permsToText(perms: string): string {
   const map = ['---', '--x', '-w-', '-wx', 'r--', 'r-x', 'rw-', 'rwx'];
-  return perms.split('').map((c) => map[Number(c)] ?? '---').join('');
+  return perms
+    .split('')
+    .map((c) => map[Number(c)] ?? '---')
+    .join('');
 }
 
 /** Matches a file name against a simple pattern list (".git", "*.log"). */

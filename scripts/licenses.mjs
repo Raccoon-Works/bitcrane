@@ -11,7 +11,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = [];
 
 // npm: walk the production dependency tree.
-const tree = JSON.parse(execSync('npm ls --omit=dev --all --json', { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 }));
+const tree = JSON.parse(
+  execSync('npm ls --omit=dev --all --json', { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 }),
+);
 const seen = new Set();
 (function walk(deps) {
   for (const [name, info] of Object.entries(deps ?? {})) {
@@ -21,7 +23,7 @@ const seen = new Set();
     let license = '';
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(root, 'node_modules', name, 'package.json'), 'utf8'));
-      license = typeof pkg.license === 'string' ? pkg.license : pkg.license?.type ?? '';
+      license = typeof pkg.license === 'string' ? pkg.license : (pkg.license?.type ?? '');
     } catch {
       // Nested copy; the license of the top-level copy is used if present.
     }
@@ -31,7 +33,13 @@ const seen = new Set();
 })(tree.dependencies);
 
 // Rust: every crate in the dependency graph except Bitcrane itself.
-const meta = JSON.parse(execSync('cargo metadata --format-version 1 --locked', { cwd: path.join(root, 'src-tauri'), encoding: 'utf8', maxBuffer: 256 << 20 }));
+const meta = JSON.parse(
+  execSync('cargo metadata --format-version 1 --locked', {
+    cwd: path.join(root, 'src-tauri'),
+    encoding: 'utf8',
+    maxBuffer: 256 << 20,
+  }),
+);
 const used = new Set(meta.resolve.nodes.map((n) => n.id));
 for (const p of meta.packages) {
   // Crates from crates.io, plus the patched copies in src-tauri/vendor.
@@ -41,7 +49,14 @@ for (const p of meta.packages) {
 }
 
 // Not packages, but taken over: the terminal's colour schemes (published palettes).
-for (const name of ['Dracula (colour scheme)', 'Nord (colour scheme)', 'Gruvbox (colour scheme)', 'Solarized (colour scheme)', 'One Dark (colour scheme)', 'Tomorrow Night (colour scheme)']) {
+for (const name of [
+  'Dracula (colour scheme)',
+  'Nord (colour scheme)',
+  'Gruvbox (colour scheme)',
+  'Solarized (colour scheme)',
+  'One Dark (colour scheme)',
+  'Tomorrow Night (colour scheme)',
+]) {
   out.push({ name, version: '', license: 'MIT', kind: 'other' });
 }
 

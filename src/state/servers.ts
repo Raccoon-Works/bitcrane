@@ -6,7 +6,19 @@ import * as live from './live';
 import type { PaneSide, Server } from '../backend/types';
 import { isCloudProtocol } from '../backend/types';
 import { $t } from '../i18n';
-import { state, setState, LIVE, showToast, type AppState, serverById, uid, openServerIn, activeTab, watchForLocal, panePath } from './core';
+import {
+  state,
+  setState,
+  LIVE,
+  showToast,
+  type AppState,
+  serverById,
+  uid,
+  openServerIn,
+  activeTab,
+  watchForLocal,
+  panePath,
+} from './core';
 import { openServer } from './tabs';
 import { openDialog } from './panels';
 import { updateSettings } from './settings';
@@ -25,7 +37,12 @@ export function saveServer(server: Server, connect: boolean) {
   } else if (connect) {
     // Cloud services have no fingerprint to confirm (the prototype connects them at once).
     if (!exists && !isCloudProtocol(server.protocol)) {
-      openDialog({ type: 'fingerprint', mode: 'new', serverId: server.id, key: { host: server.host, algorithm: 'ED25519', fingerprint: fakeFingerprint(server.host) } });
+      openDialog({
+        type: 'fingerprint',
+        mode: 'new',
+        serverId: server.id,
+        key: { host: server.host, algorithm: 'ED25519', fingerprint: fakeFingerprint(server.host) },
+      });
     } else openServer(server.id);
   } else showToast($t('„{0}“ gespeichert.', server.name), 'ok');
 }
@@ -41,7 +58,9 @@ export function moveServer(id: string, beforeId: string | null, group: string) {
     if (at < 0) {
       // Behind the last server of the group (or at the end).
       let last = -1;
-      rest.forEach((x, i) => { if (!x.temporary && x.group.trim() === group.trim()) last = i; });
+      rest.forEach((x, i) => {
+        if (!x.temporary && x.group.trim() === group.trim()) last = i;
+      });
       return { servers: last < 0 ? [...rest, moved] : [...rest.slice(0, last + 1), moved, ...rest.slice(last + 1)] };
     }
     return { servers: [...rest.slice(0, at), moved, ...rest.slice(at)] };
@@ -52,7 +71,10 @@ export function moveServer(id: string, beforeId: string | null, group: string) {
 
 /** All group names: those of saved servers plus empty ones created by the user. */
 export function serverGroupNames(s: AppState = state): string[] {
-  const names = new Set([...s.servers.filter((x) => !x.temporary).map((x) => x.group.trim()), ...(s.settings.serverGroups ?? [])]);
+  const names = new Set([
+    ...s.servers.filter((x) => !x.temporary).map((x) => x.group.trim()),
+    ...(s.settings.serverGroups ?? []),
+  ]);
   names.delete('');
   return [...names].sort((a, b) => a.localeCompare(b, 'de'));
 }
@@ -73,7 +95,10 @@ export function renameServerGroup(from: string, to: string) {
   if (!name || name === from) return;
   setState((s) => ({
     servers: s.servers.map((x) => (x.group.trim() === from ? { ...x, group: name } : x)),
-    settings: { ...s.settings, serverGroups: [...new Set((s.settings.serverGroups ?? []).map((g) => (g === from ? name : g)))] },
+    settings: {
+      ...s.settings,
+      serverGroups: [...new Set((s.settings.serverGroups ?? []).map((g) => (g === from ? name : g)))],
+    },
   }));
 }
 
@@ -90,7 +115,15 @@ export function removeServerGroup(name: string) {
 export function duplicateServer(id: string) {
   const srv = serverById(id);
   if (!srv) return;
-  const copy: Server = { ...srv, id: uid('srv'), name: $t('{0} Kopie', srv.name), online: false, temporary: false, lastUsed: undefined, bookmarks: srv.bookmarks?.map((b) => ({ ...b })) };
+  const copy: Server = {
+    ...srv,
+    id: uid('srv'),
+    name: $t('{0} Kopie', srv.name),
+    online: false,
+    temporary: false,
+    lastUsed: undefined,
+    bookmarks: srv.bookmarks?.map((b) => ({ ...b })),
+  };
   setState((s) => {
     const at = s.servers.findIndex((x) => x.id === id);
     return { servers: [...s.servers.slice(0, at + 1), copy, ...s.servers.slice(at + 1)], contextMenu: null };
@@ -102,7 +135,10 @@ export function duplicateServer(id: string) {
 export function keepServer(id: string) {
   const srv = serverById(id);
   if (!srv) return;
-  setState((s) => ({ servers: s.servers.map((x) => (x.id === id ? { ...x, temporary: false } : x)), contextMenu: null }));
+  setState((s) => ({
+    servers: s.servers.map((x) => (x.id === id ? { ...x, temporary: false } : x)),
+    contextMenu: null,
+  }));
   showToast($t('„{0}“ gespeichert.', srv.name), 'ok');
 }
 
@@ -110,22 +146,55 @@ export function deleteServer(id: string) {
   const removed = serverById(id);
   if (LIVE) {
     void live.disconnectServer(id);
-    if (removed) void live.forgetSecrets(removed, state.servers.filter((x) => x.id !== id));
+    if (removed)
+      void live.forgetSecrets(
+        removed,
+        state.servers.filter((x) => x.id !== id),
+      );
   }
   setState((s) => {
     const servers = s.servers.filter((x) => x.id !== id);
-    let tabs = s.tabs.filter((t) => t.serverId !== id).map((t) => (t.leftServerId === id ? { ...t, leftServerId: undefined, localPath: '~' } : t));
+    let tabs = s.tabs
+      .filter((t) => t.serverId !== id)
+      .map((t) => (t.leftServerId === id ? { ...t, leftServerId: undefined, localPath: '~' } : t));
     // Every tab showed the removed server: open the first remaining one instead.
-    if (!tabs.length && servers[0]) tabs = [{ id: uid('tab'), serverId: servers[0].id, localPath: servers[0].localStart || '~', remotePath: servers[0].remoteStart, back: [], forward: [] }];
-    return { servers, tabs, activeTabId: tabs.some((t) => t.id === s.activeTabId) ? s.activeTabId : tabs[0]?.id ?? '' };
+    if (!tabs.length && servers[0])
+      tabs = [
+        {
+          id: uid('tab'),
+          serverId: servers[0].id,
+          localPath: servers[0].localStart || '~',
+          remotePath: servers[0].remoteStart,
+          back: [],
+          forward: [],
+        },
+      ];
+    return {
+      servers,
+      tabs,
+      activeTabId: tabs.some((t) => t.id === s.activeTabId) ? s.activeTabId : (tabs[0]?.id ?? ''),
+    };
   });
 }
 
 export function newServerTemplate(): Server {
   const d = state.settings.serverDefaults;
   return {
-    id: uid('srv'), name: '', mono: '', color: 'gray', host: '', port: 22, user: '', auth: 'auto', keyPath: '~/.ssh/id_ed25519', group: '', localStart: '~', remoteStart: '', online: false,
-    ...d, proxy: d.proxy ? { ...d.proxy } : undefined,
+    id: uid('srv'),
+    name: '',
+    mono: '',
+    color: 'gray',
+    host: '',
+    port: 22,
+    user: '',
+    auth: 'auto',
+    keyPath: '~/.ssh/id_ed25519',
+    group: '',
+    localStart: '~',
+    remoteStart: '',
+    online: false,
+    ...d,
+    proxy: d.proxy ? { ...d.proxy } : undefined,
   };
 }
 
@@ -170,10 +239,23 @@ export function normalizeSshAddress(address: string): string {
   return port && !/:\d+(\/|$)/.test(a) ? `${a}:${port}` : a;
 }
 
-export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key' | 'password' = 'auto', side?: PaneSide, password?: string, openAs?: 'terminal') {
+export function quickConnect(
+  address: string,
+  save: boolean,
+  auth: 'auto' | 'key' | 'password' = 'auto',
+  side?: PaneSide,
+  password?: string,
+  openAs?: 'terminal',
+) {
   address = normalizeSshAddress(address);
   const typed = address.trim().replace(/^sftp:\/\//, '');
-  if (typed) setState((s) => ({ settings: { ...s.settings, recentAddresses: [typed, ...s.settings.recentAddresses.filter((a) => a !== typed)].slice(0, 8) } }));
+  if (typed)
+    setState((s) => ({
+      settings: {
+        ...s.settings,
+        recentAddresses: [typed, ...s.settings.recentAddresses.filter((a) => a !== typed)].slice(0, 8),
+      },
+    }));
   if (LIVE) {
     void live.quickConnect(address, save, password ? 'password' : auth).then((server) => {
       if (!server) return;
@@ -186,7 +268,10 @@ export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key
     });
     return;
   }
-  const m = address.trim().replace(/^sftp:\/\//, '').match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
+  const m = address
+    .trim()
+    .replace(/^sftp:\/\//, '')
+    .match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
   if (!m) {
     showToast($t('Adresse nicht erkannt. Beispiel: ubuntu@server.example:22'), 'error');
     return;
@@ -194,8 +279,15 @@ export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key
   const [, user = 'ubuntu', host, port = '22', path] = m;
   const server: Server = {
     ...newServerTemplate(),
-    name: host, mono: host.slice(0, 2).toUpperCase(), host, user, port: Number(port), color: 'gray',
-    remoteStart: path || `/home/${user}`, temporary: !save, auth: auth === 'auto' ? 'agent' : auth,
+    name: host,
+    mono: host.slice(0, 2).toUpperCase(),
+    host,
+    user,
+    port: Number(port),
+    color: 'gray',
+    remoteStart: path || `/home/${user}`,
+    temporary: !save,
+    auth: auth === 'auto' ? 'agent' : auth,
     ...(openAs ? { openAs } : {}),
   };
   setState((s) => ({ servers: [...s.servers, server] }));
@@ -203,7 +295,12 @@ export function quickConnect(address: string, save: boolean, auth: 'auto' | 'key
     openServerIn('local', server.id);
     return;
   }
-  openDialog({ type: 'fingerprint', mode: 'new', serverId: server.id, key: { host, algorithm: 'ED25519', fingerprint: fakeFingerprint(host) } });
+  openDialog({
+    type: 'fingerprint',
+    mode: 'new',
+    serverId: server.id,
+    key: { host, algorithm: 'ED25519', fingerprint: fakeFingerprint(host) },
+  });
 }
 
 /** Passphrase or password typed by the user in the login prompt. */
@@ -254,7 +351,7 @@ export function rejectHostKey(serverId: string) {
     // Close the tab the temporary server was opened in.
     setState((s) => {
       const tabs = s.tabs.filter((t) => t.serverId !== serverId);
-      return { tabs, activeTabId: tabs.some((t) => t.id === s.activeTabId) ? s.activeTabId : tabs[0]?.id ?? '' };
+      return { tabs, activeTabId: tabs.some((t) => t.id === s.activeTabId) ? s.activeTabId : (tabs[0]?.id ?? '') };
     });
   }
   showToast($t('Nicht verbunden.'));
@@ -264,5 +361,15 @@ export function rejectHostKey(serverId: string) {
 export function simulateChangedHostKey() {
   const srv = serverById(activeTab()?.serverId ?? 'ob');
   if (!srv) return;
-  openDialog({ type: 'fingerprint', mode: 'changed', serverId: srv.id, key: { host: srv.host, algorithm: 'ED25519', fingerprint: fakeFingerprint(srv.host + 'neu'), previous: fakeFingerprint(srv.host) } });
+  openDialog({
+    type: 'fingerprint',
+    mode: 'changed',
+    serverId: srv.id,
+    key: {
+      host: srv.host,
+      algorithm: 'ED25519',
+      fingerprint: fakeFingerprint(srv.host + 'neu'),
+      previous: fakeFingerprint(srv.host),
+    },
+  });
 }

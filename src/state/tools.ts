@@ -13,9 +13,30 @@ import { invoke } from '@tauri-apps/api/core';
 import type { FileEntry, PaneSide, Tab } from '../backend/types';
 import * as live from './live';
 import {
-  activeTab, closeDialog, disconnect, getState, openServerInNewTab, LIVE, listEntries, openDialog, paneEntries, paneLoc, panePath, paneShowsServers,
-  refresh, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings,
-  type AfterQueue, type CustomCommand, type SavedTab, type Workspace,
+  activeTab,
+  closeDialog,
+  disconnect,
+  getState,
+  openServerInNewTab,
+  LIVE,
+  listEntries,
+  openDialog,
+  paneEntries,
+  paneLoc,
+  panePath,
+  paneShowsServers,
+  refresh,
+  selectTab,
+  serverById,
+  setState,
+  showToast,
+  subscribeStore,
+  uid,
+  updateSettings,
+  type AfterQueue,
+  type CustomCommand,
+  type SavedTab,
+  type Workspace,
 } from './store';
 import { addLog } from './log';
 import { TOLERANCE_MS } from './syncPlan';
@@ -34,7 +55,8 @@ export function toggleCompareDirs() {
   setState({ compareDirs: on });
   if (on) {
     const t = activeTab();
-    if (!t || paneShowsServers('local', t) || paneShowsServers('remote', t)) showToast($t('Zum Vergleichen müssen beide Hälften einen Ordner zeigen.'));
+    if (!t || paneShowsServers('local', t) || paneShowsServers('remote', t))
+      showToast($t('Zum Vergleichen müssen beide Hälften einen Ordner zeigen.'));
   }
 }
 
@@ -61,9 +83,12 @@ export function compareMarks(side: PaneSide): Map<string, CompareMark> | null {
   const out = new Map<string, CompareMark>();
   for (const e of mine) {
     const o = byName.get(e.name);
-    if (!o || o.kind !== e.kind) { out.set(e.name, 'only'); continue; }
+    if (!o || o.kind !== e.kind) {
+      out.set(e.name, 'only');
+      continue;
+    }
     if (e.kind === 'dir') continue;
-    const diff = (e.mtime - myOffset) - (o.mtime - theirOffset);
+    const diff = e.mtime - myOffset - (o.mtime - theirOffset);
     if (diff > TOLERANCE_MS) out.set(e.name, 'newer');
     else if (diff < -TOLERANCE_MS) out.set(e.name, 'older');
     else if (e.size !== o.size) out.set(e.name, 'size');
@@ -75,7 +100,13 @@ export function compareMarks(side: PaneSide): Map<string, CompareMark> | null {
 export function selectDifferences(side: PaneSide) {
   const marks = compareMarks(side);
   if (!marks) return;
-  const names = paneEntries(side).filter((e) => (e.depth ?? 0) === 0 && (marks.get(e.name) === 'only' || marks.get(e.name) === 'newer' || marks.get(e.name) === 'size')).map((e) => e.name);
+  const names = paneEntries(side)
+    .filter(
+      (e) =>
+        (e.depth ?? 0) === 0 &&
+        (marks.get(e.name) === 'only' || marks.get(e.name) === 'newer' || marks.get(e.name) === 'size'),
+    )
+    .map((e) => e.name);
   setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names, cursor: -1, anchor: -1 } } }));
 }
 
@@ -86,10 +117,18 @@ export function selectDifferences(side: PaneSide) {
 /** Turns "*.jpg; foto-??.png" into one case-insensitive regular expression per pattern. */
 export function maskToRegexps(mask: string): RegExp[] {
   // "*.*" means every entry, as in Windows and WinSCP (also names without a dot).
-  return mask.split(/[;,]/).map((p) => p.trim()).filter(Boolean).map((p) => (p === '*.*' ? '*' : p)).map((p) => {
-    const body = p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
-    return new RegExp(`^${body}$`, 'i');
-  });
+  return mask
+    .split(/[;,]/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => (p === '*.*' ? '*' : p))
+    .map((p) => {
+      const body = p
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      return new RegExp(`^${body}$`, 'i');
+    });
 }
 
 /** Names in a half (top level) that match the mask. */
@@ -102,11 +141,21 @@ export function matchingNames(side: PaneSide, mask: string, includeFolders: bool
 }
 
 /** Applies a mask: "replace" selects only the matches, "add" adds them, "remove" takes them out. */
-export function selectByMask(side: PaneSide, mask: string, mode: 'replace' | 'add' | 'remove', includeFolders: boolean) {
+export function selectByMask(
+  side: PaneSide,
+  mask: string,
+  mode: 'replace' | 'add' | 'remove',
+  includeFolders: boolean,
+) {
   const hits = matchingNames(side, mask, includeFolders);
   setState((s) => {
     const cur = s.selection[side].names;
-    const names = mode === 'replace' ? hits : mode === 'add' ? [...new Set([...cur, ...hits])] : cur.filter((n) => !hits.includes(n));
+    const names =
+      mode === 'replace'
+        ? hits
+        : mode === 'add'
+          ? [...new Set([...cur, ...hits])]
+          : cur.filter((n) => !hits.includes(n));
     return { focusSide: side, dialog: null, selection: { ...s.selection, [side]: { names, cursor: -1, anchor: -1 } } };
   });
   showToast(hits.length === 1 ? $t('1 Eintrag passt.') : $t('{0} Einträge passen.', hits.length));
@@ -115,7 +164,9 @@ export function selectByMask(side: PaneSide, mask: string, mode: 'replace' | 'ad
 /** Selects what is not selected and the other way round. */
 export function invertSelection(side: PaneSide) {
   const cur = new Set(getState().selection[side].names);
-  const names = paneEntries(side).filter((e) => (e.depth ?? 0) === 0 && !cur.has(e.name)).map((e) => e.name);
+  const names = paneEntries(side)
+    .filter((e) => (e.depth ?? 0) === 0 && !cur.has(e.name))
+    .map((e) => e.name);
   setState((s) => ({ selection: { ...s.selection, [side]: { names, cursor: -1, anchor: -1 } } }));
 }
 
@@ -165,11 +216,23 @@ export async function runCustomCommand(cmd: CustomCommand, side: PaneSide, names
   let failed = 0;
   for (const line of commands) {
     const r = await live.runRemoteCommand(sid, line);
-    if ('error' in r) { showError(r.error); return; }
+    if ('error' in r) {
+      showError(r.error);
+      return;
+    }
     if (r.code !== 0) failed++;
   }
-  addLog(failed ? 'error' : 'ok', $t('Eigener Befehl „{0}“: {1}', cmd.name, failed ? $t('{0} mit Fehler', failed) : $t('fertig')), sid);
-  showToast(failed ? $t('„{0}“ meldet einen Fehler. Die Ausgabe steht im Protokoll.', cmd.name) : $t('„{0}“ ausgeführt.', cmd.name), failed ? 'error' : 'ok');
+  addLog(
+    failed ? 'error' : 'ok',
+    $t('Eigener Befehl „{0}“: {1}', cmd.name, failed ? $t('{0} mit Fehler', failed) : $t('fertig')),
+    sid,
+  );
+  showToast(
+    failed
+      ? $t('„{0}“ meldet einen Fehler. Die Ausgabe steht im Protokoll.', cmd.name)
+      : $t('„{0}“ ausgeführt.', cmd.name),
+    failed ? 'error' : 'ok',
+  );
   refresh();
 }
 
@@ -198,8 +261,12 @@ export function savedTabs(tabs: Tab[] = getState().tabs): SavedTab[] {
 /** The tab's terminal sessions, kept when Settings › Terminal › "Terminals wieder öffnen" is on. */
 function terminalsToSave(t: Tab): Pick<SavedTab, 'terminals' | 'terminalOpen' | 'terminalFull'> {
   if (!getState().settings.terminal?.restore) return {};
-  const ids = getState().terminals.filter((x) => x.tabId === t.id && x.alive).map((x) => x.serverId);
-  return ids.length ? { terminals: ids, terminalOpen: !!t.terminal?.open, ...(t.terminal?.full ? { terminalFull: true } : {}) } : {};
+  const ids = getState()
+    .terminals.filter((x) => x.tabId === t.id && x.alive)
+    .map((x) => x.serverId);
+  return ids.length
+    ? { terminals: ids, terminalOpen: !!t.terminal?.open, ...(t.terminal?.full ? { terminalFull: true } : {}) }
+    : {};
 }
 
 /** Tabs built from saved ones; servers that no longer exist are dropped from them. */
@@ -224,9 +291,20 @@ export function saveWorkspace(name: string) {
   const s = getState();
   const list = s.settings.workspaces ?? [];
   const existing = list.find((w) => w.name.toLowerCase() === clean.toLowerCase());
-  const ws: Workspace = { id: existing?.id ?? uid('ws'), name: clean, tabs: savedTabs(), active: Math.max(0, s.tabs.findIndex((t) => t.id === s.activeTabId)) };
+  const ws: Workspace = {
+    id: existing?.id ?? uid('ws'),
+    name: clean,
+    tabs: savedTabs(),
+    active: Math.max(
+      0,
+      s.tabs.findIndex((t) => t.id === s.activeTabId),
+    ),
+  };
   updateSettings({ workspaces: existing ? list.map((w) => (w.id === existing.id ? ws : w)) : [...list, ws] });
-  showToast(existing ? $t('Arbeitsbereich „{0}“ aktualisiert.', clean) : $t('Arbeitsbereich „{0}“ gespeichert.', clean), 'ok');
+  showToast(
+    existing ? $t('Arbeitsbereich „{0}“ aktualisiert.', clean) : $t('Arbeitsbereich „{0}“ gespeichert.', clean),
+    'ok',
+  );
 }
 
 /** Opens a workspace: its tabs replace the open ones, or are added to them. */
@@ -256,11 +334,16 @@ export function setAfterQueue(afterQueue: AfterQueue) {
 export function afterQueueLabel(a: AfterQueue): string {
   const mac = getState().platform === 'mac';
   switch (a) {
-    case 'disconnect': return $t('Verbindungen trennen');
-    case 'quit': return $t('Bitcrane beenden');
-    case 'sleep': return mac ? $t('Ruhezustand') : $t('Energie sparen');
-    case 'shutdown': return mac ? $t('Mac ausschalten') : $t('PC herunterfahren');
-    default: return $t('Nichts tun');
+    case 'disconnect':
+      return $t('Verbindungen trennen');
+    case 'quit':
+      return $t('Bitcrane beenden');
+    case 'sleep':
+      return mac ? $t('Ruhezustand') : $t('Energie sparen');
+    case 'shutdown':
+      return mac ? $t('Mac ausschalten') : $t('PC herunterfahren');
+    default:
+      return $t('Nichts tun');
   }
 }
 
@@ -277,7 +360,10 @@ export async function runAfterQueue(action: AfterQueue) {
     return;
   }
   if (action === 'sleep' || action === 'shutdown') {
-    if (!LIVE) { showToast($t('Im Prototyp passiert hier nichts.')); return; }
+    if (!LIVE) {
+      showToast($t('Im Prototyp passiert hier nichts.'));
+      return;
+    }
     const { saveNow } = await import('./live');
     await saveNow();
     try {
@@ -305,7 +391,10 @@ export function startAfterQueueWatch() {
       const errors = manual.some((t) => t.state === 'error');
       if (errors) {
         setState({ afterQueue: 'none' });
-        showToast($t('Übertragungen mit Fehlern beendet. „{0}“ wurde deshalb nicht ausgeführt.', afterQueueLabel(s.afterQueue)), 'error');
+        showToast(
+          $t('Übertragungen mit Fehlern beendet. „{0}“ wurde deshalb nicht ausgeführt.', afterQueueLabel(s.afterQueue)),
+          'error',
+        );
       } else if (!paused) {
         openDialog({ type: 'afterQueue', action: s.afterQueue });
       }
@@ -338,10 +427,17 @@ export function receiveUploadPaths(paths: string[]) {
 
 /** Decodes a "bitcrane://upload/<base64url>" link of the Finder Quick Action. */
 export function uploadPathsFromLink(url: string): string[] {
-  const data = url.replace(/^bitcrane:\/\/upload\/?/, '').replace(/-/g, '+').replace(/_/g, '/');
+  const data = url
+    .replace(/^bitcrane:\/\/upload\/?/, '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
   try {
     const bytes = Uint8Array.from(atob(data + '='.repeat((4 - (data.length % 4)) % 4)), (c) => c.charCodeAt(0));
-    return new TextDecoder().decode(bytes).split('\n').map((p) => p.trim()).filter(Boolean);
+    return new TextDecoder()
+      .decode(bytes)
+      .split('\n')
+      .map((p) => p.trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -352,7 +448,12 @@ export async function uploadToServer(paths: string[], serverId: string, dir: str
   updateSettings({ uploadToLast: { serverId, dir } });
   closeDialog();
   if (!LIVE) {
-    showToast(paths.length === 1 ? $t('„{0}“ wird hochgeladen.', paths.length ? paths[0].split(/[\\/]/).pop() ?? '' : '') : $t('{0} Objekte werden hochgeladen.', paths.length), 'ok');
+    showToast(
+      paths.length === 1
+        ? $t('„{0}“ wird hochgeladen.', paths.length ? (paths[0].split(/[\\/]/).pop() ?? '') : '')
+        : $t('{0} Objekte werden hochgeladen.', paths.length),
+      'ok',
+    );
     return;
   }
   if (!live.isConnected(serverId)) {

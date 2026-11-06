@@ -33,7 +33,8 @@ export function SnippetSettings() {
   const [newGroup, setNewGroup] = useState<string | null>(null);
 
   const save = (list: Snippet[], g: string[] = groups) => updateSettings({ snippets: list, snippetGroups: g });
-  const edit = (id: string, patch: Partial<Snippet>) => save(snippets.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const edit = (id: string, patch: Partial<Snippet>) =>
+    save(snippets.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const add = (group?: string) => save([...snippets, { id: uid('sn'), name: '', command: '', run: true, group }]);
 
   /** Drops the dragged snippet before `beforeId`, or at the end of `group`. */
@@ -49,7 +50,10 @@ export function SnippetSettings() {
       const last = rest.map((x) => x.group).lastIndexOf(group);
       at = last >= 0 ? last + 1 : rest.length;
     }
-    updateSettings({ snippets: [...rest.slice(0, at), moved, ...rest.slice(at)], snippetGroups: groupsOf(all, getState().settings.snippetGroups ?? []) });
+    updateSettings({
+      snippets: [...rest.slice(0, at), moved, ...rest.slice(at)],
+      snippetGroups: groupsOf(all, getState().settings.snippetGroups ?? []),
+    });
   };
   /** Dragging by the handle: the row or group head under the pointer is the target. */
   const begin = (e: ReactPointerEvent, id: string) => {
@@ -58,8 +62,14 @@ export function SnippetSettings() {
     setDragId(id);
     let target: { group: string | undefined; before?: string; key: string } | null = null;
     const move = (ev: PointerEvent) => {
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-snippet-id], [data-snippet-group]');
-      if (!el) { target = null; setOver(null); return; }
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(
+        '[data-snippet-id], [data-snippet-group]',
+      );
+      if (!el) {
+        target = null;
+        setOver(null);
+        return;
+      }
       if (el.dataset.snippetId) {
         const sn = getSnippets().find((x) => x.id === el.dataset.snippetId);
         target = { group: sn?.group, before: el.dataset.snippetId, key: el.dataset.snippetId };
@@ -85,11 +95,20 @@ export function SnippetSettings() {
   const renameGroup = (from: string, to: string) => {
     const name = to.trim();
     if (!name || name === from || groups.includes(name)) return;
-    save(snippets.map((x) => (x.group === from ? { ...x, group: name } : x)), groups.map((g) => (g === from ? name : g)));
+    save(
+      snippets.map((x) => (x.group === from ? { ...x, group: name } : x)),
+      groups.map((g) => (g === from ? name : g)),
+    );
   };
-  const removeGroup = (g: string) => save(snippets.map((x) => (x.group === g ? { ...x, group: undefined } : x)), groups.filter((x) => x !== g));
-  const groupHidden = (g: string) => snippets.some((x) => x.group === g) && snippets.filter((x) => x.group === g).every((x) => x.hidden);
-  const setGroupHidden = (g: string, hidden: boolean) => save(snippets.map((x) => (x.group === g ? { ...x, hidden: hidden || undefined } : x)));
+  const removeGroup = (g: string) =>
+    save(
+      snippets.map((x) => (x.group === g ? { ...x, group: undefined } : x)),
+      groups.filter((x) => x !== g),
+    );
+  const groupHidden = (g: string) =>
+    snippets.some((x) => x.group === g) && snippets.filter((x) => x.group === g).every((x) => x.hidden);
+  const setGroupHidden = (g: string, hidden: boolean) =>
+    save(snippets.map((x) => (x.group === g ? { ...x, hidden: hidden || undefined } : x)));
   const moveGroup = (g: string, d: -1 | 1) => {
     const i = groups.indexOf(g);
     const j = i + d;
@@ -102,22 +121,55 @@ export function SnippetSettings() {
   const fromTabby = async () => {
     const n = await importTabbySnippets();
     if (n === null) showToast($t('In Tabby wurden keine Quick Commands gefunden.'));
-    else showToast(n ? $t('{0} Befehle aus Tabby übernommen.', String(n)) : $t('Die Befehle aus Tabby sind schon alle da.'), n ? 'ok' : 'info');
+    else
+      showToast(
+        n ? $t('{0} Befehle aus Tabby übernommen.', String(n)) : $t('Die Befehle aus Tabby sind schon alle da.'),
+        n ? 'ok' : 'info',
+      );
   };
 
   const row = (sn: Snippet) => (
-    <div key={sn.id} className={`set-row snippet-row${sn.hidden ? ' is-hidden' : ''}${over === sn.id ? ' is-drop' : ''}${dragId === sn.id ? ' is-dragging' : ''}`}
-      data-snippet-id={sn.id}>
-      <span className="snippet-grip" aria-label={$t('Ziehen zum Verschieben')} title={$t('Ziehen zum Verschieben')} onPointerDown={(e) => begin(e, sn.id)}>
+    <div
+      key={sn.id}
+      className={`set-row snippet-row${sn.hidden ? ' is-hidden' : ''}${over === sn.id ? ' is-drop' : ''}${dragId === sn.id ? ' is-dragging' : ''}`}
+      data-snippet-id={sn.id}
+    >
+      <span
+        className="snippet-grip"
+        aria-label={$t('Ziehen zum Verschieben')}
+        title={$t('Ziehen zum Verschieben')}
+        onPointerDown={(e) => begin(e, sn.id)}
+      >
         <GripVertical size={14} />
       </span>
-      <TextField value={sn.name} onChange={(v) => edit(sn.id, { name: v })} placeholder={$t('Name')} label={$t('Name')} className="snippet-name" />
-      <TextField value={sn.command} onChange={(v) => edit(sn.id, { command: v })} placeholder={$t('Befehl')} label={$t('Befehl')} mono className="flex-1" />
-      <span className="row-inline small" title={$t('Nach dem Einfügen gleich ausführen')}><Switch checked={sn.run} onChange={(v) => edit(sn.id, { run: v })} label={$t('Gleich ausführen')} />{$t('ausführen')}</span>
-      <IconButton label={sn.hidden ? $t('Im Menü zeigen') : $t('Im Menü ausblenden')} onClick={() => edit(sn.id, { hidden: !sn.hidden || undefined })}>
+      <TextField
+        value={sn.name}
+        onChange={(v) => edit(sn.id, { name: v })}
+        placeholder={$t('Name')}
+        label={$t('Name')}
+        className="snippet-name"
+      />
+      <TextField
+        value={sn.command}
+        onChange={(v) => edit(sn.id, { command: v })}
+        placeholder={$t('Befehl')}
+        label={$t('Befehl')}
+        mono
+        className="flex-1"
+      />
+      <span className="row-inline small" title={$t('Nach dem Einfügen gleich ausführen')}>
+        <Switch checked={sn.run} onChange={(v) => edit(sn.id, { run: v })} label={$t('Gleich ausführen')} />
+        {$t('ausführen')}
+      </span>
+      <IconButton
+        label={sn.hidden ? $t('Im Menü zeigen') : $t('Im Menü ausblenden')}
+        onClick={() => edit(sn.id, { hidden: !sn.hidden || undefined })}
+      >
         {sn.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
       </IconButton>
-      <IconButton label={$t('Entfernen')} onClick={() => save(snippets.filter((x) => x.id !== sn.id))}><X size={14} strokeWidth={1.75} /></IconButton>
+      <IconButton label={$t('Entfernen')} onClick={() => save(snippets.filter((x) => x.id !== sn.id))}>
+        <X size={14} strokeWidth={1.75} />
+      </IconButton>
     </div>
   );
 
@@ -127,7 +179,9 @@ export function SnippetSettings() {
       {/* Also the drop place for "no group". */}
       <div className={`set-row${over === '' ? ' is-drop' : ''}`} data-snippet-group="">
         <span className="small muted flex-1">
-          {$t('Gespeicherte Befehle, die du im Terminal über das {}-Symbol mit einem Klick einfügst. Am Griff ziehen ordnet sie um, auch in eine andere Gruppe. \\x03 sendet Strg+C, \\s500 wartet eine halbe Sekunde.')}
+          {$t(
+            'Gespeicherte Befehle, die du im Terminal über das {}-Symbol mit einem Klick einfügst. Am Griff ziehen ordnet sie um, auch in eine andere Gruppe. \\x03 sendet Strg+C, \\s500 wartet eine halbe Sekunde.',
+          )}
         </span>
       </div>
       {loose.map(row)}
@@ -136,34 +190,75 @@ export function SnippetSettings() {
         const hidden = groupHidden(g);
         return (
           <div key={g} className="snippet-group">
-            <div className={`set-row snippet-group-head${over === `g:${g}` ? ' is-drop' : ''}${hidden ? ' is-hidden' : ''}`} data-snippet-group={g}>
+            <div
+              className={`set-row snippet-group-head${over === `g:${g}` ? ' is-drop' : ''}${hidden ? ' is-hidden' : ''}`}
+              data-snippet-group={g}
+            >
               <GroupName name={g} onRename={(to) => renameGroup(g, to)} />
-              <span className="small muted flex-1">{members.length === 1 ? $t('1 Befehl') : $t('{0} Befehle', String(members.length))}</span>
-              <IconButton label={$t('Gruppe nach oben')} disabled={i === 0} onClick={() => moveGroup(g, -1)}><span aria-hidden="true">↑</span></IconButton>
-              <IconButton label={$t('Gruppe nach unten')} disabled={i === groups.length - 1} onClick={() => moveGroup(g, 1)}><span aria-hidden="true">↓</span></IconButton>
-              <IconButton label={hidden ? $t('Gruppe im Menü zeigen') : $t('Gruppe im Menü ausblenden')} disabled={!members.length} onClick={() => setGroupHidden(g, !hidden)}>
+              <span className="small muted flex-1">
+                {members.length === 1 ? $t('1 Befehl') : $t('{0} Befehle', String(members.length))}
+              </span>
+              <IconButton label={$t('Gruppe nach oben')} disabled={i === 0} onClick={() => moveGroup(g, -1)}>
+                <span aria-hidden="true">↑</span>
+              </IconButton>
+              <IconButton
+                label={$t('Gruppe nach unten')}
+                disabled={i === groups.length - 1}
+                onClick={() => moveGroup(g, 1)}
+              >
+                <span aria-hidden="true">↓</span>
+              </IconButton>
+              <IconButton
+                label={hidden ? $t('Gruppe im Menü zeigen') : $t('Gruppe im Menü ausblenden')}
+                disabled={!members.length}
+                onClick={() => setGroupHidden(g, !hidden)}
+              >
                 {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
               </IconButton>
-              <IconButton label={$t('Gruppe auflösen (die Befehle bleiben)')} onClick={() => removeGroup(g)}><X size={14} strokeWidth={1.75} /></IconButton>
+              <IconButton label={$t('Gruppe auflösen (die Befehle bleiben)')} onClick={() => removeGroup(g)}>
+                <X size={14} strokeWidth={1.75} />
+              </IconButton>
             </div>
             {members.map(row)}
-            <div className="set-row snippet-add-in"><Button small variant="ghost" onClick={() => add(g)}><Plus size={13} strokeWidth={2} /> {$t('Befehl in „{0}“', g)}</Button></div>
+            <div className="set-row snippet-add-in">
+              <Button small variant="ghost" onClick={() => add(g)}>
+                <Plus size={13} strokeWidth={2} /> {$t('Befehl in „{0}“', g)}
+              </Button>
+            </div>
           </div>
         );
       })}
       <div className="set-row">
-        <Button small onClick={() => add()}><Plus size={13} strokeWidth={2} /> {$t('Snippet hinzufügen')}</Button>
-        {newGroup === null
-          ? <Button small onClick={() => setNewGroup('')}><Plus size={13} strokeWidth={2} /> {$t('Gruppe')}</Button>
-          : (
-            <span className="row-inline">
-              <TextField value={newGroup} onChange={setNewGroup} placeholder={$t('Name der Gruppe')} label={$t('Name der Gruppe')} autoFocus
-                onEnter={() => { const n = newGroup.trim(); if (n && !groups.includes(n)) save(snippets, [...groups, n]); setNewGroup(null); }} />
-              <Button small variant="ghost" onClick={() => setNewGroup(null)}>{$t('Abbrechen')}</Button>
-            </span>
-          )}
+        <Button small onClick={() => add()}>
+          <Plus size={13} strokeWidth={2} /> {$t('Snippet hinzufügen')}
+        </Button>
+        {newGroup === null ? (
+          <Button small onClick={() => setNewGroup('')}>
+            <Plus size={13} strokeWidth={2} /> {$t('Gruppe')}
+          </Button>
+        ) : (
+          <span className="row-inline">
+            <TextField
+              value={newGroup}
+              onChange={setNewGroup}
+              placeholder={$t('Name der Gruppe')}
+              label={$t('Name der Gruppe')}
+              autoFocus
+              onEnter={() => {
+                const n = newGroup.trim();
+                if (n && !groups.includes(n)) save(snippets, [...groups, n]);
+                setNewGroup(null);
+              }}
+            />
+            <Button small variant="ghost" onClick={() => setNewGroup(null)}>
+              {$t('Abbrechen')}
+            </Button>
+          </span>
+        )}
         <span className="flex-1" />
-        <Button small variant="ghost" onClick={() => void fromTabby()}>{$t('Aus Tabby übernehmen …')}</Button>
+        <Button small variant="ghost" onClick={() => void fromTabby()}>
+          {$t('Aus Tabby übernehmen …')}
+        </Button>
       </div>
     </>
   );
@@ -173,7 +268,28 @@ export function SnippetSettings() {
 function GroupName({ name, onRename }: { name: string; onRename: (to: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   if (draft === null) {
-    return <button type="button" className="snippet-group-name" title={$t('Klicken zum Umbenennen')} onClick={() => setDraft(name)}>{name}</button>;
+    return (
+      <button
+        type="button"
+        className="snippet-group-name"
+        title={$t('Klicken zum Umbenennen')}
+        onClick={() => setDraft(name)}
+      >
+        {name}
+      </button>
+    );
   }
-  return <TextField value={draft} onChange={setDraft} label={$t('Name der Gruppe')} autoFocus onEnter={() => { onRename(draft); setDraft(null); }} className="snippet-group-edit" />;
+  return (
+    <TextField
+      value={draft}
+      onChange={setDraft}
+      label={$t('Name der Gruppe')}
+      autoFocus
+      onEnter={() => {
+        onRename(draft);
+        setDraft(null);
+      }}
+      className="snippet-group-edit"
+    />
+  );
 }

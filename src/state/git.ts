@@ -40,12 +40,14 @@ export function useGit(dir: string, enabled: boolean): GitStatus | null {
   useEffect(() => {
     const l = () => setTick((n) => n + 1);
     listeners.add(l);
-    return () => { listeners.delete(l); };
+    return () => {
+      listeners.delete(l);
+    };
   }, []);
   useEffect(() => {
     if (enabled && dir) void refreshGit(dir);
   }, [dir, enabled, fsRev]);
-  return enabled ? cache.get(dir) ?? null : null;
+  return enabled ? (cache.get(dir) ?? null) : null;
 }
 
 // File actions bump fsRev; the visible git folders follow (at most every 1.5 s).
@@ -73,18 +75,40 @@ export function gitMark(st: GitStatus | null, dir: string, name: string, isDir: 
 }
 
 export const GIT_LABEL: Record<string, string> = {
-  M: $t('geändert'), A: $t('hinzugefügt'), D: $t('gelöscht'), R: $t('umbenannt'), '?': $t('neu, nicht in Git'), U: $t('Konflikt'), '•': $t('enthält Änderungen'),
+  M: $t('geändert'),
+  A: $t('hinzugefügt'),
+  D: $t('gelöscht'),
+  R: $t('umbenannt'),
+  '?': $t('neu, nicht in Git'),
+  U: $t('Konflikt'),
+  '•': $t('enthält Änderungen'),
 };
 
 /** Runs add, addAll, commit, pull or push and reports the outcome. */
-export async function gitRun(root: string, what: 'add' | 'addAll' | 'commit' | 'pull' | 'push', opts: { paths?: string[]; message?: string; all?: boolean } = {}) {
+export async function gitRun(
+  root: string,
+  what: 'add' | 'addAll' | 'commit' | 'pull' | 'push',
+  opts: { paths?: string[]; message?: string; all?: boolean } = {},
+) {
   if (!LIVE) {
     showToast($t('Git geht im echten Programm.'));
     return false;
   }
-  const label = { add: $t('Hinzufügen'), addAll: $t('Alles hinzufügen'), commit: $t('Commit'), pull: 'Pull', push: 'Push' }[what];
+  const label = {
+    add: $t('Hinzufügen'),
+    addAll: $t('Alles hinzufügen'),
+    commit: $t('Commit'),
+    pull: 'Pull',
+    push: 'Push',
+  }[what];
   try {
-    const out = await invoke<string>('git_action', { root, what, paths: opts.paths ?? [], message: opts.message ?? '', all: !!opts.all });
+    const out = await invoke<string>('git_action', {
+      root,
+      what,
+      paths: opts.paths ?? [],
+      message: opts.message ?? '',
+      all: !!opts.all,
+    });
     addLog('ok', `Git ${label}: ${out.split('\n').filter(Boolean).slice(-1)[0] ?? $t('fertig')}`);
     showToast($t('Git: {0} erledigt.', label), 'ok');
     return true;

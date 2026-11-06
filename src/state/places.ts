@@ -9,7 +9,19 @@ import type { PaneSide, Tab, Transfer } from '../backend/types';
 
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { type AppState, state, activeTab, paneLoc, serverById, setState, showToast, LIVE, paneShowsServers, panePath, uid } from './core';
+import {
+  type AppState,
+  state,
+  activeTab,
+  paneLoc,
+  serverById,
+  setState,
+  showToast,
+  LIVE,
+  paneShowsServers,
+  panePath,
+  uid,
+} from './core';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
 import { placeOf } from './fileOps';
@@ -69,14 +81,23 @@ export function editLocalPlaces(path: string, op: { remove: true } | { before: s
   const rest = list.filter((p) => p.path !== path);
   if ('remove' in op) updateSettings({ localPlaces: rest });
   else {
-    const i = op.before === null ? rest.length : Math.max(0, rest.findIndex((p) => p.path === op.before));
+    const i =
+      op.before === null
+        ? rest.length
+        : Math.max(
+            0,
+            rest.findIndex((p) => p.path === op.before),
+          );
     updateSettings({ localPlaces: [...rest.slice(0, i), item, ...rest.slice(i)] });
   }
   setState({ contextMenu: null });
 }
 
 export function removePlace(side: PaneSide, path: string) {
-  setPlaces(side, placesFor(side).filter((p) => p.path !== path));
+  setPlaces(
+    side,
+    placesFor(side).filter((p) => p.path !== path),
+  );
   setState({ contextMenu: null });
 }
 
@@ -99,12 +120,21 @@ export function movePlace(side: PaneSide, path: string, before: string | null) {
 export async function offerCloudPlaces(manual: boolean) {
   const found: CloudPlace[] = LIVE
     ? await live.cloudPlaces()
-    : [{ name: 'Google Drive', path: '~/Library/CloudStorage/GoogleDrive', service: 'gdrive' }, { name: 'OneDrive', path: '~/Library/CloudStorage/OneDrive-Personal', service: 'onedrive' }, { name: 'iCloud Drive', path: '~/Library/Mobile Documents/com~apple~CloudDocs', service: 'icloud' }];
+    : [
+        { name: 'Google Drive', path: '~/Library/CloudStorage/GoogleDrive', service: 'gdrive' },
+        { name: 'OneDrive', path: '~/Library/CloudStorage/OneDrive-Personal', service: 'onedrive' },
+        { name: 'iCloud Drive', path: '~/Library/Mobile Documents/com~apple~CloudDocs', service: 'icloud' },
+      ];
   if (!manual) updateSettings({ cloudAsked: true });
   const known = new Set(placesForComputer().map((p) => p.path));
   const fresh = found.filter((c) => !known.has(c.path));
   if (!fresh.length) {
-    if (manual) showToast(found.length ? $t('Alle gefundenen Cloud-Ordner sind schon in der Ortsleiste.') : $t('Auf diesem Rechner wurden keine Cloud-Ordner gefunden.'));
+    if (manual)
+      showToast(
+        found.length
+          ? $t('Alle gefundenen Cloud-Ordner sind schon in der Ortsleiste.')
+          : $t('Auf diesem Rechner wurden keine Cloud-Ordner gefunden.'),
+      );
     return;
   }
   if (!manual && state.dialog) return;
@@ -121,9 +151,16 @@ export function addCloudPlaces(list: CloudPlace[]) {
   setState({ dialog: null });
   if (!list.length) return;
   const cur = placesForComputer();
-  const add = list.filter((c) => !cur.some((p) => p.path === c.path)).map((c) => ({ name: c.name, path: c.path, cloud: c.service }));
+  const add = list
+    .filter((c) => !cur.some((p) => p.path === c.path))
+    .map((c) => ({ name: c.name, path: c.path, cloud: c.service }));
   updateSettings({ localPlaces: [...cur, ...add] });
-  showToast(add.length === 1 ? $t('„{0}“ zur Ortsleiste hinzugefügt.', add[0].name) : $t('{0} Cloud-Ordner zur Ortsleiste hinzugefügt.', add.length), 'ok');
+  showToast(
+    add.length === 1
+      ? $t('„{0}“ zur Ortsleiste hinzugefügt.', add[0].name)
+      : $t('{0} Cloud-Ordner zur Ortsleiste hinzugefügt.', add.length),
+    'ok',
+  );
 }
 
 /** ⌘D: the folder shown in the focused half goes into its places bar. */
@@ -150,8 +187,21 @@ export function runSync(actions: SyncAction[]) {
   const t = activeTab();
   setState({ dialog: null });
   if (!t || !actions.length) return;
-  const { n, deleteCount } = runSyncBetween(placeOf('local', t), t.localPath, placeOf('remote', t), t.remotePath, actions);
-  showToast($t('Abgleich gestartet: {0} {1}{2}.', n, n === 1 ? $t('Übertragung') : $t('Übertragungen'), deleteCount ? $t(', {0} zu löschen', deleteCount) : ''));
+  const { n, deleteCount } = runSyncBetween(
+    placeOf('local', t),
+    t.localPath,
+    placeOf('remote', t),
+    t.remotePath,
+    actions,
+  );
+  showToast(
+    $t(
+      'Abgleich gestartet: {0} {1}{2}.',
+      n,
+      n === 1 ? $t('Übertragung') : $t('Übertragungen'),
+      deleteCount ? $t(', {0} zu löschen', deleteCount) : '',
+    ),
+  );
 }
 
 /**
@@ -161,7 +211,13 @@ export function runSync(actions: SyncAction[]) {
  * and two folders of this computer. Used by the comparison window and by
  * scheduled comparisons. Returns the number of copies and deletes started.
  */
-export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: string, actions: SyncAction[]): { n: number; deleteCount: number } {
+export function runSyncBetween(
+  L: string,
+  leftDir: string,
+  R: string,
+  rightDir: string,
+  actions: SyncAction[],
+): { n: number; deleteCount: number } {
   const t = { localPath: leftDir, remotePath: rightDir };
   const items: Transfer[] = [];
   const localPairs: Array<[string, string]> = [];
@@ -173,7 +229,17 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
     // A new file on this computer gets a name Windows can store; one on a server its real name back.
     const rel = !to ? live.localRel(a.rel) : !from ? live.remoteRel(to, a.rel) : a.rel;
     const target = a.to ?? paths.join(toRight ? t.remotePath : t.localPath, rel);
-    const base = { id: uid('t'), name: paths.basename(a.rel), folder: relFolder(toRight ? t.remotePath : t.localPath, target), source, target, size: a.size, done: 0, state: 'queued' as const, decided: true };
+    const base = {
+      id: uid('t'),
+      name: paths.basename(a.rel),
+      folder: relFolder(toRight ? t.remotePath : t.localPath, target),
+      source,
+      target,
+      size: a.size,
+      done: 0,
+      state: 'queued' as const,
+      decided: true,
+    };
     if (!from && !to) localPairs.push([source, target]);
     else if (!from) items.push({ ...base, direction: 'up', serverId: to });
     else if (!to) items.push({ ...base, direction: 'down', serverId: from });
@@ -186,7 +252,10 @@ export function runSyncBetween(L: string, leftDir: string, R: string, rightDir: 
     if (a.kind !== 'deleteRemote' && a.kind !== 'deleteLocal') continue;
     const right = a.kind === 'deleteRemote';
     const place = right ? R : L;
-    deletes.set(place, [...(deletes.get(place) ?? []), a.from ?? paths.join(right ? t.remotePath : t.localPath, a.rel)]);
+    deletes.set(place, [
+      ...(deletes.get(place) ?? []),
+      a.from ?? paths.join(right ? t.remotePath : t.localPath, a.rel),
+    ]);
   }
   const deleteCount = [...deletes.values()].reduce((n, l) => n + l.length, 0);
   if (LIVE) {

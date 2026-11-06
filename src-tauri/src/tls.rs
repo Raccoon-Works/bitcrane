@@ -38,7 +38,14 @@ pub fn fingerprint(cert: &CertificateDer<'_>) -> String {
 }
 
 impl ServerCertVerifier for Verifier {
-    fn verify_server_cert(&self, end_entity: &CertificateDer<'_>, intermediates: &[CertificateDer<'_>], server_name: &ServerName<'_>, ocsp: &[u8], now: UnixTime) -> Result<ServerCertVerified, rustls::Error> {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        intermediates: &[CertificateDer<'_>],
+        server_name: &ServerName<'_>,
+        ocsp: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
         let fp = fingerprint(end_entity);
         *self.seen.lock().unwrap() = Some(SeenCert { fingerprint: fp.clone() });
         // A certificate from a public authority needs no confirmation.
@@ -55,12 +62,32 @@ impl ServerCertVerifier for Verifier {
         Err(rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer))
     }
 
-    fn verify_tls12_signature(&self, message: &[u8], cert: &CertificateDer<'_>, dss: &DigitallySignedStruct) -> Result<HandshakeSignatureValid, rustls::Error> {
-        rustls::crypto::verify_tls12_signature(message, cert, dss, &rustls::crypto::ring::default_provider().signature_verification_algorithms)
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+        )
     }
 
-    fn verify_tls13_signature(&self, message: &[u8], cert: &CertificateDer<'_>, dss: &DigitallySignedStruct) -> Result<HandshakeSignatureValid, rustls::Error> {
-        rustls::crypto::verify_tls13_signature(message, cert, dss, &rustls::crypto::ring::default_provider().signature_verification_algorithms)
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &rustls::crypto::ring::default_provider().signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
@@ -70,14 +97,22 @@ impl ServerCertVerifier for Verifier {
 
 /// Client configuration with certificate check as described above.
 /// `min_tls13`: only TLS 1.3 (setting "TLS-Version"), otherwise 1.2 and 1.3.
-pub fn client_config(known: Arc<KnownHosts>, host_id: String, trust: Option<String>, min_tls13: bool) -> (Arc<rustls::ClientConfig>, Arc<Mutex<Option<SeenCert>>>) {
+pub fn client_config(
+    known: Arc<KnownHosts>,
+    host_id: String,
+    trust: Option<String>,
+    min_tls13: bool,
+) -> (Arc<rustls::ClientConfig>, Arc<Mutex<Option<SeenCert>>>) {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut roots = rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let inner = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone()).build().expect("root certificates");
+    let inner = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
+        .build()
+        .expect("root certificates");
     let seen = Arc::new(Mutex::new(None));
     let verifier = Arc::new(Verifier { inner, known, host_id, trust, seen: seen.clone() });
-    let versions: &[&rustls::SupportedProtocolVersion] = if min_tls13 { &[&rustls::version::TLS13] } else { &[&rustls::version::TLS13, &rustls::version::TLS12] };
+    let versions: &[&rustls::SupportedProtocolVersion] =
+        if min_tls13 { &[&rustls::version::TLS13] } else { &[&rustls::version::TLS13, &rustls::version::TLS12] };
     let config = rustls::ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(versions)
         .expect("protocol versions")

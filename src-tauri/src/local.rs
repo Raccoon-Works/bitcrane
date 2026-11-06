@@ -8,11 +8,7 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 fn mtime_ms(meta: &fs::Metadata) -> i64 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+    meta.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
 #[cfg(unix)]
@@ -24,7 +20,13 @@ fn mode_of(meta: &fs::Metadata) -> String {
 #[cfg(not(unix))]
 fn mode_of(meta: &fs::Metadata) -> String {
     // Windows has no Unix permissions; show a sensible equivalent.
-    if meta.permissions().readonly() { "444".into() } else if meta.is_dir() { "755".into() } else { "644".into() }
+    if meta.permissions().readonly() {
+        "444".into()
+    } else if meta.is_dir() {
+        "755".into()
+    } else {
+        "644".into()
+    }
 }
 
 fn entry_from(name: String, meta: &fs::Metadata) -> FileEntry {
@@ -160,7 +162,8 @@ pub fn trash(paths: &[String]) -> AppResult<()> {
         return Err(crate::archive_vfs::read_only());
     }
     let natives: Vec<_> = paths.iter().map(|p| to_native(p)).collect();
-    trash::delete_all(&natives).map_err(|e| AppError::other("Konnte nicht in den Papierkorb legen.").with_detail(e.to_string()))
+    trash::delete_all(&natives)
+        .map_err(|e| AppError::other("Konnte nicht in den Papierkorb legen.").with_detail(e.to_string()))
 }
 
 /// Recursively lists all files below `path` (or the file itself).
@@ -176,12 +179,15 @@ pub fn walk(path: &str) -> AppResult<Vec<WalkItem>> {
     let base = root.parent().map(Path::to_path_buf).unwrap_or_else(|| root.clone());
     let mut out = Vec::new();
     for entry in walkdir::WalkDir::new(&root).follow_links(false) {
-        let entry = entry.map_err(|e| AppError::other("Ordner konnte nicht gelesen werden.").with_detail(e.to_string()))?;
+        let entry =
+            entry.map_err(|e| AppError::other("Ordner konnte nicht gelesen werden.").with_detail(e.to_string()))?;
         // Half-written files of Bitcrane's own transfers (".name.bitcrane-part") are never transferred.
         if !entry.file_type().is_file() || entry.file_name().to_string_lossy().ends_with(".bitcrane-part") {
             continue;
         }
-        let meta = entry.metadata().map_err(|e| AppError::other("Datei konnte nicht gelesen werden.").with_detail(e.to_string()))?;
+        let meta = entry
+            .metadata()
+            .map_err(|e| AppError::other("Datei konnte nicht gelesen werden.").with_detail(e.to_string()))?;
         let rel = entry.path().strip_prefix(&base).unwrap_or(entry.path()).to_string_lossy().replace('\\', "/");
         out.push(WalkItem { path: to_ui(entry.path()), relative: rel, size: meta.len(), mtime: mtime_ms(&meta) });
     }
@@ -316,7 +322,11 @@ fn merge_tree(from: &Path, to: &Path, moving: bool) -> std::io::Result<()> {
         if !moving || fs::rename(&src, &target).is_err() {
             copy_tree(&src, &target)?;
             if moving {
-                if src_is_dir { fs::remove_dir_all(&src)?; } else { fs::remove_file(&src)?; }
+                if src_is_dir {
+                    fs::remove_dir_all(&src)?;
+                } else {
+                    fs::remove_file(&src)?;
+                }
             }
         }
     }
@@ -389,7 +399,9 @@ pub fn copy_file_over(from: &str, to: &str) -> AppResult<()> {
 /// goes to the trash (never deleted permanently). A name that already exists
 /// in the target gets " Kopie" like a copy. Returns the new names.
 pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
-    if crate::archive_vfs::split(dest_dir).is_some() || paths.iter().any(|p| crate::archive_vfs::split(p).is_some_and(|(_, inner)| !inner.is_empty())) {
+    if crate::archive_vfs::split(dest_dir).is_some()
+        || paths.iter().any(|p| crate::archive_vfs::split(p).is_some_and(|(_, inner)| !inner.is_empty()))
+    {
         return Err(crate::archive_vfs::read_only());
     }
     let dest = to_native(dest_dir);
@@ -410,7 +422,9 @@ pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec
         if fs::rename(&from, &to).is_err() {
             // Different drive: copy, then the original into the trash.
             copy_tree(&from, &to)?;
-            trash::delete(&from).map_err(|e| AppError::other("Kopiert, aber das Original konnte nicht in den Papierkorb.").with_detail(e.to_string()))?;
+            trash::delete(&from).map_err(|e| {
+                AppError::other("Kopiert, aber das Original konnte nicht in den Papierkorb.").with_detail(e.to_string())
+            })?;
         }
         out.push(target);
     }
@@ -472,7 +486,10 @@ pub fn media_mime(name: &str) -> Option<&'static str> {
 pub fn media_response(uri_path: &str, range: Option<&str>) -> tauri::http::Response<Vec<u8>> {
     use std::io::{Read, Seek, SeekFrom};
     let not_found = || tauri::http::Response::builder().status(404).body(Vec::new()).unwrap();
-    let Some(decoded) = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok() else { return not_found() };
+    let Some(decoded) = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()
+    else {
+        return not_found();
+    };
     let Some(mime) = media_mime(&decoded) else { return not_found() };
     let native = to_native(&decoded);
     let Ok(mut file) = fs::File::open(&native) else { return not_found() };
@@ -517,7 +534,11 @@ pub fn places() -> Vec<Place> {
     // The home folder carries the user's name, like in Explorer and the Finder sidebar
     // (the path row shows the same name).
     let home = dirs::home_dir();
-    let home_name = home.as_ref().and_then(|h| h.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Persönlich".into());
+    let home_name = home
+        .as_ref()
+        .and_then(|h| h.file_name())
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Persönlich".into());
     push(&home_name, home);
     push("Schreibtisch", dirs::desktop_dir());
     push("Dokumente", dirs::document_dir());
@@ -543,7 +564,16 @@ fn volume_label(letter: char) -> Option<String> {
     let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
     let mut name = [0u16; 261];
     let ok = unsafe {
-        GetVolumeInformationW(root.as_ptr(), name.as_mut_ptr(), name.len() as u32, std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), 0)
+        GetVolumeInformationW(
+            root.as_ptr(),
+            name.as_mut_ptr(),
+            name.len() as u32,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+        )
     };
     if ok == 0 {
         return None;
@@ -619,7 +649,13 @@ fn drives_list() -> Vec<Place> {
             if let Ok(rd) = fs::read_dir(&base) {
                 for e in rd.flatten() {
                     if e.path().is_dir() {
-                        out.push(Place { name: e.file_name().to_string_lossy().into_owned(), path: to_ui(&e.path()), network: false, free: None, label: None });
+                        out.push(Place {
+                            name: e.file_name().to_string_lossy().into_owned(),
+                            path: to_ui(&e.path()),
+                            network: false,
+                            free: None,
+                            label: None,
+                        });
                     }
                 }
             }
@@ -765,14 +801,23 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let f = dir.join("clip.mp3");
         fs::write(&f, b"0123456789").unwrap();
-        let uri = format!("/{}", percent_encoding::utf8_percent_encode(&f.to_string_lossy(), percent_encoding::NON_ALPHANUMERIC));
+        let uri = format!(
+            "/{}",
+            percent_encoding::utf8_percent_encode(&f.to_string_lossy(), percent_encoding::NON_ALPHANUMERIC)
+        );
         let r = media_response(&uri, Some("bytes=2-5"));
         assert_eq!(r.status(), 206);
         assert_eq!(r.body().as_slice(), b"2345");
         assert_eq!(r.headers()["content-range"], "bytes 2-5/10");
         assert_eq!(media_response(&uri, None).body().as_slice(), b"0123456789");
         fs::write(dir.join("secret.txt"), b"x").unwrap();
-        let other = format!("/{}", percent_encoding::utf8_percent_encode(&dir.join("secret.txt").to_string_lossy(), percent_encoding::NON_ALPHANUMERIC));
+        let other = format!(
+            "/{}",
+            percent_encoding::utf8_percent_encode(
+                &dir.join("secret.txt").to_string_lossy(),
+                percent_encoding::NON_ALPHANUMERIC
+            )
+        );
         assert_eq!(media_response(&other, None).status(), 404);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -900,7 +945,14 @@ pub fn grep(path: &str, query: &str, max: usize) -> AppResult<Vec<GrepHit>> {
         let text = String::from_utf8_lossy(&bytes);
         if let Some((i, line)) = text.lines().enumerate().find(|(_, l)| l.to_lowercase().contains(&needle)) {
             let rel = entry.path().strip_prefix(&root).unwrap_or(entry.path()).to_string_lossy().replace('\\', "/");
-            out.push(GrepHit { path: to_ui(entry.path()), rel, size: meta.len(), mtime: mtime_ms(&meta), line: snippet(line), line_no: i as u32 + 1 });
+            out.push(GrepHit {
+                path: to_ui(entry.path()),
+                rel,
+                size: meta.len(),
+                mtime: mtime_ms(&meta),
+                line: snippet(line),
+                line_no: i as u32 + 1,
+            });
         }
     }
     Ok(out)

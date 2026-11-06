@@ -13,12 +13,43 @@
  * - Right click on a favourite: open, copy path, move up or down, remove.
  * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
-import { X, CaretDown, ClockCounterClockwise, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, HardDrive, HardDrives, House, Usb, Network } from '@phosphor-icons/react';
+import {
+  X,
+  CaretDown,
+  ClockCounterClockwise,
+  Cloud,
+  Desktop,
+  DownloadSimple,
+  FileText,
+  FolderSimple,
+  HardDrive,
+  HardDrives,
+  House,
+  Usb,
+  Network,
+} from '@phosphor-icons/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t, LOCALE } from '../i18n';
-import { LIVE, removeRecent, activeTab, editLocalPlaces, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
+import {
+  LIVE,
+  removeRecent,
+  activeTab,
+  editLocalPlaces,
+  getState,
+  localPlaces,
+  moveSidebarSection,
+  navigate,
+  openDialog,
+  openPlace,
+  setRightLocal,
+  setState,
+  sidebarOrder,
+  toggleSidebarCollapsed,
+  useStore,
+  type SidebarSection,
+} from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
 import { BrandLogo } from './BrandLogo';
 import { isBrandService } from './brands';
@@ -28,7 +59,12 @@ import * as paths from '../util/paths';
 const ICON = { size: 16, weight: 'regular', 'aria-hidden': true } as const;
 
 function PlaceIcon({ place }: { place: Place }) {
-  const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
+  const last =
+    place.path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop()
+      ?.toLowerCase() ?? '';
   if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={14} />;
   if (place.cloud) return <Cloud {...ICON} />;
   if (place.path === '~') return <House {...ICON} />;
@@ -57,13 +93,25 @@ function driveName(d: Place, mac: boolean): string {
 /** Typical drives for the browser prototype, which has no real ones. */
 function mockDrives(mac: boolean): Place[] {
   return mac
-    ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }, { name: 'iMac im Studio', path: '~/Projekte/blog', network: true }]
-    : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads', label: 'Daten' }, { name: 'Z: (NAS)', path: '~/Projekte/blog', network: true }];
+    ? [
+        { name: 'Macintosh HD', path: '~' },
+        { name: 'USB-Stick', path: '~/Downloads' },
+        { name: 'iMac im Studio', path: '~/Projekte/blog', network: true },
+      ]
+    : [
+        { name: 'C:', path: '~' },
+        { name: 'D:', path: '~/Downloads', label: 'Daten' },
+        { name: 'Z: (NAS)', path: '~/Projekte/blog', network: true },
+      ];
 }
 
 /** Account part of a cloud folder's name ("GoogleDrive-name@example.com" → "name"). */
 function accountOf(place: Place): string {
-  const folder = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+  const folder =
+    place.path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() ?? '';
   if (!place.cloud || !folder.includes('-')) return '';
   return folder.slice(folder.indexOf('-') + 1).split('@')[0];
 }
@@ -80,9 +128,13 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
     if (!LIVE || !places.length) return;
     let live = true;
     void invoke<string[]>('local_real_paths', { list: places.map((p) => p.path) })
-      .then((r) => { if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path]))); })
+      .then((r) => {
+        if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path])));
+      })
       .catch(() => {});
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const seen = new Set<string>();
@@ -114,12 +166,23 @@ function useNetworkHosts(enabled: boolean): Array<{ name: string; host: string }
   const [hosts, setHosts] = useState<Array<{ name: string; host: string }>>([]);
   useEffect(() => {
     if (!enabled) return;
-    if (!LIVE) { setHosts([{ name: 'NAS Keller', host: 'nas-keller.local' }]); return; }
+    if (!LIVE) {
+      setHosts([{ name: 'NAS Keller', host: 'nas-keller.local' }]);
+      return;
+    }
     let live = true;
-    const run = () => void invoke<Array<{ name: string; host: string }>>('network_hosts').then((h) => { if (live) setHosts(h); }).catch(() => {});
+    const run = () =>
+      void invoke<Array<{ name: string; host: string }>>('network_hosts')
+        .then((h) => {
+          if (live) setHosts(h);
+        })
+        .catch(() => {});
     run();
     const t = window.setInterval(run, 120000);
-    return () => { live = false; window.clearInterval(t); };
+    return () => {
+      live = false;
+      window.clearInterval(t);
+    };
   }, [enabled]);
   return hosts;
 }
@@ -167,7 +230,9 @@ export function Sidebar() {
     const move = (ev: PointerEvent) => {
       if (!favMoved.current && Math.abs(ev.clientY - y0) < 5) return;
       favMoved.current = true;
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-fav-path]');
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(
+        '[data-fav-path]',
+      );
       let before: string | null = current?.before ?? null;
       if (el) {
         const target = el.dataset.favPath!;
@@ -208,8 +273,23 @@ export function Sidebar() {
     else setRightLocal(path);
   };
 
-  const item = (key: string, icon: React.ReactNode, label: string, path: string | null, onClick: () => void, extra: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> = {}, trailing?: React.ReactNode) => (
-    <button key={key} type="button" className={`side-item${path !== null && activeLocal === path ? ' is-active' : ''}`} title={path ?? label} onClick={onClick} {...extra}>
+  const item = (
+    key: string,
+    icon: React.ReactNode,
+    label: string,
+    path: string | null,
+    onClick: () => void,
+    extra: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> = {},
+    trailing?: React.ReactNode,
+  ) => (
+    <button
+      key={key}
+      type="button"
+      className={`side-item${path !== null && activeLocal === path ? ' is-active' : ''}`}
+      title={path ?? label}
+      onClick={onClick}
+      {...extra}
+    >
       <span className="side-icon">{icon}</span>
       <span className="ellipsis">{label}</span>
       {trailing}
@@ -225,7 +305,9 @@ export function Sidebar() {
       const d = dragRef.current;
       if (!d) return;
       if (!d.moved && Math.abs(ev.clientY - y0) < 5) return;
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-section]');
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(
+        '[data-section]',
+      );
       let before: SidebarSection | null = d.before;
       if (el) {
         const sec = el.dataset.section as SidebarSection;
@@ -248,16 +330,37 @@ export function Sidebar() {
     window.addEventListener('pointerup', up, true);
   };
 
-  const section = (id: SidebarSection, body: React.ReactNode, extra: Partial<React.HTMLAttributes<HTMLDivElement>> = {}) => {
+  const section = (
+    id: SidebarSection,
+    body: React.ReactNode,
+    extra: Partial<React.HTMLAttributes<HTMLDivElement>> = {},
+  ) => {
     const folded = collapsed.includes(id);
     const marker = drag?.moved && drag.id !== id && drag.before === id;
     return (
-      <div key={id} data-section={id} {...extra} className={`side-group${folded ? ' is-folded' : ''}${marker ? ' is-drop-before' : ''}${drag?.moved && drag.id === id ? ' is-dragged' : ''}`}>
-        <button type="button" className="side-title" aria-expanded={!folded}
+      <div
+        key={id}
+        data-section={id}
+        {...extra}
+        className={`side-group${folded ? ' is-folded' : ''}${marker ? ' is-drop-before' : ''}${drag?.moved && drag.id === id ? ' is-dragged' : ''}`}
+      >
+        <button
+          type="button"
+          className="side-title"
+          aria-expanded={!folded}
           title={$t('Klicken: ein- oder ausklappen, ziehen: verschieben')}
           onPointerDown={(e) => beginDrag(e, id)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSidebarCollapsed(id); } }}
-          onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarSection' } }); }}>
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleSidebarCollapsed(id);
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarSection' } });
+          }}
+        >
           <span className="ellipsis">{TITLES[id]()}</span>
           <CaretDown size={11} weight="bold" className="side-caret" aria-hidden="true" />
         </button>
@@ -267,42 +370,160 @@ export function Sidebar() {
   };
 
   const sections: Record<SidebarSection, React.ReactNode> = {
-    favorites: section('favorites', <>
-      {shown.map(({ place: p, label }) => item(`p:${p.path}`, <PlaceIcon place={p} />, label, p.path, () => { if (!favMoved.current) open(p.path); favMoved.current = false; }, {
-        onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarPlace', place: p.path } }); },
-        onPointerDown: (e) => beginFavDrag(e, p.path),
-        ...({ 'data-fav-path': p.path } as object),
-        className: `side-item${activeLocal === p.path ? ' is-active' : ''}${favDrag && favDrag.before === p.path && favDrag.path !== p.path ? ' is-drop-before' : ''}${favDrag?.path === p.path ? ' is-dragged' : ''}`,
-      }))}
-      {favDrag && favDrag.before === null && <div className="side-drop-end" />}
-      {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
-    </>, { 'data-sidebar-favs': '' } as Partial<React.HTMLAttributes<HTMLDivElement>>),
-    recent: recent.length > 0 ? section('recent', recent.map((p) => {
-      // Two recent folders with the same name ("Applications" and "~/Applications") show where they are.
-      // A drive root shows the drive's name as under "Geräte" ("C: WINDOWS 11 PRO").
-      const drive = /^[A-Z]:\/?$/i.test(p) ? drives.find((d) => d.path.replace(/\/$/, '').toUpperCase() === p.replace(/\/$/, '').toUpperCase()) : undefined;
-      const base = drive ? driveName(drive, mac) : paths.basename(p) || p;
-      const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
-      const where = paths.parent(p);
-      return item(`r:${p}`, <ClockCounterClockwise {...ICON} />, twin ? `${base} – ${where === '~' ? homeName : where}` : base, p, () => open(p),
-        { onContextMenu: (e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: focus, names: [], kind: 'sidebarRecent', place: p } }); } },
-        // A small × on hover takes the folder off the list (the folder itself stays).
-        <span className="side-remove" role="button" tabIndex={-1} aria-label={$t('Aus „Zuletzt verwendet“ entfernen')} title={$t('Aus „Zuletzt verwendet“ entfernen')}
-          onClick={(e) => { e.stopPropagation(); removeRecent(p); }}><X size={12} weight="bold" /></span>);
-    })) : null,
-    devices: section('devices', devices.map((d, i) => item(`d:${d.path}:${d.name}`, <DriveIcon drive={d} first={i === 0} />, driveName(d, mac), d.path, () => open(d.path), {},
-      d.free !== undefined ? <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>{shortSize(d.free)}</span> : undefined))),
-    shares: mounted.length + others.length > 0 ? section('shares', <>
-      {mounted.map((d) => item(`n:${d.path}:${d.name}`, <Network {...ICON} />, d.name, d.path, () => open(d.path)))}
-      {others.map((h) => item(`h:${h.host}`, <Desktop {...ICON} />, h.name, null,
-        () => openDialog({ type: 'serverEdit', preset: { name: h.name, host: h.host, port: 445, protocol: 'smb' } }), { title: $t('{0} über SMB verbinden …', h.name) }))}
-    </>) : null,
-    tags: mac ? section('tags', TAG_COLORS.map((c) => item(`t:${c.color}`, <span className="tag-dot side-tag" style={{ background: c.css }} />, tagName(c), null,
-      () => openDialog({ type: 'tagFiles', name: tagName(c), color: c.color })))) : null,
+    favorites: section(
+      'favorites',
+      <>
+        {shown.map(({ place: p, label }) =>
+          item(
+            `p:${p.path}`,
+            <PlaceIcon place={p} />,
+            label,
+            p.path,
+            () => {
+              if (!favMoved.current) open(p.path);
+              favMoved.current = false;
+            },
+            {
+              onContextMenu: (e) => {
+                e.preventDefault();
+                setState({
+                  contextMenu: {
+                    x: e.clientX,
+                    y: e.clientY,
+                    side: focus,
+                    names: [],
+                    kind: 'sidebarPlace',
+                    place: p.path,
+                  },
+                });
+              },
+              onPointerDown: (e) => beginFavDrag(e, p.path),
+              ...({ 'data-fav-path': p.path } as object),
+              className: `side-item${activeLocal === p.path ? ' is-active' : ''}${favDrag && favDrag.before === p.path && favDrag.path !== p.path ? ' is-drop-before' : ''}${favDrag?.path === p.path ? ' is-dragged' : ''}`,
+            },
+          ),
+        )}
+        {favDrag && favDrag.before === null && <div className="side-drop-end" />}
+        {places.length === 0 && <div className="side-empty">{$t('Ordner hierher ziehen')}</div>}
+      </>,
+      { 'data-sidebar-favs': '' } as Partial<React.HTMLAttributes<HTMLDivElement>>,
+    ),
+    recent:
+      recent.length > 0
+        ? section(
+            'recent',
+            recent.map((p) => {
+              // Two recent folders with the same name ("Applications" and "~/Applications") show where they are.
+              // A drive root shows the drive's name as under "Geräte" ("C: WINDOWS 11 PRO").
+              const drive = /^[A-Z]:\/?$/i.test(p)
+                ? drives.find((d) => d.path.replace(/\/$/, '').toUpperCase() === p.replace(/\/$/, '').toUpperCase())
+                : undefined;
+              const base = drive ? driveName(drive, mac) : paths.basename(p) || p;
+              const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
+              const where = paths.parent(p);
+              return item(
+                `r:${p}`,
+                <ClockCounterClockwise {...ICON} />,
+                twin ? `${base} – ${where === '~' ? homeName : where}` : base,
+                p,
+                () => open(p),
+                {
+                  onContextMenu: (e) => {
+                    e.preventDefault();
+                    setState({
+                      contextMenu: {
+                        x: e.clientX,
+                        y: e.clientY,
+                        side: focus,
+                        names: [],
+                        kind: 'sidebarRecent',
+                        place: p,
+                      },
+                    });
+                  },
+                },
+                // A small × on hover takes the folder off the list (the folder itself stays).
+                <span
+                  className="side-remove"
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={$t('Aus „Zuletzt verwendet“ entfernen')}
+                  title={$t('Aus „Zuletzt verwendet“ entfernen')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeRecent(p);
+                  }}
+                >
+                  <X size={12} weight="bold" />
+                </span>,
+              );
+            }),
+          )
+        : null,
+    devices: section(
+      'devices',
+      devices.map((d, i) =>
+        item(
+          `d:${d.path}:${d.name}`,
+          <DriveIcon drive={d} first={i === 0} />,
+          driveName(d, mac),
+          d.path,
+          () => open(d.path),
+          {},
+          d.free !== undefined ? (
+            <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>
+              {shortSize(d.free)}
+            </span>
+          ) : undefined,
+        ),
+      ),
+    ),
+    shares:
+      mounted.length + others.length > 0
+        ? section(
+            'shares',
+            <>
+              {mounted.map((d) =>
+                item(`n:${d.path}:${d.name}`, <Network {...ICON} />, d.name, d.path, () => open(d.path)),
+              )}
+              {others.map((h) =>
+                item(
+                  `h:${h.host}`,
+                  <Desktop {...ICON} />,
+                  h.name,
+                  null,
+                  () =>
+                    openDialog({
+                      type: 'serverEdit',
+                      preset: { name: h.name, host: h.host, port: 445, protocol: 'smb' },
+                    }),
+                  { title: $t('{0} über SMB verbinden …', h.name) },
+                ),
+              )}
+            </>,
+          )
+        : null,
+    tags: mac
+      ? section(
+          'tags',
+          TAG_COLORS.map((c) =>
+            item(
+              `t:${c.color}`,
+              <span className="tag-dot side-tag" style={{ background: c.css }} />,
+              tagName(c),
+              null,
+              () => openDialog({ type: 'tagFiles', name: tagName(c), color: c.color }),
+            ),
+          ),
+        )
+      : null,
   };
 
   return (
-    <nav className={`sidebar${dropHere ? ' is-drop-favs' : ''}${drag?.moved ? ' is-sorting' : ''}`} aria-label={$t('Seitenleiste')}>
+    <nav
+      className={`sidebar${dropHere ? ' is-drop-favs' : ''}${drag?.moved ? ' is-sorting' : ''}`}
+      aria-label={$t('Seitenleiste')}
+    >
       {order.filter((id) => !hidden.includes(id)).map((id) => sections[id])}
       {drag?.moved && drag.before === null && <div className="side-drop-end" />}
     </nav>

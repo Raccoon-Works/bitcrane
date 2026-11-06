@@ -9,13 +9,26 @@ import type { PaneSide, Tab, Transfer, Watch } from '../backend/types';
 import { matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { setState, state, showToast, uid, LIVE, watchForLocal, panePath, activeTab, paneLoc, setLeftServer } from './core';
+import {
+  setState,
+  state,
+  showToast,
+  uid,
+  LIVE,
+  watchForLocal,
+  panePath,
+  activeTab,
+  paneLoc,
+  setLeftServer,
+} from './core';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
 import { updateTab } from './tabs';
 
 export function toggleWatch(id: string) {
-  setState((s) => ({ watches: s.watches.map((w) => (w.id === id ? { ...w, state: w.state === 'paused' ? 'active' : 'paused' } : w)) }));
+  setState((s) => ({
+    watches: s.watches.map((w) => (w.id === id ? { ...w, state: w.state === 'paused' ? 'active' : 'paused' } : w)),
+  }));
 }
 
 export function pauseAllWatches() {
@@ -26,7 +39,7 @@ export function pauseAllWatches() {
 
 export function saveWatch(w: Omit<Watch, 'id' | 'state' | 'lastFile' | 'lastTime'> & { id?: string }) {
   if (w.id) {
-    setState((s) => ({ watches: s.watches.map((x) => (x.id === w.id ? { ...x, ...w } as Watch : x)), dialog: null }));
+    setState((s) => ({ watches: s.watches.map((x) => (x.id === w.id ? ({ ...x, ...w } as Watch) : x)), dialog: null }));
     showToast($t('Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.', w.name), 'ok');
     return;
   }
@@ -36,8 +49,14 @@ export function saveWatch(w: Omit<Watch, 'id' | 'state' | 'lastFile' | 'lastTime
   // Live mode: the watcher starts through the store subscription and syncs on start itself.
   if (watch.options.syncOnStart && !LIVE) {
     // Initial sync: upload a couple of files that are "newer" locally.
-    const files = fs.walkFiles('local', watch.serverId, watch.localPath).filter((f) => !matchesExclude(f.entry.name, watch.excludes)).slice(0, 2);
-    enqueueWatchFiles(watch, files.map((f) => f.path));
+    const files = fs
+      .walkFiles('local', watch.serverId, watch.localPath)
+      .filter((f) => !matchesExclude(f.entry.name, watch.excludes))
+      .slice(0, 2);
+    enqueueWatchFiles(
+      watch,
+      files.map((f) => f.path),
+    );
   }
 }
 
@@ -52,7 +71,13 @@ export function testRunWatch(localPath: string, excludes: string[]) {
     return;
   }
   const files = fs.walkFiles('local', 'ob', localPath).filter((f) => !matchesExclude(f.entry.name, excludes));
-  showToast($t('Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.', files.length, Math.min(2, files.length)));
+  showToast(
+    $t(
+      'Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.',
+      files.length,
+      Math.min(2, files.length),
+    ),
+  );
 }
 
 function enqueueWatchFiles(w: Watch, files: string[]) {
@@ -60,7 +85,19 @@ function enqueueWatchFiles(w: Watch, files: string[]) {
     const rel = p.slice(w.localPath.length + 1);
     const target = paths.join(w.remotePath, rel);
     const st = fs.stat('local', w.serverId, p);
-    return { id: uid('t'), name: paths.basename(p), direction: 'up', serverId: w.serverId, folder: relFolder(w.remotePath, target), source: p, target, size: st?.size ?? 1024, done: 0, state: 'queued', watchId: w.id };
+    return {
+      id: uid('t'),
+      name: paths.basename(p),
+      direction: 'up',
+      serverId: w.serverId,
+      folder: relFolder(w.remotePath, target),
+      source: p,
+      target,
+      size: st?.size ?? 1024,
+      done: 0,
+      state: 'queued',
+      watchId: w.id,
+    };
   });
   enqueue(items);
   pendingCommand.add(w.id);
@@ -76,7 +113,9 @@ export const pendingCommand = new Set<string>();
 export function simulateLocalChange(watchId?: string, path?: string) {
   if (LIVE) {
     // In the app this is "Abgleichen": compare the watched folder with the server now.
-    const w = watchId ? state.watches.find((x) => x.id === watchId) : watchForLocal(panePath('local')) ?? state.watches.find((x) => x.state !== 'paused');
+    const w = watchId
+      ? state.watches.find((x) => x.id === watchId)
+      : (watchForLocal(panePath('local')) ?? state.watches.find((x) => x.state !== 'paused'));
     if (w) live.syncWatch(w.id);
     else showToast($t('Für diesen Ordner gibt es keine Überwachung.'));
     return;
@@ -86,12 +125,14 @@ export function simulateLocalChange(watchId?: string, path?: string) {
     showToast($t('Keine aktive Überwachung. Starte zuerst eine.'), 'error');
     return;
   }
-  const candidates = fs.walkFiles('local', w.serverId, w.localPath)
+  const candidates = fs
+    .walkFiles('local', w.serverId, w.localPath)
     .filter((f) => !matchesExclude(f.entry.name, w.excludes))
     .filter((f) => !f.path.includes('/static/logo.png'));
   if (!candidates.length) return;
   // A given file (used by the scripted website clips), otherwise a random one.
-  const pick = candidates.find((f) => path && f.path.endsWith(path)) ?? candidates[Math.floor(Math.random() * candidates.length)];
+  const pick =
+    candidates.find((f) => path && f.path.endsWith(path)) ?? candidates[Math.floor(Math.random() * candidates.length)];
   fs.touch('local', w.serverId, pick.path, Math.round((Math.random() - 0.3) * 600));
   setState((s) => ({ fsRev: s.fsRev + 1 }));
   if (w.state === 'paused') {
@@ -140,9 +181,15 @@ export function simulateDisconnect(serverId = activeTab()?.serverId) {
   const w = state.watches.find((x) => x.serverId === serverId && x.state === 'waiting');
   if (w) {
     // Changes keep being collected while offline.
-    const files = fs.walkFiles('local', serverId, w.localPath).filter((f) => !matchesExclude(f.entry.name, w.excludes)).slice(0, 3);
+    const files = fs
+      .walkFiles('local', serverId, w.localPath)
+      .filter((f) => !matchesExclude(f.entry.name, w.excludes))
+      .slice(0, 3);
     files.forEach((f) => fs.touch('local', serverId, f.path));
-    enqueueWatchFiles(w, files.map((f) => f.path));
+    enqueueWatchFiles(
+      w,
+      files.map((f) => f.path),
+    );
   }
 }
 
@@ -180,7 +227,12 @@ function serverStillUsed(sid: string): boolean {
   const s = state;
   if (s.tabs.some((x) => x.serverId === sid || x.leftServerId === sid)) return true;
   if (s.watches.some((w) => w.serverId === sid && w.state !== 'paused')) return true;
-  if (s.transfers.some((t) => (t.serverId === sid || t.sourceServerId === sid) && (t.state === 'queued' || t.state === 'running'))) return true;
+  if (
+    s.transfers.some(
+      (t) => (t.serverId === sid || t.sourceServerId === sid) && (t.state === 'queued' || t.state === 'running'),
+    )
+  )
+    return true;
   const tunnels = s.servers.find((x) => x.id === sid)?.forwards?.map((f) => f.id) ?? [];
   return tunnels.some((id) => s.tunnels.includes(id));
 }
@@ -209,8 +261,18 @@ export function closePaneServer(side: PaneSide) {
   if (ls !== 'remote' || !sid) return;
   if (side === 'local') setLeftServer('');
   else {
-    updateTab({ serverId: '', remotePath: '', back: [], forward: [], syncBrowse: undefined, serverList: { ...t.serverList, remote: true } });
-    setState((s) => ({ selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } }, expanded: { ...s.expanded, remote: [] } }));
+    updateTab({
+      serverId: '',
+      remotePath: '',
+      back: [],
+      forward: [],
+      syncBrowse: undefined,
+      serverList: { ...t.serverList, remote: true },
+    });
+    setState((s) => ({
+      selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+      expanded: { ...s.expanded, remote: [] },
+    }));
   }
   if (!serverStillUsed(sid)) disconnect(sid);
 }

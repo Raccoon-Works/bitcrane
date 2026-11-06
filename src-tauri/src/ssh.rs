@@ -29,10 +29,7 @@ pub struct KnownHosts {
 
 impl KnownHosts {
     pub fn load(path: PathBuf) -> Self {
-        let map = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let map = std::fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
         Self { path, map: Mutex::new(map) }
     }
 
@@ -119,7 +116,11 @@ pub struct PromptItem {
 }
 
 /// Asks the user (in the interface) and returns the answers, or `None` when cancelled.
-pub type Prompter = Arc<dyn Fn(PromptRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<String>>> + Send>> + Send + Sync>;
+pub type Prompter = Arc<
+    dyn Fn(PromptRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<String>>> + Send>>
+        + Send
+        + Sync,
+>;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -212,7 +213,9 @@ impl client::Handler for Handler {
     async fn check_server_key(&mut self, key: &russh::keys::PublicKeyOrCertificate) -> Result<bool, Self::Error> {
         let public = match key {
             russh::keys::PublicKeyOrCertificate::PublicKey { key, .. } => key.clone(),
-            russh::keys::PublicKeyOrCertificate::Certificate(cert) => russh::keys::PublicKey::new(cert.public_key().clone(), ""),
+            russh::keys::PublicKeyOrCertificate::Certificate(cert) => {
+                russh::keys::PublicKey::new(cert.public_key().clone(), "")
+            }
         };
         let fingerprint = public.fingerprint(HashAlg::Sha256).to_string();
         let algorithm = public.algorithm().as_str().to_string();
@@ -259,7 +262,12 @@ impl client::Handler for Handler {
 
     /// The server asks for the forwarded agent (a program on the server used
     /// the key): the request goes to the agent on this computer and back.
-    async fn server_channel_open_agent_forward(&mut self, channel: russh::Channel<client::Msg>, reply: client::ChannelOpenHandle, _session: &mut client::Session) -> Result<(), Self::Error> {
+    async fn server_channel_open_agent_forward(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
         if !self.forward_agent {
             reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
@@ -296,31 +304,43 @@ pub struct Connection {
 }
 
 fn agent_error(e: impl std::fmt::Display) -> AppError {
-    AppError::new(ErrorKind::AuthFailed, "Der SSH-Agent ist nicht erreichbar oder hat keinen passenden Schlüssel.").with_detail(e.to_string())
+    AppError::new(ErrorKind::AuthFailed, "Der SSH-Agent ist nicht erreichbar oder hat keinen passenden Schlüssel.")
+        .with_detail(e.to_string())
 }
 
 /// Opens a connection, verifies the host key and authenticates.
 /// Loads a private key in OpenSSH, PEM or PuTTY (.ppk) format.
 pub fn load_private_key(path: &str, passphrase: Option<&str>) -> AppResult<russh::keys::PrivateKey> {
     let native = crate::paths::to_native(path);
-    let text = std::fs::read_to_string(&native).map_err(|e| AppError::new(ErrorKind::AuthFailed, "Der Schlüssel konnte nicht gelesen werden.").with_detail(format!("{}: {e}", native.display())))?;
+    let text = std::fs::read_to_string(&native).map_err(|e| {
+        AppError::new(ErrorKind::AuthFailed, "Der Schlüssel konnte nicht gelesen werden.")
+            .with_detail(format!("{}: {e}", native.display()))
+    })?;
     if text.starts_with("PuTTY-User-Key-File") {
         // PuTTY keys (from WinSCP / Pageant). Encrypted ones say so in their header.
-        let encrypted = text.lines().find(|l| l.starts_with("Encryption:")).map(|l| !l.contains("none")).unwrap_or(false);
+        let encrypted =
+            text.lines().find(|l| l.starts_with("Encryption:")).map(|l| !l.contains("none")).unwrap_or(false);
         if encrypted && passphrase.is_none() {
-            return Err(AppError::new(ErrorKind::PassphraseRequired, "Der Schlüssel ist mit einer Passphrase geschützt."));
+            return Err(AppError::new(
+                ErrorKind::PassphraseRequired,
+                "Der Schlüssel ist mit einer Passphrase geschützt.",
+            ));
         }
         return russh::keys::PrivateKey::from_ppk(&text, passphrase.map(str::to_string)).map_err(|e| {
             if encrypted {
                 AppError::new(ErrorKind::PassphraseRequired, "Die Passphrase stimmt nicht.").with_detail(e.to_string())
             } else {
-                AppError::new(ErrorKind::AuthFailed, "Der PuTTY-Schlüssel konnte nicht gelesen werden.").with_detail(e.to_string())
+                AppError::new(ErrorKind::AuthFailed, "Der PuTTY-Schlüssel konnte nicht gelesen werden.")
+                    .with_detail(e.to_string())
             }
         });
     }
     // Keys on a hardware token (YubiKey and other FIDO2 keys, "sk-…") cannot sign from the file:
     // the token has to be touched, which the SSH agent does.
-    if text.contains("sk-ssh-ed25519@openssh.com") || text.contains("sk-ecdsa-sha2-nistp256@openssh.com") || std::fs::read_to_string(format!("{}.pub", native.display())).map(|p| p.starts_with("sk-")).unwrap_or(false) {
+    if text.contains("sk-ssh-ed25519@openssh.com")
+        || text.contains("sk-ecdsa-sha2-nistp256@openssh.com")
+        || std::fs::read_to_string(format!("{}.pub", native.display())).map(|p| p.starts_with("sk-")).unwrap_or(false)
+    {
         return Err(AppError::new(
             ErrorKind::AuthFailed,
             "Das ist ein Hardware-Schlüssel (FIDO2, z. B. YubiKey). Bitte über den SSH-Agent nutzen: einmal „ssh-add“ mit dem Schlüssel ausführen und bei Anmeldung „SSH-Agent“ wählen.",
@@ -328,10 +348,15 @@ pub fn load_private_key(path: &str, passphrase: Option<&str>) -> AppResult<russh
     }
     match russh::keys::decode_secret_key(&text, passphrase) {
         Ok(k) => Ok(k),
-        Err(russh::keys::Error::KeyIsEncrypted) => Err(AppError::new(ErrorKind::PassphraseRequired, "Der Schlüssel ist mit einer Passphrase geschützt.")),
+        Err(russh::keys::Error::KeyIsEncrypted) => {
+            Err(AppError::new(ErrorKind::PassphraseRequired, "Der Schlüssel ist mit einer Passphrase geschützt."))
+        }
         // A wrong passphrase surfaces as a decoding error of the key, not as a dedicated kind.
-        Err(e) if passphrase.is_some() => Err(AppError::new(ErrorKind::PassphraseRequired, "Die Passphrase stimmt nicht.").with_detail(e.to_string())),
-        Err(e) => Err(AppError::new(ErrorKind::AuthFailed, "Der Schlüssel konnte nicht gelesen werden.").with_detail(format!("{}: {e}", native.display()))),
+        Err(e) if passphrase.is_some() => {
+            Err(AppError::new(ErrorKind::PassphraseRequired, "Die Passphrase stimmt nicht.").with_detail(e.to_string()))
+        }
+        Err(e) => Err(AppError::new(ErrorKind::AuthFailed, "Der Schlüssel konnte nicht gelesen werden.")
+            .with_detail(format!("{}: {e}", native.display()))),
     }
 }
 
@@ -353,7 +378,12 @@ fn step(r: russh::client::AuthResult) -> (Step, Vec<russh::MethodKind>) {
 }
 
 /// Logs in with a private key; uses an OpenSSH certificate ("<key>-cert.pub") when one lies next to it.
-async fn key_login(handle: &mut client::Handle<Handler>, user: &str, path: &str, passphrase: Option<&str>) -> AppResult<(Step, Vec<russh::MethodKind>)> {
+async fn key_login(
+    handle: &mut client::Handle<Handler>,
+    user: &str,
+    path: &str,
+    passphrase: Option<&str>,
+) -> AppResult<(Step, Vec<russh::MethodKind>)> {
     let key = load_private_key(path, passphrase)?;
     let cert_path = crate::paths::to_native(&format!("{path}-cert.pub"));
     if let Ok(text) = std::fs::read_to_string(&cert_path) {
@@ -367,7 +397,12 @@ async fn key_login(handle: &mut client::Handle<Handler>, user: &str, path: &str,
 
 /// Keyboard-interactive login: password prompts get `password`, everything
 /// else (one-time codes) is asked through `prompter`.
-async fn keyboard_interactive(handle: &mut client::Handle<Handler>, params: &ConnectParams, password: Option<&str>, prompter: &Option<Prompter>) -> AppResult<(Step, Vec<russh::MethodKind>)> {
+async fn keyboard_interactive(
+    handle: &mut client::Handle<Handler>,
+    params: &ConnectParams,
+    password: Option<&str>,
+    prompter: &Option<Prompter>,
+) -> AppResult<(Step, Vec<russh::MethodKind>)> {
     use russh::client::KeyboardInteractiveAuthResponse as R;
     let mut resp = handle.authenticate_keyboard_interactive_start(params.user.clone(), None::<String>).await?;
     let mut password_used = false;
@@ -381,7 +416,9 @@ async fn keyboard_interactive(handle: &mut client::Handle<Handler>, params: &Con
                 let is_password = |t: &str| t.to_lowercase().contains("passw") || t.to_lowercase().contains("kennwort");
                 let answers = if prompts.is_empty() {
                     Vec::new()
-                } else if let (Some(pw), false, true) = (password, password_used, prompts.len() == 1 && is_password(&prompts[0].prompt)) {
+                } else if let (Some(pw), false, true) =
+                    (password, password_used, prompts.len() == 1 && is_password(&prompts[0].prompt))
+                {
                     password_used = true;
                     vec![pw.to_string()]
                 } else {
@@ -407,7 +444,12 @@ async fn keyboard_interactive(handle: &mut client::Handle<Handler>, params: &Con
 }
 
 /// Password login; servers that only allow keyboard-interactive get the password there.
-async fn password_login(handle: &mut client::Handle<Handler>, params: &ConnectParams, password: &str, prompter: &Option<Prompter>) -> AppResult<(Step, Vec<russh::MethodKind>)> {
+async fn password_login(
+    handle: &mut client::Handle<Handler>,
+    params: &ConnectParams,
+    password: &str,
+    prompter: &Option<Prompter>,
+) -> AppResult<(Step, Vec<russh::MethodKind>)> {
     let (st, methods) = step(handle.authenticate_password(params.user.clone(), password).await?);
     if matches!(st, Step::Rejected) && methods.contains(&russh::MethodKind::KeyboardInteractive) {
         return keyboard_interactive(handle, params, Some(password), prompter).await;
@@ -427,13 +469,21 @@ fn default_keys() -> Vec<String> {
 
 /// Runs the login of `params.auth`, including a second step (one-time code)
 /// when the server asks for it after the first method.
-async fn authenticate(handle: &mut client::Handle<Handler>, params: &ConnectParams, prompter: Option<Prompter>) -> AppResult<()> {
+async fn authenticate(
+    handle: &mut client::Handle<Handler>,
+    params: &ConnectParams,
+    prompter: Option<Prompter>,
+) -> AppResult<()> {
     let user = params.user.clone();
     let (mut st, mut methods) = match &params.auth {
         AuthParams::Password { password } => password_login(handle, params, password, &prompter).await?,
         AuthParams::Key { path, passphrase } => key_login(handle, &user, path, passphrase.as_deref()).await?,
         AuthParams::Agent => {
-            if authenticate_with_agent(handle, &user).await? { (Step::Done, Vec::new()) } else { (Step::Rejected, Vec::new()) }
+            if authenticate_with_agent(handle, &user).await? {
+                (Step::Done, Vec::new())
+            } else {
+                (Step::Rejected, Vec::new())
+            }
         }
         AuthParams::Auto { key_path, passphrase, password } => {
             let mut result = (Step::Rejected, Vec::new());
@@ -449,9 +499,14 @@ async fn authenticate(handle: &mut client::Handle<Handler>, params: &ConnectPara
                 for k in keys {
                     let pass = if Some(&k) == key_path.as_ref() { passphrase.as_deref() } else { None };
                     match key_login(handle, &user, &k, pass).await {
-                        Ok(r) if !matches!(r.0, Step::Rejected) => { result = r; break; }
+                        Ok(r) if !matches!(r.0, Step::Rejected) => {
+                            result = r;
+                            break;
+                        }
                         Ok(r) => result.1 = r.1,
-                        Err(e) if e.kind == ErrorKind::PassphraseRequired && Some(&k) == key_path.as_ref() => needs_passphrase = true,
+                        Err(e) if e.kind == ErrorKind::PassphraseRequired && Some(&k) == key_path.as_ref() => {
+                            needs_passphrase = true
+                        }
                         Err(_) => {}
                     }
                 }
@@ -459,8 +514,15 @@ async fn authenticate(handle: &mut client::Handle<Handler>, params: &ConnectPara
                 if matches!(result.0, Step::Rejected) {
                     match password {
                         Some(pw) => result = password_login(handle, params, pw, &prompter).await?,
-                        None if needs_passphrase => return Err(AppError::new(ErrorKind::PassphraseRequired, "Der Schlüssel ist mit einer Passphrase geschützt.")),
-                        None => return Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort.")),
+                        None if needs_passphrase => {
+                            return Err(AppError::new(
+                                ErrorKind::PassphraseRequired,
+                                "Der Schlüssel ist mit einer Passphrase geschützt.",
+                            ))
+                        }
+                        None => {
+                            return Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort."))
+                        }
                     }
                 }
             }
@@ -474,17 +536,24 @@ async fn authenticate(handle: &mut client::Handle<Handler>, params: &ConnectPara
         }
         let (s2, m2) = if methods.contains(&russh::MethodKind::KeyboardInteractive) {
             keyboard_interactive(handle, params, None, &prompter).await?
-        } else if let (true, AuthParams::Password { password } | AuthParams::Auto { password: Some(password), .. }) = (methods.contains(&russh::MethodKind::Password), &params.auth) {
+        } else if let (true, AuthParams::Password { password } | AuthParams::Auto { password: Some(password), .. }) =
+            (methods.contains(&russh::MethodKind::Password), &params.auth)
+        {
             step(handle.authenticate_password(user.clone(), password.clone()).await?)
         } else {
-            return Err(AppError::new(ErrorKind::AuthFailed, "Der Server verlangt eine weitere Anmeldung, die Bitcrane nicht kennt."));
+            return Err(AppError::new(
+                ErrorKind::AuthFailed,
+                "Der Server verlangt eine weitere Anmeldung, die Bitcrane nicht kennt.",
+            ));
         };
         st = s2;
         methods = m2;
     }
     match st {
         Step::Done => Ok(()),
-        _ => Err(AppError::new(ErrorKind::AuthFailed, "Anmeldung abgelehnt. Benutzer, Schlüssel oder Passwort prüfen.")),
+        _ => {
+            Err(AppError::new(ErrorKind::AuthFailed, "Anmeldung abgelehnt. Benutzer, Schlüssel oder Passwort prüfen."))
+        }
     }
 }
 
@@ -496,10 +565,23 @@ enum Transport {
 }
 
 /// Handshake (with host key check) and login for one hop.
-async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport: Transport, prompter: Option<Prompter>, forwards: RemoteForwards) -> AppResult<client::Handle<Handler>> {
+async fn open_session(
+    params: &ConnectParams,
+    known: Arc<KnownHosts>,
+    transport: Transport,
+    prompter: Option<Prompter>,
+    forwards: RemoteForwards,
+) -> AppResult<client::Handle<Handler>> {
     let host_id = format!("{}:{}", params.host, params.port);
     let seen = Arc::new(Mutex::new(None));
-    let handler = Handler { host_id: host_id.clone(), known: known.clone(), trust: params.trust.clone(), seen: seen.clone(), forwards, forward_agent: params.forward_agent };
+    let handler = Handler {
+        host_id: host_id.clone(),
+        known: known.clone(),
+        trust: params.trust.clone(),
+        seen: seen.clone(),
+        forwards,
+        forward_agent: params.forward_agent,
+    };
 
     let config = Arc::new(client::Config {
         inactivity_timeout: None,
@@ -510,18 +592,35 @@ async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport:
 
     let connected = match transport {
         Transport::Direct => match &params.proxy {
-            None => tokio::time::timeout(connect_timeout(params.timeout), client::connect(config, (params.host.as_str(), params.port), handler)).await,
+            None => {
+                tokio::time::timeout(
+                    connect_timeout(params.timeout),
+                    client::connect(config, (params.host.as_str(), params.port), handler),
+                )
+                .await
+            }
             Some(proxy) => {
-                let stream = tokio::time::timeout(connect_timeout(params.timeout), crate::proxy::connect(proxy, &params.host, params.port))
+                let stream = tokio::time::timeout(
+                    connect_timeout(params.timeout),
+                    crate::proxy::connect(proxy, &params.host, params.port),
+                )
+                .await
+                .map_err(|_| {
+                    AppError::new(ErrorKind::Unreachable, "Der Proxy antwortet nicht (Zeitüberschreitung).")
+                })??;
+                tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler))
                     .await
-                    .map_err(|_| AppError::new(ErrorKind::Unreachable, "Der Proxy antwortet nicht (Zeitüberschreitung)."))??;
-                tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler)).await
             }
         },
-        Transport::Through(stream) => tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, *stream, handler)).await,
+        Transport::Through(stream) => {
+            tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, *stream, handler))
+                .await
+        }
     };
     let mut handle = match connected {
-        Err(_) => return Err(AppError::new(ErrorKind::Unreachable, "Der Server antwortet nicht (Zeitüberschreitung).")),
+        Err(_) => {
+            return Err(AppError::new(ErrorKind::Unreachable, "Der Server antwortet nicht (Zeitüberschreitung)."))
+        }
         Ok(Ok(h)) => h,
         Ok(Err(e)) => {
             // A rejected host key ends the handshake; report which case it was.
@@ -531,15 +630,25 @@ async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport:
                     let changed = stored.is_some();
                     let mut err = AppError::new(
                         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
-                        if changed { "Der Fingerabdruck des Servers hat sich geändert." } else { "Dieser Server ist noch nicht bekannt." },
+                        if changed {
+                            "Der Fingerabdruck des Servers hat sich geändert."
+                        } else {
+                            "Dieser Server ist noch nicht bekannt."
+                        },
                     );
-                    err.host_key = Some(Box::new(HostKeyInfo { host: params.host.clone(), algorithm: key.algorithm, fingerprint: key.fingerprint, previous: stored }));
+                    err.host_key = Some(Box::new(HostKeyInfo {
+                        host: params.host.clone(),
+                        algorithm: key.algorithm,
+                        fingerprint: key.fingerprint,
+                        previous: stored,
+                    }));
                     return Err(err);
                 }
             }
             return Err(match e {
                 russh::Error::IO(io) => AppError::from(io),
-                other => AppError::new(ErrorKind::Unreachable, "Verbindung zum Server fehlgeschlagen.").with_detail(other.to_string()),
+                other => AppError::new(ErrorKind::Unreachable, "Verbindung zum Server fehlgeschlagen.")
+                    .with_detail(other.to_string()),
             });
         }
     };
@@ -555,7 +664,11 @@ pub async fn connect(params: &ConnectParams, known: Arc<KnownHosts>) -> AppResul
 }
 
 /// Like `connect`, with a way to answer questions of the server (one-time codes).
-pub async fn connect_with(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Connection> {
+pub async fn connect_with(
+    params: &ConnectParams,
+    known: Arc<KnownHosts>,
+    prompter: Option<Prompter>,
+) -> AppResult<Connection> {
     open(params, known, prompter).await?.into_sftp().await.map_err(|(_, e)| e)
 }
 
@@ -573,22 +686,48 @@ pub struct Session {
 pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Session> {
     let forwards = RemoteForwards::default();
     let (handle, jump) = match &params.jump {
-        None => (open_session(params, known.clone(), Transport::Direct, prompter.clone(), forwards.clone()).await?, None),
+        None => {
+            (open_session(params, known.clone(), Transport::Direct, prompter.clone(), forwards.clone()).await?, None)
+        }
         Some(jump_params) => {
-            let jump = open_session(jump_params, known.clone(), Transport::Direct, prompter.clone(), RemoteForwards::default()).await.map_err(|mut e| {
+            let jump = open_session(
+                jump_params,
+                known.clone(),
+                Transport::Direct,
+                prompter.clone(),
+                RemoteForwards::default(),
+            )
+            .await
+            .map_err(|mut e| {
                 e.message = format!("Sprungserver {}: {}", jump_params.host, e.message);
                 e
             })?;
             let channel = jump
                 .channel_open_direct_tcpip(params.host.clone(), params.port as u32, "127.0.0.1", 0)
                 .await
-                .map_err(|e| AppError::new(ErrorKind::Unreachable, "Der Sprungserver erreicht das Ziel nicht.").with_detail(e.to_string()))?;
-            let target = open_session(params, known.clone(), Transport::Through(Box::new(channel.into_stream())), prompter, forwards.clone()).await?;
+                .map_err(|e| {
+                    AppError::new(ErrorKind::Unreachable, "Der Sprungserver erreicht das Ziel nicht.")
+                        .with_detail(e.to_string())
+                })?;
+            let target = open_session(
+                params,
+                known.clone(),
+                Transport::Through(Box::new(channel.into_stream())),
+                prompter,
+                forwards.clone(),
+            )
+            .await?;
             (target, Some(jump))
         }
     };
 
-    Ok(Session { handle, jump, forwards, forward_agent: params.forward_agent, sftp_command: params.sftp_command.clone().filter(|c| !c.trim().is_empty()) })
+    Ok(Session {
+        handle,
+        jump,
+        forwards,
+        forward_agent: params.forward_agent,
+        sftp_command: params.sftp_command.clone().filter(|c| !c.trim().is_empty()),
+    })
 }
 
 impl Session {
@@ -622,7 +761,14 @@ impl Session {
         };
         sftp.set_timeout(30);
         let home = sftp.canonicalize(".").await.unwrap_or_else(|_| "/".to_string());
-        Ok(Connection { handle: self.handle, sftp, home, jump: self.jump, forwards: self.forwards, forward_agent: self.forward_agent })
+        Ok(Connection {
+            handle: self.handle,
+            sftp,
+            home,
+            jump: self.jump,
+            forwards: self.forwards,
+            forward_agent: self.forward_agent,
+        })
     }
 }
 
@@ -655,7 +801,10 @@ fn agent_sockets() -> Vec<std::path::PathBuf> {
 async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &str) -> AppResult<bool> {
     let sockets = agent_sockets();
     if sockets.is_empty() {
-        return Err(AppError::new(ErrorKind::AuthFailed, "Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?"));
+        return Err(AppError::new(
+            ErrorKind::AuthFailed,
+            "Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?",
+        ));
     }
     let mut any_keys = false;
     for sock in sockets {
@@ -677,7 +826,9 @@ async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &st
 async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &str) -> AppResult<bool> {
     // Windows' OpenSSH agent pipe (also used by 1Password and Bitwarden), then Pageant.
     let mut any_keys = false;
-    if let Ok(mut agent) = russh::keys::agent::client::AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await {
+    if let Ok(mut agent) =
+        russh::keys::agent::client::AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await
+    {
         match try_agent_identities(handle, user, &mut agent).await {
             Ok(AgentOutcome::Accepted) => return Ok(true),
             Ok(AgentOutcome::Rejected) => any_keys = true,
@@ -705,7 +856,11 @@ enum AgentOutcome {
     NoKeys,
 }
 
-async fn try_agent_identities<S>(handle: &mut client::Handle<Handler>, user: &str, agent: &mut russh::keys::agent::client::AgentClient<S>) -> AppResult<AgentOutcome>
+async fn try_agent_identities<S>(
+    handle: &mut client::Handle<Handler>,
+    user: &str,
+    agent: &mut russh::keys::agent::client::AgentClient<S>,
+) -> AppResult<AgentOutcome>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
 {
@@ -718,7 +873,9 @@ where
         // Certificates in the agent (company SSH CAs) are offered as certificates;
         // keys on hardware tokens (FIDO2, "sk-" keys) sign inside the agent like any other key.
         let result = match &id {
-            russh::keys::agent::AgentIdentity::Certificate { certificate, .. } => handle.authenticate_certificate_with(user, certificate.clone(), hash, agent).await,
+            russh::keys::agent::AgentIdentity::Certificate { certificate, .. } => {
+                handle.authenticate_certificate_with(user, certificate.clone(), hash, agent).await
+            }
             _ => handle.authenticate_publickey_with(user, id.public_key().into_owned(), hash, agent).await,
         };
         match result {
@@ -799,7 +956,16 @@ impl Connection {
         use tokio::io::AsyncWriteExt;
         let probe = remote_join(&self.home, &format!(".bitcrane-clock-{}", uuid::Uuid::new_v4().simple()));
         let before = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as i64;
-        let mut f = self.sftp.open_with_flags(probe.clone(), russh_sftp::protocol::OpenFlags::CREATE | russh_sftp::protocol::OpenFlags::WRITE | russh_sftp::protocol::OpenFlags::TRUNCATE).await.ok()?;
+        let mut f = self
+            .sftp
+            .open_with_flags(
+                probe.clone(),
+                russh_sftp::protocol::OpenFlags::CREATE
+                    | russh_sftp::protocol::OpenFlags::WRITE
+                    | russh_sftp::protocol::OpenFlags::TRUNCATE,
+            )
+            .await
+            .ok()?;
         let _ = f.write_all(b"x").await;
         let _ = f.shutdown().await;
         let after = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as i64;
@@ -815,7 +981,9 @@ impl Connection {
         use tokio::io::AsyncReadExt;
         let file = self.sftp.open(path).await?;
         let mut buf = Vec::new();
-        file.take(max as u64).read_to_end(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
+        file.take(max as u64).read_to_end(&mut buf).await.map_err(|e| {
+            AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string())
+        })?;
         Ok(buf)
     }
 
@@ -879,7 +1047,8 @@ impl Connection {
         let is_dir = attrs.is_dir();
         let file_type_bits = attrs.permissions.unwrap_or(0) & !0o7777;
         let own_mode = if recursive && !is_dir { mode & 0o666 } else { mode };
-        attrs = russh_sftp::protocol::FileAttributes { permissions: Some(file_type_bits | own_mode), ..Default::default() };
+        attrs =
+            russh_sftp::protocol::FileAttributes { permissions: Some(file_type_bits | own_mode), ..Default::default() };
         self.sftp.set_metadata(path, attrs).await?;
         if recursive && is_dir {
             // Linked entries are left alone: they may point outside the folder (or back into it).
@@ -896,7 +1065,12 @@ impl Connection {
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         let root = self.stat(path).await?;
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: path.to_string(),
+                relative: rel(path),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let mut out = Vec::new();
         let mut stack = vec![path.to_string()];
@@ -919,7 +1093,10 @@ impl Connection {
     /// Creates a symbolic link `link` that points to `target`.
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
         if self.exists(link).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(link))));
+            return Err(AppError::new(
+                ErrorKind::AlreadyExists,
+                format!("„{}“ gibt es hier schon.", remote_name(link)),
+            ));
         }
         // OpenSSH's sftp-server reads the two paths in swapped order (a known quirk);
         // russh-sftp sends (link, target), so pass them swapped for OpenSSH.
@@ -942,7 +1119,11 @@ impl Connection {
         let quoted = format!("'{}'", path.replace('\'', "'\\''"));
         for cmd in algo.commands(&quoted) {
             if let Ok((0, out)) = self.exec(&cmd).await {
-                if let Some(hex) = out.split_whitespace().next().filter(|h| h.len() == algo.hex_len() && h.chars().all(|c| c.is_ascii_hexdigit())) {
+                if let Some(hex) = out
+                    .split_whitespace()
+                    .next()
+                    .filter(|h| h.len() == algo.hex_len() && h.chars().all(|c| c.is_ascii_hexdigit()))
+                {
                     return Ok(hex.to_lowercase());
                 }
             }
@@ -952,7 +1133,9 @@ impl Connection {
         let mut h = algo.hasher();
         let mut buf = vec![0u8; 256 * 1024];
         loop {
-            let n = f.read(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
+            let n = f.read(&mut buf).await.map_err(|e| {
+                AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string())
+            })?;
             if n == 0 {
                 break;
             }
@@ -965,7 +1148,8 @@ impl Connection {
     /// when the server allows commands (fast, the data stays on the server),
     /// otherwise copies through this connection. Returns the new names.
     pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -978,7 +1162,8 @@ impl Connection {
                 Ok((0, _)) => true,
                 // A real cp error (no space, no permission); other failures mean commands are not allowed.
                 Ok((_, output)) if output.trim_start().starts_with("cp:") => {
-                    return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.").with_detail(output.trim().to_string()));
+                    return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.")
+                        .with_detail(output.trim().to_string()));
                 }
                 _ => false,
             };
@@ -1004,11 +1189,19 @@ impl Connection {
         } else {
             let mut src = self.sftp.open(from).await?;
             let mut dst = self.sftp.create(to).await?;
-            tokio::io::copy(&mut src, &mut dst).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Kopieren auf dem Server fehlgeschlagen.").with_detail(e.to_string()))?;
+            tokio::io::copy(&mut src, &mut dst).await.map_err(|e| {
+                AppError::new(ErrorKind::ConnectionLost, "Kopieren auf dem Server fehlgeschlagen.")
+                    .with_detail(e.to_string())
+            })?;
             use tokio::io::AsyncWriteExt;
             let _ = dst.shutdown().await;
         }
-        let keep = russh_sftp::protocol::FileAttributes { permissions: attrs.permissions.map(|p| p & 0o7777), atime: attrs.atime, mtime: attrs.mtime, ..Default::default() };
+        let keep = russh_sftp::protocol::FileAttributes {
+            permissions: attrs.permissions.map(|p| p & 0o7777),
+            atime: attrs.atime,
+            mtime: attrs.mtime,
+            ..Default::default()
+        };
         let _ = self.sftp.set_metadata(to, keep).await;
         Ok(())
     }
@@ -1083,7 +1276,20 @@ mod integration {
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
-        ConnectParams { sftp_command: None, forward_agent: false, host: e.host.clone(), port: e.port, user: e.user.clone(), auth, trust, keepalive: true, scp: false, jump: None, proxy: None, timeout: None }
+        ConnectParams {
+            sftp_command: None,
+            forward_agent: false,
+            host: e.host.clone(),
+            port: e.port,
+            user: e.user.clone(),
+            auth,
+            trust,
+            keepalive: true,
+            scp: false,
+            jump: None,
+            proxy: None,
+            timeout: None,
+        }
     }
 
     /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.
@@ -1095,9 +1301,18 @@ mod integration {
         let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
         let fp = connect(&params(&e, key(), None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
-        let conn = Arc::new(crate::remote::Remote::Sftp(Box::new(connect(&params(&e, key(), Some(fp)), known).await.unwrap())));
+        let conn = Arc::new(crate::remote::Remote::Sftp(Box::new(
+            connect(&params(&e, key(), Some(fp)), known).await.unwrap(),
+        )));
         let fw = crate::forward::Forwards::default();
-        let spec = |id: &str, kind: &str, port: u16| crate::forward::ForwardSpec { id: id.into(), kind: kind.into(), bind_host: "127.0.0.1".into(), bind_port: port, dest_host: "127.0.0.1".into(), dest_port: e.port };
+        let spec = |id: &str, kind: &str, port: u16| crate::forward::ForwardSpec {
+            id: id.into(),
+            kind: kind.into(),
+            bind_host: "127.0.0.1".into(),
+            bind_port: port,
+            dest_host: "127.0.0.1".into(),
+            dest_port: e.port,
+        };
         async fn banner(mut s: tokio::net::TcpStream) -> String {
             let mut buf = [0u8; 7];
             s.read_exact(&mut buf).await.unwrap();
@@ -1107,7 +1322,8 @@ mod integration {
         fw.start("s", conn.clone(), spec("l", "local", 47811)).await.unwrap();
         assert_eq!(banner(tokio::net::TcpStream::connect("127.0.0.1:47811").await.unwrap()).await, "SSH-2.0");
         // The same port again: a clear message.
-        let busy = crate::forward::Forwards::default().start("s", conn.clone(), spec("x", "local", 47811)).await.unwrap_err();
+        let busy =
+            crate::forward::Forwards::default().start("s", conn.clone(), spec("x", "local", 47811)).await.unwrap_err();
         assert!(busy.message.contains("belegt"), "{}", busy.message);
 
         fw.start("s", conn.clone(), spec("d", "dynamic", 47812)).await.unwrap();
@@ -1166,7 +1382,16 @@ mod integration {
         let local_ui = local_file.to_string_lossy().replace('\\', "/");
         let seen = std::sync::Mutex::new(Vec::new());
         let progress = |d: u64, t: u64| seen.lock().unwrap().push((d, t));
-        let n = crate::transfer::upload(&conn, &local_ui, &format!("{base}/a/bot.py"), &TransferOptions::default(), &progress, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        let n = crate::transfer::upload(
+            &conn,
+            &local_ui,
+            &format!("{base}/a/bot.py"),
+            &TransferOptions::default(),
+            &progress,
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         assert_eq!(n, 700_000);
         assert_eq!(seen.lock().unwrap().last().copied(), Some((700_000, 700_000)));
         let st = conn.stat(&format!("{base}/a/bot.py")).await.unwrap();
@@ -1182,7 +1407,16 @@ mod integration {
         assert_eq!(walked[0].relative, "a/main.py");
 
         let back = local_dir.path().join("back.py").to_string_lossy().replace('\\', "/");
-        crate::transfer::download(&conn, &format!("{base}/a/main.py"), &back, &TransferOptions::default(), &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        crate::transfer::download(
+            &conn,
+            &format!("{base}/a/main.py"),
+            &back,
+            &TransferOptions::default(),
+            &|_, _| {},
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         assert_eq!(std::fs::metadata(local_dir.path().join("back.py")).unwrap().len(), 700_000);
 
         let (code, out) = conn.exec("echo hallo && exit 3").await.unwrap();
@@ -1208,24 +1442,56 @@ mod integration {
         let part = conn.stat(&crate::transfer::temp_name(&target)).await.expect("partial file kept").size;
         assert!(part > 0 && part < 3_000_000, "partial size {part}");
         let first = std::sync::Mutex::new(None);
-        let resumed = |d: u64, _t: u64| { first.lock().unwrap().get_or_insert(d); };
-        crate::transfer::upload(&conn, &big_ui, &target, &TransferOptions::default(), &resumed, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        let resumed = |d: u64, _t: u64| {
+            first.lock().unwrap().get_or_insert(d);
+        };
+        crate::transfer::upload(
+            &conn,
+            &big_ui,
+            &target,
+            &TransferOptions::default(),
+            &resumed,
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         assert_eq!(first.lock().unwrap().unwrap(), part, "continued at the partial size");
         let back_big = local_dir.path().join("big-back.bin");
-        crate::transfer::download(&conn, &target, &back_big.to_string_lossy().replace('\\', "/"), &TransferOptions::default(), &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        crate::transfer::download(
+            &conn,
+            &target,
+            &back_big.to_string_lossy().replace('\\', "/"),
+            &TransferOptions::default(),
+            &|_, _| {},
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         assert_eq!(std::fs::read(&back_big).unwrap(), data, "content identical after resume");
 
         // 3c. Older versions are kept (at most 2), explicit permissions are applied.
         let keep = TransferOptions { keep_versions: 2, file_perms: Some(0o640), ..Default::default() };
         for i in 0..3 {
             std::fs::write(&local_file, format!("version {i}")).unwrap();
-            crate::transfer::upload(&conn, &local_ui, &format!("{base}/v.py"), &keep, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+            crate::transfer::upload(
+                &conn,
+                &local_ui,
+                &format!("{base}/v.py"),
+                &keep,
+                &|_, _| {},
+                Arc::new(AtomicU8::new(RUN)),
+            )
+            .await
+            .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
         }
         let versions = conn.list(&format!("{base}/{}", crate::transfer::VERSIONS_DIR)).await.unwrap();
         assert_eq!(versions.len(), 2, "two older versions kept");
         assert_eq!(conn.stat(&format!("{base}/v.py")).await.unwrap().perms, "640");
-        assert_eq!(String::from_utf8(conn.read_head(&format!("{base}/v.py"), 100).await.unwrap()).unwrap(), "version 2");
+        assert_eq!(
+            String::from_utf8(conn.read_head(&format!("{base}/v.py"), 100).await.unwrap()).unwrap(),
+            "version 2"
+        );
 
         // 3d. Copies on the server: a clash gets "Kopie", folders are copied with content.
         let made = conn.copy_within(&[format!("{base}/v.py")], &base).await.unwrap();
@@ -1238,8 +1504,17 @@ mod integration {
         assert_eq!(conn.walk(&format!("{base}/c/a")).await.unwrap().len(), 1);
         assert!(conn.copy_within(&[format!("{base}/c")], &format!("{base}/c/a")).await.is_err(), "not into itself");
         // Without commands on the server the copy goes through the connection.
-        match &conn { crate::remote::Remote::Sftp(c) => c, _ => unreachable!() }.copy_stream(&format!("{base}/v.py"), &format!("{base}/stream.py")).await.unwrap();
-        assert_eq!(String::from_utf8(conn.read_head(&format!("{base}/stream.py"), 100).await.unwrap()).unwrap(), "version 2");
+        match &conn {
+            crate::remote::Remote::Sftp(c) => c,
+            _ => unreachable!(),
+        }
+        .copy_stream(&format!("{base}/v.py"), &format!("{base}/stream.py"))
+        .await
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(conn.read_head(&format!("{base}/stream.py"), 100).await.unwrap()).unwrap(),
+            "version 2"
+        );
 
         // 3e. Symbolic links and checksums.
         conn.symlink(&format!("{base}/link.py"), &format!("{base}/v.py")).await.unwrap();
@@ -1253,7 +1528,15 @@ mod integration {
         assert_eq!(sum, crate::local::checksum(&local_v.to_string_lossy()).unwrap());
 
         // 4. Writing into a root-owned folder fails with a clear error.
-        let denied = crate::transfer::upload(&conn, &local_ui, &format!("{}/rootdir/x.py", conn.home()), &TransferOptions::default(), &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await;
+        let denied = crate::transfer::upload(
+            &conn,
+            &local_ui,
+            &format!("{}/rootdir/x.py", conn.home()),
+            &TransferOptions::default(),
+            &|_, _| {},
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await;
         assert_eq!(denied.err().map(|e| e.kind), Some(ErrorKind::PermissionDenied));
 
         conn.remove(&base).await.unwrap();
@@ -1261,10 +1544,27 @@ mod integration {
         conn.close().await;
 
         // 5. Encrypted key: without passphrase -> PassphraseRequired, with -> ok.
-        let err = connect(&params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: None }, None), known.clone()).await.err().unwrap();
+        let err =
+            connect(&params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: None }, None), known.clone())
+                .await
+                .err()
+                .unwrap();
         assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-        connect(&params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some(e.passphrase.clone()) }, None), known.clone()).await.expect("passphrase key").close().await;
-        let err = connect(&params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some("falsch".into()) }, None), known.clone()).await.err().unwrap();
+        connect(
+            &params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some(e.passphrase.clone()) }, None),
+            known.clone(),
+        )
+        .await
+        .expect("passphrase key")
+        .close()
+        .await;
+        let err = connect(
+            &params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some("falsch".into()) }, None),
+            known.clone(),
+        )
+        .await
+        .err()
+        .unwrap();
         assert_eq!(err.kind, ErrorKind::PassphraseRequired, "wrong passphrase: {err:?}");
 
         // 5b. Through a jump server (here the same server reaches itself on localhost).
@@ -1285,23 +1585,54 @@ mod integration {
             if let Ok(addr) = std::env::var(var) {
                 let (h, p) = addr.split_once(':').unwrap();
                 let mut through = params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None);
-                through.proxy = Some(crate::proxy::ProxyParams { kind: kind.into(), host: h.into(), port: p.parse().unwrap(), user: None, password: None });
+                through.proxy = Some(crate::proxy::ProxyParams {
+                    kind: kind.into(),
+                    host: h.into(),
+                    port: p.parse().unwrap(),
+                    user: None,
+                    password: None,
+                });
                 let c = connect(&through, known.clone()).await.unwrap_or_else(|err| panic!("{kind} proxy: {err:?}"));
                 assert!(!c.list(&c.home).await.unwrap().is_empty());
                 c.close().await;
                 through.port = 1;
-                assert_eq!(connect(&through, known.clone()).await.err().map(|x| x.kind), Some(ErrorKind::Unreachable), "{kind}: closed port");
+                assert_eq!(
+                    connect(&through, known.clone()).await.err().map(|x| x.kind),
+                    Some(ErrorKind::Unreachable),
+                    "{kind}: closed port"
+                );
             }
         }
 
         // 5c. PuTTY keys (.ppk), plain and with passphrase, if the test provides them.
         if let (Ok(ppk), Ok(ppk_pass)) = (std::env::var("BITCRANE_TEST_PPK"), std::env::var("BITCRANE_TEST_PPK_PASS")) {
-            connect(&params(&e, AuthParams::Key { path: ppk, passphrase: None }, None), known.clone()).await.expect("ppk").close().await;
-            let err = connect(&params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: None }, None), known.clone()).await.err().unwrap();
+            connect(&params(&e, AuthParams::Key { path: ppk, passphrase: None }, None), known.clone())
+                .await
+                .expect("ppk")
+                .close()
+                .await;
+            let err =
+                connect(&params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: None }, None), known.clone())
+                    .await
+                    .err()
+                    .unwrap();
             assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-            let err = connect(&params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: Some("falsch".into()) }, None), known.clone()).await.err().unwrap();
+            let err = connect(
+                &params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: Some("falsch".into()) }, None),
+                known.clone(),
+            )
+            .await
+            .err()
+            .unwrap();
             assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-            connect(&params(&e, AuthParams::Key { path: ppk_pass, passphrase: Some("pp geheim".into()) }, None), known.clone()).await.expect("ppk with passphrase").close().await;
+            connect(
+                &params(&e, AuthParams::Key { path: ppk_pass, passphrase: Some("pp geheim".into()) }, None),
+                known.clone(),
+            )
+            .await
+            .expect("ppk with passphrase")
+            .close()
+            .await;
         }
 
         // 5d. "Automatisch" with only a password: no agent/key fits, the password does.
@@ -1310,7 +1641,10 @@ mod integration {
         let auto = AuthParams::Auto { key_path: Some(e.key.clone()), passphrase: None, password: None };
         connect(&params(&e, auto, None), known.clone()).await.expect("auto with key").close().await;
         let auto = AuthParams::Auto { key_path: None, passphrase: None, password: None };
-        assert_eq!(connect(&params(&e, auto, None), known.clone()).await.err().map(|x| x.kind), Some(ErrorKind::PasswordRequired));
+        assert_eq!(
+            connect(&params(&e, auto, None), known.clone()).await.err().map(|x| x.kind),
+            Some(ErrorKind::PasswordRequired)
+        );
 
         // 5e. Keyboard-interactive only (PasswordAuthentication no) and key plus a second step.
         if let (Ok(kbd), Ok(two)) = (std::env::var("BITCRANE_TEST_KBD_PORT"), std::env::var("BITCRANE_TEST_2FA_PORT")) {
@@ -1354,8 +1688,15 @@ mod integration {
         }
 
         // 6. Password authentication, right and wrong.
-        connect(&params(&e, AuthParams::Password { password: e.password.clone() }, None), known.clone()).await.expect("password").close().await;
-        let err = connect(&params(&e, AuthParams::Password { password: "falsch".into() }, None), known.clone()).await.err().unwrap();
+        connect(&params(&e, AuthParams::Password { password: e.password.clone() }, None), known.clone())
+            .await
+            .expect("password")
+            .close()
+            .await;
+        let err = connect(&params(&e, AuthParams::Password { password: "falsch".into() }, None), known.clone())
+            .await
+            .err()
+            .unwrap();
         assert_eq!(err.kind, ErrorKind::AuthFailed);
 
         // 7. SSH agent (only when an agent is running).
@@ -1393,7 +1734,13 @@ mod params_tests {
 
 /// A shell with a pseudo terminal on an SSH session. `command` replaces the
 /// plain login shell (e.g. to start in a folder); empty starts the shell.
-pub(crate) async fn open_shell(handle: &client::Handle<Handler>, cols: u32, rows: u32, command: &str, forward_agent: bool) -> AppResult<russh::Channel<client::Msg>> {
+pub(crate) async fn open_shell(
+    handle: &client::Handle<Handler>,
+    cols: u32,
+    rows: u32,
+    command: &str,
+    forward_agent: bool,
+) -> AppResult<russh::Channel<client::Msg>> {
     let channel = handle.channel_open_session().await?;
     if forward_agent {
         // Like ssh -A: programs in this shell may ask the agent on this computer to sign.

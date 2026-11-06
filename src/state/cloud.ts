@@ -13,7 +13,18 @@
 import type { Protocol, Server } from '../backend/types';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { cloudAccount, disconnectServer } from './live';
-import { closeDialog, getState, LIVE, newServerTemplate, openDialog, saveServer, serverById, setState, showToast, updateSettings } from './store';
+import {
+  closeDialog,
+  getState,
+  LIVE,
+  newServerTemplate,
+  openDialog,
+  saveServer,
+  serverById,
+  setState,
+  showToast,
+  updateSettings,
+} from './store';
 import { addLog } from './log';
 import { $t } from '../i18n';
 
@@ -70,7 +81,17 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
   const name = CLOUD_NAMES[service] ?? service;
   if (!LIVE) {
     // Prototype: a simulated account.
-    const srv: Server = { ...newServerTemplate(), name, protocol: service, host: `${service}.com`, port: 443, user: 'alex@example.com', auth: 'agent', keyPath: '', remoteStart: '/' };
+    const srv: Server = {
+      ...newServerTemplate(),
+      name,
+      protocol: service,
+      host: `${service}.com`,
+      port: 443,
+      user: 'alex@example.com',
+      auth: 'agent',
+      keyPath: '',
+      remoteStart: '/',
+    };
     saveServer(srv, true);
     return null;
   }
@@ -78,13 +99,28 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
     let key: { clientId: string; clientSecret: string } | null = null;
     if (service === 'gdrive') {
       key = await googleKey();
-      if (!key) return $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.');
+      if (!key)
+        return $t(
+          'Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.',
+        );
     }
     const { refreshToken, account } = await backend.cloudSignIn(service, key?.clientId, key?.clientSecret);
     const existing = serverId ? serverById(serverId) : undefined;
     const srv: Server = existing
       ? { ...existing, user: account || existing.user }
-      : { ...newServerTemplate(), name: getState().servers.some((x) => x.protocol === service) ? `${name} · ${account}` : name, protocol: service, host: service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : `${service}.com`, port: 443, user: account, auth: 'agent', keyPath: '', remoteStart: '/', group: '' };
+      : {
+          ...newServerTemplate(),
+          name: getState().servers.some((x) => x.protocol === service) ? `${name} · ${account}` : name,
+          protocol: service,
+          host:
+            service === 'gdrive' ? 'drive.google.com' : service === 'onedrive' ? 'onedrive.live.com' : `${service}.com`,
+          port: 443,
+          user: account,
+          auth: 'agent',
+          keyPath: '',
+          remoteStart: '/',
+          group: '',
+        };
     await backend.secretSet(cloudAccount(srv), refreshToken);
     addLog('ok', $t('Bei {0} angemeldet als {1}', name, account), srv.id);
     closeDialog();
@@ -104,5 +140,10 @@ export function cancelCloudSignIn() {
 }
 
 export function showCloudNotSetUp(service: Protocol) {
-  showToast($t('{0} ist in dieser Version noch nicht eingerichtet. Es kommt mit einem der nächsten Updates.', CLOUD_NAMES[service] ?? service));
+  showToast(
+    $t(
+      '{0} ist in dieser Version noch nicht eingerichtet. Es kommt mit einem der nächsten Updates.',
+      CLOUD_NAMES[service] ?? service,
+    ),
+  );
 }

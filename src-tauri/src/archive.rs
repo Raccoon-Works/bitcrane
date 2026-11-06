@@ -94,17 +94,23 @@ pub fn extract(path: &str) -> AppResult<String> {
     }
     let dir = archive.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
     let stem = archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into());
-    let file = fs::File::open(&archive).map_err(|e| AppError::other("Das Archiv konnte nicht geöffnet werden.").with_detail(e.to_string()))?;
+    let file = fs::File::open(&archive)
+        .map_err(|e| AppError::other("Das Archiv konnte nicht geöffnet werden.").with_detail(e.to_string()))?;
     let mut zip = zip::ZipArchive::new(io::BufReader::new(file))
         .map_err(|e| AppError::other("Das ist kein gültiges Zip-Archiv.").with_detail(e.to_string()))?;
     let name = copy_name(|n| dir.join(n).exists(), &stem);
     let out = dir.join(&name);
-    fs::create_dir(&out).map_err(|e| AppError::other("Der Ordner zum Entpacken konnte nicht angelegt werden.").with_detail(e.to_string()))?;
+    fs::create_dir(&out).map_err(|e| {
+        AppError::other("Der Ordner zum Entpacken konnte nicht angelegt werden.").with_detail(e.to_string())
+    })?;
     let result = (|| -> AppResult<()> {
         for i in 0..zip.len() {
-            let mut entry = zip.by_index(i).map_err(|e| AppError::other("Das Archiv ist beschädigt.").with_detail(e.to_string()))?;
+            let mut entry = zip
+                .by_index(i)
+                .map_err(|e| AppError::other("Das Archiv ist beschädigt.").with_detail(e.to_string()))?;
             let Some(rel) = entry.enclosed_name() else {
-                return Err(AppError::other("Das Archiv enthält einen ungültigen Pfad und wird nicht entpackt.").with_detail(entry.name().to_string()));
+                return Err(AppError::other("Das Archiv enthält einen ungültigen Pfad und wird nicht entpackt.")
+                    .with_detail(entry.name().to_string()));
             };
             let target = out.join(rel);
             if entry.is_dir() {

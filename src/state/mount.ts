@@ -30,9 +30,11 @@ const lastReconnect = new Map<string, number>();
 const lastError = new Map<string, number>();
 
 /** What decides how a server is mounted; a change mounts it again. */
-const signature = (srv: Server) => JSON.stringify([srv.name, srv.host, srv.port, srv.user, srv.protocol, srv.remoteStart, srv.smbShare, srv.davPath]);
+const signature = (srv: Server) =>
+  JSON.stringify([srv.name, srv.host, srv.port, srv.user, srv.protocol, srv.remoteStart, srv.smbShare, srv.davPath]);
 
-const errorText = (e: unknown) => (typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e));
+const errorText = (e: unknown) =>
+  typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e);
 
 /** Starts the Explorer folder of one server. */
 async function mount(srv: Server, quiet: boolean): Promise<void> {
@@ -64,12 +66,22 @@ async function unmount(serverId: string, remove: boolean): Promise<void> {
     delete next[serverId];
     return { explorerFolders: next };
   });
-  if (kept) showToast($t('Der Ordner {0} ist geblieben, weil noch nicht alles hochgeladen war. Du kannst ihn selbst löschen, wenn du ihn nicht mehr brauchst.', kept));
+  if (kept)
+    showToast(
+      $t(
+        'Der Ordner {0} ist geblieben, weil noch nicht alles hochgeladen war. Du kannst ihn selbst löschen, wenn du ihn nicht mehr brauchst.',
+        kept,
+      ),
+    );
 }
 
 /** Brings the mounted folders in line with the server list. */
 function reconcile(quiet: boolean) {
-  const want = new Map(getState().servers.filter((x) => x.mountExplorer && !x.temporary).map((x) => [x.id, x]));
+  const want = new Map(
+    getState()
+      .servers.filter((x) => x.mountExplorer && !x.temporary)
+      .map((x) => [x.id, x]),
+  );
   for (const id of [...mounted.keys()]) {
     if (!want.has(id)) void unmount(id, true);
   }
@@ -80,7 +92,9 @@ function reconcile(quiet: boolean) {
 
 /** Switches the Explorer folder of a server on or off (server menu). */
 export function setExplorerFolder(serverId: string, on: boolean) {
-  setState((s) => ({ servers: s.servers.map((x) => (x.id === serverId ? { ...x, mountExplorer: on || undefined } : x)) }));
+  setState((s) => ({
+    servers: s.servers.map((x) => (x.id === serverId ? { ...x, mountExplorer: on || undefined } : x)),
+  }));
 }
 
 /** Opens the server's folder in the Explorer. */
@@ -110,7 +124,9 @@ export async function initMounts() {
       const now = Date.now();
       if (now - (lastReconnect.get(ev.serverId) ?? 0) < 20_000) return;
       lastReconnect.set(ev.serverId, now);
-      void connectAs(connectionId(srv.id), srv).catch((err) => addLog('warn', $t('Explorer-Ordner: keine Verbindung zu {0} ({1})', srv.name, errorText(err)), srv.id));
+      void connectAs(connectionId(srv.id), srv).catch((err) =>
+        addLog('warn', $t('Explorer-Ordner: keine Verbindung zu {0} ({1})', srv.name, errorText(err)), srv.id),
+      );
     }
   });
   reconcile(true);

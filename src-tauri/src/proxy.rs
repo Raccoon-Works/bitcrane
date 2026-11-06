@@ -102,7 +102,8 @@ async fn http_connect(s: &mut TcpStream, p: &ProxyParams, host: &str, port: u16)
     let target = if host.contains(':') { format!("[{host}]:{port}") } else { format!("{host}:{port}") };
     let mut req = format!("CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n");
     if let Some(user) = p.user.as_deref().filter(|u| !u.is_empty()) {
-        let token = base64::engine::general_purpose::STANDARD.encode(format!("{user}:{}", p.password.clone().unwrap_or_default()));
+        let token = base64::engine::general_purpose::STANDARD
+            .encode(format!("{user}:{}", p.password.clone().unwrap_or_default()));
         req.push_str(&format!("Proxy-Authorization: Basic {token}\r\n"));
     }
     req.push_str("\r\n");

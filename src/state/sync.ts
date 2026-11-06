@@ -27,7 +27,20 @@ import { addLog } from './log';
 import { getState, LIVE, setState, showToast, subscribeStore, type Settings } from './store';
 
 /** Settings that are the same on every computer. */
-const SHARED_SETTINGS = ['serverGroups', 'rules', 'customCommands', 'googleClientId', 'watchTemplates', 'defaultExcludes', 'skipPatterns', 'existingFiles', 'existingDownload', 'uploadTempName', 'keepMtime', 'serverDefaults'] as const;
+const SHARED_SETTINGS = [
+  'serverGroups',
+  'rules',
+  'customCommands',
+  'googleClientId',
+  'watchTemplates',
+  'defaultExcludes',
+  'skipPatterns',
+  'existingFiles',
+  'existingDownload',
+  'uploadTempName',
+  'keepMtime',
+  'serverDefaults',
+] as const;
 type SharedKey = (typeof SHARED_SETTINGS)[number];
 
 /** Keychain entry of the sync password on this computer. */
@@ -57,7 +70,11 @@ export interface SyncBase {
 function stable(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
   if (v && typeof v === 'object') {
-    return `{${Object.keys(v as object).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}`;
+    return `{${Object.keys(v as object)
+      .sort()
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`;
   }
   return JSON.stringify(v ?? null);
 }
@@ -84,7 +101,11 @@ function pick(ours: string | undefined, theirs: string | undefined, base: string
  * no shared file yet, everything here is kept. Returns the merged list (our
  * order first) and the servers taken over from the other computer.
  */
-export function mergeServers(ours: Server[], theirs: Server[] | null, base: Record<string, string>): { merged: Server[]; taken: Server[] } {
+export function mergeServers(
+  ours: Server[],
+  theirs: Server[] | null,
+  base: Record<string, string>,
+): { merged: Server[]; taken: Server[] } {
   const theirServers = new Map((theirs ?? []).map((x) => [x.id, x]));
   const ourServers = new Map(ours.map((x) => [x.id, x]));
   const merged: Server[] = [];
@@ -108,7 +129,12 @@ export function mergeServers(ours: Server[], theirs: Server[] | null, base: Reco
       // Only there: new there (take), or deleted here since the last sync (stay deleted, unless changed there).
       if (hb === undefined || ht !== hb) {
         // A start folder from the other kind of computer (C:\…) does not fit here.
-        const next = { ...t, online: false, localStart: t.localStart && !t.localStart.includes('\\') && !/^[A-Za-z]:/.test(t.localStart) ? t.localStart : '~' };
+        const next = {
+          ...t,
+          online: false,
+          localStart:
+            t.localStart && !t.localStart.includes('\\') && !/^[A-Za-z]:/.test(t.localStart) ? t.localStart : '~',
+        };
         merged.push(next);
         taken.push(next);
       }
@@ -193,7 +219,8 @@ async function syncOnce() {
   let theirs: SyncData | null = null;
   if (file) {
     const parsed = JSON.parse(file.text) as SyncData;
-    if (parsed.format !== 'bitcrane-sync') throw new Error($t('Die Datei im Abgleich-Ordner gehört nicht zu Bitcrane.'));
+    if (parsed.format !== 'bitcrane-sync')
+      throw new Error($t('Die Datei im Abgleich-Ordner gehört nicht zu Bitcrane.'));
     theirs = parsed;
   }
   const base: SyncBase = st.settings.syncBase ?? { servers: {}, settings: {} };
@@ -227,12 +254,17 @@ async function syncOnce() {
         if (have === null) await backend.secretSet(account, value).catch(() => undefined);
       }
     } catch {
-      throw new Error($t('Die Passwörter im Abgleich lassen sich mit deinem Abgleich-Passwort nicht entschlüsseln. Ist es auf allen Rechnern gleich?'));
+      throw new Error(
+        $t(
+          'Die Passwörter im Abgleich lassen sich mit deinem Abgleich-Passwort nicht entschlüsseln. Ist es auf allen Rechnern gleich?',
+        ),
+      );
     }
   }
 
   // Apply here.
-  const serversChanged = stable(merged.map(hashServer)) !== stable(ours.map(hashServer)) || merged.length !== ours.length;
+  const serversChanged =
+    stable(merged.map(hashServer)) !== stable(ours.map(hashServer)) || merged.length !== ours.length;
   applying = true;
   try {
     if (serversChanged || Object.keys(settingsPatch).length) {
@@ -243,7 +275,13 @@ async function syncOnce() {
       const n = taken.length;
       if (n || Object.keys(settingsPatch).length) {
         addLog('ok', $t('Abgleich: {0} Server vom anderen Rechner übernommen.', n));
-        if (n) showToast(n === 1 ? $t('Abgleich: 1 Server vom anderen Rechner übernommen.') : $t('Abgleich: {0} Server vom anderen Rechner übernommen.', n), 'ok');
+        if (n)
+          showToast(
+            n === 1
+              ? $t('Abgleich: 1 Server vom anderen Rechner übernommen.')
+              : $t('Abgleich: {0} Server vom anderen Rechner übernommen.', n),
+            'ok',
+          );
       }
     }
   } finally {
@@ -259,16 +297,23 @@ async function syncOnce() {
     servers: merged.map(sharedServer).map((x, i) => ({ ...x, localStart: merged[i].localStart })),
     settings: mergedSettings as SyncData['settings'],
   };
-  const sameAsFile = theirs && stable(theirs.servers.map(hashServer)) === stable(data.servers.map(hashServer)) && stable(theirs.settings) === stable(data.settings);
+  const sameAsFile =
+    theirs &&
+    stable(theirs.servers.map(hashServer)) === stable(data.servers.map(hashServer)) &&
+    stable(theirs.settings) === stable(data.settings);
   let mtime = file?.mtime ?? 0;
   if (!sameAsFile || (st.settings.syncPasswords && password && !theirs?.secrets)) {
-    if (st.settings.syncPasswords && password) data.secrets = await seal(JSON.stringify(await secretsOf(merged)), password);
+    if (st.settings.syncPasswords && password)
+      data.secrets = await seal(JSON.stringify(await secretsOf(merged)), password);
     else if (theirs?.secrets && !st.settings.syncPasswords) data.secrets = undefined;
     else if (theirs?.secrets) data.secrets = theirs.secrets;
     mtime = await backend.syncWrite(folder, JSON.stringify(data, null, 2));
   }
   patchSettings({
-    syncBase: { servers: Object.fromEntries(merged.map((x) => [x.id, hashServer(x)])), settings: Object.fromEntries(SHARED_SETTINGS.map((k) => [k, stable(mergedSettings[k])])) },
+    syncBase: {
+      servers: Object.fromEntries(merged.map((x) => [x.id, hashServer(x)])),
+      settings: Object.fromEntries(SHARED_SETTINGS.map((k) => [k, stable(mergedSettings[k])])),
+    },
     syncAt: Date.now(),
     syncSeen: mtime,
     syncError: undefined,
@@ -282,7 +327,10 @@ export function startSync() {
   let last = getState();
   subscribeStore(() => {
     const s = getState();
-    const changed = s.servers !== last.servers || SHARED_SETTINGS.some((k) => s.settings[k] !== last.settings[k]) || s.settings.syncFolder !== last.settings.syncFolder;
+    const changed =
+      s.servers !== last.servers ||
+      SHARED_SETTINGS.some((k) => s.settings[k] !== last.settings[k]) ||
+      s.settings.syncFolder !== last.settings.syncFolder;
     last = s;
     if (!changed || applying || !s.settings.syncFolder) return;
     window.clearTimeout(timer);
@@ -300,7 +348,13 @@ export function startSync() {
 /** Settings: choose the folder (null switches the sync off). */
 export async function setSyncFolder(folder: string | null) {
   if (!folder) {
-    patchSettings({ syncFolder: undefined, syncBase: undefined, syncAt: undefined, syncSeen: undefined, syncError: undefined });
+    patchSettings({
+      syncFolder: undefined,
+      syncBase: undefined,
+      syncAt: undefined,
+      syncSeen: undefined,
+      syncError: undefined,
+    });
     showToast($t('Abgleich zwischen Rechnern ist aus.'));
     return;
   }

@@ -5,12 +5,59 @@
  * Lucide-only prop `strokeWidth` picks the Phosphor weight (2 and more = bold).
  */
 import {
-  ArrowDown as PArrowDown, ArrowElbowDownLeft, ArrowElbowDownRight, ArrowElbowLeftUp, ArrowLeft as PArrowLeft, ArrowRight as PArrowRight,
-  ArrowsDownUp, ArrowsLeftRight, ArrowUp as PArrowUp, Broadcast, CaretDown, CaretRight, CaretUp, Check as PCheck, CheckCircle, CircleHalf,
-  CircleNotch, Clock as PClock, Cloud as PCloud, Copy as PCopy, Dot as PDot, DotsSixVertical, DotsThree, DownloadSimple, Eye as PEye, EyeSlash, Flask,
-  FolderPlus as PFolderPlus, Gear, Info as PInfo, Key, Keyboard as PKeyboard, Lightning, LinkSimple, Lock as PLock, MagnifyingGlass, Pause as PPause,
-  Play as PPlay, Plug, Plus as PPlus, Shield as PShield, ShieldCheck as PShieldCheck, ShieldWarning, SlidersHorizontal as PSliders, Star as PStar,
-  TerminalWindow, Trash, UploadSimple, Warning, WifiSlash, X as PX, XCircle as PXCircle, type Icon,
+  ArrowDown as PArrowDown,
+  ArrowElbowDownLeft,
+  ArrowElbowDownRight,
+  ArrowElbowLeftUp,
+  ArrowLeft as PArrowLeft,
+  ArrowRight as PArrowRight,
+  ArrowsDownUp,
+  ArrowsLeftRight,
+  ArrowUp as PArrowUp,
+  Broadcast,
+  CaretDown,
+  CaretRight,
+  CaretUp,
+  Check as PCheck,
+  CheckCircle,
+  CircleHalf,
+  CircleNotch,
+  Clock as PClock,
+  Cloud as PCloud,
+  Copy as PCopy,
+  Dot as PDot,
+  DotsSixVertical,
+  DotsThree,
+  DownloadSimple,
+  Eye as PEye,
+  EyeSlash,
+  Flask,
+  FolderPlus as PFolderPlus,
+  Gear,
+  Info as PInfo,
+  Key,
+  Keyboard as PKeyboard,
+  Lightning,
+  LinkSimple,
+  Lock as PLock,
+  MagnifyingGlass,
+  Pause as PPause,
+  Play as PPlay,
+  Plug,
+  Plus as PPlus,
+  Shield as PShield,
+  ShieldCheck as PShieldCheck,
+  ShieldWarning,
+  SlidersHorizontal as PSliders,
+  Star as PStar,
+  TerminalWindow,
+  Trash,
+  UploadSimple,
+  Warning,
+  WifiSlash,
+  X as PX,
+  XCircle as PXCircle,
+  type Icon,
 } from '@phosphor-icons/react';
 import type { CSSProperties } from 'react';
 
@@ -26,7 +73,14 @@ interface GlyphProps {
 
 function wrap(P: Icon) {
   return function Glyph({ size = 16, strokeWidth = 1.75, ...rest }: GlyphProps) {
-    return <P size={size} weight={strokeWidth >= 2 ? 'bold' : 'regular'} aria-hidden={rest['aria-label'] ? undefined : true} {...rest} />;
+    return (
+      <P
+        size={size}
+        weight={strokeWidth >= 2 ? 'bold' : 'regular'}
+        aria-hidden={rest['aria-label'] ? undefined : true}
+        {...rest}
+      />
+    );
   };
 }
 

@@ -12,7 +12,6 @@ import { closeDialog, useStore } from '../../state/store';
 import { TrafficLights } from '../TrafficLights';
 import { $t } from '../../i18n';
 
-
 /** Whether a dialog has body content (false, null and empty arrays render nothing). */
 function hasContent(c: ReactNode): boolean {
   if (c === null || c === undefined || c === false || c === '') return false;
@@ -21,7 +20,18 @@ function hasContent(c: ReactNode): boolean {
 }
 
 export function Dialog({
-  label, title, subtitle, icon, children, footer, width = 560, onClose = closeDialog, windowLike, windowTitle, className = '', maxHeight,
+  label,
+  title,
+  subtitle,
+  icon,
+  children,
+  footer,
+  width = 560,
+  onClose = closeDialog,
+  windowLike,
+  windowTitle,
+  className = '',
+  maxHeight,
 }: {
   label: string;
   title?: ReactNode;
@@ -46,7 +56,9 @@ export function Dialog({
     const el = ref.current;
     if (!el) return;
     const previous = document.activeElement as HTMLElement | null;
-    const first = el.querySelector<HTMLElement>('[autofocus], input:not([type="checkbox"]), select, textarea, button.btn-primary, button');
+    const first = el.querySelector<HTMLElement>(
+      '[autofocus], input:not([type="checkbox"]), select, textarea, button.btn-primary, button',
+    );
     first?.focus({ preventScroll: true });
     // Escape is handled on the window so it also works after focus left the
     // dialog (e.g. a button became disabled). Inner fields that use Escape
@@ -59,11 +71,20 @@ export function Dialog({
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
-        const items = Array.from(el.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select, textarea, [tabindex="0"]')).filter((x) => x.offsetParent !== null);
+        const items = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select, textarea, [tabindex="0"]',
+          ),
+        ).filter((x) => x.offsetParent !== null);
         if (!items.length) return;
         const i = items.indexOf(document.activeElement as HTMLElement);
-        if (e.shiftKey && (i <= 0)) { e.preventDefault(); items[items.length - 1].focus(); }
-        else if (!e.shiftKey && i === items.length - 1) { e.preventDefault(); items[0].focus(); }
+        if (e.shiftKey && i <= 0) {
+          e.preventDefault();
+          items[items.length - 1].focus();
+        } else if (!e.shiftKey && i === items.length - 1) {
+          e.preventDefault();
+          items[0].focus();
+        }
       }
     };
     el.addEventListener('keydown', onKey);
@@ -76,7 +97,12 @@ export function Dialog({
   }, []);
 
   return (
-    <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget && !windowLike) onClose(); }}>
+    <div
+      className="scrim"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !windowLike) onClose();
+      }}
+    >
       <div
         ref={ref}
         role="dialog"
@@ -89,7 +115,9 @@ export function Dialog({
           <div className="dialog-titlebar">
             {platform === 'mac' ? (
               <>
-                <button type="button" className="tl-button" aria-label={$t('Schließen')} onClick={onClose}><TrafficLights /></button>
+                <button type="button" className="tl-button" aria-label={$t('Schließen')} onClick={onClose}>
+                  <TrafficLights />
+                </button>
                 <span className="dialog-window-title">{windowTitle}</span>
                 <span className="tl-spacer" />
               </>
@@ -97,7 +125,9 @@ export function Dialog({
               <>
                 <span className="dialog-window-title is-left">{windowTitle}</span>
                 <button type="button" className="win-close" aria-label={$t('Schließen')} onClick={onClose}>
-                  <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1"><path d="m0 0 10 10M10 0 0 10" /></svg>
+                  <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1">
+                    <path d="m0 0 10 10M10 0 0 10" />
+                  </svg>
                 </button>
               </>
             )}

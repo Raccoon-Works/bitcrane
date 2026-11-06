@@ -12,7 +12,20 @@ import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
 import { DEMO_CLIP, DEMO_THEME, listenForDemoMessages } from '../util/demo';
 import { $t } from '../i18n';
-import { emptyTab, setState, initialState, state, subscribeStore, showToast, uid, activeTab, openServerIn, LIVE, sampleServers, detectTheme } from './core';
+import {
+  emptyTab,
+  setState,
+  initialState,
+  state,
+  subscribeStore,
+  showToast,
+  uid,
+  activeTab,
+  openServerIn,
+  LIVE,
+  sampleServers,
+  detectTheme,
+} from './core';
 import { openDialog } from './panels';
 import { offerCloudPlaces } from './places';
 import { forced } from './transfers';
@@ -25,11 +38,25 @@ export const PROTOTYPE_VERSION = '0.3.0';
 export function showFirstRun() {
   fs.resetAll();
   const tab = emptyTab('~');
-  setState({ ...initialState(), platform: state.platform, theme: state.theme, servers: [], tabs: [tab], watches: [], transfers: [], activeTabId: tab.id });
+  setState({
+    ...initialState(),
+    platform: state.platform,
+    theme: state.theme,
+    servers: [],
+    tabs: [tab],
+    watches: [],
+    transfers: [],
+    activeTabId: tab.id,
+  });
   // As on a real first start: offer the servers of other programs, then the cloud folders (simulated here).
   window.setTimeout(() => {
     openDialog({ type: 'import', firstStart: true });
-    const stop = subscribeStore(() => { if (state.dialog?.type !== 'import') { stop(); void offerCloudPlaces(false); } });
+    const stop = subscribeStore(() => {
+      if (state.dialog?.type !== 'import') {
+        stop();
+        void offerCloudPlaces(false);
+      }
+    });
   }, 400);
   setState((s) => ({ settings: { ...s.settings, syncFavorites: [], recentAddresses: [] } }));
 }
@@ -45,7 +72,10 @@ export function resetPrototype() {
 
 /** Two letters for the server tile: initials of two words, else the first two letters. */
 export function monoFor(name: string): string {
-  const words = name.replace(/[^A-Za-z0-9ÄÖÜäöüß ]/g, ' ').split(/\s+/).filter(Boolean);
+  const words = name
+    .replace(/[^A-Za-z0-9ÄÖÜäöüß ]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
   const m = words.length >= 2 ? words[0][0] + words[1][0] : (words[0] ?? name).slice(0, 2);
   return (m || 'SV').toUpperCase();
 }
@@ -57,14 +87,33 @@ export function importServers(list: ImportedServer[]) {
   const keyOf = (x: { host: string; port: number; user: string; protocol?: string; keyPath?: string; auth?: string }) =>
     `${x.protocol ?? 'sftp'}|${x.user.toLowerCase()}@${x.host.toLowerCase()}:${x.port}|${x.auth === 'key' ? (x.keyPath ?? '') : ''}`;
   const seen = new Set(state.servers.filter((x) => !x.temporary).map(keyOf));
-  list = list.filter((s) => { const k = keyOf(s); if (seen.has(k)) return false; seen.add(k); return true; });
-  if (!list.length) { setState({ dialog: null }); showToast($t('Diese Server sind schon vorhanden.')); return; }
+  list = list.filter((s) => {
+    const k = keyOf(s);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  if (!list.length) {
+    setState({ dialog: null });
+    showToast($t('Diese Server sind schon vorhanden.'));
+    return;
+  }
   const created: Server[] = list.map((s) => ({
-    id: uid('srv'), name: s.name, mono: monoFor(s.name),
-    color: 'gray', host: s.host, port: s.port, user: s.user,
-    auth: s.protocol === 'sftp' ? s.auth : 'password', keyPath: s.keyPath ?? '~/.ssh/id_ed25519', group: s.group,
-    localStart: s.localDir ?? '~', remoteStart: s.remoteDir ?? '', online: false,
-    protocol: s.protocol, implicitTls: s.implicitTls || undefined,
+    id: uid('srv'),
+    name: s.name,
+    mono: monoFor(s.name),
+    color: 'gray',
+    host: s.host,
+    port: s.port,
+    user: s.user,
+    auth: s.protocol === 'sftp' ? s.auth : 'password',
+    keyPath: s.keyPath ?? '~/.ssh/id_ed25519',
+    group: s.group,
+    localStart: s.localDir ?? '~',
+    remoteStart: s.remoteDir ?? '',
+    online: false,
+    protocol: s.protocol,
+    implicitTls: s.implicitTls || undefined,
     // WebDAV from Cyberduck: plain http only on port 80.
     ...(s.protocol === 'webdav' ? { davHttps: s.port !== 80 } : {}),
   }));
@@ -78,7 +127,10 @@ export function importServers(list: ImportedServer[]) {
   // Offered on the first start: the servers only go into the list; connecting stays the user's choice.
   const firstStart = state.dialog?.type === 'import' && !!state.dialog.firstStart;
   setState((st) => ({ servers: [...st.servers, ...created], dialog: null, firstRun: false }));
-  showToast(created.length === 1 ? $t('„{0}“ übernommen.', created[0].name) : $t('{0} Server übernommen.', created.length), 'ok');
+  showToast(
+    created.length === 1 ? $t('„{0}“ übernommen.', created[0].name) : $t('{0} Server übernommen.', created.length),
+    'ok',
+  );
   const t = activeTab();
   if (!firstStart && (!t || !t.serverId) && created[0]) openServerIn('remote', created[0].id);
 }
@@ -89,7 +141,9 @@ export function importSshConfig() {
     openDialog({ type: 'import' });
     return;
   }
-  const servers = sampleServers().slice(0, 3).map((x) => ({ ...x, online: false }));
+  const servers = sampleServers()
+    .slice(0, 3)
+    .map((x) => ({ ...x, online: false }));
   setState({ servers, firstRun: false });
   showToast($t('3 Server aus der SSH-Konfiguration übernommen.'), 'ok');
 }
@@ -109,7 +163,10 @@ function writeError(tr: Transfer): { error: string; detail: string } | null {
   if (d && d.owner === 'root' && !d.perms.endsWith('7')) {
     return {
       error: $t('Keine Schreibrechte'),
-      detail: $t('Der Server verweigert das Schreiben in {0} (Permission denied). Prüfe die Ordnerrechte oder den Besitzer auf dem Server.', dirPath),
+      detail: $t(
+        'Der Server verweigert das Schreiben in {0} (Permission denied). Prüfe die Ordnerrechte oder den Besitzer auf dem Server.',
+        dirPath,
+      ),
     };
   }
   return null;
@@ -146,10 +203,21 @@ function tick() {
         const remote = fs.stat('remote', tr.serverId, tr.target);
         const local = fs.stat('local', tr.serverId, tr.source);
         if (remote && local && remote.mtime > local.mtime && !conflicts.some((c) => c.transferId === tr.id)) {
-          conflicts = [...conflicts, {
-            transferId: tr.id, name: tr.name, serverId: tr.serverId, remoteFolder: paths.parent(tr.target),
-            localSize: local.size, localTime: local.mtime, remoteSize: remote.size, remoteTime: remote.mtime, watchName: watch.name, more: 0,
-          }];
+          conflicts = [
+            ...conflicts,
+            {
+              transferId: tr.id,
+              name: tr.name,
+              serverId: tr.serverId,
+              remoteFolder: paths.parent(tr.target),
+              localSize: local.size,
+              localTime: local.mtime,
+              remoteSize: remote.size,
+              remoteTime: remote.mtime,
+              watchName: watch.name,
+              more: 0,
+            },
+          ];
           dialog = dialog ?? { type: 'conflict' };
           changed = true;
           return { ...tr, state: 'paused' as const, error: $t('Wartet auf Entscheidung'), hold: 'conflict' as const };
@@ -161,12 +229,23 @@ function tick() {
     }
     if (tr.state === 'running') {
       changed = true;
-      if (offline[tr.serverId] || (tr.sourceServerId && offline[tr.sourceServerId])) return { ...tr, state: 'queued' as const, done: 0 };
+      if (offline[tr.serverId] || (tr.sourceServerId && offline[tr.sourceServerId]))
+        return { ...tr, state: 'queued' as const, done: 0 };
       if (tr.direction === 'command') {
         // The preview runs a command for 1.5 seconds; done counts the milliseconds of that.
         const done = tr.done + TICK;
         if (done >= 1500) {
-          return { ...tr, done: tr.size, state: 'done' as const, finishedAt: now, output: $t('[PM2] Applying action restartProcessId on app [{0}]\n[PM2] [{1}](0) ✓', tr.name.split(' ').pop(), tr.name.split(' ').pop()) };
+          return {
+            ...tr,
+            done: tr.size,
+            state: 'done' as const,
+            finishedAt: now,
+            output: $t(
+              '[PM2] Applying action restartProcessId on app [{0}]\n[PM2] [{1}](0) ✓',
+              tr.name.split(' ').pop(),
+              tr.name.split(' ').pop(),
+            ),
+          };
         }
         return { ...tr, done, size: 1500 };
       }
@@ -198,16 +277,35 @@ function tick() {
   for (const w of watches) {
     const batch = transfers.filter((x) => x.watchId === w.id && x.direction === 'up');
     const busy = batch.some((x) => x.state === 'running' || x.state === 'queued' || x.state === 'paused');
-    const lastDone = batch.filter((x) => x.state === 'done' && x.finishedAt).sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))[0];
+    const lastDone = batch
+      .filter((x) => x.state === 'done' && x.finishedAt)
+      .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))[0];
     if (lastDone && lastDone.finishedAt! > w.lastTime) {
-      watches = watches.map((x) => (x.id === w.id ? { ...x, lastFile: lastDone.name, lastTime: lastDone.finishedAt! } : x));
+      watches = watches.map((x) =>
+        x.id === w.id ? { ...x, lastFile: lastDone.name, lastTime: lastDone.finishedAt! } : x,
+      );
       changed = true;
     }
     if (!busy && pendingCommand.has(w.id)) {
       pendingCommand.delete(w.id);
       const hadError = batch.some((x) => x.state === 'error');
       if (w.options.commandEnabled && w.options.command && !hadError) {
-        transfers = [...transfers, { id: uid('t'), name: w.options.command, direction: 'command', serverId: w.serverId, folder: '', source: '', target: '', size: 1, done: 0, state: 'running', watchId: w.id }];
+        transfers = [
+          ...transfers,
+          {
+            id: uid('t'),
+            name: w.options.command,
+            direction: 'command',
+            serverId: w.serverId,
+            folder: '',
+            source: '',
+            target: '',
+            size: 1,
+            done: 0,
+            state: 'running',
+            watchId: w.id,
+          },
+        ];
         changed = true;
       }
     }
@@ -231,7 +329,12 @@ function tick() {
   const nowSec = Math.floor(now / 1000) !== Math.floor(s.now / 1000);
   if (changed || fsChanged || nowSec) {
     setState({
-      transfers, watches, conflicts, dialog, offline, speed,
+      transfers,
+      watches,
+      conflicts,
+      dialog,
+      offline,
+      speed,
       fsRev: fsChanged ? s.fsRev + 1 : s.fsRev,
       now: nowSec ? now : s.now,
     });
@@ -242,7 +345,10 @@ let started = false;
 /** Starts the simulation timer once. */
 /** Prototype: a believable connection log, and one line per finished transfer. */
 function simulateLog(addLog: typeof import('./log').addLog) {
-  addLog('info', $t('Bitcrane gestartet, {0} {1}, {2} Überwachungen', state.servers.length, $t('Server'), state.watches.length));
+  addLog(
+    'info',
+    $t('Bitcrane gestartet, {0} {1}, {2} Überwachungen', state.servers.length, $t('Server'), state.watches.length),
+  );
   addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', 'deploy', 'shop.example', 22, $t('SSH-Schlüssel')), 'ob');
   addLog('ok', $t('Verbunden, Startordner {0}', '/home/deploy'), 'ob');
   addLog('info', $t('Überwachung „{0}“ gestartet', 'webshop live'), 'ob');
@@ -253,9 +359,20 @@ function simulateLog(addLog: typeof import('./log').addLog) {
       if (before === t.state) continue;
       seen.set(t.id, t.state);
       if (before === undefined && t.state === 'done') continue;
-      const what = t.direction === 'command' ? t.name : `${t.direction === 'up' ? '↑' : t.direction === 'down' ? '↓' : '↔'} ${t.target || t.name}`;
-      if (t.state === 'running') addLog('info', t.direction === 'command' ? $t('Befehl: {0}', t.name) : $t('Übertrage {0}', what), t.serverId);
-      if (t.state === 'done') addLog('ok', t.direction === 'command' ? $t('Befehl fertig: {0}', t.name) : $t('Fertig: {0} ({1})', what, formatSize(t.size)), t.serverId);
+      const what =
+        t.direction === 'command'
+          ? t.name
+          : `${t.direction === 'up' ? '↑' : t.direction === 'down' ? '↓' : '↔'} ${t.target || t.name}`;
+      if (t.state === 'running')
+        addLog('info', t.direction === 'command' ? $t('Befehl: {0}', t.name) : $t('Übertrage {0}', what), t.serverId);
+      if (t.state === 'done')
+        addLog(
+          'ok',
+          t.direction === 'command'
+            ? $t('Befehl fertig: {0}', t.name)
+            : $t('Fertig: {0} ({1})', what, formatSize(t.size)),
+          t.serverId,
+        );
       if (t.state === 'error') addLog('error', `${t.name}: ${t.error ?? $t('Fehler')}`, t.serverId);
     }
   });
