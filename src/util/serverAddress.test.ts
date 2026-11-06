@@ -93,12 +93,35 @@ describe('splitAddress', () => {
     expect(splitAddress(':22')).toBeNull();
   });
 
-  it('splits at the first "@"; the rest counts as the host', () => {
+  it('ends the user name at the last "@", as OpenSSH does', () => {
     expect(splitAddress('web@domain.example@ftp.example')).toEqual({
-      user: 'web',
-      host: 'domain.example@ftp.example',
+      user: 'web@domain.example',
+      host: 'ftp.example',
+      port: undefined,
+      path: undefined,
     });
-    expect(splitAddress('deploy@')).toEqual({ host: 'deploy@' });
+    expect(splitAddress('web@domain.example@ftp.example:2121/htdocs/a@b')).toEqual({
+      user: 'web@domain.example',
+      host: 'ftp.example',
+      port: 2121,
+      path: '/htdocs/a@b',
+    });
+  });
+
+  it('reads IPv6 addresses in brackets', () => {
+    expect(splitAddress('root@[2001:db8::1]:2222')).toEqual({
+      user: 'root',
+      host: '2001:db8::1',
+      port: 2222,
+      path: undefined,
+    });
+    expect(splitAddress('[::1]')).toEqual({ user: undefined, host: '::1', port: undefined, path: undefined });
+  });
+
+  it('refuses an empty user or host', () => {
+    expect(splitAddress('deploy@')).toBeNull();
+    expect(splitAddress('@web.example')).toBeNull();
+    expect(splitAddress('::1')).toBeNull();
   });
 });
 

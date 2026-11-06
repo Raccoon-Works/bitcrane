@@ -58,12 +58,21 @@ export interface AddressParts {
   path?: string;
 }
 
-/** Splits "user@host:port/path"; null when it is not an address of that form. */
+/**
+ * Splits "user@host:port/path"; null when it is not an address of that form. The user name ends
+ * at the last "@" before the host, as in OpenSSH, so logins that contain "@" (common for FTP on
+ * shared hosting) need no escaping. IPv6 addresses are written in brackets: "user@[::1]:22".
+ */
 export function splitAddress(address: string): AddressParts | null {
-  const m = address.match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
-  if (!m) return null;
-  const [, user, host, port, path] = m;
-  return { user, host, port: port ? Number(port) : undefined, path };
+  const slash = address.indexOf('/');
+  const authority = slash < 0 ? address : address.slice(0, slash);
+  const path = slash < 0 ? undefined : address.slice(slash);
+  const at = authority.lastIndexOf('@');
+  const user = at < 0 ? undefined : authority.slice(0, at);
+  const m = authority.slice(at + 1).match(/^(?:\[([0-9a-f:.]+)\]|([^:@[\]]+))(?::(\d+))?$/i);
+  if (!m || user === '') return null;
+  const [, v6, host, port] = m;
+  return { user, host: v6 ?? host, port: port ? Number(port) : undefined, path };
 }
 
 /** A quick-connect address: the scheme as typed, the protocol it stands for and the port it implies. */
