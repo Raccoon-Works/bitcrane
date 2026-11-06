@@ -461,11 +461,6 @@ impl Remote {
         }
     }
 
-    #[allow(dead_code)]
-    pub async fn checksum(&self, path: &str) -> AppResult<String> {
-        self.checksum_with(path, crate::local::Algo::Sha256).await
-    }
-
     pub async fn checksum_with(&self, path: &str, algo: crate::local::Algo) -> AppResult<String> {
         match self {
             Remote::Sftp(c) => c.checksum_with(path, algo).await,
@@ -900,8 +895,8 @@ pub(crate) mod integration {
         .unwrap();
         assert_eq!(std::fs::read(&back).unwrap(), data, "{}", conn.protocol());
         assert_eq!(conn.read_head(&target, 10).await.unwrap(), data[..10].to_vec());
-        let local_sum = crate::local::checksum(&local_ui).unwrap();
-        assert_eq!(conn.checksum(&target).await.unwrap(), local_sum);
+        let local_sum = crate::local::checksum_with(&local_ui, crate::local::Algo::Sha256).unwrap();
+        assert_eq!(conn.checksum_with(&target, crate::local::Algo::Sha256).await.unwrap(), local_sum);
         assert_eq!(
             conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub")).await.unwrap(),
             vec!["big Kopie.bin".to_string()]

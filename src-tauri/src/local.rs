@@ -249,12 +249,7 @@ pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Checksum of a file as hex (SHA-256 unless another algorithm is asked for).
-#[allow(dead_code)]
-pub fn checksum(path: &str) -> AppResult<String> {
-    checksum_with(path, Algo::Sha256)
-}
-
+/// Checksum of a file as hex.
 pub fn checksum_with(path: &str, algo: Algo) -> AppResult<String> {
     use std::io::Read;
     let mut f = fs::File::open(to_native(path))?;
@@ -610,7 +605,7 @@ pub fn drives() -> Vec<Place> {
 }
 
 fn drives_list() -> Vec<Place> {
-    #[allow(unused_mut)]
+    #[allow(unused_mut, reason = "filled on Windows and macOS only; a Linux build (tests) lists no drives")]
     let mut out = vec![];
     #[cfg(windows)]
     for letter in b'C'..=b'Z' {

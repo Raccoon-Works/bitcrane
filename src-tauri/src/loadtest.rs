@@ -214,8 +214,8 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
     let down = t.elapsed();
     assert_eq!(std::fs::metadata(&back).unwrap().len(), size);
     assert_eq!(
-        crate::local::checksum(&ui(&back)).unwrap(),
-        crate::local::checksum(&ui(&local)).unwrap(),
+        crate::local::checksum_with(&ui(&back), crate::local::Algo::Sha256).unwrap(),
+        crate::local::checksum_with(&ui(&local), crate::local::Algo::Sha256).unwrap(),
         "{}: big file intact",
         conn.protocol()
     );

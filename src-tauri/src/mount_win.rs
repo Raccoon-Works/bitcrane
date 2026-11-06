@@ -87,7 +87,7 @@ fn sync_root_id(server_id: &str) -> AppResult<SyncRootId> {
 
 impl Mounts {
     /// Shows a server as a folder in the Explorer. Returns the folder.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "takes the arguments of the mount_start command unchanged")]
     pub fn start(
         &self,
         app: AppHandle,

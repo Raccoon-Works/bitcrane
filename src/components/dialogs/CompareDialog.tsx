@@ -153,7 +153,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
       // The agreed state from the last time (for "Beide Richtungen"); what is equal now is remembered.
       .then(([local, remote]) => setData({ local, remote, base: learnBase(baseKey(left, right), local, remote) }))
       .catch((e) => setError(toBackendError(e).message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- both folders are read once, when the dialog opens
   }, []);
 
   // "Inhalt prüfen": checksums for files of the same size on both sides.
@@ -180,7 +180,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- compared again only when the data or the method changes
   }, [byContent, data]);
 
   const lines: Line[] = useMemo(

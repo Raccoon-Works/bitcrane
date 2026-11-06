@@ -52,8 +52,7 @@ export function DiffDialog({ transferId }: { transferId: string }) {
     return () => {
       cancelled = true;
     };
-    // Load once per transfer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per transfer
   }, [transferId]);
 
   const lines = useMemo(() => (data ? diffLines(data.server, data.local) : []), [data]);

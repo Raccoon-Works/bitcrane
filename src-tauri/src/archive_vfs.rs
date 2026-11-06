@@ -33,12 +33,6 @@ fn kind_of(name: &str) -> Option<Kind> {
     }
 }
 
-/// True for file names Bitcrane opens like a folder.
-#[allow(dead_code)]
-pub fn is_archive_name(name: &str) -> bool {
-    kind_of(name).is_some()
-}
-
 /// Splits a path inside an archive into the archive file and the path within
 /// it ("" = its top). None for ordinary paths.
 pub fn split(path: &str) -> Option<(PathBuf, String)> {

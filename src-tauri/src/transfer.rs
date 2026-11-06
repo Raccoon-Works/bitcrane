@@ -367,7 +367,7 @@ pub async fn download(
 /// The data streams through this computer; nothing is stored on it. The
 /// target gets the same temp-name and replace handling as an upload; there is
 /// no resume, a stopped transfer starts again from the beginning.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "takes the arguments of the transfer_cross command unchanged")]
 pub async fn cross(
     src: &Remote,
     src_path: &str,

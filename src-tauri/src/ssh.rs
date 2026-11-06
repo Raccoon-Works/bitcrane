@@ -1108,13 +1108,8 @@ impl Connection {
         Ok(())
     }
 
-    /// SHA-256 of a server file as hex: `sha256sum` on the server when
-    /// commands are allowed, otherwise read through this connection.
-    #[allow(dead_code)]
-    pub async fn checksum(&self, path: &str) -> AppResult<String> {
-        self.checksum_with(path, crate::local::Algo::Sha256).await
-    }
-
+    /// Checksum of a server file as hex: computed on the server when commands
+    /// are allowed, otherwise read through this connection.
     pub async fn checksum_with(&self, path: &str, algo: crate::local::Algo) -> AppResult<String> {
         let quoted = format!("'{}'", path.replace('\'', "'\\''"));
         for cmd in algo.commands(&quoted) {
@@ -1522,10 +1517,10 @@ mod integration {
         let link = entries.iter().find(|x| x.name == "link.py").unwrap();
         assert_eq!(link.link.as_deref(), Some(format!("{base}/v.py").as_str()));
         assert_eq!(link.size, 9);
-        let sum = conn.checksum(&format!("{base}/v.py")).await.unwrap();
+        let sum = conn.checksum_with(&format!("{base}/v.py"), crate::local::Algo::Sha256).await.unwrap();
         let local_v = local_dir.path().join("v.txt");
         std::fs::write(&local_v, "version 2").unwrap();
-        assert_eq!(sum, crate::local::checksum(&local_v.to_string_lossy()).unwrap());
+        assert_eq!(sum, crate::local::checksum_with(&local_v.to_string_lossy(), crate::local::Algo::Sha256).unwrap());
 
         // 4. Writing into a root-owned folder fails with a clear error.
         let denied = crate::transfer::upload(

@@ -120,8 +120,7 @@ export function ChecksumDialog({ side, name }: { side: PaneSide; name: string })
     return () => {
       current = false;
     };
-    // Computed when the dialog opens and when the algorithm changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- computed when the dialog opens and when the algorithm changes
   }, [algo]);
 
   const pickAlgo = (a: ChecksumAlgo) => {
@@ -135,8 +134,7 @@ export function ChecksumDialog({ side, name }: { side: PaneSide; name: string })
   );
   useEffect(() => {
     if (pastedAlgo && pastedAlgo !== algo) pickAlgo(pastedAlgo);
-    // Only when the pasted value changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the pasted value changes
   }, [pastedAlgo]);
 
   const same = mine.state === 'ok' && theirs.state === 'ok' ? mine.hex === theirs.hex : undefined;
@@ -246,8 +244,7 @@ export function PresignDialog({ side, name }: { side: PaneSide; name: string }) 
     return () => {
       current = false;
     };
-    // Signed again whenever the duration changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- signed again whenever the duration changes
   }, [secs]);
   const until = new Date(Date.now() + Number(secs) * 1000).toLocaleString(undefined, {
     dateStyle: 'medium',
