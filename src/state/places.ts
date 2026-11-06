@@ -10,7 +10,6 @@ import type { PaneSide, Tab, Transfer } from '../backend/types';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
-  type AppState,
   state,
   activeTab,
   paneLoc,
@@ -22,6 +21,7 @@ import {
   panePath,
   uid,
 } from './core';
+import type { AppState } from './appState';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
 import { placeOf } from './fileOps';

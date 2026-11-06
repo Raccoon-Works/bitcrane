@@ -41,6 +41,7 @@ import {
 import { addLog } from './log';
 import { TOLERANCE_MS } from './syncPlan';
 import * as paths from '../util/paths';
+import { fromBase64 } from '../util/base64';
 import { $t } from '../i18n';
 
 /* ------------------------------------------------------------------------ */
@@ -432,7 +433,7 @@ export function uploadPathsFromLink(url: string): string[] {
     .replace(/-/g, '+')
     .replace(/_/g, '/');
   try {
-    const bytes = Uint8Array.from(atob(data + '='.repeat((4 - (data.length % 4)) % 4)), (c) => c.charCodeAt(0));
+    const bytes = fromBase64(data + '='.repeat((4 - (data.length % 4)) % 4));
     return new TextDecoder()
       .decode(bytes)
       .split('\n')

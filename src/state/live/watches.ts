@@ -4,7 +4,8 @@
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Watch, type Transfer } from '../../backend/types';
 import { watchExcludes } from '../tabs';
-import { type AppState, setState, uid, getState, showToast } from '../core';
+import { setState, uid, getState, showToast } from '../core';
+import type { AppState } from '../appState';
 import { showError } from '../errors';
 import { $t } from '../../i18n';
 import { basename, join, parent, relFolder } from '../../util/paths';

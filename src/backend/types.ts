@@ -221,7 +221,7 @@ export interface Tab {
   /** Two local halves (Total Commander): the right half shows this computer; `remotePath` is then a local path. */
   rightLocal?: boolean;
   /** Built-in terminal of this tab (state/terminal.ts): panel shown, session in front, filling the tab. */
-  terminal?: { open: boolean; active?: string; full?: boolean };
+  terminal?: import('../state/terminal').TabTerminal;
   /** The settings shown in a tab of their own (like a browser or VS Code); the area in front. */
   settings?: import('../state/store').SettingsTab;
 }

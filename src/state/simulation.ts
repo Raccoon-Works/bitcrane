@@ -23,9 +23,9 @@ import {
   activeTab,
   openServerIn,
   LIVE,
-  sampleServers,
-  detectTheme,
 } from './core';
+import { detectTheme } from './defaults';
+import { sampleServers } from './demoData';
 import { openDialog } from './panels';
 import { offerCloudPlaces } from './places';
 import { forced } from './transfers';

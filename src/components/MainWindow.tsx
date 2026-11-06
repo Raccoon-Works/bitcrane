@@ -15,7 +15,7 @@ import { Activity } from './Activity';
 import { TerminalPanel } from './TerminalPanel';
 import { WinSystemMenu } from './AppMenu';
 import { Inspector } from './Inspector';
-import { Pane } from './Pane';
+import { Pane } from './pane/Pane';
 import { ConnectionTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
 import { SettingsPage } from './dialogs/settings/SettingsPage';

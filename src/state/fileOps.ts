@@ -21,11 +21,11 @@ import {
   listEntries,
   paneEntries,
   paneOnServer,
-  type AppState,
   serverById,
   paneShowsServers,
   isDirEntry,
 } from './core';
+import type { AppState } from './appState';
 import { openDialog } from './panels';
 import { pushUndo, renameAt } from './undo';
 import { navigate } from './tabs';

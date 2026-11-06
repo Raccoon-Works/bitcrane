@@ -4,7 +4,8 @@
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { listen } from '@tauri-apps/api/event';
 
-import { type AppState, subscribeStore, getState, setState } from '../core';
+import { subscribeStore, getState, setState } from '../core';
+import type { AppState } from '../appState';
 import { addLog } from '../log';
 import { $t } from '../../i18n';
 import { openDialog } from '../panels';

@@ -3,16 +3,9 @@
  */
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Server, type Watch, type Transfer, type Tab } from '../../backend/types';
-import {
-  type AppState,
-  type SavedTab,
-  emptyTab,
-  showToast,
-  getState,
-  setState,
-  oldDefaultToolbars,
-  uid,
-} from '../core';
+import { emptyTab, showToast, getState, setState, uid } from '../core';
+import type { AppState, SavedTab } from '../appState';
+import { oldDefaultToolbars } from '../defaults';
 import { savedTabs, tabsFromSaved } from '../tools';
 import { $t, LANG, rememberLanguage } from '../../i18n';
 import { updateSettings } from '../settings';
