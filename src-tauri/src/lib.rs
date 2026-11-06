@@ -54,7 +54,7 @@ use error::{AppError, AppResult, ErrorKind};
 use ssh::KnownHosts;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
@@ -218,7 +218,7 @@ pub fn run() {
             // A restart after an update is never a start at login, whatever the arguments say.
             let after_update = std::fs::remove_file(update_marker(app.handle())).is_ok();
             let autostart = !after_update && std::env::args().any(|a| a == "--autostart");
-            app.manage(StartInfo { autostart, decided: Arc::new(std::sync::atomic::AtomicBool::new(!autostart)) });
+            app.manage(StartInfo { autostart, decided: Arc::new(AtomicBool::new(!autostart)) });
             if !autostart {
                 tray::show_main_window(app.handle());
             } else {

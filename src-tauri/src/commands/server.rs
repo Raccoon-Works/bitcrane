@@ -82,7 +82,7 @@ pub(crate) fn drag_out(window: tauri::WebviewWindow, paths: Vec<String>) -> AppR
         let w = window.clone();
         window
             .run_on_main_thread(move || {
-                let icon = drag::Image::Raw(include_bytes!("../icons/64x64.png").to_vec());
+                let icon = drag::Image::Raw(include_bytes!("../../icons/64x64.png").to_vec());
                 if let Err(e) = drag::start_drag(&w, drag::DragItem::Files(files), icon, |_, _| {}, drag::Options::default()) {
                     log::warn!("drag out failed: {e}");
                 }

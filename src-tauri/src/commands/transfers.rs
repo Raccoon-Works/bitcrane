@@ -5,6 +5,7 @@ use crate::{AppState, paths, transfer};
 use serde::Serialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
+use std::path::PathBuf;
 use tauri::{Emitter, State};
 
 #[derive(Clone, Serialize)]
@@ -138,7 +139,7 @@ pub(crate) fn watch_stop(state: State<'_, AppState>, watch_id: String) {
 
 /// Shared settings file in a folder the user's cloud keeps in step between
 /// computers ("Zwischen Rechnern abgleichen", after Panic Sync): "<folder>/Bitcrane/bitcrane-sync.json".
-fn sync_file(dir: &str) -> std::path::PathBuf {
+fn sync_file(dir: &str) -> PathBuf {
     paths::to_native(dir).join("Bitcrane").join("bitcrane-sync.json")
 }
 

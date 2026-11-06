@@ -1,7 +1,9 @@
 //! Servers shown as folders in the system file manager.
 
 use crate::AppState;
-use crate::error::{AppError, AppResult};
+#[cfg(not(windows))]
+use crate::error::AppError;
+use crate::error::AppResult;
 use tauri::State;
 
 /// Shows a server as a folder in the Windows Explorer (Cloud Files API). The
