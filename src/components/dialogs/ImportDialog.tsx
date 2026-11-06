@@ -74,11 +74,7 @@ export function ImportDialog() {
   const firstStart = useStore((s) => s.dialog?.type === 'import' && !!s.dialog.firstStart);
 
   useEffect(() => {
-    if (LIVE)
-      backend
-        .importFind()
-        .then(setFound)
-        .catch(() => setFound({ servers: [], sources: [] }));
+    if (LIVE) void backend.importFind().then(setFound);
   }, []);
   useEffect(() => {
     // Preselect each new server once; the same server from a second program stays unticked.

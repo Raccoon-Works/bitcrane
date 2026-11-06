@@ -272,8 +272,8 @@ async fn load_sftp() {
         jump: None,
         proxy: None,
     };
-    let fp = crate::ssh::connect(&p(None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
-    let c = crate::ssh::connect(&p(Some(fp)), known).await.unwrap();
+    let fp = crate::ssh::connect_with(&p(None), known.clone(), None).await.err().unwrap().host_key.unwrap().fingerprint;
+    let c = crate::ssh::connect_with(&p(Some(fp)), known, None).await.unwrap();
     let home = c.home.clone();
     run(
         Remote::Sftp(Box::new(c)),

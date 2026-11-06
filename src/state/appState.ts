@@ -10,6 +10,7 @@ import type {
   Platform,
   Protocol,
   Server,
+  SettingsTab,
   Tab,
   Theme,
   Transfer,
@@ -19,7 +20,9 @@ import type {
 import type { Sealed } from '../util/crypto';
 import type { Lang } from '../i18n';
 import type { CompareRef } from './fileOps';
+import type { SyncBase } from './sync';
 import type { Snippet, TermSession, TerminalSettings } from './terminal';
+import type { UpdateState } from './updates';
 
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
@@ -81,17 +84,6 @@ export type DialogState =
       instructions: string;
       prompts: Array<{ text: string; echo: boolean }>;
     };
-
-export type SettingsTab =
-  | 'general'
-  | 'watch'
-  | 'transfers'
-  | 'rules'
-  | 'connections'
-  | 'appearance'
-  | 'terminal'
-  | 'keys'
-  | 'advanced';
 
 export interface PaneSelection {
   names: string[];
@@ -233,7 +225,6 @@ export interface Settings {
   skipUnchanged: boolean;
   /** Retry failed transfers automatically (up to three times). */
   autoRetry: boolean;
-  /** Look for a new Bitcrane version at start and every few hours. */
   /** Updates (after Transmit): install automatically when quitting, only tell, or never look. */
   updateMode: 'auto' | 'notify' | 'off';
   /** "Mit Bitcrane hochladen" in the Explorer / Finder context menu (missing = on). */
@@ -249,7 +240,7 @@ export interface Settings {
   /** Passwords travel too (encrypted with the sync password from the keychain). */
   syncPasswords?: boolean;
   /** State after the last sync (hashes), last successful sync, file time seen, last error. */
-  syncBase?: import('./sync').SyncBase;
+  syncBase?: SyncBase;
   syncAt?: number;
   syncSeen?: number;
   syncError?: string;
@@ -389,7 +380,6 @@ export interface SyncSchedule {
   allowDelete?: boolean;
 }
 
-/** Rule for files that already exist at the target of a manual transfer. */
 /** What happens once the transfer queue is empty (WinSCP "Once empty"). */
 export type AfterQueue = 'none' | 'disconnect' | 'quit' | 'sleep' | 'shutdown';
 
@@ -422,6 +412,7 @@ export interface Workspace {
   active?: number;
 }
 
+/** Rule for files that already exist at the target of a manual transfer. */
 export type ExistingRule = 'ask' | 'overwrite' | 'newer' | 'keepBoth' | 'skip';
 
 /**
@@ -501,8 +492,6 @@ export interface AppState {
   popoverOpen: boolean;
   menuBarWindowOpen: boolean;
   appMenu: string | null;
-  /** Width of the sidebar in pixels; the user can drag its edge. */
-  sidebarWidth: number;
   dialog: DialogState | null;
   contextMenu: ContextMenuState | null;
   renaming: { side: PaneSide; name: string } | null;
@@ -556,10 +545,9 @@ export interface AppState {
   /** Cloud services this build has app keys for (desktop app; the prototype shows all). */
   cloudAvailable: { dropbox: boolean; onedrive: boolean };
   /** Update in progress or waiting (null: none known). */
-  update: import('./updates').UpdateState | null;
-  /** Where dragged files would land: a side and a folder name ('' = folder shown). */
-  /** Drop target while dragging: a folder in a half ('' = the folder shown), a place
-      in a places bar (`place` = its path), or the places bar itself (`addPlace`). */
+  update: UpdateState | null;
+  /** Drop target while dragging: a folder in a half ('' = the folder shown), a place in a places
+      bar (`place` = its path), or the places bar or sidebar itself (`addPlace`, `sidebar`). */
   dropHint: { side: PaneSide; name: string; place?: string; addPlace?: boolean; sidebar?: boolean } | null;
   /** Folders opened in place (triangle in the list), as paths relative to the folder shown. */
   expanded: Record<PaneSide, string[]>;

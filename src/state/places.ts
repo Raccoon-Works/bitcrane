@@ -10,7 +10,6 @@ import type { PaneSide, Tab, Transfer } from '../backend/types';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
-  state,
   activeTab,
   paneLoc,
   serverById,
@@ -20,6 +19,7 @@ import {
   paneShowsServers,
   panePath,
   uid,
+  getState,
 } from './core';
 import type { AppState } from './appState';
 import { updateSettings } from './settings';
@@ -29,7 +29,7 @@ import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
 
 /** Places bar of a half: favourite folders of this computer, or of the server it shows. */
-export function placesFor(side: PaneSide, s: AppState = state, t: Tab | undefined = activeTab(s)): Place[] {
+export function placesFor(side: PaneSide, s: AppState = getState(), t: Tab | undefined = activeTab(s)): Place[] {
   const [ls, sid] = paneLoc(side, t);
   if (ls === 'local') return s.settings.localPlaces ?? s.places;
   return serverById(sid, s)?.places ?? NO_PLACES;
@@ -51,20 +51,20 @@ export function addPlace(side: PaneSide, path: string) {
     showToast($t('„{0}“ ist schon in der Ortsleiste.', paths.basename(path) || path));
     return;
   }
-  const name = path === '~' ? state.homeName : paths.basename(path) || path;
+  const name = path === '~' ? getState().homeName : paths.basename(path) || path;
   setPlaces(side, [...list, { name, path }]);
   showToast($t('„{0}“ zur Ortsleiste hinzugefügt.', name), 'ok');
 }
 
 /** Favourites of this computer (sidebar), whatever the halves show. */
-export function localPlaces(s: AppState = state): Place[] {
+export function localPlaces(s: AppState = getState()): Place[] {
   return s.settings.localPlaces ?? s.places;
 }
 
 /** Adds a folder of this computer to the sidebar's favourites. */
 export function addLocalPlace(path: string) {
   const list = localPlaces();
-  const name = path === '~' ? state.homeName : paths.basename(path) || path;
+  const name = path === '~' ? getState().homeName : paths.basename(path) || path;
   if (list.some((p) => p.path === path)) {
     showToast($t('„{0}“ ist schon in den Favoriten.', name));
     return;
@@ -137,13 +137,13 @@ export async function offerCloudPlaces(manual: boolean) {
       );
     return;
   }
-  if (!manual && state.dialog) return;
+  if (!manual && getState().dialog) return;
   openDialog({ type: 'cloudPlaces', found: fresh });
 }
 
 /** Places of this computer (independent of what the left half shows right now). */
 function placesForComputer(): Place[] {
-  return state.settings.localPlaces ?? state.places;
+  return getState().settings.localPlaces ?? getState().places;
 }
 
 /** Adds the cloud folders the user ticked to the places of this computer. */
@@ -165,7 +165,7 @@ export function addCloudPlaces(list: CloudPlace[]) {
 
 /** ⌘D: the folder shown in the focused half goes into its places bar. */
 export function addBookmark() {
-  const side = state.focusSide;
+  const side = getState().focusSide;
   if (!activeTab() || paneShowsServers(side)) return;
   addPlace(side, panePath(side));
 }
@@ -183,7 +183,7 @@ export interface SyncAction {
 }
 
 /** Carries out the ticked lines of "Ordner abgleichen". */
-export function runSync(actions: SyncAction[]) {
+export function applySyncActions(actions: SyncAction[]) {
   const t = activeTab();
   setState({ dialog: null });
   if (!t || !actions.length) return;

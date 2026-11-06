@@ -3,9 +3,9 @@
  * "Unterschiede zeigen" view of the conflict dialog.
  */
 
-export type DiffOp = 'same' | 'add' | 'del';
+type DiffOp = 'same' | 'add' | 'del';
 
-export interface DiffLine {
+interface DiffLine {
   op: DiffOp;
   text: string;
   /** Line number in the old text (server version), if the line exists there. */
@@ -15,7 +15,7 @@ export interface DiffLine {
 }
 
 /** Hunk of changed lines with some unchanged context around it. */
-export interface DiffHunk {
+interface DiffHunk {
   lines: DiffLine[];
   /** Unchanged lines skipped before this hunk. */
   skipped: number;

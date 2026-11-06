@@ -112,7 +112,7 @@ const SMALL_WORDS = new Set([
 const IS_MAC = !/Win/i.test(`${navigator.platform} ${navigator.userAgent}`);
 
 /** Title case for one English menu text; quoted parts (file names) stay as they are. */
-export function titleCase(text: string): string {
+function titleCase(text: string): string {
   // Split into quoted and unquoted parts; only the unquoted ones change.
   const parts = text.split(/(“[^”]*”|„[^“]*“|"[^"]*"|'[^']*')/);
   const words = parts.flatMap((p, i) =>

@@ -23,15 +23,15 @@ export const connected = new Set<string>();
 /** Server clock minus local clock (ms), measured when connecting. */
 const clockOffsets = new Map<string, number>();
 
-/**
- * Margin for "which copy is newer": SFTP keeps whole seconds, and a server
- * whose clock is off makes its own changes look older or newer by that much.
- */
 /** How far the server's clock is ahead of this computer (ms; negative = behind), measured when connecting. */
 export function clockOffset(serverId: string): number {
   return clockOffsets.get(serverId) ?? 0;
 }
 
+/**
+ * Margin for "which copy is newer": SFTP keeps whole seconds, and a server
+ * whose clock is off makes its own changes look older or newer by that much.
+ */
 export function timeTolerance(serverId: string): number {
   return 1000 + Math.abs(clockOffsets.get(serverId) ?? 0);
 }
@@ -66,6 +66,7 @@ export async function forgetSecrets(removed: Server, remaining: Server[]) {
     ...(isCloudProtocol(x.protocol) ? [cloudAccount(x)] : []),
   ];
   const inUse = new Set(remaining.flatMap(accounts));
+  // Most of these accounts were never stored; a failed removal leaves nothing the user can act on.
   for (const a of accounts(removed)) if (!inUse.has(a)) await backend.secretDelete(a).catch(() => undefined);
 }
 
@@ -214,7 +215,7 @@ async function openConnection(
     const r = await backend.connectOneDrive(id, { refreshToken });
     // Microsoft renews the sign-in with each use; keep the newest one.
     if (r.refreshToken && r.refreshToken !== refreshToken)
-      void backend.secretSet(cloudAccount(srv), r.refreshToken).catch(() => undefined);
+      backend.secretSet(cloudAccount(srv), r.refreshToken).catch((e) => showError(e));
     return r;
   }
   if (srv.protocol === 'gdrive') {
@@ -376,7 +377,6 @@ const authLabel = (srv: Server) =>
             ? $t('Passwort')
             : $t('automatisch');
 
-/** Opens an SSH session for a saved server. Resolves to true when connected. */
 /** Home folder of each connected server: a half that opens an already connected server starts there. */
 const homes = new Map<string, string>();
 export const homeOf = (serverId: string) => homes.get(serverId);
@@ -388,6 +388,7 @@ export function presetPassword(serverId: string, secret: string, save: boolean) 
   presetSecrets.set(serverId, { secret, save });
 }
 
+/** Opens an SSH session for a saved server. Resolves to true when connected. */
 export function connectServer(serverId: string, opts: ConnectOptions = {}): Promise<boolean> {
   const preset = opts.secret === undefined ? presetSecrets.get(serverId) : undefined;
   if (preset) {
@@ -559,7 +560,7 @@ export async function firstStartOffers() {
   const s = getState();
   if (!s.settings.importAsked && !s.servers.some((x) => !x.temporary)) {
     updateSettings({ importAsked: true });
-    const found = await backend.importFind().catch(() => null);
+    const found = await backend.importFind();
     if (found?.servers.length && !getState().dialog && !getState().servers.some((x) => !x.temporary)) {
       openDialog({ type: 'import', firstStart: true });
       // The cloud folders wait until this dialog is closed.
@@ -590,8 +591,7 @@ export async function installPublicKey(serverId: string, publicKey: string): Pro
     );
   // A public key line never contains single quotes; refuse anything else to keep the command safe.
   if (!/^[A-Za-z0-9@.+/=_ :-]+$/.test(publicKey)) return $t('Der öffentliche Schlüssel enthält unerwartete Zeichen.');
-  const cmd = `umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && (grep -qxF '${publicKey}' ~/.ssh/authorized_keys || printf '%s
-' '${publicKey}' >> ~/.ssh/authorized_keys) && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
+  const cmd = `umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && (grep -qxF '${publicKey}' ~/.ssh/authorized_keys || printf '%s\n' '${publicKey}' >> ~/.ssh/authorized_keys) && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
   try {
     const r = await backend.remoteExec(serverId, cmd);
     if (r.code !== 0) return $t('Der Server meldet Code {0}: {1}', r.code, r.output.trim());
@@ -612,7 +612,7 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
       // Other protocols: a short connection with a temporary id.
       const id = `test-${uid('t')}`;
       const { home } = await openConnection(id, srv, auth, password, undefined, undefined, await proxyParams(srv));
-      await backend.disconnect(id).catch(() => undefined);
+      await backend.disconnect(id);
       return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
     }
     const jump = await jumpParams(srv);

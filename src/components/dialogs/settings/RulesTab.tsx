@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { Plus } from '../../glyphs';
 import {
-  getState,
   newRuleId,
   NO_RULES,
   removeRule,
@@ -24,6 +23,7 @@ export function RulesSettings() {
   const rules = useStore((st) => st.settings.rules) ?? NO_RULES;
   const servers = useStore((st) => st.servers);
   const watches = useStore((st) => st.watches);
+  const gs = useStore((st) => st.settings);
   const [selId, setSelId] = useState<string | null>(rules[0]?.id ?? null);
   const sel = rules.find((r) => r.id === selId) ?? rules[0];
   const add = (from?: TransferRule) => {
@@ -33,9 +33,8 @@ export function RulesSettings() {
     saveRule(r);
     setSelId(r.id);
   };
-  const set = <K extends keyof TransferRule>(k: K, v: TransferRule[K]) => {
-    if (sel) saveRule({ ...sel, [k]: v });
-  };
+  // Only the detail view calls this, and it is shown only while a rule is selected.
+  const set = <K extends keyof TransferRule>(k: K, v: TransferRule[K]) => saveRule({ ...sel!, [k]: v });
   const usedBy = sel
     ? [
         ...servers.filter((x) => x.ruleId === sel.id).map((x) => x.name),
@@ -44,7 +43,6 @@ export function RulesSettings() {
     : [];
   const inherit = (label: string) => [{ value: '', label: $t('Wie allgemein eingestellt ({0})', label) }];
   const existingLabel = (v: ExistingRule) => existingOptions.find((o) => o.value === v)?.label ?? v;
-  const gs = getState().settings;
   return (
     <>
       <p className="small muted">

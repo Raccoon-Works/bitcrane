@@ -11,11 +11,11 @@
 //!
 //! Switching it off removes the entry again.
 
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
-fn fail(e: impl ToString) -> AppError {
-    AppError::other("Der Eintrag im Kontextmenü konnte nicht geändert werden.").with_detail(e.to_string())
+#[cfg(any(windows, target_os = "macos"))]
+fn fail(e: impl ToString) -> crate::error::AppError {
+    crate::error::AppError::other("Der Eintrag im Kontextmenü konnte nicht geändert werden.").with_detail(e.to_string())
 }
 
 #[cfg(windows)]

@@ -50,10 +50,6 @@ impl KnownHosts {
         let _ = std::fs::write(&self.path, serde_json::to_string_pretty(map).unwrap_or_default());
     }
 
-    pub fn count(&self) -> usize {
-        self.map.lock().unwrap().len()
-    }
-
     /// All stored fingerprints as ("host:port", fingerprint), sorted by host.
     pub fn list(&self) -> Vec<(String, String)> {
         let mut v: Vec<_> = self.map.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -308,7 +304,6 @@ fn agent_error(e: impl std::fmt::Display) -> AppError {
         .with_detail(e.to_string())
 }
 
-/// Opens a connection, verifies the host key and authenticates.
 /// Loads a private key in OpenSSH, PEM or PuTTY (.ppk) format.
 pub fn load_private_key(path: &str, passphrase: Option<&str>) -> AppResult<russh::keys::PrivateKey> {
     let native = crate::paths::to_native(path);
@@ -657,13 +652,10 @@ async fn open_session(
     Ok(handle)
 }
 
-/// Opens an SFTP session, directly or through a jump server.
-#[cfg_attr(not(test), allow(dead_code))]
-pub async fn connect(params: &ConnectParams, known: Arc<KnownHosts>) -> AppResult<Connection> {
-    connect_with(params, known, None).await
-}
-
-/// Like `connect`, with a way to answer questions of the server (one-time codes).
+/// Opens an SFTP session, directly or through a jump server; `prompter` answers questions of
+/// the server (one-time codes). The app goes through `open` and `remote.rs`, which also handle
+/// servers without SFTP; the tests connect with this.
+#[cfg(test)]
 pub async fn connect_with(
     params: &ConnectParams,
     known: Arc<KnownHosts>,
@@ -1025,7 +1017,6 @@ impl Connection {
         Ok(())
     }
 
-    /// Replaces `to` with `from` (used after uploading under a temporary name).
     /// Deletes a file or a folder with all its contents.
     pub async fn remove(&self, path: &str) -> AppResult<()> {
         let attrs = self.sftp.symlink_metadata(path).await?;
@@ -1274,9 +1265,15 @@ mod integration {
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
-        let fp = connect(&params(&e, key(), None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
+        let fp = connect_with(&params(&e, key(), None), known.clone(), None)
+            .await
+            .err()
+            .unwrap()
+            .host_key
+            .unwrap()
+            .fingerprint;
         let conn = Arc::new(crate::remote::Remote::Sftp(Box::new(
-            connect(&params(&e, key(), Some(fp)), known).await.unwrap(),
+            connect_with(&params(&e, key(), Some(fp)), known, None).await.unwrap(),
         )));
         let fw = crate::forward::Forwards::default();
         let spec = |id: &str, kind: &str, port: u16| crate::forward::ForwardSpec {
@@ -1333,15 +1330,16 @@ mod integration {
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
 
         // 1. Unknown host key is reported with its fingerprint.
-        let err = connect(&params(&e, key(), None), known.clone()).await.err().expect("must ask for trust");
+        let err = connect_with(&params(&e, key(), None), known.clone(), None).await.err().expect("must ask for trust");
         assert_eq!(err.kind, ErrorKind::HostKeyUnknown);
         let fp = err.host_key.unwrap().fingerprint;
         assert!(fp.starts_with("SHA256:"));
 
         // 2. Trusting it connects and stores it.
-        let conn = connect(&params(&e, key(), Some(fp.clone())), known.clone()).await.expect("connect with trust");
+        let conn =
+            connect_with(&params(&e, key(), Some(fp.clone())), known.clone(), None).await.expect("connect with trust");
         let conn = crate::remote::Remote::Sftp(Box::new(conn));
-        assert_eq!(known.count(), 1);
+        assert_eq!(known.list().len(), 1);
         assert!(conn.home().starts_with('/'));
         let offset = conn.clock_offset_ms().await.expect("clock offset");
         assert!(offset.abs() < 2000, "same machine, offset {offset}");
@@ -1518,23 +1516,28 @@ mod integration {
         conn.close().await;
 
         // 5. Encrypted key: without passphrase -> PassphraseRequired, with -> ok.
-        let err =
-            connect(&params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: None }, None), known.clone())
-                .await
-                .err()
-                .unwrap();
+        let err = connect_with(
+            &params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: None }, None),
+            known.clone(),
+            None,
+        )
+        .await
+        .err()
+        .unwrap();
         assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-        connect(
+        connect_with(
             &params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some(e.passphrase.clone()) }, None),
             known.clone(),
+            None,
         )
         .await
         .expect("passphrase key")
         .close()
         .await;
-        let err = connect(
+        let err = connect_with(
             &params(&e, AuthParams::Key { path: e.key_pass.clone(), passphrase: Some("falsch".into()) }, None),
             known.clone(),
+            None,
         )
         .await
         .err()
@@ -1544,7 +1547,7 @@ mod integration {
         // 5b. Through a jump server (here the same server reaches itself on localhost).
         let mut via = params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None);
         via.jump = Some(Box::new(params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None)));
-        let hop = connect(&via, known.clone()).await.expect("connect through jump server");
+        let hop = connect_with(&via, known.clone(), None).await.expect("connect through jump server");
         assert!(hop.home.starts_with('/'));
         assert!(!hop.list(&hop.home).await.unwrap().is_empty());
         hop.close().await;
@@ -1552,7 +1555,7 @@ mod integration {
         let mut bad = params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None);
         bad.port = 1;
         bad.jump = via.jump.clone();
-        assert_eq!(connect(&bad, known.clone()).await.err().map(|x| x.kind), Some(ErrorKind::Unreachable));
+        assert_eq!(connect_with(&bad, known.clone(), None).await.err().map(|x| x.kind), Some(ErrorKind::Unreachable));
 
         // 5d. Through a SOCKS5 and an HTTP proxy, if the test provides them.
         for (var, kind) in [("BITCRANE_TEST_SOCKS", "socks5"), ("BITCRANE_TEST_HTTP_PROXY", "http")] {
@@ -1566,12 +1569,14 @@ mod integration {
                     user: None,
                     password: None,
                 });
-                let c = connect(&through, known.clone()).await.unwrap_or_else(|err| panic!("{kind} proxy: {err:?}"));
+                let c = connect_with(&through, known.clone(), None)
+                    .await
+                    .unwrap_or_else(|err| panic!("{kind} proxy: {err:?}"));
                 assert!(!c.list(&c.home).await.unwrap().is_empty());
                 c.close().await;
                 through.port = 1;
                 assert_eq!(
-                    connect(&through, known.clone()).await.err().map(|x| x.kind),
+                    connect_with(&through, known.clone(), None).await.err().map(|x| x.kind),
                     Some(ErrorKind::Unreachable),
                     "{kind}: closed port"
                 );
@@ -1580,28 +1585,33 @@ mod integration {
 
         // 5c. PuTTY keys (.ppk), plain and with passphrase, if the test provides them.
         if let (Ok(ppk), Ok(ppk_pass)) = (std::env::var("BITCRANE_TEST_PPK"), std::env::var("BITCRANE_TEST_PPK_PASS")) {
-            connect(&params(&e, AuthParams::Key { path: ppk, passphrase: None }, None), known.clone())
+            connect_with(&params(&e, AuthParams::Key { path: ppk, passphrase: None }, None), known.clone(), None)
                 .await
                 .expect("ppk")
                 .close()
                 .await;
-            let err =
-                connect(&params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: None }, None), known.clone())
-                    .await
-                    .err()
-                    .unwrap();
-            assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-            let err = connect(
-                &params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: Some("falsch".into()) }, None),
+            let err = connect_with(
+                &params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: None }, None),
                 known.clone(),
+                None,
             )
             .await
             .err()
             .unwrap();
             assert_eq!(err.kind, ErrorKind::PassphraseRequired);
-            connect(
+            let err = connect_with(
+                &params(&e, AuthParams::Key { path: ppk_pass.clone(), passphrase: Some("falsch".into()) }, None),
+                known.clone(),
+                None,
+            )
+            .await
+            .err()
+            .unwrap();
+            assert_eq!(err.kind, ErrorKind::PassphraseRequired);
+            connect_with(
                 &params(&e, AuthParams::Key { path: ppk_pass, passphrase: Some("pp geheim".into()) }, None),
                 known.clone(),
+                None,
             )
             .await
             .expect("ppk with passphrase")
@@ -1611,12 +1621,12 @@ mod integration {
 
         // 5d. "Automatisch" with only a password: no agent/key fits, the password does.
         let auto = AuthParams::Auto { key_path: None, passphrase: None, password: Some(e.password.clone()) };
-        connect(&params(&e, auto, None), known.clone()).await.expect("auto with password").close().await;
+        connect_with(&params(&e, auto, None), known.clone(), None).await.expect("auto with password").close().await;
         let auto = AuthParams::Auto { key_path: Some(e.key.clone()), passphrase: None, password: None };
-        connect(&params(&e, auto, None), known.clone()).await.expect("auto with key").close().await;
+        connect_with(&params(&e, auto, None), known.clone(), None).await.expect("auto with key").close().await;
         let auto = AuthParams::Auto { key_path: None, passphrase: None, password: None };
         assert_eq!(
-            connect(&params(&e, auto, None), known.clone()).await.err().map(|x| x.kind),
+            connect_with(&params(&e, auto, None), known.clone(), None).await.err().map(|x| x.kind),
             Some(ErrorKind::PasswordRequired)
         );
 
@@ -1630,7 +1640,7 @@ mod integration {
             // Host keys are the same server; trust them under the new ports first.
             let mut p = trust_all(&kbd);
             p.trust = Some(fp.clone());
-            connect(&p, known.clone()).await.expect("password via keyboard-interactive").close().await;
+            connect_with(&p, known.clone(), None).await.expect("password via keyboard-interactive").close().await;
             // Second step answered through the prompter (here with the password, like a code).
             let pw = e.password.clone();
             let asked = Arc::new(Mutex::new(Vec::new()));
@@ -1647,7 +1657,7 @@ mod integration {
             // Without a way to answer, the second step fails clearly.
             let mut p = params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None);
             p.port = two.parse().unwrap();
-            assert_eq!(connect(&p, known.clone()).await.err().map(|x| x.kind), Some(ErrorKind::AuthFailed));
+            assert_eq!(connect_with(&p, known.clone(), None).await.err().map(|x| x.kind), Some(ErrorKind::AuthFailed));
         }
 
         // 5f. OpenSSH certificate: the server only trusts the CA, not the key itself.
@@ -1655,32 +1665,33 @@ mod integration {
             let cert_key = std::env::var("BITCRANE_TEST_CERT_KEY").unwrap();
             let mut p = params(&e, AuthParams::Key { path: cert_key, passphrase: None }, Some(fp.clone()));
             p.port = port.parse().unwrap();
-            connect(&p, known.clone()).await.expect("certificate login").close().await;
+            connect_with(&p, known.clone(), None).await.expect("certificate login").close().await;
             let mut p = params(&e, AuthParams::Key { path: e.key.clone(), passphrase: None }, None);
             p.port = port.parse().unwrap();
-            assert!(connect(&p, known.clone()).await.is_err(), "plain key is not accepted there");
+            assert!(connect_with(&p, known.clone(), None).await.is_err(), "plain key is not accepted there");
         }
 
         // 6. Password authentication, right and wrong.
-        connect(&params(&e, AuthParams::Password { password: e.password.clone() }, None), known.clone())
+        connect_with(&params(&e, AuthParams::Password { password: e.password.clone() }, None), known.clone(), None)
             .await
             .expect("password")
             .close()
             .await;
-        let err = connect(&params(&e, AuthParams::Password { password: "falsch".into() }, None), known.clone())
-            .await
-            .err()
-            .unwrap();
+        let err =
+            connect_with(&params(&e, AuthParams::Password { password: "falsch".into() }, None), known.clone(), None)
+                .await
+                .err()
+                .unwrap();
         assert_eq!(err.kind, ErrorKind::AuthFailed);
 
         // 7. SSH agent (only when an agent is running).
         if std::env::var("SSH_AUTH_SOCK").is_ok() {
-            connect(&params(&e, AuthParams::Agent, None), known.clone()).await.expect("agent").close().await;
+            connect_with(&params(&e, AuthParams::Agent, None), known.clone(), None).await.expect("agent").close().await;
         }
 
         // 8. A changed host key is detected.
         known.set(&format!("{}:{}", e.host, e.port), "SHA256:anders");
-        let err = connect(&params(&e, key(), None), known.clone()).await.err().unwrap();
+        let err = connect_with(&params(&e, key(), None), known.clone(), None).await.err().unwrap();
         assert_eq!(err.kind, ErrorKind::HostKeyChanged);
         assert_eq!(err.host_key.unwrap().previous.as_deref(), Some("SHA256:anders"));
     }

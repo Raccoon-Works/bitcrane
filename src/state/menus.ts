@@ -69,7 +69,7 @@ export interface MenuItem {
   danger?: boolean;
   sep?: boolean;
 }
-export interface MenuDef {
+interface MenuDef {
   id: string;
   label: string;
   items: MenuItem[];

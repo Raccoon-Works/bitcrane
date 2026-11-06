@@ -11,7 +11,6 @@ import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
   setState,
-  state,
   showToast,
   uid,
   LIVE,
@@ -20,6 +19,7 @@ import {
   activeTab,
   paneLoc,
   setLeftServer,
+  getState,
 } from './core';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
@@ -32,7 +32,7 @@ export function toggleWatch(id: string) {
 }
 
 export function pauseAllWatches() {
-  const anyActive = state.watches.some((w) => w.state !== 'paused');
+  const anyActive = getState().watches.some((w) => w.state !== 'paused');
   setState((s) => ({ watches: s.watches.map((w) => ({ ...w, state: anyActive ? 'paused' : 'active' })) }));
   showToast(anyActive ? $t('Alle Überwachungen pausiert.') : $t('Alle Überwachungen laufen wieder.'));
 }
@@ -100,11 +100,11 @@ function enqueueWatchFiles(w: Watch, files: string[]) {
     };
   });
   enqueue(items);
-  pendingCommand.add(w.id);
+  pendingDemoCommand.add(w.id);
 }
 
-/** Watches whose post-upload command should run once their batch is done. */
-export const pendingCommand = new Set<string>();
+/** Browser demo: watches whose post-upload command runs once their batch is done (live: live/transfers.ts). */
+export const pendingDemoCommand = new Set<string>();
 
 /**
  * Simulates the user saving a file in a watched folder. Called by the
@@ -114,13 +114,13 @@ export function simulateLocalChange(watchId?: string, path?: string) {
   if (LIVE) {
     // In the app this is "Abgleichen": compare the watched folder with the server now.
     const w = watchId
-      ? state.watches.find((x) => x.id === watchId)
-      : (watchForLocal(panePath('local')) ?? state.watches.find((x) => x.state !== 'paused'));
+      ? getState().watches.find((x) => x.id === watchId)
+      : (watchForLocal(panePath('local')) ?? getState().watches.find((x) => x.state !== 'paused'));
     if (w) live.syncWatch(w.id);
     else showToast($t('Für diesen Ordner gibt es keine Überwachung.'));
     return;
   }
-  const w = state.watches.find((x) => (watchId ? x.id === watchId : x.state !== 'paused'));
+  const w = getState().watches.find((x) => (watchId ? x.id === watchId : x.state !== 'paused'));
   if (!w) {
     showToast($t('Keine aktive Überwachung. Starte zuerst eine.'), 'error');
     return;
@@ -145,7 +145,7 @@ export function simulateLocalChange(watchId?: string, path?: string) {
 
 /** Scenario: the file on the server was changed by someone else. */
 export function simulateConflict() {
-  const w = state.watches[0];
+  const w = getState().watches[0];
   if (!w) return;
   const path = paths.join(w.localPath, 'app.py');
   const target = paths.join(w.remotePath, 'app.py');
@@ -161,7 +161,7 @@ export function simulateConflict() {
 
 /** Scenario: an upload fails because the server folder belongs to root. */
 export function simulateError() {
-  const w = state.watches[0];
+  const w = getState().watches[0];
   if (!w) return;
   fs.chmod('remote', w.serverId, paths.join(w.remotePath, 'admin/static'), '755', 'root', 'root');
   const path = paths.join(w.localPath, 'admin/static/logo.png');
@@ -178,7 +178,7 @@ export function simulateDisconnect(serverId = activeTab()?.serverId) {
     watches: s.watches.map((w) => (w.serverId === serverId && w.state === 'active' ? { ...w, state: 'waiting' } : w)),
     servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: false } : x)),
   }));
-  const w = state.watches.find((x) => x.serverId === serverId && x.state === 'waiting');
+  const w = getState().watches.find((x) => x.serverId === serverId && x.state === 'waiting');
   if (w) {
     // Changes keep being collected while offline.
     const files = fs
@@ -224,7 +224,7 @@ export function disconnect(serverId = activeTab()?.serverId, quiet = false) {
  * SSH tunnels is open.
  */
 function serverStillUsed(sid: string): boolean {
-  const s = state;
+  const s = getState();
   if (s.tabs.some((x) => x.serverId === sid || x.leftServerId === sid)) return true;
   if (s.watches.some((w) => w.serverId === sid && w.state !== 'paused')) return true;
   if (
@@ -244,7 +244,7 @@ function serverStillUsed(sid: string): boolean {
 export function releaseServers(closed: Tab[]) {
   const ids = new Set(closed.flatMap((t) => [t.serverId, t.leftServerId]).filter((x): x is string => !!x));
   for (const sid of ids) {
-    if (!state.servers.find((x) => x.id === sid)?.online) continue;
+    if (!getState().servers.find((x) => x.id === sid)?.online) continue;
     if (!serverStillUsed(sid)) disconnect(sid, true);
   }
 }

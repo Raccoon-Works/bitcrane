@@ -297,19 +297,7 @@ export function Tooltip({
   );
 }
 
-/* ----------------------------------------------------------- Disclosure */
-
-export function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
-  return (
-    <section className="form-section" aria-label={title}>
-      <div className="form-section-head">
-        <span className="caption-strong">{title}</span>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
-}
+/* ---------------------------------------------------------------- Wordmark */
 
 /** The name as a wordmark: "Bit" bold, "crane" light (decided 31.10.2026), read as one word "Bitcrane". */
 export function Wordmark({ className = '' }: { className?: string }) {

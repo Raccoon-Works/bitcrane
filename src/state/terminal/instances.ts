@@ -16,7 +16,7 @@ import { previewEcho } from './preview';
 import { terminalSettings, themeFor } from './settings';
 import type { TermSession } from './types';
 
-export interface Live {
+interface Live {
   term: Terminal;
   fit: FitAddon;
   search: SearchAddon;
@@ -64,10 +64,11 @@ export function makeTerminal(session: TermSession): Live {
     e.preventDefault();
     e.stopPropagation();
     if (term.hasSelection()) {
-      void navigator.clipboard?.writeText(term.getSelection());
+      void navigator.clipboard.writeText(term.getSelection());
       term.clearSelection();
-    } else void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
+    } else void navigator.clipboard.readText().then((t) => t && pasteInto(term, t));
   });
+  // Input and size changes for a session that has just ended are refused; the end itself is shown elsewhere.
   const write = (d: string) => {
     if (LIVE) void backend.termWrite(session.id, d).catch(() => undefined);
     else previewEcho(term, d);
@@ -94,8 +95,7 @@ export function makeTerminal(session: TermSession): Live {
     if (LIVE) void backend.termResize(session.id, cols, rows).catch(() => undefined);
   });
   term.onSelectionChange(() => {
-    if (terminalSettings().copyOnSelect && term.hasSelection())
-      void navigator.clipboard?.writeText(term.getSelection());
+    if (terminalSettings().copyOnSelect && term.hasSelection()) void navigator.clipboard.writeText(term.getSelection());
   });
   // Windows and Linux: Strg+C without a selection stays "interrupt"; with one it copies, Strg+V pastes.
   term.attachCustomKeyEventHandler((e) => {
@@ -110,12 +110,12 @@ export function makeTerminal(session: TermSession): Live {
     const copy = mac ? e.metaKey && e.key === 'c' : e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'c';
     const paste = mac ? e.metaKey && e.key === 'v' : e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'v';
     if (copy && term.hasSelection()) {
-      void navigator.clipboard?.writeText(term.getSelection());
+      void navigator.clipboard.writeText(term.getSelection());
       term.clearSelection();
       return false;
     }
     if (paste) {
-      void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
+      void navigator.clipboard.readText().then((t) => t && pasteInto(term, t));
       return false;
     }
     // ⌘ shortcuts on the Mac belong to Bitcrane, not to the shell.

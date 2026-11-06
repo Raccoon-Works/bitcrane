@@ -12,6 +12,7 @@ import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
 import { $t } from '../i18n';
 import { connectAs } from './live';
+import { showError } from './errors';
 import { addLog } from './log';
 import { getState, serverById, setState, showToast, subscribeStore } from './store';
 
@@ -59,8 +60,11 @@ async function mount(srv: Server, quiet: boolean): Promise<void> {
 /** Takes the folder out of the Explorer; `remove` also deletes the local copies. */
 async function unmount(serverId: string, remove: boolean): Promise<void> {
   mounted.delete(serverId);
-  const kept = await backend.mountStop(serverId, remove).catch(() => null);
-  await backend.disconnect(connectionId(serverId)).catch(() => undefined);
+  const kept = await backend.mountStop(serverId, remove).catch((e) => {
+    showError(e);
+    return null;
+  });
+  await backend.disconnect(connectionId(serverId));
   setState((s) => {
     const next = { ...s.explorerFolders };
     delete next[serverId];
@@ -100,7 +104,7 @@ export function setExplorerFolder(serverId: string, on: boolean) {
 /** Opens the server's folder in the Explorer. */
 export function openExplorerFolder(serverId: string) {
   const folder = getState().explorerFolders[serverId];
-  if (folder) void backend.localOpen(folder).catch(() => undefined);
+  if (folder) backend.localOpen(folder).catch((e) => showError(e));
 }
 
 /** Windows only: mounts the servers that want it and keeps them in step. */

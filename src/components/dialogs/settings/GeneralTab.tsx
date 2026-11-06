@@ -20,11 +20,7 @@ const CLI_GUIDE_URL = 'https://github.com/Raccoon-Works/bitcrane/blob/main/docs/
 function CliRow() {
   const [exe, setExe] = useState('');
   useEffect(() => {
-    if (LIVE)
-      void backend
-        .cliPath()
-        .then(setExe)
-        .catch(() => undefined);
+    if (LIVE) void backend.cliPath().then(setExe);
   }, []);
   return (
     <Row
@@ -38,7 +34,7 @@ function CliRow() {
     >
       <span className="row-inline">
         {exe && (
-          <Button small onClick={() => void navigator.clipboard?.writeText(exe)}>
+          <Button small onClick={() => void navigator.clipboard.writeText(exe)}>
             {$t('Pfad kopieren')}
           </Button>
         )}

@@ -42,11 +42,7 @@ function doQuit() {
     .then((m) => m.saveNow())
     .then(() => import('../state/updates'))
     .then((u) => u.installOnQuit())
+    // Quitting goes ahead even when saving or installing failed; both report their own errors.
     .catch(() => undefined)
     .finally(() => backend.appQuit());
-}
-
-/** Starts moving the window (title bar drag). */
-export function startWindowDrag() {
-  if (LIVE) void win().startDragging();
 }

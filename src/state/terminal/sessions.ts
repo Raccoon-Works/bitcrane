@@ -14,7 +14,8 @@ import { activeTab, getState, LIVE, serverById, setState, showToast, subscribeSt
 import { applySettings, live, makeTerminal } from './instances';
 import { startPreviewSession } from './preview';
 import { terminalSettings } from './settings';
-import type { TabTerminal, TermSession } from './types';
+import type { TabTerminal } from '../../backend/types';
+import type { TermSession } from './types';
 
 /** Whether the tab's server can have a terminal (SSH). */
 function canHaveTerminal(t: Tab | undefined = activeTab()): boolean {
@@ -90,7 +91,7 @@ let shellList: LocalShell[] | null = null;
 export async function localShells(): Promise<LocalShell[]> {
   if (shellList) return shellList;
   if (!LIVE) return [];
-  shellList = await backend.termShells().catch(() => []);
+  shellList = await backend.termShells();
   return shellList;
 }
 
@@ -207,7 +208,7 @@ function markEnded(id: string) {
 /** Ends a session and removes it; the panel shows the next one or closes. */
 export function closeTerminal(id: string) {
   const session = getState().terminals.find((x) => x.id === id);
-  if (LIVE) void backend.termClose(id).catch(() => undefined);
+  if (LIVE) void backend.termClose(id);
   live.get(id)?.suggest.dispose();
   live.get(id)?.term.dispose();
   live.delete(id);

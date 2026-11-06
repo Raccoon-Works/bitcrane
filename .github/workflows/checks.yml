@@ -1,8 +1,8 @@
 # Code checks without building installers or publishing anything. Every warning
 # fails a check, so the code base stays at zero warnings:
 # - interface: Prettier, ESLint and the TypeScript compiler,
-# - Rust: rustfmt and Clippy on Windows, where the platform code (e.g. the jump list
-#   in iconmenu.rs) is compiled. The release build compiles the Mac code.
+# - Rust: rustfmt, Clippy and the tests on Windows, where the platform code (e.g. the
+#   jump list in iconmenu.rs) is compiled. The release build compiles the Mac code.
 name: Checks
 
 # The branch "native-check" runs the checks before anything reaches main.
@@ -61,6 +61,9 @@ jobs:
         run: |
           set -o pipefail
           cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --message-format=short -- -D warnings 2>&1 | tee check.log
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
 
       # The full log is not always reachable from outside; errors and warnings also become annotations.
       - name: Report problems as annotations

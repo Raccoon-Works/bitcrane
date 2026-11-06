@@ -36,8 +36,7 @@ export interface FileEntry {
   depth?: number;
 }
 
-/** Authentication method of a saved server. */
-/** "auto": agent, then the chosen and the default keys, then the password. */
+/** Authentication method of a saved server. "auto": agent, then the chosen and the default keys, then the password. */
 export type AuthMethod = 'auto' | 'key' | 'agent' | 'password';
 
 /** A saved server connection. */
@@ -48,7 +47,7 @@ export interface Server {
   ruleId?: string;
   /** Two-letter abbreviation shown in the coloured tile. */
   mono: string;
-  /** Tile colour key, see `serverColors` in the UI. */
+  /** Colour key, see `swatch` in components/serverColors.ts. */
   color: ServerColor;
   /** Own picture for the server (Transmit): a small PNG as data URL (64 px), shown instead of the globe. */
   image?: string;
@@ -169,7 +168,7 @@ export interface ServerProxy {
 export type Protocol = 'sftp' | 'ftp' | 'ftps' | 'webdav' | 'smb' | 's3' | 'vault' | 'dropbox' | 'gdrive' | 'onedrive';
 
 /** Cloud services that Bitcrane treats like a server (signed in through the browser). */
-export const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];
+const CLOUD_PROTOCOLS: Protocol[] = ['dropbox', 'gdrive', 'onedrive'];
 export const isCloudProtocol = (p?: Protocol) => !!p && CLOUD_PROTOCOLS.includes(p);
 
 /** A saved folder pair: server folder and, optionally, the matching local folder. */
@@ -221,10 +220,29 @@ export interface Tab {
   /** Two local halves (Total Commander): the right half shows this computer; `remotePath` is then a local path. */
   rightLocal?: boolean;
   /** Built-in terminal of this tab (state/terminal.ts): panel shown, session in front, filling the tab. */
-  terminal?: import('../state/terminal').TabTerminal;
+  terminal?: TabTerminal;
   /** The settings shown in a tab of their own (like a browser or VS Code); the area in front. */
-  settings?: import('../state/store').SettingsTab;
+  settings?: SettingsTab;
 }
+
+/** Tab state of the terminal: panel shown, session in front, whole tab. */
+export interface TabTerminal {
+  open: boolean;
+  active?: string;
+  full?: boolean;
+}
+
+/** Areas of the settings, each shown in the settings tab. */
+export type SettingsTab =
+  | 'general'
+  | 'watch'
+  | 'transfers'
+  | 'rules'
+  | 'connections'
+  | 'appearance'
+  | 'terminal'
+  | 'keys'
+  | 'advanced';
 
 /** Options of a folder watch. Mirrors the "Überwachung einrichten" dialog. */
 export interface WatchOptions {

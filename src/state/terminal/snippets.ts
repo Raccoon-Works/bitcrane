@@ -55,7 +55,7 @@ export async function sendSnippet(id: string, snippet: Snippet) {
  * null when Tabby or its quick commands were not found.
  */
 export async function importTabbySnippets(): Promise<number | null> {
-  const text = LIVE ? await backend.tabbyConfig().catch(() => null) : PREVIEW_TABBY;
+  const text = LIVE ? await backend.tabbyConfig() : PREVIEW_TABBY;
   if (!text) return null;
   const { load } = await import('js-yaml');
   let qc:

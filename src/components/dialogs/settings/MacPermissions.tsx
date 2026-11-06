@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { tauriBackend as backend } from '../../../backend/tauriBackend';
+import { showError } from '../../../state/errors';
 import { LIVE, useStore } from '../../../state/store';
 import { Button } from '../../ui';
 import { $t } from '../../../i18n';
@@ -22,10 +23,7 @@ export function MacPermissions() {
   useEffect(() => {
     if (!LIVE) return;
     const read = () => {
-      void backend
-        .macFullDiskAccess()
-        .then(setFullDisk)
-        .catch(() => setFullDisk(null));
+      void backend.macFullDiskAccess().then(setFullDisk);
       void import('@tauri-apps/plugin-notification')
         .then((m) => m.isPermissionGranted())
         .then(setNotify)
@@ -35,7 +33,7 @@ export function MacPermissions() {
     window.addEventListener('focus', read);
     return () => window.removeEventListener('focus', read);
   }, []);
-  const open = (page: string) => void backend.openMacSettings(page).catch(() => undefined);
+  const open = (page: string) => void backend.openMacSettings(page).catch((e) => showError(e));
   const state = (ok: boolean | null) =>
     ok === null ? null : ok ? (
       <span className="small tone-ok perm-state">{$t('erlaubt')}</span>

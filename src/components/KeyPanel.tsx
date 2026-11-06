@@ -64,9 +64,9 @@ export function KeyPanel({
 
   const copy = () =>
     navigator.clipboard
-      ?.writeText(publicKey)
+      .writeText(publicKey)
       .then(() => showToast($t('Öffentlicher Schlüssel kopiert.'), 'ok'))
-      .catch(() => undefined);
+      .catch(() => showToast($t('Kopieren nicht möglich.'), 'error'));
   const install = async () => {
     if (!LIVE) {
       setInstalled(null);

@@ -78,7 +78,7 @@ export function startLive() {
         s.settings.keepAwake !== false && s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
       if (busy !== awake) {
         awake = busy;
-        void backend.keepAwake(busy).catch(() => undefined);
+        void backend.keepAwake(busy);
       }
     });
     // Servers and shared settings between the user's computers (sync.ts).

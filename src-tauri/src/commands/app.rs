@@ -3,29 +3,10 @@
 
 use crate::error::{AppError, AppResult};
 use crate::{iconmenu, paths, shell_integration, tray, AppState};
-use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::{Manager, State};
-
-/// Opens the macOS privacy settings at "Festplattenvollzugriff" (Full Disk Access), so Bitcrane
-/// can be allowed once for all folders instead of one question per protected folder.
-#[tauri::command]
-pub(crate) fn open_full_disk_access() -> AppResult<()> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
-            .spawn()
-            .map(|_| ())
-            .map_err(AppError::from)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        Ok(())
-    }
-}
 
 /// State of the macOS permissions Bitcrane can check: "Festplattenvollzugriff"
 /// shows in whether the privacy database itself can be read (only with it).
@@ -234,13 +215,13 @@ pub(crate) fn app_quit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-/// While transfers or watches are busy, the computer must not fall asleep
-/// (idle sleep; the display may still turn off). One thread owns the lock,
-/// because Windows ties it to the thread that took it.
 /// Stops the thread that keeps the computer awake (set while it runs).
 static KEEP_AWAKE: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
 /// Keeps the computer from going to sleep while transfers run, until called with `false`.
+/// While transfers or watches are busy, the computer must not fall asleep (idle sleep; the
+/// display may still turn off). One thread owns the lock, because Windows ties it to the
+/// thread that took it.
 #[tauri::command]
 pub(crate) fn keep_awake(on: bool) {
     let mut slot = KEEP_AWAKE.lock().unwrap();
@@ -265,20 +246,8 @@ pub(crate) fn keep_awake(on: bool) {
     }
 }
 
-/// Version and platform of the running app (about dialog and settings).
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AppInfo {
-    version: String,
-    platform: String,
-    known_hosts: usize,
-}
-
+/// Version of the running app (about dialog, settings, the note after an update).
 #[tauri::command]
-pub(crate) fn app_info(app: tauri::AppHandle, state: State<'_, AppState>) -> AppInfo {
-    AppInfo {
-        version: app.package_info().version.to_string(),
-        platform: std::env::consts::OS.to_string(),
-        known_hosts: state.known_hosts.count(),
-    }
+pub(crate) fn app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
 }

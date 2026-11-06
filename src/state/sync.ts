@@ -23,6 +23,7 @@ import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
 import { seal, unseal, type Sealed } from '../util/crypto';
 import { $t } from '../i18n';
+import { showError } from './errors';
 import { addLog } from './log';
 import { getState, LIVE, setState, showToast, subscribeStore, type Settings } from './store';
 
@@ -101,7 +102,7 @@ function pick(ours: string | undefined, theirs: string | undefined, base: string
  * no shared file yet, everything here is kept. Returns the merged list (our
  * order first) and the servers taken over from the other computer.
  */
-export function mergeServers(
+function mergeServers(
   ours: Server[],
   theirs: Server[] | null,
   base: Record<string, string>,
@@ -144,11 +145,6 @@ export function mergeServers(
   const order = new Map(ours.map((x, i) => [x.id, i]));
   merged.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
   return { merged, taken };
-}
-
-/** Hash of a server as the sync compares it. */
-export function serverHash(x: Server): string {
-  return hashServer(x);
 }
 
 let applying = false;
@@ -246,19 +242,25 @@ async function syncOnce() {
   // Passwords from the other computer (only with the sync password).
   const password = await syncPassword();
   if (theirs?.secrets && password && st.settings.syncPasswords) {
+    let secrets: Record<string, string>;
     try {
-      const secrets = JSON.parse(await unseal(theirs.secrets, password)) as Record<string, string>;
-      // Only missing entries are filled in; a password changed here is not overwritten.
-      for (const [account, value] of Object.entries(secrets)) {
-        const have = await backend.secretGet(account).catch(() => null);
-        if (have === null) await backend.secretSet(account, value).catch(() => undefined);
-      }
+      secrets = JSON.parse(await unseal(theirs.secrets, password)) as Record<string, string>;
     } catch {
       throw new Error(
         $t(
           'Die Passwörter im Abgleich lassen sich mit deinem Abgleich-Passwort nicht entschlüsseln. Ist es auf allen Rechnern gleich?',
         ),
       );
+    }
+    // Only missing entries are filled in; a password changed here is not overwritten. A keychain
+    // that refuses to store is reported once, and the rest of the sync still applies.
+    try {
+      for (const [account, value] of Object.entries(secrets)) {
+        const have = await backend.secretGet(account).catch(() => null);
+        if (have === null) await backend.secretSet(account, value);
+      }
+    } catch (e) {
+      showError(e);
     }
   }
 
@@ -375,7 +377,7 @@ export async function setSyncPassword(password: string | null) {
     if (LIVE) await backend.secretSet(SYNC_PASSWORD, password);
     patchSettings({ syncPasswords: true });
   } else {
-    if (LIVE) await backend.secretDelete(SYNC_PASSWORD).catch(() => undefined);
+    if (LIVE) await backend.secretDelete(SYNC_PASSWORD).catch((e) => showError(e));
     patchSettings({ syncPasswords: false });
   }
   void runSync();

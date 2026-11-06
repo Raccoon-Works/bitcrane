@@ -135,7 +135,7 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
 }
 
 export function cancelCloudSignIn() {
-  if (LIVE) void backend.cloudSignInCancel().catch(() => undefined);
+  if (LIVE) void backend.cloudSignInCancel();
   closeDialog();
 }
 

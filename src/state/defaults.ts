@@ -89,18 +89,3 @@ export function detectTheme(): Theme {
   if (HOST_THEME === 'dark' || HOST_THEME === 'light') return HOST_THEME;
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
-
-export const SIDEBAR_MIN = 180;
-export const SIDEBAR_MAX = 360;
-export const SIDEBAR_DEFAULT = 224;
-
-/** Reads the remembered sidebar width (browser prototype: localStorage). */
-export function loadSidebarWidth(): number {
-  try {
-    const v = Number(window.localStorage.getItem('bitcrane.sidebarWidth'));
-    if (v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v;
-  } catch {
-    // Storage can be unavailable (private window, sandbox); fall back to the default.
-  }
-  return SIDEBAR_DEFAULT;
-}

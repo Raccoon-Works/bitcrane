@@ -19,7 +19,7 @@ import { describeFile } from '../util/format';
 import * as paths from '../util/paths';
 import { $t, LANG } from '../i18n';
 import type { AppState, SidebarSection, SortKey, ViewMode } from './appState';
-import { defaultToolbar, detectPlatform, detectTheme, loadSidebarWidth } from './defaults';
+import { defaultToolbar, detectPlatform, detectTheme } from './defaults';
 import { sampleServers, sampleTransfers, sampleWatches } from './demoData';
 import { updateTab } from './tabs';
 import { closePaneServer } from './watches';
@@ -69,7 +69,6 @@ export function initialState(): AppState {
     popoverOpen: false,
     menuBarWindowOpen: false,
     appMenu: null,
-    sidebarWidth: loadSidebarWidth(),
     dialog: null,
     contextMenu: null,
     renaming: null,
@@ -178,7 +177,7 @@ export function initialState(): AppState {
 /* Store plumbing                                                           */
 /* ------------------------------------------------------------------------ */
 
-export let state: AppState = initialState();
+let state: AppState = initialState();
 const listeners = new Set<() => void>();
 
 export function getState(): AppState {
@@ -534,7 +533,7 @@ const collator = new Intl.Collator('de', { numeric: true, sensitivity: 'base' })
 export const kindOf = (e: FileEntry) => describeFile(e.name.slice(e.name.lastIndexOf('/') + 1), e.kind);
 
 /** Sorts a listing; folders always come first, names break ties. */
-export function sortEntries(list: FileEntry[], order: { key: SortKey; dir: 1 | -1 }): FileEntry[] {
+function sortEntries(list: FileEntry[], order: { key: SortKey; dir: 1 | -1 }): FileEntry[] {
   const byName = (a: FileEntry, b: FileEntry) => collator.compare(a.name.replace(/^\./, ''), b.name.replace(/^\./, ''));
   return [...list].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;

@@ -19,14 +19,9 @@ export function TagFiles({ name, color }: { name: string; color: number }) {
   useEffect(() => {
     if (!LIVE) return;
     let live = true;
-    void backend
-      .localTagFind(name)
-      .then((r) => {
-        if (live) setItems(r);
-      })
-      .catch(() => {
-        if (live) setItems([]);
-      });
+    void backend.localTagFind(name).then((r) => {
+      if (live) setItems(r);
+    });
     return () => {
       live = false;
     };

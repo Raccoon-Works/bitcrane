@@ -23,11 +23,7 @@ export function SyncSettings() {
   const [pw, setPw] = useState('');
   // Cloud folders of this computer as quick choices (the same detection as for the places bar).
   useEffect(() => {
-    if (LIVE)
-      void backend
-        .localCloudPlaces()
-        .then((l) => setFound(l.filter((c) => c.service !== 'other')))
-        .catch(() => undefined);
+    if (LIVE) void backend.localCloudPlaces().then((l) => setFound(l.filter((c) => c.service !== 'other')));
   }, []);
   const choose = async () => {
     const picked = await chooseFolder($t('Ordner für den Abgleich'));

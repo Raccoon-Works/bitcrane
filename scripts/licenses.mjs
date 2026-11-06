@@ -61,5 +61,5 @@ for (const name of [
 }
 
 out.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
-fs.writeFileSync(path.join(root, 'src', 'licenses.json'), JSON.stringify(out));
+fs.writeFileSync(path.join(root, 'src', 'licenses.json'), JSON.stringify(out, null, 2) + '\n');
 console.log(`${out.length} packages`);

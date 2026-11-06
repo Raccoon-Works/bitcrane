@@ -44,11 +44,7 @@ const SIX_HOURS = 6 * 3600 * 1000;
 export function useAppVersion(): string {
   const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
   useEffect(() => {
-    if (LIVE)
-      backend
-        .appInfo()
-        .then((i) => setVersion(i.version))
-        .catch(() => undefined);
+    if (LIVE) void backend.appVersion().then(setVersion);
   }, []);
   return version;
 }

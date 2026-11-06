@@ -12,7 +12,7 @@ import type { PaneSide, Server, Watch } from '../backend/types';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
 import { $t } from '../i18n';
-import { showToast, LIVE, setState, activeTab, panePath, paneLoc, state, setLeftServer } from './core';
+import { showToast, LIVE, setState, activeTab, panePath, paneLoc, setLeftServer, getState } from './core';
 import type { Settings } from './appState';
 import { openDialog, closeDialog } from './panels';
 import { openServer, navigate, updateTab, clearSelection } from './tabs';
@@ -81,7 +81,7 @@ export function renameMany(side: PaneSide, pairs: Array<[string, string]>) {
         ok === pairs.length ? $t('{0} Objekte umbenannt.', ok) : $t('{0} von {1} umbenannt.', ok, pairs.length),
         ok === pairs.length ? 'ok' : 'error',
       );
-      if (state.activeTabId === t.id && panePath(side) === dir)
+      if (getState().activeTabId === t.id && panePath(side) === dir)
         setState((s) => ({
           selection: { ...s.selection, [side]: { names: pairs.map((p) => p[1]), cursor: -1, anchor: -1 } },
         }));
@@ -123,20 +123,22 @@ export function exportConfig() {
 
 /** Writes the export file; with a password it is encrypted and may carry the stored secrets. */
 export async function writeExport(password: string, withSecrets: boolean): Promise<boolean> {
-  const servers = state.servers.filter((x) => !x.temporary).map((x) => ({ ...x, online: false }));
+  const servers = getState()
+    .servers.filter((x) => !x.temporary)
+    .map((x) => ({ ...x, online: false }));
   const payload: ExportFile = {
     format: 'bitcrane-export',
     version: 1,
     servers,
-    watches: state.watches,
-    settings: { ...state.settings },
+    watches: getState().watches,
+    settings: { ...getState().settings },
   };
   if (!LIVE) {
     showToast(
       $t(
         'Export: {0} Server und {1} Überwachungen{2} (im Prototyp nicht gespeichert).',
         servers.length,
-        state.watches.length,
+        getState().watches.length,
         password ? $t(', verschlüsselt') : '',
       ),
     );
@@ -165,7 +167,7 @@ export async function writeExport(password: string, withSecrets: boolean): Promi
       $t(
         'Exportiert: {0} Server, {1} Überwachungen{2}.',
         servers.length,
-        state.watches.length,
+        getState().watches.length,
         password
           ? $t(', verschlüsselt{0}', secretCount ? $t(' mit {0} Passwörtern', secretCount) : '')
           : $t('. Passwörter sind nicht enthalten'),
@@ -222,7 +224,11 @@ async function applyImport(data: ExportFile) {
   ];
   // A server that already exists here under another id (same connection) is not added twice;
   // watches of the imported copy are pointed at the existing server instead.
-  const existing = new Map(state.servers.filter((x) => !x.temporary).map((x) => [connectionKey(x), x.id]));
+  const existing = new Map(
+    getState()
+      .servers.filter((x) => !x.temporary)
+      .map((x) => [connectionKey(x), x.id]),
+  );
   const remap = new Map<string, string>();
   const servers = (data.servers ?? []).filter((x) => {
     const have = existing.get(connectionKey(x));
@@ -254,13 +260,13 @@ async function applyImport(data: ExportFile) {
         ? $t(
             ', {0} Passwörter im {1}',
             restored,
-            state.platform === 'mac' ? $t('Schlüsselbund') : $t('Anmeldespeicher'),
+            getState().platform === 'mac' ? $t('Schlüsselbund') : $t('Anmeldespeicher'),
           )
         : '',
     ),
     'ok',
   );
-  if (!state.tabs.length && state.servers[0]) openServer(state.servers[0].id, true);
+  if (!getState().tabs.length && getState().servers[0]) openServer(getState().servers[0].id, true);
 }
 
 /**
@@ -288,7 +294,7 @@ export function openPlace(path: string) {
 
 /** Opens a watch's folders in the current tab. */
 export function openWatchFolders(watchId: string) {
-  const w = state.watches.find((x) => x.id === watchId);
+  const w = getState().watches.find((x) => x.id === watchId);
   if (!w) return;
   const t = activeTab();
   if (t && t.serverId !== w.serverId) openServer(w.serverId, true);
