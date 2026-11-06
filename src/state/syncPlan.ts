@@ -94,7 +94,8 @@ function changedSince(side: Side, agreed: [number, number]): boolean {
 export const TOLERANCE_MS = 1500;
 const DAY_MS = 24 * 3600 * 1000;
 
-export function isExcluded(rel: string, excludes: string[]) {
+/** Whether a relative path has a segment matching one of the patterns (a name or "*.ext"). */
+export function isExcluded(rel: string, excludes: string[]): boolean {
   return rel.split('/').some((seg) => excludes.some((p) => (p.startsWith('*.') ? seg.toLowerCase().endsWith(p.slice(1).toLowerCase()) : seg === p)));
 }
 

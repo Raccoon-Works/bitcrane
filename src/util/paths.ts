@@ -54,6 +54,13 @@ export function basename(path: string): string {
  * Breadcrumb parts of a path, e.g. "~/Projekte/a" -> [home, Projekte, a].
  * Handles the home folder ("~"), POSIX roots ("/") and Windows drives ("D:/").
  */
+/** Folder of `path` as shown in a transfer list: relative to `root`, or the root's own name. */
+export function relFolder(root: string, path: string): string {
+  const p = parent(path);
+  if (p === root) return basename(root);
+  return p.startsWith(root + '/') ? p.slice(root.length + 1) : p;
+}
+
 export function crumbs(path: string, homeName: string): Array<{ name: string; path: string }> {
   const out: Array<{ name: string; path: string }> = [];
   let acc: string;
