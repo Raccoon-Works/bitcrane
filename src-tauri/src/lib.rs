@@ -21,6 +21,7 @@ mod git;
 mod iconmenu;
 mod import;
 mod keys;
+mod links;
 #[cfg(test)]
 mod loadtest;
 mod local;
@@ -135,6 +136,9 @@ pub fn run() {
             }
             if let Some(action) = iconmenu::action_arg(&args) {
                 tray::on_menu(app, &action);
+            }
+            if let Some(link) = links::link_arg(&args) {
+                let _ = app.emit("open-link", link);
             }
         }));
     }
@@ -279,6 +283,8 @@ pub fn run() {
             commands::local::archive_extract_temp,
             commands::app::take_pending_uploads,
             commands::app::take_start_action,
+            commands::app::take_start_link,
+            commands::app::sftp_links_set,
             commands::app::cli_path,
             commands::mount::mount_start,
             commands::mount::mount_stop,

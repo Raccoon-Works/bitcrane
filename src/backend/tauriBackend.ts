@@ -79,6 +79,8 @@ export const tauriBackend: Backend = {
   localZip: (paths) => invoke('local_zip', { paths }),
   takePendingUploads: () => invoke('take_pending_uploads'),
   takeStartAction: () => invoke('take_start_action'),
+  takeStartLink: () => invoke('take_start_link'),
+  sftpLinksSet: (enable) => invoke('sftp_links_set', { enable }),
   mountStart: (connectionId, serverId, name, remoteRoot) =>
     invoke('mount_start', { connectionId, serverId, name, remoteRoot }),
   mountStop: (serverId, removeFolder) => invoke('mount_stop', { serverId, removeFolder }),

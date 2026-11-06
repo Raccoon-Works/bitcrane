@@ -26,8 +26,6 @@
     "autostart:default",
     "dialog:default",
     "deep-link:default",
-    "deep-link:allow-register",
-    "deep-link:allow-unregister",
     "updater:default",
     "process:allow-restart"
   ]

@@ -369,6 +369,10 @@ export interface Backend {
   takePendingUploads(): Promise<string[]>;
   /** The jump list entry (Windows) Bitcrane was started from: an action id of the status menu. */
   takeStartAction(): Promise<string | null>;
+  /** The sftp:// link Bitcrane was started with (Windows), once. */
+  takeStartLink(): Promise<string | null>;
+  /** Bitcrane as the program for sftp:// links on or off (Windows). */
+  sftpLinksSet(enable: boolean): Promise<void>;
   /** Extracts entries of archives into a new temporary folder; returns [folder, names]. */
   archiveExtractTemp(paths: string[]): Promise<[string, string[]]>;
   /** Shared settings file in a sync folder (null when there is none yet). */
