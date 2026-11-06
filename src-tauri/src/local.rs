@@ -1,7 +1,7 @@
 //! Local file system operations.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{perms_string, FileEntry, GrepHit, Place, WalkItem};
+use crate::model::{FileEntry, GrepHit, Place, WalkItem};
 use crate::paths::{to_native, to_ui};
 use std::fs;
 use std::path::Path;
@@ -18,7 +18,7 @@ fn mtime_ms(meta: &fs::Metadata) -> i64 {
 #[cfg(unix)]
 fn mode_of(meta: &fs::Metadata) -> String {
     use std::os::unix::fs::PermissionsExt;
-    perms_string(meta.permissions().mode())
+    crate::model::perms_string(meta.permissions().mode())
 }
 
 #[cfg(not(unix))]
@@ -420,7 +420,7 @@ pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec
 /// Largest image the icons view loads as a preview picture.
 const THUMB_MAX_BYTES: u64 = 40 * 1024 * 1024;
 
-/// Image type of a file name for the preview pictures, or None.
+/// Image type of a file name (previews and preview pictures), or None.
 pub(crate) fn image_mime(name: &str) -> Option<&'static str> {
     let ext = name.rsplit('.').next()?.to_ascii_lowercase();
     Some(match ext.as_str() {
@@ -428,6 +428,7 @@ pub(crate) fn image_mime(name: &str) -> Option<&'static str> {
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
+        "svg" => "image/svg+xml",
         "bmp" => "image/bmp",
         "avif" => "image/avif",
         "ico" => "image/x-icon",

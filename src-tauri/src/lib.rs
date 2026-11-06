@@ -1473,23 +1473,9 @@ struct Preview {
     truncated: bool,
 }
 
-fn image_mime(path: &str) -> Option<&'static str> {
-    let ext = path.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-    Some(match ext.as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "svg" => "image/svg+xml",
-        "bmp" => "image/bmp",
-        "ico" => "image/x-icon",
-        _ => return None,
-    })
-}
-
 fn make_preview(path: &str, mut bytes: Vec<u8>) -> Preview {
     use base64::Engine;
-    if let Some(mime) = image_mime(path) {
+    if let Some(mime) = local::image_mime(path) {
         let truncated = bytes.len() > IMAGE_LIMIT;
         if truncated {
             return Preview { kind: "binary", mime: mime.into(), data: String::new(), truncated };
@@ -1508,7 +1494,7 @@ fn make_preview(path: &str, mut bytes: Vec<u8>) -> Preview {
 #[tauri::command]
 async fn local_preview(path: String) -> AppResult<Preview> {
     use tokio::io::AsyncReadExt;
-    let limit = if image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
+    let limit = if local::image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
     if let Some((archive, inner)) = archive_vfs::split(&path) {
         return Ok(make_preview(&path, archive_vfs::read(&archive, &inner, limit + 1)?));
     }
@@ -1546,7 +1532,7 @@ async fn remote_media(state: State<'_, AppState>, server_id: String, path: Strin
 
 #[tauri::command]
 async fn remote_preview(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<Preview> {
-    let limit = if image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
+    let limit = if local::image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
     let bytes = remote!(state, server_id, |c| c.read_head(&path, limit + 1))?;
     Ok(make_preview(&path, bytes))
 }

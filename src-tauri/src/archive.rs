@@ -54,14 +54,17 @@ fn write_zip(items: &[PathBuf], target: &Path) -> AppResult<()> {
             if kind.is_dir() {
                 zip.add_directory(format!("{name}/"), options).map_err(zip_error)?;
             } else if kind.is_file() {
-                let mut opts = options;
+                // Unix keeps the file's permissions in the archive.
                 #[cfg(unix)]
-                {
+                let opts = {
                     use std::os::unix::fs::PermissionsExt;
-                    if let Ok(meta) = entry.metadata() {
-                        opts = opts.unix_permissions(meta.permissions().mode() & 0o777);
+                    match entry.metadata() {
+                        Ok(meta) => options.unix_permissions(meta.permissions().mode() & 0o777),
+                        Err(_) => options,
                     }
-                }
+                };
+                #[cfg(not(unix))]
+                let opts = options;
                 zip.start_file(name, opts).map_err(zip_error)?;
                 let mut f = fs::File::open(entry.path()).map_err(zip_error)?;
                 loop {
