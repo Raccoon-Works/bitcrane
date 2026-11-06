@@ -309,16 +309,6 @@ export function CodeEditor() {
     return state;
   };
 
-  // Closing the editor keeps what was typed: the texts go into the documents and come back when it opens again.
-  useEffect(() => {
-    const saved = states.current;
-    return () => {
-      const texts = new Map<string, string>();
-      for (const [id, st] of saved) texts.set(id, st.doc.toString());
-      keepTexts(texts);
-    };
-  }, []);
-
   // One EditorView; documents swap their states in and out of it.
   useEffect(() => {
     if (!host.current) return;
@@ -326,9 +316,14 @@ export function CodeEditor() {
     view.current = v;
     const saved = states.current;
     return () => {
-      // The shown document's latest state is kept before the view goes (closing the editor).
+      // Closing the editor keeps what was typed: the texts go into the documents and come back
+      // when it opens again. The shown document's text is taken from the view, which is ahead
+      // of its kept state.
       const a = activeRef.current;
       if (a && saved.has(a)) saved.set(a, v.state);
+      const texts = new Map<string, string>();
+      for (const [id, st] of saved) texts.set(id, st.doc.toString());
+      keepTexts(texts);
       v.destroy();
       view.current = null;
     };
