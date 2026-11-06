@@ -796,30 +796,12 @@ impl VaultConn {
     }
 
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
-        let base = remote_parent(path);
-        let root = self.stat(path).await?;
-        let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
-        if root.kind != "dir" {
-            return Ok(vec![WalkItem {
-                path: path.to_string(),
-                relative: rel(path),
-                size: root.size,
-                mtime: root.mtime,
-            }]);
-        }
-        let mut out = Vec::new();
-        let mut stack = vec![path.to_string()];
-        while let Some(dir) = stack.pop() {
-            for e in self.list(&dir).await? {
-                let p = remote_join(&dir, &e.name);
-                if e.kind == "dir" {
-                    stack.push(p);
-                } else {
-                    out.push(WalkItem { relative: rel(&p), path: p, size: e.size, mtime: e.mtime });
-                }
-            }
-        }
-        Ok(out)
+        crate::remote::walk_by_listing(
+            path,
+            |p| async move { self.stat(&p).await },
+            |d| async move { self.list(&d).await },
+        )
+        .await
     }
 
     /// Reads and decrypts a file from `offset`.

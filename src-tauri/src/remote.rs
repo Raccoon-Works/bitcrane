@@ -4,6 +4,38 @@
 //! The commands in `lib.rs` and the transfers in `transfer.rs` only talk to
 //! `Remote`; what a protocol cannot do (commands on the server over FTP,
 //! permissions over WebDAV, ...) comes back as a clear error.
+/// Files below `path` (or `path` itself when it is a file), found by listing folder after
+/// folder, for protocols without a recursive listing of their own. Linked folders are not
+/// entered: a link back up would never end.
+pub async fn walk_by_listing<S, L>(
+    path: &str,
+    stat: impl FnOnce(String) -> S,
+    list: impl Fn(String) -> L,
+) -> AppResult<Vec<WalkItem>>
+where
+    S: Future<Output = AppResult<FileEntry>>,
+    L: Future<Output = AppResult<Vec<FileEntry>>>,
+{
+    let base = remote_parent(path);
+    let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
+    let root = stat(path.to_string()).await?;
+    if root.kind != "dir" {
+        return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+    }
+    let mut out = Vec::new();
+    let mut stack = vec![path.to_string()];
+    while let Some(dir) = stack.pop() {
+        for e in list(dir.clone()).await? {
+            let p = remote_join(&dir, &e.name);
+            if e.kind != "dir" {
+                out.push(WalkItem { relative: rel(&p), path: p, size: e.size, mtime: e.mtime });
+            } else if e.link.is_none() {
+                stack.push(p);
+            }
+        }
+    }
+    Ok(out)
+}
 
 use crate::dav::DavConn;
 use crate::dropbox::DropboxConn;
@@ -12,11 +44,12 @@ use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::gdrive::GDriveConn;
 use crate::model::{FileEntry, WalkItem};
 use crate::onedrive::OneDriveConn;
-use crate::paths::{remote_join, remote_name};
+use crate::paths::{remote_join, remote_name, remote_parent};
 use crate::scp::ScpConn;
 use crate::smb::SmbConn;
 use crate::ssh::Connection;
 use crate::vault::VaultConn;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};

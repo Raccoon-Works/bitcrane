@@ -16,7 +16,7 @@
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::model::{FileEntry, WalkItem};
 use crate::oauth;
-use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::paths::{remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::Deserialize;
@@ -471,30 +471,12 @@ impl OneDriveConn {
 
     /// All files below a folder.
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
-        let base = remote_parent(&norm(path));
-        let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
-        let root = self.stat(path).await?;
-        if root.kind != "dir" {
-            return Ok(vec![WalkItem {
-                path: norm(path),
-                relative: rel(&norm(path)),
-                size: root.size,
-                mtime: root.mtime,
-            }]);
-        }
-        let mut out = Vec::new();
-        let mut todo = vec![norm(path)];
-        while let Some(dir) = todo.pop() {
-            for e in self.list(&dir).await? {
-                let p = remote_join(&dir, &e.name);
-                if e.kind == "dir" {
-                    todo.push(p);
-                } else {
-                    out.push(WalkItem { relative: rel(&p), path: p, size: e.size, mtime: e.mtime });
-                }
-            }
-        }
-        Ok(out)
+        crate::remote::walk_by_listing(
+            &norm(path),
+            |p| async move { self.stat(&p).await },
+            |d| async move { self.list(&d).await },
+        )
+        .await
     }
 
     /// A view link anyone with the link can open (Transmit "Copy Link"). Accounts
