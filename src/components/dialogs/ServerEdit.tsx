@@ -14,7 +14,8 @@ import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/l
 import { askRemoveServer, closeDialog, getState, LIVE, monoFor, newServerTemplate, openDialog, openExternal, saveServer, showToast, updateSettings, useStore } from '../../state/store';
 import { CLOUD_NAMES, GDRIVE_GUIDE_URL, googleKey, saveGoogleKey, showCloudNotSetUp } from '../../state/cloud';
 import { KeyPanel } from '../KeyPanel';
-import { ServerTile, swatch } from '../ServerTile';
+import { ServerTile } from '../ServerTile';
+import { swatch } from '../serverColors';
 import { Button, Segmented, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';

@@ -82,7 +82,7 @@ export function tr(message: string): string {
 /* Mac menus in English use title case ("Open in New Tab"); Windows keeps
    sentence case ("Open in new tab"), as each system does in its own apps. */
 const SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'to', 'of', 'in', 'on', 'at', 'by', 'as', 'via', 'per', 'vs', 'with', 'from', 'into', 'onto']);
-const IS_MAC = typeof navigator !== 'undefined' && !/Win/i.test(`${navigator.platform} ${navigator.userAgent}`);
+const IS_MAC = !/Win/i.test(`${navigator.platform} ${navigator.userAgent}`);
 
 /** Title case for one English menu text; quoted parts (file names) stay as they are. */
 export function titleCase(text: string): string {

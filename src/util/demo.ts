@@ -8,7 +8,7 @@
  */
 import type { Platform, Theme } from '../backend/types';
 
-const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const params = new URLSearchParams(location.search);
 
 /** True when the prototype runs as the website demo (no prototype control bar). */
 export const DEMO = params.has('demo');
@@ -30,7 +30,7 @@ export const DEMO_LANG: string | undefined = DEMO ? params.get('lang') ?? undefi
  * from the embedding window are accepted, and only these two known values.
  */
 export function listenForDemoMessages(apply: (patch: { platform?: Platform; theme?: Theme }) => void) {
-  if (!DEMO || typeof window === 'undefined' || window.parent === window) return;
+  if (!DEMO || window.parent === window) return;
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent) return;
     const d = e.data as { bitcraneDemo?: boolean; platform?: string; theme?: string } | null;

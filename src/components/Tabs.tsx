@@ -8,8 +8,9 @@
  * to the tabs opens a new one.
  */
 import { Plus, Settings as Gear, X } from './glyphs';
-import { addressOf } from './ServerList';
-import { LocalTile, ServerTile, swatch } from './ServerTile';
+import { addressOf } from '../util/serverAddress';
+import { LocalTile, ServerTile } from './ServerTile';
+import { swatch } from './serverColors';
 import type { CSSProperties } from 'react';
 import { IconButton, Tooltip } from './ui';
 import { useKeyLabel } from '../state/keys';

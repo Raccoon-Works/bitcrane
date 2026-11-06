@@ -151,11 +151,11 @@ export function Tooltip({ text, shortcut, children, below = true }: { text: stri
     const roomBelow = pos.bottom + 6 + h < pos.h - 4;
     el.style.top = `${below && roomBelow ? pos.bottom + 6 : pos.top - 6 - h}px`;
   }, [open, pos, below]);
-  const host = typeof document !== 'undefined' ? document.getElementById(STAGE_ID) ?? document.body : null;
+  const host = document.getElementById(STAGE_ID) ?? document.body;
   return (
     <span ref={anchor} className="tip-anchor" onMouseEnter={show} onMouseLeave={hide} onMouseDown={hide}>
       {children}
-      {open && pos && host && createPortal(
+      {open && pos && createPortal(
         <span ref={tip} role="tooltip" className={`tooltip is-floating${instant ? ' is-instant' : ''}`}>
           {text}
           {shortcut && <span className="tooltip-key">{shortcut}</span>}

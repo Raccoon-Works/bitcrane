@@ -7,7 +7,7 @@ import { Search } from '../glyphs';
 import { useState } from 'react';
 import { allTools, closeDialog, defaultToolbar, setState, setToolbar, useStore, type ToolId } from '../../state/store';
 import { WatchIcon } from '../icons';
-import { useToolDefs } from '../Toolbar';
+import { useToolDefs } from '../toolDefs';
 import { Button, Select } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';

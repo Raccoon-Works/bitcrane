@@ -2,7 +2,7 @@
  * Right-click menu for files. Shows only what fits the clicked entries
  * (design rule: no greyed-out items from later stages).
  */
-import { placeLabel } from './PlacesBar';
+import { placeLabel } from '../util/placeLabel';
 import { Check } from './glyphs';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { keyLabel } from '../state/keys';
@@ -13,7 +13,7 @@ import {
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
-import { addressOf } from './ServerList';
+import { addressOf } from '../util/serverAddress';
 import { gitFor, gitRun } from '../state/git';
 import { TAG_COLORS, tagName, tagsFor, toggleTag } from '../state/tags';
 import { openExplorerFolder, setExplorerFolder } from '../state/mount';

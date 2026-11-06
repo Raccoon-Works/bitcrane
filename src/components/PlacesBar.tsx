@@ -9,11 +9,13 @@
  *   go removes it (also in the context menu, which is the way on Windows).
  */
 import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, House } from '@phosphor-icons/react';
-import { BrandLogo, isBrandService } from './BrandLogo';
+import { BrandLogo } from './BrandLogo';
+import { isBrandService } from './brands';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PaneSide, Place } from '../backend/types';
 import { activeTab, movePlace, navigate, placesFor, removePlace, setState, useStore } from '../state/store';
 import { $t } from '../i18n';
+import { placeLabel } from '../util/placeLabel';
 
 /** Icon of a place, guessed from its folder (home, desktop, downloads, documents). */
 function PlaceIcon({ place }: { place: Place }) {
@@ -27,16 +29,6 @@ function PlaceIcon({ place }: { place: Place }) {
   if (last === 'downloads') return <DownloadSimple {...props} />;
   if (last === 'documents' || last === 'dokumente') return <FileText {...props} />;
   return <FolderSimple {...props} />;
-}
-
-/**
- * Name shown for a place. Cloud folders found by older versions were named
- * with their account ("Google Drive (name@example.com)"), which filled the bar;
- * the account is shown in the tooltip instead.
- */
-export function placeLabel(place: Place): string {
-  if (!place.cloud) return place.name;
-  return place.name.replace(/\s*\([^)]*@[^)]*\)\s*$/, '');
 }
 
 /** Tooltip of a place: the folder, and for cloud folders the account it belongs to. */
@@ -77,7 +69,7 @@ export function PlacesBar({ side }: { side: PaneSide }) {
   useLayoutEffect(measure);
   useLayoutEffect(() => {
     const bar = barRef.current;
-    if (!bar || typeof ResizeObserver === 'undefined') return;
+    if (!bar) return;
     const ro = new ResizeObserver(() => setFit(places.length));
     ro.observe(bar);
     return () => ro.disconnect();
