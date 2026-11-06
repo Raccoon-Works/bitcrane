@@ -15,21 +15,21 @@ on:
   workflow_dispatch:
     inputs:
       notes:
-        description: "Short summary (shown in the update window)"
+        description: 'Short summary (shown in the update window)'
         required: false
-        default: "Improvements and fixes."
+        default: 'Improvements and fixes.'
       added:
-        description: "Features: items separated by |"
+        description: 'Features: items separated by |'
         required: false
-        default: ""
+        default: ''
       improved:
-        description: "Improvements: items separated by |"
+        description: 'Improvements: items separated by |'
         required: false
-        default: ""
+        default: ''
       fixed:
-        description: "Fixes: items separated by |"
+        description: 'Fixes: items separated by |'
         required: false
-        default: ""
+        default: ''
 
 permissions:
   contents: write
@@ -53,7 +53,7 @@ jobs:
             args: --target universal-apple-darwin
           - platform: windows-latest
             name: windows
-            args: ""
+            args: ''
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v5
@@ -138,7 +138,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
           # App keys of the cloud services (Settings -> Secrets and variables -> Actions -> Variables).
           # Public by design for desktop apps; without them the services show as "not set up yet".
           BITCRANE_DROPBOX_KEY: ${{ vars.DROPBOX_APP_KEY }}
