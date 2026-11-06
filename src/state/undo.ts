@@ -3,7 +3,8 @@
  */
 import { showError } from './errors';
 
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import { chooseFile, chooseFolder, chooseSaveTarget } from '../backend/dialogs';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { PaneSide, Server, Watch } from '../backend/types';
@@ -140,12 +141,11 @@ export async function writeExport(password: string, withSecrets: boolean): Promi
     );
     return true;
   }
-  const { save } = await import('@tauri-apps/plugin-dialog');
-  const path = await save({
-    title: $t('Exportieren'),
-    defaultPath: password ? 'bitcrane-export-verschluesselt.json' : 'bitcrane-export.json',
-    filters: [{ name: 'Bitcrane', extensions: ['json'] }],
-  }).catch(() => null);
+  const path = await chooseSaveTarget(
+    $t('Exportieren'),
+    password ? 'bitcrane-export-verschluesselt.json' : 'bitcrane-export.json',
+    [{ name: 'Bitcrane', extensions: ['json'] }],
+  );
   if (!path) return false;
   try {
     let file: ExportFile = payload;
@@ -159,7 +159,7 @@ export async function writeExport(password: string, withSecrets: boolean): Promi
         encrypted: await seal(JSON.stringify({ ...payload, secrets }), password),
       };
     }
-    await invoke('file_write', { path, text: JSON.stringify(file, null, 2) });
+    await backend.fileWrite(path, JSON.stringify(file, null, 2));
     showToast(
       $t(
         'Exportiert: {0} Server, {1} Überwachungen{2}.',
@@ -184,16 +184,10 @@ export async function importConfig() {
     showToast($t('Import einer Exportdatei geht im echten Programm.'));
     return;
   }
-  const { open } = await import('@tauri-apps/plugin-dialog');
-  const path = await open({
-    title: $t('Importieren'),
-    multiple: false,
-    directory: false,
-    filters: [{ name: 'Bitcrane', extensions: ['json'] }],
-  }).catch(() => null);
-  if (typeof path !== 'string') return;
+  const path = await chooseFile($t('Importieren'), { filters: [{ name: 'Bitcrane', extensions: ['json'] }] });
+  if (!path) return;
   try {
-    const data = JSON.parse(await invoke<string>('file_read', { path })) as ExportFile;
+    const data = JSON.parse(await backend.fileRead(path)) as ExportFile;
     if (data.format !== 'bitcrane-export') throw new Error($t('Das ist keine Exportdatei von Bitcrane.'));
     if (data.encrypted) openDialog({ type: 'importPassword', sealed: data.encrypted });
     else await applyImport(data);
@@ -268,7 +262,6 @@ async function applyImport(data: ExportFile) {
   if (!state.tabs.length && state.servers[0]) openServer(state.servers[0].id, true);
 }
 
-/** Opens a local place from the sidebar ("Projekte", "Downloads"). */
 /**
  * "Anderer Ordner …" in the location menu: any folder of this computer, chosen
  * in the system's folder dialog (in the prototype the path field opens instead).
@@ -279,14 +272,13 @@ export async function pickLocalFolder(side: PaneSide = 'local') {
     editPath(side);
     return;
   }
-  const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ directory: true, multiple: false, title: $t('Ordner öffnen') }).catch(() => null);
-  if (typeof picked !== 'string') return;
-  const path = await invoke<string>('path_to_ui', { path: picked });
+  const path = await chooseFolder($t('Ordner öffnen'));
+  if (!path) return;
   if (side === 'local' && activeTab()?.leftServerId) setLeftServer('');
   navigate(side, path);
 }
 
+/** Opens a local place from the sidebar ("Projekte", "Downloads"). */
 export function openPlace(path: string) {
   // Places are on this computer: leave server-to-server mode first.
   if (activeTab()?.leftServerId) setLeftServer('');

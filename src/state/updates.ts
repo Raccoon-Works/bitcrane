@@ -10,6 +10,7 @@
  * the background and installs it when Bitcrane quits (or right away from the
  * update window), "notify" only shows the update window, "off" never looks.
  */
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import { $t } from '../i18n';
 import { getState, LIVE, openDialog, setState, showToast } from './store';
 import { addLog } from './log';
@@ -120,8 +121,7 @@ export async function installOnQuit(): Promise<boolean> {
 /** Tells the next start that it follows an update, so the window opens (see mark_update_restart). */
 async function markRestart() {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('mark_update_restart');
+    await backend.markUpdateRestart();
   } catch {
     /* the window may then stay in the notification area; the update still runs */
   }

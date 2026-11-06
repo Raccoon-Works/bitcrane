@@ -3,7 +3,8 @@
  * in the Finder's sidebar. A double click (or Enter) shows the file in the
  * active half of this computer.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../../backend/tauriBackend';
+import type { TaggedFile } from '../../backend/api';
 import { useEffect, useState } from 'react';
 import { $t } from '../../i18n';
 import { closeDialog, getState, LIVE, revealSearchResult } from '../../state/store';
@@ -13,19 +14,13 @@ import { FileGlyph, FolderGlyph } from '../icons';
 import { Button } from '../ui';
 import { Dialog } from './Dialog';
 
-interface Tagged {
-  path: string;
-  size: number;
-  mtime: number;
-  dir: boolean;
-}
-
 export function TagFiles({ name, color }: { name: string; color: number }) {
-  const [items, setItems] = useState<Tagged[] | null>(LIVE ? null : []);
+  const [items, setItems] = useState<TaggedFile[] | null>(LIVE ? null : []);
   useEffect(() => {
     if (!LIVE) return;
     let live = true;
-    void invoke<Tagged[]>('local_tag_find', { name })
+    void backend
+      .localTagFind(name)
       .then((r) => {
         if (live) setItems(r);
       })

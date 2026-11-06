@@ -8,8 +8,8 @@
 import { ArrowRight, ChevronRight, Eye, Plus, X } from '../glyphs';
 import { useState } from 'react';
 import type { WatchOptions } from '../../backend/types';
-import { invoke } from '@tauri-apps/api/core';
-import { open as openFolderDialog } from '@tauri-apps/plugin-dialog';
+import { tauriBackend as backend } from '../../backend/tauriBackend';
+import { chooseFolder } from '../../backend/dialogs';
 import {
   activeTab,
   closeDialog,
@@ -45,7 +45,7 @@ const templates: Record<string, string[]> = {
 /** Brings a typed folder into the form watch events use ("~/x", forward slashes, no trailing slash). */
 async function normaliseLocalPath(typed: string): Promise<string> {
   let p = typed.trim().replace(/\\/g, '/');
-  if (LIVE) p = await invoke<string>('path_to_ui', { path: p }).catch(() => p);
+  if (LIVE) p = await backend.pathToUi(p);
   return p.length > 1 && !/^[A-Za-z]:\/$/.test(p) ? p.replace(/\/+$/, '') : p;
 }
 
@@ -113,12 +113,8 @@ export function WatchSetup({ editId }: { editId?: string }) {
       setLocalPath(panePath('local'));
       return;
     }
-    const picked = await openFolderDialog({
-      directory: true,
-      multiple: false,
-      title: $t('Lokalen Ordner wählen'),
-    }).catch(() => null);
-    if (typeof picked === 'string') setLocalPath(await invoke<string>('path_to_ui', { path: picked }));
+    const picked = await chooseFolder($t('Lokalen Ordner wählen'));
+    if (picked) setLocalPath(picked);
   };
 
   const saveTemplate = () => {

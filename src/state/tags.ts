@@ -5,15 +5,11 @@
  * Finder shows the same ones.
  */
 import { showError } from './errors';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { Tag } from '../backend/api';
 import { useEffect, useState } from 'react';
 import { $t, LANG } from '../i18n';
 import { getState, LIVE, showToast } from './store';
-
-export interface Tag {
-  name: string;
-  color: number;
-}
 
 /** Finder colours by number, with the names the Finder gives them. */
 export const TAG_COLORS: Array<{ color: number; css: string; de: string; en: string }> = [
@@ -33,7 +29,7 @@ const listeners = new Set<() => void>();
 
 export async function refreshTags(dir: string) {
   if (!LIVE || !dir) return;
-  const t = await invoke<Record<string, Tag[]>>('local_tags', { dir }).catch(() => ({}));
+  const t = await backend.localTags(dir).catch(() => ({}));
   cache.set(dir, t);
   listeners.forEach((l) => l());
 }
@@ -69,6 +65,6 @@ export async function toggleTag(dir: string, names: string[], color: (typeof TAG
   const name = tagName(color);
   const on = !names.every((n) => (have[n] ?? []).some((t) => t.color === color.color));
   const paths = names.map((n) => `${dir.replace(/\/$/, '')}/${n}`);
-  await invoke('local_tag', { paths, name, color: color.color, on }).catch((e) => showError(e));
+  await backend.localTag(paths, name, color.color, on).catch((e) => showError(e));
   await refreshTags(dir);
 }

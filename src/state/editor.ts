@@ -13,7 +13,8 @@
  * and whether a document has unsaved changes.
  */
 import { showError } from './errors';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import { chooseSaveTarget } from '../backend/dialogs';
 import { useSyncExternalStore } from 'react';
 import { $t } from '../i18n';
 import * as paths from '../util/paths';
@@ -150,7 +151,7 @@ export async function openFile(serverId: string, path: string) {
     set({ active: known.id, open: true });
     // Without own changes the file is read again if it changed in the meantime (another program, a watch, a download).
     if (LIVE && !known.dirty && known.mtime) {
-      const now = await invoke<number>('editor_mtime', { serverId: serverId || null, path }).catch(() => known.mtime);
+      const now = await backend.editorMtime(serverId || null, path).catch(() => known.mtime);
       if (Math.abs(now - known.mtime) > 1500) await reloadDoc(known.id);
     }
     return;
@@ -175,10 +176,7 @@ export async function openFile(serverId: string, path: string) {
     return;
   }
   try {
-    const f = await invoke<{ text: string; mtime: number; eol: string; bom: boolean }>('editor_read', {
-      serverId: serverId || null,
-      path,
-    });
+    const f = await backend.editorRead(serverId || null, path);
     patchDoc(doc.id, {
       loading: false,
       initial: f.text,
@@ -231,7 +229,7 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
   const serverId = d.serverId || null;
   try {
     if (!force && d.mtime) {
-      const now = await invoke<number>('editor_mtime', { serverId, path: d.path }).catch(() => d.mtime);
+      const now = await backend.editorMtime(serverId, d.path).catch(() => d.mtime);
       // Seconds are enough: FTP servers report whole seconds or minutes.
       if (Math.abs(now - d.mtime) > 1500) {
         patchDoc(id, { conflict: true });
@@ -239,7 +237,7 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
       }
     }
     const text = get();
-    const mtime = await invoke<number>('editor_write', { serverId, path: d.path, text, eol: d.eol, bom: d.bom });
+    const mtime = await backend.editorWrite(serverId, d.path, text, d.eol, d.bom);
     // The saved text is the new reference; the editor shows it again after being closed and reopened.
     patchDoc(id, { dirty: false, conflict: false, mtime, initial: text, text: undefined });
     if (serverId) addLog('ok', $t('Gesichert und hochgeladen: {0}', d.path), serverId);
@@ -267,15 +265,11 @@ export async function saveAs(id: string): Promise<boolean> {
     showToast($t('„{0}“ gesichert.', `${d.name}.txt`), 'ok');
     return true;
   }
-  const { save } = await import('@tauri-apps/plugin-dialog');
-  const picked = await save({ title: $t('Sichern unter'), defaultPath: d.serverId === null ? d.name : d.name }).catch(
-    () => null,
-  );
-  if (!picked) return false;
-  const path = await invoke<string>('path_to_ui', { path: picked });
+  const path = await chooseSaveTarget($t('Sichern unter'), d.name);
+  if (!path) return false;
   try {
     const text = get();
-    const mtime = await invoke<number>('editor_write', { serverId: null, path, text, eol: d.eol, bom: d.bom });
+    const mtime = await backend.editorWrite(null, path, text, d.eol, d.bom);
     patchDoc(id, {
       serverId: '',
       path,

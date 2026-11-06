@@ -30,7 +30,7 @@ import {
   navigate,
   listEntries,
 } from '../state/store';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import { join } from './paths';
 import { $t } from '../i18n';
 
@@ -163,7 +163,7 @@ function prepareOut(d: DragState) {
   const list = outEligible(d);
   const key = `${loc[1]}|${list?.join('|')}`;
   if (!list || prepared?.key === key) return;
-  prepared = { key, job: invoke<string[]>('remote_drag_prepare', { serverId: loc[1], paths: list }) };
+  prepared = { key, job: backend.remoteDragPrepare(loc[1], list) };
 }
 
 /**
@@ -195,7 +195,7 @@ async function handOut(d: DragState) {
       files = (await prepared?.job) ?? [];
     }
     handedOut = { names: new Set(files.map((f) => f.split(/[\\/]/).pop() ?? '')), until: Date.now() + 120000 };
-    await invoke('drag_out', { paths: files });
+    await backend.dragOut(files);
   } catch (e) {
     showError(e);
   } finally {

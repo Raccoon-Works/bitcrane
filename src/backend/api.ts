@@ -5,7 +5,7 @@
  * The browser prototype does not use it; there the store works on the
  * in-memory demo file systems in `mockFs.ts`.
  */
-import type { CloudPlace, FileEntry, HostKey, Place } from './types';
+import type { CloudPlace, FileEntry, HostKey, Place, PortForward } from './types';
 import { $t, tr } from '../i18n';
 
 export interface WalkItem {
@@ -206,7 +206,151 @@ export interface SshConfigHost {
   identityFile?: string;
 }
 
+/** Version and platform of the running app (see `app_info` in commands/app.rs). */
+export interface AppInfo {
+  version: string;
+  platform: string;
+  knownHosts: number;
+}
+
+/** A Finder tag (Mac) of a file; `color` is the Finder colour number 0 to 7. */
+export interface Tag {
+  name: string;
+  color: number;
+}
+
+/** A file or folder found by its Finder tag. */
+export interface TaggedFile {
+  path: string;
+  size: number;
+  mtime: number;
+  dir: boolean;
+}
+
+/** State of a git working copy (see `git.rs`). */
+export interface GitStatus {
+  root: string;
+  branch: string;
+  ahead: number;
+  behind: number;
+  /** Path relative to root → M, A, D, R, ? or U. */
+  files: Record<string, string>;
+}
+
+/** A shell of this computer that the local terminal can run. */
+export interface LocalShell {
+  id: string;
+  name: string;
+}
+
+/** A computer in the network that announces file shares (Bonjour). */
+export interface NetworkHost {
+  name: string;
+  host: string;
+}
+
+/** A file opened in the built-in editor; `eol` and `bom` are kept when it is saved. */
+export interface EditorFile {
+  text: string;
+  mtime: number;
+  eol: string;
+  bom: boolean;
+}
+
+/** The part of a tunnel the backend needs to run it. */
+export type ForwardSpec = Pick<PortForward, 'id' | 'kind' | 'bindHost' | 'bindPort' | 'destHost' | 'destPort'>;
+
+/** A session of the built-in terminal; a local one has an empty `serverId`. */
+export interface TermOpenParams {
+  id: string;
+  serverId: string;
+  cols: number;
+  rows: number;
+  cwd?: string;
+  /** Command run after the login (server setting). */
+  startup?: string;
+  /** Local shell id (see `LocalShell`); only for a local terminal. */
+  shell?: string;
+}
+
+/** What "Terminal öffnen" connects to: a local folder, or a server with its folder. */
+export interface TerminalTarget {
+  localPath: string;
+  host?: string;
+  port?: number;
+  user?: string;
+  keyPath?: string;
+  remotePath?: string;
+  /** Terminal program (setting "externalTerminal"); the system's default when missing. */
+  app?: string;
+}
+
 export interface Backend {
+  /** Converts a native path (from a system dialog or a drop) into the interface's form. */
+  pathToUi(path: string): Promise<string>;
+  /** Real target of each folder (links resolved, interface form), in the same order; unchanged when unresolvable. */
+  localRealPaths(paths: string[]): Promise<string[]>;
+  /** Free bytes on the volume of a folder; null when unknown. */
+  localFreeSpace(path: string): Promise<number | null>;
+  /** Finder tags of the entries of a folder, by name. */
+  localTags(dir: string): Promise<Record<string, Tag[]>>;
+  /** Sets (`on`) or removes a tag on files. */
+  localTag(paths: string[], name: string, color: number, on: boolean): Promise<void>;
+  localTagFind(name: string): Promise<TaggedFile[]>;
+  networkHosts(): Promise<NetworkHost[]>;
+  /** Null outside a git working copy or without git. */
+  gitStatus(dir: string): Promise<GitStatus | null>;
+  /** Runs add, addAll, commit, pull or push; resolves to git's output. */
+  gitAction(root: string, what: string, paths: string[], message: string, all: boolean): Promise<string>;
+  /** Copies server files into temporary files for dragging them out of the window; returns their native paths. */
+  remoteDragPrepare(serverId: string, paths: string[]): Promise<string[]>;
+  /** Hands native files to the system's drag and drop. */
+  dragOut(paths: string[]): Promise<void>;
+
+  editorRead(serverId: string | null, path: string): Promise<EditorFile>;
+  /** Modification time in ms; `serverId` null for a file of this computer. */
+  editorMtime(serverId: string | null, path: string): Promise<number>;
+  /** Saves the text with the given line ending; returns the new modification time. */
+  editorWrite(serverId: string | null, path: string, text: string, eol: string, bom: boolean): Promise<number>;
+
+  termShells(): Promise<LocalShell[]>;
+  termOpen(params: TermOpenParams): Promise<void>;
+  termWrite(id: string, data: string): Promise<void>;
+  termResize(id: string, cols: number, rows: number): Promise<void>;
+  termClose(id: string): Promise<void>;
+  /** Opens the system's terminal program (outside Bitcrane). */
+  openTerminal(target: TerminalTarget): Promise<void>;
+  /** Tabby's config.yaml, null when Tabby is not installed. */
+  tabbyConfig(): Promise<string | null>;
+  /** Ids of the tunnels running now. */
+  forwardActive(): Promise<string[]>;
+  forwardStart(serverId: string, spec: ForwardSpec): Promise<void>;
+  forwardStop(id: string): Promise<void>;
+  /** Answers a keyboard-interactive login prompt; null cancels it. */
+  authPromptAnswer(id: string, answers: string[] | null): Promise<void>;
+
+  appInfo(): Promise<AppInfo>;
+  /** Path of the program for `bitcrane …` on the command line. */
+  cliPath(): Promise<string>;
+  /** True after a start at login (the window may stay hidden). */
+  startInfo(): Promise<boolean>;
+  /** Tells Rust the interface decided about the window, so it does not show it by itself. */
+  startDecided(): Promise<void>;
+  /** Tells the next start that it follows an update, so the window opens. */
+  markUpdateRestart(): Promise<void>;
+  /** Prevents the computer from sleeping while `on`. */
+  keepAwake(on: boolean): Promise<void>;
+  /** "sleep" or "shutdown". */
+  systemPower(action: string): Promise<void>;
+  /** Adds or removes the "upload with Bitcrane" entry of the system's context menu. */
+  shellIntegrationSet(enable: boolean, label: string): Promise<void>;
+  /** Mac: whether Bitcrane has Full Disk Access. */
+  macFullDiskAccess(): Promise<boolean>;
+  /** Mac: opens a page of the System Settings: "fullDisk", "localNetwork", "notifications" or "loginItems". */
+  openMacSettings(page: string): Promise<void>;
+  /** Mac: opens the Full Disk Access page of the system settings. */
+  openFullDiskAccess(): Promise<void>;
+
   localList(path: string): Promise<FileEntry[]>;
   localStat(path: string): Promise<FileEntry>;
   localMkdir(path: string): Promise<void>;

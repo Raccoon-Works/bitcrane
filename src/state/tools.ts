@@ -9,7 +9,7 @@
  * - "Nach Abschluss": disconnect, quit, sleep or shut down once all transfers are done.
  */
 import { showError } from './errors';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { FileEntry, PaneSide, Tab } from '../backend/types';
 import * as live from './live';
 import {
@@ -367,7 +367,7 @@ export async function runAfterQueue(action: AfterQueue) {
     const { saveNow } = await import('./live');
     await saveNow();
     try {
-      await invoke('system_power', { action });
+      await backend.systemPower(action);
     } catch (e) {
       showError(e);
     }
@@ -472,5 +472,5 @@ export async function uploadToServer(paths: string[], serverId: string, dir: str
 export async function applyShellIntegration() {
   if (!LIVE) return;
   const on = getState().settings.shellIntegration !== false;
-  await invoke('shell_integration_set', { enable: on, label: $t('Mit Bitcrane hochladen') }).catch(() => undefined);
+  await backend.shellIntegrationSet(on, $t('Mit Bitcrane hochladen')).catch(() => undefined);
 }

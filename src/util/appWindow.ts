@@ -2,7 +2,7 @@
  * Window controls for the custom Windows title bar.
  * In the browser prototype these do nothing visible except a short note.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { LIVE, showToast } from '../state/store';
 import { $t } from '../i18n';
@@ -43,7 +43,7 @@ function doQuit() {
     .then(() => import('../state/updates'))
     .then((u) => u.installOnQuit())
     .catch(() => undefined)
-    .finally(() => invoke('app_quit'));
+    .finally(() => backend.appQuit());
 }
 
 /** Starts moving the window (title bar drag). */

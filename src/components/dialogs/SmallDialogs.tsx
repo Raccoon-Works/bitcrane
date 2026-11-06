@@ -5,7 +5,7 @@
 import { addressOf } from '../../util/serverAddress';
 import { serverTrash } from '../../state/live';
 import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { useEffect, useState } from 'react';
 import {
   isCloudProtocol,
@@ -406,7 +406,7 @@ export function AuthPrompt({
   const [values, setValues] = useState<string[]>(prompts.map(() => ''));
   const answer = (answers: string[] | null) => {
     closeDialog();
-    void invoke('auth_prompt_answer', { id, answers });
+    void backend.authPromptAnswer(id, answers);
   };
   const submit = () => answer(values);
   return (
@@ -857,7 +857,8 @@ export function About() {
   const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
   useEffect(() => {
     if (LIVE)
-      invoke<{ version: string }>('app_info')
+      backend
+        .appInfo()
         .then((i) => setVersion(i.version))
         .catch(() => undefined);
   }, []);
@@ -892,7 +893,8 @@ export function UpdateDialog() {
   const [current, setCurrent] = useState('');
   useEffect(() => {
     if (LIVE)
-      invoke<{ version: string }>('app_info')
+      backend
+        .appInfo()
         .then((i) => setCurrent(i.version))
         .catch(() => undefined);
   }, []);

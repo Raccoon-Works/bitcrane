@@ -2,7 +2,6 @@
  * The transfer queue of the real backend: starting, limiting, retrying and
  * finishing transfers.
  */
-import { invoke } from '@tauri-apps/api/core';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { getState, showToast, uid, serverById, subscribeStore, setState } from '../core';
 import { ruleFor } from '../tabs';
@@ -104,7 +103,7 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
 export async function uploadNativePaths(serverId: string, nativePaths: string[], remoteDir: string) {
   const byParent = new Map<string, string[]>();
   for (const n of nativePaths) {
-    const ui = await invoke<string>('path_to_ui', { path: n });
+    const ui = await backend.pathToUi(n);
     const dir = parent(ui);
     byParent.set(dir, [...(byParent.get(dir) ?? []), basename(ui)]);
   }
