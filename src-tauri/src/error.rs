@@ -46,9 +46,10 @@ pub struct AppError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
-    /// Host key information for `HostKeyUnknown` / `HostKeyChanged`.
+    /// Host key information for `HostKeyUnknown` / `HostKeyChanged`; boxed, as it is rare and
+    /// would otherwise make every `AppResult` large.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub host_key: Option<HostKeyInfo>,
+    pub host_key: Option<Box<HostKeyInfo>>,
 }
 
 /// Host key data shown in the fingerprint dialogs.

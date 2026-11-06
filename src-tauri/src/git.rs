@@ -44,7 +44,7 @@ pub fn parse_status(out: &str) -> GitStatus {
     while let Some(p) = parts.next() {
         if let Some(head) = p.strip_prefix("## ") {
             // "main...origin/main [ahead 1, behind 2]" or "No commits yet on main".
-            let (name, rest) = head.split_once(' ').map(|(a, b)| (a, b)).unwrap_or((head, ""));
+            let (name, rest) = head.split_once(' ').unwrap_or((head, ""));
             let name = name.split("...").next().unwrap_or(name);
             st.branch = if head.starts_with("No commits yet on ") { head.trim_start_matches("No commits yet on ").to_string() } else { name.to_string() };
             for (key, field) in [("ahead ", &mut st.ahead), ("behind ", &mut st.behind)] {

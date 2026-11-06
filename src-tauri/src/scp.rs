@@ -150,17 +150,17 @@ fn perms_octal(p: &str) -> String {
     let special = |i: usize, set: [u8; 2]| set.contains(b.get(i).unwrap_or(&b'-'));
     let mut mode = 0u32;
     for (n, base) in [(1usize, 6u32), (4, 3), (7, 0)] {
-        let x = if special(n + 2, [b's', b't']) { 1 } else { bit(n + 2, b'x') };
+        let x = if special(n + 2, *b"st") { 1 } else { bit(n + 2, b'x') };
         mode |= ((bit(n, b'r') << 2) | (bit(n + 1, b'w') << 1) | x) << base;
     }
     let mut extra = 0;
-    if special(3, [b's', b'S']) {
+    if special(3, *b"sS") {
         extra |= 4;
     }
-    if special(6, [b's', b'S']) {
+    if special(6, *b"sS") {
         extra |= 2;
     }
-    if special(9, [b't', b'T']) {
+    if special(9, *b"tT") {
         extra |= 1;
     }
     if extra > 0 {

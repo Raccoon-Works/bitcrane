@@ -492,7 +492,7 @@ async fn authenticate(handle: &mut client::Handle<Handler>, params: &ConnectPara
 /// of an already open session (jump server).
 enum Transport {
     Direct,
-    Through(russh::ChannelStream<client::Msg>),
+    Through(Box<russh::ChannelStream<client::Msg>>),
 }
 
 /// Handshake (with host key check) and login for one hop.
@@ -518,7 +518,7 @@ async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport:
                 tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler)).await
             }
         },
-        Transport::Through(stream) => tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, stream, handler)).await,
+        Transport::Through(stream) => tokio::time::timeout(connect_timeout(params.timeout), client::connect_stream(config, *stream, handler)).await,
     };
     let mut handle = match connected {
         Err(_) => return Err(AppError::new(ErrorKind::Unreachable, "Der Server antwortet nicht (Zeitüberschreitung).")),
@@ -533,7 +533,7 @@ async fn open_session(params: &ConnectParams, known: Arc<KnownHosts>, transport:
                         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
                         if changed { "Der Fingerabdruck des Servers hat sich geändert." } else { "Dieser Server ist noch nicht bekannt." },
                     );
-                    err.host_key = Some(HostKeyInfo { host: params.host.clone(), algorithm: key.algorithm, fingerprint: key.fingerprint, previous: stored });
+                    err.host_key = Some(Box::new(HostKeyInfo { host: params.host.clone(), algorithm: key.algorithm, fingerprint: key.fingerprint, previous: stored }));
                     return Err(err);
                 }
             }
@@ -583,7 +583,7 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
                 .channel_open_direct_tcpip(params.host.clone(), params.port as u32, "127.0.0.1", 0)
                 .await
                 .map_err(|e| AppError::new(ErrorKind::Unreachable, "Der Sprungserver erreicht das Ziel nicht.").with_detail(e.to_string()))?;
-            let target = open_session(params, known.clone(), Transport::Through(channel.into_stream()), prompter, forwards.clone()).await?;
+            let target = open_session(params, known.clone(), Transport::Through(Box::new(channel.into_stream())), prompter, forwards.clone()).await?;
             (target, Some(jump))
         }
     };
@@ -826,12 +826,6 @@ impl Connection {
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
         self.sftp.create_dir(path).await?;
         Ok(())
-    }
-
-    /// Creates a folder and all missing parents.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
-        self.mkdir_all_with(path, None).await
     }
 
     /// Creates all missing folders of `path`, optionally with the given permissions.
@@ -1101,7 +1095,7 @@ mod integration {
         let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
         let fp = connect(&params(&e, key(), None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
-        let conn = Arc::new(crate::remote::Remote::Sftp(connect(&params(&e, key(), Some(fp)), known).await.unwrap()));
+        let conn = Arc::new(crate::remote::Remote::Sftp(Box::new(connect(&params(&e, key(), Some(fp)), known).await.unwrap())));
         let fw = crate::forward::Forwards::default();
         let spec = |id: &str, kind: &str, port: u16| crate::forward::ForwardSpec { id: id.into(), kind: kind.into(), bind_host: "127.0.0.1".into(), bind_port: port, dest_host: "127.0.0.1".into(), dest_port: e.port };
         async fn banner(mut s: tokio::net::TcpStream) -> String {
@@ -1156,7 +1150,7 @@ mod integration {
 
         // 2. Trusting it connects and stores it.
         let conn = connect(&params(&e, key(), Some(fp.clone())), known.clone()).await.expect("connect with trust");
-        let conn = crate::remote::Remote::Sftp(conn);
+        let conn = crate::remote::Remote::Sftp(Box::new(conn));
         assert_eq!(known.count(), 1);
         assert!(conn.home().starts_with('/'));
         let offset = conn.clock_offset_ms().await.expect("clock offset");

@@ -23,7 +23,7 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 pub enum Remote {
-    Sftp(Connection),
+    Sftp(Box<Connection>),
     Ftp(Arc<FtpConn>),
     Dav(DavConn),
     Dropbox(Arc<DropboxConn>),
@@ -507,7 +507,7 @@ impl Remote {
             Remote::Sftp(c) => c.sftp.metadata(path).await.ok().map(|a| Meta { size: a.size.unwrap_or(0), mtime: a.mtime, perms: a.permissions }),
             _ => self.stat(path).await.ok().filter(|e| e.kind == "file").map(|e| Meta {
                 size: e.size,
-                mtime: (e.mtime > 0).then(|| (e.mtime / 1000) as u32),
+                mtime: (e.mtime > 0).then_some((e.mtime / 1000) as u32),
                 perms: u32::from_str_radix(&e.perms, 8).ok(),
             }),
         }
@@ -802,7 +802,7 @@ pub(crate) mod integration {
         assert_eq!(conn.read_head(&target, 10).await.unwrap(), data[..10].to_vec());
         let local_sum = crate::local::checksum(&local_ui).unwrap();
         assert_eq!(conn.checksum(&target).await.unwrap(), local_sum);
-        assert_eq!(conn.copy_within(&[target.clone()], &format!("{base}/sub")).await.unwrap(), vec!["big Kopie.bin".to_string()]);
+        assert_eq!(conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub")).await.unwrap(), vec!["big Kopie.bin".to_string()]);
         assert_eq!(conn.stat(&format!("{base}/sub/big Kopie.bin")).await.unwrap().size, 1_500_000);
         // Only SSH connections (SFTP, SCP) run commands.
         assert_eq!(conn.exec("true").await.is_ok(), matches!(conn, Remote::Sftp(_) | Remote::Scp(_)));
@@ -937,7 +937,7 @@ pub async fn connect_ssh(params: &crate::ssh::ConnectParams, known: Arc<crate::s
     }
     let custom = params.sftp_command.as_deref().is_some_and(|c| !c.trim().is_empty());
     match session.into_sftp().await {
-        Ok(c) => Ok(Remote::Sftp(c)),
+        Ok(c) => Ok(Remote::Sftp(Box::new(c))),
         // With an own SFTP command (sudo) its error counts; silently falling back to SCP without root would hide it.
         Err((_, e)) if custom => Err(e),
         Err((session, e)) => match ScpConn::new(session).await {

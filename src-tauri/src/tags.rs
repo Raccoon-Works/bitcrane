@@ -19,7 +19,8 @@ pub struct Tag {
 const ATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 
 /// Parses the strings of the attribute ("Rot\n6", or just "Projekt").
-pub fn parse(items: &[String]) -> Vec<Tag> {
+#[cfg(any(target_os = "macos", test))]
+fn parse(items: &[String]) -> Vec<Tag> {
     items
         .iter()
         .map(|s| match s.rsplit_once('\n') {
