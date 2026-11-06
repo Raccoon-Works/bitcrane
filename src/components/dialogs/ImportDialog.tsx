@@ -8,6 +8,7 @@ import { Loader2 } from '../glyphs';
 import { useEffect, useState } from 'react';
 import type { ImportedServer } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
+import { chooseFile } from '../../backend/dialogs';
 import { closeDialog, getState, importServers, LIVE, useStore } from '../../state/store';
 import { Button, Checkbox } from '../ui';
 import { Dialog } from './Dialog';
@@ -115,17 +116,13 @@ export function ImportDialog() {
       }));
       return;
     }
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({
-      multiple: false,
-      directory: false,
-      title: $t('Exportierte Server wählen'),
+    const path = await chooseFile($t('Exportierte Server wählen'), {
       filters: [
         { name: $t('Server-Export'), extensions: ['transmitservers', 'xml', 'ini', 'duck', 'json'] },
         { name: $t('Alle Dateien'), extensions: ['*'] },
       ],
     });
-    if (typeof path !== 'string') return;
+    if (!path) return;
     try {
       const list = await backend.importFile(path);
       if (!list.length) {

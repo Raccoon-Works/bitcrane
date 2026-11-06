@@ -4,7 +4,7 @@
  * are running right now is `tunnels` in the store. Tunnels use the server's
  * open connection and end when it is closed.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { PortForward } from '../backend/types';
 import { $t } from '../i18n';
 import { addLog } from './log';
@@ -20,7 +20,7 @@ export function describeForward(f: PortForward): string {
 
 export async function refreshForwards() {
   if (!LIVE) return;
-  const ids = await invoke<string[]>('forward_active').catch(() => []);
+  const ids = await backend.forwardActive().catch(() => []);
   setState({ tunnels: ids });
 }
 
@@ -31,16 +31,13 @@ export async function startForward(serverId: string, f: PortForward): Promise<bo
     return true;
   }
   try {
-    await invoke('forward_start', {
-      serverId,
-      spec: {
-        id: f.id,
-        kind: f.kind,
-        bindHost: f.bindHost,
-        bindPort: f.bindPort,
-        destHost: f.destHost,
-        destPort: f.destPort,
-      },
+    await backend.forwardStart(serverId, {
+      id: f.id,
+      kind: f.kind,
+      bindHost: f.bindHost,
+      bindPort: f.bindPort,
+      destHost: f.destHost,
+      destPort: f.destPort,
     });
     addLog('ok', $t('Tunnel gestartet: {0}', describeForward(f)), serverId);
     return true;
@@ -55,7 +52,7 @@ export async function startForward(serverId: string, f: PortForward): Promise<bo
 }
 
 export async function stopForward(f: PortForward) {
-  if (LIVE) await invoke('forward_stop', { id: f.id }).catch(() => undefined);
+  if (LIVE) await backend.forwardStop(f.id).catch(() => undefined);
   setState((s) => ({ tunnels: s.tunnels.filter((x) => x !== f.id) }));
   await refreshForwards();
 }

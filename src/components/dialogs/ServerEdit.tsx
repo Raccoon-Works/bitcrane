@@ -3,12 +3,11 @@
  * server's settings on the right. Opens for a new server when no id is given.
  */
 import { SCHEMES } from '../../state/terminal';
-import { invoke } from '@tauri-apps/api/core';
-import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
 import { AlertTriangle, Check, ChevronRight, FolderPlus, KeyRound, Plus, Search, Trash2 } from '../glyphs';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyInfo } from '../../backend/api';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
+import { chooseFile } from '../../backend/dialogs';
 import { isCloudProtocol, type AuthMethod, type Protocol, type Server, type ServerColor } from '../../backend/types';
 import { davUrl, hasStoredSecret, proxyAccount, testServer } from '../../state/live';
 import {
@@ -251,10 +250,8 @@ export function ServerEdit({
   }, [draft.keyPath, draft.auth]);
 
   const chooseKey = async () => {
-    const picked = await openFileDialog({ multiple: false, directory: false, title: $t('SSH-Schlüssel wählen') }).catch(
-      () => null,
-    );
-    if (typeof picked === 'string') set('keyPath', await invoke<string>('path_to_ui', { path: picked }));
+    const picked = await chooseFile($t('SSH-Schlüssel wählen'));
+    if (picked) set('keyPath', picked);
   };
   const isNew = !servers.some((x) => x.id === draft.id);
   /** Signs in to the chosen cloud service (Google Drive: keeps the entered app key first). */

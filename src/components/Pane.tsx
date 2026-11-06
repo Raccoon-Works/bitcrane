@@ -105,7 +105,7 @@ import { LocalTile, ServerTile } from './ServerTile';
 import { swatch } from './serverColors';
 import { Button, IconButton } from './ui';
 import { $t, LOCALE } from '../i18n';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import { compareMarks, selectDifferences, toggleCompareDirs, type CompareMark } from '../state/tools';
 import { GIT_LABEL, gitMark, useGit } from '../state/git';
 import { tagCss, useTags } from '../state/tags';
@@ -205,7 +205,8 @@ function useFreeSpace(path: string, enabled: boolean, rev: number): number | nul
     }
     let live = true;
     const t = window.setTimeout(() => {
-      void invoke<number | null>('local_free_space', { path })
+      void backend
+        .localFreeSpace(path)
         .then((v) => {
           if (live) setFree(v ?? null);
         })

@@ -4,7 +4,7 @@
  * folder picked in the system dialog — without opening it in the other half.
  * On this computer the entries can be moved instead.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { chooseFolder } from '../../backend/dialogs';
 import { useState } from 'react';
 import { $t } from '../../i18n';
 import { closeDialog, copyTo, LIVE, paneOnServer, useStore } from '../../state/store';
@@ -23,9 +23,8 @@ export function CopyToDialog({ side, names }: { side: 'local' | 'remote'; names:
   ];
   const pick = async () => {
     if (!LIVE) return;
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const picked = await open({ directory: true, multiple: false, title: $t('Kopieren nach') }).catch(() => null);
-    if (typeof picked === 'string') copyTo(side, names, await invoke<string>('path_to_ui', { path: picked }), move);
+    const picked = await chooseFolder($t('Kopieren nach'));
+    if (picked) copyTo(side, names, picked, move);
   };
   return (
     <Dialog

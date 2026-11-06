@@ -1,7 +1,7 @@
 /**
  * Start of the real backend: loads the configuration and keeps it saved.
  */
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { listen } from '@tauri-apps/api/event';
 
 import { type AppState, subscribeStore, getState, setState } from '../core';
@@ -77,7 +77,7 @@ export function startLive() {
         s.settings.keepAwake !== false && s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
       if (busy !== awake) {
         awake = busy;
-        void invoke('keep_awake', { on: busy }).catch(() => undefined);
+        void backend.keepAwake(busy).catch(() => undefined);
       }
     });
     // Servers and shared settings between the user's computers (sync.ts).

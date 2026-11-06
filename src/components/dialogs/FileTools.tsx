@@ -28,8 +28,7 @@ import {
 import { formatAgo } from '../../util/format';
 import { basename, join, parent } from '../../util/paths';
 import { Button, Checkbox, Segmented, TextField } from '../ui';
-import { invoke } from '@tauri-apps/api/core';
-import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
+import { chooseProgram } from '../../backend/dialogs';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -447,14 +446,8 @@ export function EditWithDialog({ side, name }: { side: PaneSide; name: string })
       choose(mac ? '/Applications/Visual Studio Code.app' : 'C:/Program Files/Microsoft VS Code/Code.exe');
       return;
     }
-    const picked = await openDialogPicker({
-      multiple: false,
-      directory: false,
-      title: $t('Programm wählen'),
-      defaultPath: mac ? '/Applications' : undefined,
-      filters: mac ? [{ name: 'Programme', extensions: ['app'] }] : [{ name: 'Programme', extensions: ['exe'] }],
-    }).catch(() => null);
-    if (typeof picked === 'string') choose(await invoke<string>('path_to_ui', { path: picked }));
+    const picked = await chooseProgram($t('Programm wählen'), mac);
+    if (picked) choose(picked);
   };
   const options: Array<{ key: string; label: string; sub?: string; run: () => void }> = [
     { key: 'builtin', label: $t('Editor von Bitcrane'), run: () => choose(null) },

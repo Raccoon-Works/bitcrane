@@ -3,7 +3,7 @@
  */
 import { showError } from './errors';
 
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import * as live from './live';
 import type { PaneSide, Tab, Watch } from '../backend/types';
 
@@ -553,5 +553,5 @@ export function openTerminal(side: PaneSide = state.focusSide) {
           app: state.settings.externalTerminal,
         }
       : { localPath: home, app: state.settings.externalTerminal };
-  void invoke('open_terminal', { target }).catch((e) => showError(e));
+  void backend.openTerminal(target).catch((e) => showError(e));
 }

@@ -18,10 +18,9 @@ import { createContext, useContext, useLayoutEffect, useRef, useState, type Reac
 import { createPortal } from 'react-dom';
 import { TOOLBAR_LOOKS } from './ToolbarCustomize';
 import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { open as openDialogPicker } from '@tauri-apps/plugin-dialog';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import type { CloudPlace, KnownHost } from '../../backend/api';
+import { chooseFolder, chooseProgram } from '../../backend/dialogs';
+import type { CloudPlace, KnownHost, LocalShell } from '../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../state/sync';
 import {
   getState,
@@ -77,7 +76,8 @@ function CliRow() {
   const [exe, setExe] = useState('');
   useEffect(() => {
     if (LIVE)
-      void invoke<string>('cli_path')
+      void backend
+        .cliPath()
         .then(setExe)
         .catch(() => undefined);
   }, []);
@@ -113,7 +113,7 @@ function TerminalSettingsPage() {
   const set = (patch: Partial<TerminalSettings>) =>
     updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const [historyN, setHistoryN] = useState(historyCount);
-  const [shells, setShells] = useState<Array<{ id: string; name: string }>>(
+  const [shells, setShells] = useState<LocalShell[]>(
     LIVE
       ? []
       : getState().platform === 'mac'
@@ -130,7 +130,8 @@ function TerminalSettingsPage() {
   );
   useEffect(() => {
     if (LIVE)
-      invoke<Array<{ id: string; name: string }>>('term_shells')
+      backend
+        .termShells()
         .then(setShells)
         .catch(() => undefined);
   }, []);
@@ -552,7 +553,8 @@ function MacPermissions() {
   useEffect(() => {
     if (!LIVE) return;
     const read = () => {
-      void invoke<boolean>('mac_full_disk_access')
+      void backend
+        .macFullDiskAccess()
         .then(setFullDisk)
         .catch(() => setFullDisk(null));
       void import('@tauri-apps/plugin-notification')
@@ -564,7 +566,7 @@ function MacPermissions() {
     window.addEventListener('focus', read);
     return () => window.removeEventListener('focus', read);
   }, []);
-  const open = (page: string) => void invoke('open_mac_settings', { page }).catch(() => undefined);
+  const open = (page: string) => void backend.openMacSettings(page).catch(() => undefined);
   const state = (ok: boolean | null) =>
     ok === null ? null : ok ? (
       <span className="small tone-ok perm-state">{$t('erlaubt')}</span>
@@ -961,7 +963,8 @@ function AboutHeader() {
   const update = useStore((st) => st.update);
   useEffect(() => {
     if (LIVE)
-      invoke<{ version: string }>('app_info')
+      backend
+        .appInfo()
         .then((i) => setVersion(i.version))
         .catch(() => undefined);
   }, []);
@@ -1168,14 +1171,7 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
   /** Picks a program (an .app on the Mac, an .exe on Windows). */
   const pickProgram = async (): Promise<string | null> => {
     if (!LIVE) return mac ? '/Applications/Visual Studio Code.app' : $t('C:/Program Files/Microsoft VS Code/Code.exe');
-    const picked = await openDialogPicker({
-      multiple: false,
-      directory: false,
-      title: $t('Editor wählen'),
-      defaultPath: mac ? '/Applications' : undefined,
-      filters: mac ? [{ name: 'Programme', extensions: ['app'] }] : [{ name: 'Programme', extensions: ['exe'] }],
-    }).catch(() => null);
-    return typeof picked === 'string' ? invoke<string>('path_to_ui', { path: picked }) : null;
+    return chooseProgram($t('Editor wählen'), mac);
   };
   const chooseEditor = async () => {
     const app = await pickProgram();
@@ -1202,11 +1198,8 @@ export function SettingsPage({ section }: { section: SettingsTab }) {
   const servers = useStore((st) => st.servers);
   /** "Beim Start öffnen": folder of this computer for the left half. */
   const pickStartFolder = async () => {
-    const picked = await openDialogPicker({ directory: true, multiple: false, title: $t('Ordner beim Start') }).catch(
-      () => null,
-    );
-    if (typeof picked === 'string')
-      updateSettings({ startLocal: await invoke<string>('path_to_ui', { path: picked }) });
+    const picked = await chooseFolder($t('Ordner beim Start'));
+    if (picked) updateSettings({ startLocal: picked });
   };
 
   /** The rows of one area; the search shows all areas with this at once. */
@@ -2251,12 +2244,8 @@ function SyncSettings() {
         .catch(() => undefined);
   }, []);
   const choose = async () => {
-    const picked = await openDialogPicker({
-      directory: true,
-      multiple: false,
-      title: $t('Ordner für den Abgleich'),
-    }).catch(() => null);
-    if (typeof picked === 'string') await setSyncFolder(await invoke<string>('path_to_ui', { path: picked }));
+    const picked = await chooseFolder($t('Ordner für den Abgleich'));
+    if (picked) await setSyncFolder(picked);
   };
   const status = syncStatus();
   return (

@@ -1,7 +1,7 @@
 //! Configuration files and importing servers from other apps and from ~/.ssh/config.
 
 use crate::error::{AppError, AppResult};
-use crate::{config, import, sshconfig, AppState};
+use crate::{config, import, paths, sshconfig, AppState};
 use serde_json::Value;
 use tauri::State;
 
@@ -18,18 +18,18 @@ pub(crate) fn config_save(state: State<'_, AppState>, value: Value) -> AppResult
 /// Writes a text file chosen by the user (export of the settings).
 #[tauri::command]
 pub(crate) fn file_write(path: String, text: String) -> AppResult<()> {
-    std::fs::write(std::path::Path::new(&path), text)?;
+    std::fs::write(paths::to_native(&path), text)?;
     Ok(())
 }
 
 /// Reads a text file chosen by the user (import of the settings).
 #[tauri::command]
 pub(crate) fn file_read(path: String) -> AppResult<String> {
-    let p = std::path::Path::new(&path);
-    if std::fs::metadata(p)?.len() > 10 * 1024 * 1024 {
+    let p = paths::to_native(&path);
+    if std::fs::metadata(&p)?.len() > 10 * 1024 * 1024 {
         return Err(AppError::other("Die Datei ist zu groß."));
     }
-    Ok(std::fs::read_to_string(p)?)
+    Ok(std::fs::read_to_string(&p)?)
 }
 
 /// Tabby's config.yaml (for taking over its quick commands as snippets).
@@ -47,7 +47,7 @@ pub(crate) fn import_find() -> import::ImportResult {
 /// Servers from an exported file the user chose (Transmit, FileZilla, WinSCP, Cyberduck).
 #[tauri::command]
 pub(crate) fn import_file(path: String) -> Vec<import::ImportedServer> {
-    import::from_file(std::path::Path::new(&path))
+    import::from_file(&paths::to_native(&path))
 }
 
 #[tauri::command]

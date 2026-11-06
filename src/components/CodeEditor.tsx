@@ -55,7 +55,7 @@ import {
 } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { ArrowLeft, FilePlus, FloppyDisk, FolderOpen, MagnifyingGlass, TextAlignLeft, X } from '@phosphor-icons/react';
-import { invoke } from '@tauri-apps/api/core';
+import { chooseFiles } from '../backend/dialogs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { $t } from '../i18n';
 import {
@@ -455,10 +455,7 @@ export function CodeEditor() {
       void openFile('', '~/Projekte/webshop/live/app.py');
       return;
     }
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const picked = await open({ multiple: true, directory: false, title: $t('Im Editor öffnen') }).catch(() => null);
-    const list = Array.isArray(picked) ? picked : picked ? [picked] : [];
-    for (const p of list) void openFile('', await invoke<string>('path_to_ui', { path: p }));
+    for (const path of await chooseFiles($t('Im Editor öffnen'))) void openFile('', path);
   };
 
   const key = (m: string, w: string) => (mac ? m : w);

@@ -5,20 +5,12 @@
  * outside a repository, on servers and without git nothing is shown.
  */
 import { showError } from './errors';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { GitStatus } from '../backend/api';
 import { useEffect, useState } from 'react';
 import { $t } from '../i18n';
 import { addLog } from './log';
 import { LIVE, showToast, subscribeStore, getState } from './store';
-
-export interface GitStatus {
-  root: string;
-  branch: string;
-  ahead: number;
-  behind: number;
-  /** Path relative to root → M, A, D, R, ? or U. */
-  files: Record<string, string>;
-}
 
 const cache = new Map<string, GitStatus | null>();
 const listeners = new Set<() => void>();
@@ -27,7 +19,7 @@ const notify = () => listeners.forEach((l) => l());
 /** Reads the state of a folder again (after file actions, a commit, a pull …). */
 export async function refreshGit(dir: string) {
   if (!LIVE || !dir) return;
-  const st = await invoke<GitStatus | null>('git_status', { dir }).catch(() => null);
+  const st = await backend.gitStatus(dir).catch(() => null);
   const before = JSON.stringify(cache.get(dir) ?? null);
   cache.set(dir, st);
   if (JSON.stringify(st) !== before) notify();
@@ -102,13 +94,7 @@ export async function gitRun(
     push: 'Push',
   }[what];
   try {
-    const out = await invoke<string>('git_action', {
-      root,
-      what,
-      paths: opts.paths ?? [],
-      message: opts.message ?? '',
-      all: !!opts.all,
-    });
+    const out = await backend.gitAction(root, what, opts.paths ?? [], opts.message ?? '', !!opts.all);
     addLog('ok', `Git ${label}: ${out.split('\n').filter(Boolean).slice(-1)[0] ?? $t('fertig')}`);
     showToast($t('Git: {0} erledigt.', label), 'ok');
     return true;

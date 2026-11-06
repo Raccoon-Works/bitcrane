@@ -28,7 +28,8 @@ import {
   Usb,
   Network,
 } from '@phosphor-icons/react';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { NetworkHost } from '../backend/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t, LOCALE } from '../i18n';
@@ -127,7 +128,7 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
   useEffect(() => {
     if (!LIVE || !places.length) return;
     let live = true;
-    void invoke<string[]>('local_real_paths', { list: places.map((p) => p.path) }).then((r) => {
+    void backend.localRealPaths(places.map((p) => p.path)).then((r) => {
       if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path])));
     });
     return () => {
@@ -160,8 +161,8 @@ function shortSize(bytes: number): string {
 }
 
 /** Computers in the network with file shares (Bonjour), searched when the sidebar opens and every two minutes. */
-function useNetworkHosts(enabled: boolean): Array<{ name: string; host: string }> {
-  const [hosts, setHosts] = useState<Array<{ name: string; host: string }>>([]);
+function useNetworkHosts(enabled: boolean): NetworkHost[] {
+  const [hosts, setHosts] = useState<NetworkHost[]>([]);
   useEffect(() => {
     if (!enabled) return;
     if (!LIVE) {
@@ -170,7 +171,7 @@ function useNetworkHosts(enabled: boolean): Array<{ name: string; host: string }
     }
     let live = true;
     const run = () =>
-      void invoke<Array<{ name: string; host: string }>>('network_hosts').then((h) => {
+      void backend.networkHosts().then((h) => {
         if (live) setHosts(h);
       });
     run();

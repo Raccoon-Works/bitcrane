@@ -10,7 +10,8 @@
  * settings. The colour values are the published palettes of the schemes.
  */
 import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { LocalShell } from '../backend/api';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -975,7 +976,7 @@ function makeTerminal(session: TermSession): Live {
     } else void navigator.clipboard?.readText().then((t) => t && pasteInto(term, t));
   });
   const write = (d: string) => {
-    if (LIVE) void invoke('term_write', { id: session.id, data: d }).catch(() => undefined);
+    if (LIVE) void backend.termWrite(session.id, d).catch(() => undefined);
     else previewEcho(term, d);
   };
   const suggest = new Suggester(
@@ -997,7 +998,7 @@ function makeTerminal(session: TermSession): Live {
   );
   term.onData((input) => write(suggest.input(input)));
   term.onResize(({ cols, rows }) => {
-    if (LIVE) void invoke('term_resize', { id: session.id, cols, rows }).catch(() => undefined);
+    if (LIVE) void backend.termResize(session.id, cols, rows).catch(() => undefined);
   });
   term.onSelectionChange(() => {
     if (terminalSettings().copyOnSelect && term.hasSelection())
@@ -1177,11 +1178,11 @@ export function newTerminal(where?: 'local' | 'server', full = false, shell?: st
 }
 
 /** Shells this computer offers (term_shells), asked once; the prototype has none. */
-let shellList: Array<{ id: string; name: string }> | null = null;
-export async function localShells(): Promise<Array<{ id: string; name: string }>> {
+let shellList: LocalShell[] | null = null;
+export async function localShells(): Promise<LocalShell[]> {
   if (shellList) return shellList;
   if (!LIVE) return [];
-  shellList = await invoke<Array<{ id: string; name: string }>>('term_shells').catch(() => []);
+  shellList = await backend.termShells().catch(() => []);
   return shellList;
 }
 
@@ -1257,18 +1258,20 @@ export function attachTerminal(id: string, container: HTMLElement) {
     const cwd = terminalSettings().startInFolder && folder ? folder : undefined;
     if (LIVE) {
       const start = () =>
-        void invoke('term_open', {
-          id,
-          serverId: session.serverId,
-          cols: l.term.cols,
-          rows: l.term.rows,
-          cwd,
-          startup: srv?.termStart || null,
-          shell: session.serverId ? null : session.shell || terminalSettings().localShell || null,
-        }).catch((e) => {
-          l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
-          markEnded(id);
-        });
+        void backend
+          .termOpen({
+            id,
+            serverId: session.serverId,
+            cols: l.term.cols,
+            rows: l.term.rows,
+            cwd,
+            startup: srv?.termStart || undefined,
+            shell: session.serverId ? undefined : session.shell || terminalSettings().localShell || undefined,
+          })
+          .catch((e) => {
+            l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
+            markEnded(id);
+          });
       // A terminal reopened at the start waits until its server is connected.
       if (session.serverId && !srv?.online) {
         l.term.writeln(`\x1b[2m${$t('Warte auf die Verbindung zu {0} …', srv?.name ?? '')}\x1b[0m`);
@@ -1327,7 +1330,7 @@ function markEnded(id: string) {
 /** Ends a session and removes it; the panel shows the next one or closes. */
 export function closeTerminal(id: string) {
   const session = getState().terminals.find((x) => x.id === id);
-  if (LIVE) void invoke('term_close', { id }).catch(() => undefined);
+  if (LIVE) void backend.termClose(id).catch(() => undefined);
   live.get(id)?.suggest.dispose();
   live.get(id)?.term.dispose();
   live.delete(id);
@@ -1424,7 +1427,7 @@ export async function sendSnippet(id: string, snippet: Snippet) {
       await new Promise((r) => setTimeout(r, p));
       continue;
     }
-    if (LIVE) await invoke('term_write', { id, data: p }).catch(() => undefined);
+    if (LIVE) await backend.termWrite(id, p).catch(() => undefined);
     else l.term.write(p === '\r' ? '\r\n$ ' : p);
   }
 }
@@ -1436,7 +1439,7 @@ export async function sendSnippet(id: string, snippet: Snippet) {
  * null when Tabby or its quick commands were not found.
  */
 export async function importTabbySnippets(): Promise<number | null> {
-  const text = LIVE ? await invoke<string | null>('tabby_config').catch(() => null) : PREVIEW_TABBY;
+  const text = LIVE ? await backend.tabbyConfig().catch(() => null) : PREVIEW_TABBY;
   if (!text) return null;
   const { load } = await import('js-yaml');
   let qc:

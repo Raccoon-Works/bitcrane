@@ -1,7 +1,6 @@
 /**
  * Loading and saving the configuration (servers, settings, tabs) through the backend.
  */
-import { invoke } from '@tauri-apps/api/core';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Server, type Watch, type Transfer, type Tab } from '../../backend/types';
 import {
@@ -150,20 +149,20 @@ export function showDiskAccessHint() {
     ),
     confirm: $t('Systemeinstellungen öffnen'),
     run: () => {
-      void invoke('open_full_disk_access').catch(() => undefined);
+      void backend.openFullDiskAccess().catch(() => undefined);
     },
   });
 }
 
 async function decideStartWindow() {
   try {
-    const atLogin = await invoke<boolean>('start_info');
+    const atLogin = await backend.startInfo();
     if (atLogin && getState().settings.startHidden) setState({ startedHidden: true });
     else if (atLogin) {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().show();
     }
-    await invoke('start_decided');
+    await backend.startDecided();
   } catch {
     // Rust shows the window by itself after a while.
   }
