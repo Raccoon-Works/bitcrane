@@ -5,8 +5,8 @@ use crate::error::{AppError, AppResult};
 use crate::{AppState, iconmenu, paths, shell_integration, tray};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use tauri::{Manager, State};
 
 /// Opens the macOS privacy settings at "Festplattenvollzugriff" (Full Disk Access), so Bitcrane
@@ -120,7 +120,7 @@ pub(crate) fn open_url(url: String) -> AppResult<()> {
 /// How Bitcrane was started: `autostart` is true for a start at login.
 pub(crate) struct StartInfo {
     pub(crate) autostart: bool,
-    pub(crate) decided: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) decided: Arc<AtomicBool>,
 }
 
 /// True when Bitcrane was started at login ("--autostart").
@@ -132,7 +132,7 @@ pub(crate) fn start_info(info: State<'_, StartInfo>) -> bool {
 /// Marker written right before an update installs. The Windows installer starts the new
 /// version with the arguments of the old process; after a start at login those include
 /// "--autostart", which would keep the window hidden. The marker makes it a normal start.
-pub(crate) fn update_marker(app: &tauri::AppHandle) -> std::path::PathBuf {
+pub(crate) fn update_marker(app: &tauri::AppHandle) -> PathBuf {
     app.path().app_config_dir().unwrap_or_else(|_| paths::home().join(".bitcrane")).join("restart-after-update")
 }
 
@@ -151,9 +151,6 @@ pub(crate) fn start_decided(info: State<'_, StartInfo>) {
     info.decided.store(true, Ordering::SeqCst);
 }
 
-/// Paths Bitcrane was started with from the Explorer menu ("--upload"), taken once by the window.
-static UPLOADS_TAKEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 /// The program file, for calls from the command line (cli.rs).
 #[tauri::command]
 pub(crate) fn cli_path() -> String {
@@ -163,16 +160,18 @@ pub(crate) fn cli_path() -> String {
 /// The jump list entry Bitcrane was started from (Windows), once.
 #[tauri::command]
 pub(crate) fn take_start_action() -> Option<String> {
-    static TAKEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    if TAKEN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+    static TAKEN: AtomicBool = AtomicBool::new(false);
+    if TAKEN.swap(true, Ordering::SeqCst) {
         return None;
     }
     iconmenu::action_arg(&std::env::args().collect::<Vec<_>>())
 }
 
+/// Paths Bitcrane was started with from the Explorer menu ("--upload"), once.
 #[tauri::command]
 pub(crate) fn take_pending_uploads() -> Vec<String> {
-    if UPLOADS_TAKEN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+    static TAKEN: AtomicBool = AtomicBool::new(false);
+    if TAKEN.swap(true, Ordering::SeqCst) {
         return Vec::new();
     }
     shell_integration::upload_args(&std::env::args().collect::<Vec<_>>())
@@ -230,13 +229,15 @@ pub(crate) fn app_quit(app: tauri::AppHandle) {
 /// While transfers or watches are busy, the computer must not fall asleep
 /// (idle sleep; the display may still turn off). One thread owns the lock,
 /// because Windows ties it to the thread that took it.
-static KEEP_AWAKE: std::sync::Mutex<Option<std::sync::mpsc::Sender<()>>> = std::sync::Mutex::new(None);
+/// Stops the thread that keeps the computer awake (set while it runs).
+static KEEP_AWAKE: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
+/// Keeps the computer from going to sleep while transfers run, until called with `false`.
 #[tauri::command]
 pub(crate) fn keep_awake(on: bool) {
     let mut slot = KEEP_AWAKE.lock().unwrap();
     if on && slot.is_none() {
-        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let (tx, rx) = mpsc::channel::<()>();
         std::thread::spawn(move || {
             let guard = keepawake::Builder::default()
                 .idle(true)
@@ -256,6 +257,7 @@ pub(crate) fn keep_awake(on: bool) {
     }
 }
 
+/// Version and platform of the running app (about dialog and settings).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppInfo {
