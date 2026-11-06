@@ -623,30 +623,12 @@ impl GDriveConn {
 
     /// All files below a folder.
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
-        let base = remote_parent(&norm(path));
-        let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
-        let root = self.stat(path).await?;
-        if root.kind != "dir" {
-            return Ok(vec![WalkItem {
-                path: norm(path),
-                relative: rel(&norm(path)),
-                size: root.size,
-                mtime: root.mtime,
-            }]);
-        }
-        let mut out = Vec::new();
-        let mut todo = vec![norm(path)];
-        while let Some(dir) = todo.pop() {
-            for e in self.list(&dir).await? {
-                let p = remote_join(&dir, &e.name);
-                if e.kind == "dir" {
-                    todo.push(p);
-                } else {
-                    out.push(WalkItem { relative: rel(&p), path: p, size: e.size, mtime: e.mtime });
-                }
-            }
-        }
-        Ok(out)
+        crate::remote::walk_by_listing(
+            &norm(path),
+            |p| async move { self.stat(&p).await },
+            |d| async move { self.list(&d).await },
+        )
+        .await
     }
 
     /// Link to the file in Google Drive (who may open it is set in Drive itself).

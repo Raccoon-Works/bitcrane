@@ -1022,33 +1022,12 @@ impl FtpConn {
     }
 
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
-        let base = remote_parent(path);
-        let root = self.stat(path).await?;
-        let mut out = Vec::new();
-        if root.kind != "dir" {
-            out.push(WalkItem {
-                path: path.to_string(),
-                relative: path.strip_prefix(&base).unwrap_or(path).trim_start_matches('/').to_string(),
-                size: root.size,
-                mtime: root.mtime,
-            });
-            return Ok(out);
-        }
-        let mut stack = vec![path.to_string()];
-        while let Some(dir) = stack.pop() {
-            for e in self.list(&dir).await? {
-                let p = remote_join(&dir, &e.name);
-                if e.kind == "dir" {
-                    if e.link.is_none() {
-                        stack.push(p);
-                    }
-                } else {
-                    let rel = p.strip_prefix(&base).unwrap_or(&p).trim_start_matches('/').to_string();
-                    out.push(WalkItem { path: p, relative: rel, size: e.size, mtime: e.mtime });
-                }
-            }
-        }
-        Ok(out)
+        crate::remote::walk_by_listing(
+            path,
+            |p| async move { self.stat(&p).await },
+            |d| async move { self.list(&d).await },
+        )
+        .await
     }
 
     /// Opens a file for reading from `offset`. The session stays with the
