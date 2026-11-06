@@ -866,11 +866,6 @@ impl VaultConn {
     }
 }
 
-/// Whether a folder listing looks like a Cryptomator vault.
-pub fn looks_like_vault(names: &[String]) -> bool {
-    names.iter().any(|n| n == "vault.cryptomator") && names.iter().any(|n| n == "masterkey.cryptomator")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

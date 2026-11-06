@@ -72,7 +72,7 @@ pub struct AppState {
     watches: watcher::Watches,
     cancels: Mutex<HashMap<String, Arc<AtomicU8>>>,
     /// Open questions of servers during login, waiting for the user's answers.
-    prompts: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Option<Vec<String>>>>>>,
+    prompts: PendingPrompts,
     config_dir: PathBuf,
 }
 
@@ -829,8 +829,11 @@ struct AuthPromptEvent {
     request: ssh::PromptRequest,
 }
 
+/// Login questions waiting for the user's answers, by question id (`None`: cancelled).
+type PendingPrompts = Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Option<Vec<String>>>>>>;
+
 /// Forwards server questions to the interface and waits up to 3 minutes for answers.
-fn make_prompter(app: tauri::AppHandle, pending: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Option<Vec<String>>>>>>, server_id: String) -> ssh::Prompter {
+fn make_prompter(app: tauri::AppHandle, pending: PendingPrompts, server_id: String) -> ssh::Prompter {
     Arc::new(move |request| {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let id = uuid::Uuid::new_v4().to_string();

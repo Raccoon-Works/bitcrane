@@ -830,7 +830,7 @@ mod integration {
         let mut got = String::new();
         r.read_to_string(&mut got).await.unwrap();
         assert_eq!(got, "welt!");
-        assert_eq!(conn.copy_within(&[file.clone()], &format!("{base}/a b")).await.unwrap(), vec!["über Kopie.txt".to_string()]);
+        assert_eq!(conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(), vec!["über Kopie.txt".to_string()]);
         assert_eq!(conn.rename(&file, &format!("{base}/a b/über Kopie.txt")).await.err().map(|e| e.kind), Some(ErrorKind::AlreadyExists));
         conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();
         assert_eq!(conn.walk(&base).await.unwrap().len(), 2);

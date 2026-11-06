@@ -427,7 +427,7 @@ mod integration {
             assert_eq!(got, "welt!");
             let names: Vec<String> = conn.list(&format!("{base}/a b")).await.unwrap().into_iter().map(|e| e.name).collect();
             assert_eq!(names, vec!["über.txt".to_string()]);
-            assert_eq!(conn.copy_within(&[file.clone()], &format!("{base}/a b")).await.unwrap(), vec!["über Kopie.txt".to_string()]);
+            assert_eq!(conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(), vec!["über Kopie.txt".to_string()]);
             conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();
             assert_eq!(conn.walk(&base).await.unwrap().len(), 2);
             assert_eq!(conn.stat(&format!("{base}/fehlt")).await.err().map(|e| e.kind), Some(ErrorKind::NotFound));

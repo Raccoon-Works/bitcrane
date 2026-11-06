@@ -196,7 +196,7 @@ async fn load_sftp() {
     let fp = crate::ssh::connect(&p(None), known.clone()).await.err().unwrap().host_key.unwrap().fingerprint;
     let c = crate::ssh::connect(&p(Some(fp)), known).await.unwrap();
     let home = c.home.clone();
-    run(Remote::Sftp(c), &home, env_num("BITCRANE_LOAD_FILES", 20_000) as usize, env_num("BITCRANE_LOAD_GB", 5)).await;
+    run(Remote::Sftp(Box::new(c)), &home, env_num("BITCRANE_LOAD_FILES", 20_000) as usize, env_num("BITCRANE_LOAD_GB", 5)).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

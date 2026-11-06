@@ -205,7 +205,7 @@ pub fn cert_error(host: &str, fingerprint: String, stored: Option<String>) -> Ap
         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
         if changed { "Das Zertifikat des Servers hat sich geändert." } else { "Das Zertifikat dieses Servers ist noch nicht bekannt." },
     );
-    err.host_key = Some(crate::error::HostKeyInfo { host: host.to_string(), algorithm: "TLS-Zertifikat".into(), fingerprint, previous: stored });
+    err.host_key = Some(Box::new(crate::error::HostKeyInfo { host: host.to_string(), algorithm: "TLS-Zertifikat".into(), fingerprint, previous: stored }));
     err
 }
 
