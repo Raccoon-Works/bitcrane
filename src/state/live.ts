@@ -17,16 +17,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { isCloudProtocol, type FileEntry, type PaneSide, type Server, type Tab, type Transfer, type Watch } from '../backend/types';
-import { basename, insideArchive, join, parent, winNameFromSafe, winSafeRel } from '../util/paths';
+import { basename, insideArchive, join, parent, relFolder, winNameFromSafe, winSafeRel } from '../util/paths';
+import { enqueue } from './transfers';
 import { addLog } from './log';
 import { reopenTerminals } from './terminal';
 import { refreshForwards, startAutoForwards } from './forward';
 import { savedTabs, tabsFromSaved } from './tools';
-import { LANG, rememberLanguage } from '../i18n';
+import { $t, LANG, rememberLanguage } from '../i18n';
 import {
   activeTab, editorFor, emptyTab, getState, offerCloudPlaces, oldDefaultToolbars, openDialog, paneLoc, ruleFor, selectTab, serverById, setState, showToast, subscribeStore, uid, updateSettings, watchExcludes, type AppState, type SavedTab,
 } from './store';
-import { $t } from '../i18n';
+import { isExcluded } from './syncPlan';
 
 /* ------------------------------------------------------------------------ */
 /* Listing cache                                                            */
@@ -974,22 +975,6 @@ function editUploaded(tr: Transfer) {
 /* Transfers                                                                */
 /* ------------------------------------------------------------------------ */
 
-function relFolder(root: string, path: string): string {
-  const p = parent(path);
-  if (p === root) return basename(root);
-  return p.startsWith(root + '/') ? p.slice(root.length + 1) : p;
-}
-
-function isExcluded(relative: string, excludes: string[]): boolean {
-  return relative.split('/').some((seg) => excludes.some((p) => (p.startsWith('*.') ? seg.toLowerCase().endsWith(p.slice(1).toLowerCase()) : seg === p)));
-}
-
-function enqueue(items: Transfer[]) {
-  if (!items.length) return;
-  setState((s) => ({ transfers: [...s.transfers, ...items] }));
-}
-
-/** Rules "Beim Übertragen auslassen" (names, patterns, size) for transfers by hand. */
 /** Left out by the general "auslassen" settings or by the server's transfer rule. */
 function skippedByRules(relative: string, size: number, serverId = ''): boolean {
   const { skipPatterns, skipLargerMb } = getState().settings;
