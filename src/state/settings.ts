@@ -5,7 +5,10 @@
 import type { Platform, Theme } from '../backend/types';
 
 import { $t, rememberLanguage } from '../i18n';
-import { type Settings, state, LIVE, showToast, setState, type ToolId, detectTheme } from './core';
+import { type Settings, type TransferRule, state, LIVE, showToast, setState, type ToolId, detectTheme } from './core';
+
+/** Stable empty rule list for store selectors (a new [] on every render would redraw endlessly). */
+export const NO_RULES: TransferRule[] = [];
 
 export function updateSettings(patch: Partial<Settings>) {
   if (patch.language && patch.language !== state.settings.language) {
