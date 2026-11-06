@@ -2,7 +2,7 @@
 //! system settings.
 
 use crate::error::{AppError, AppResult};
-use crate::{iconmenu, paths, shell_integration, tray, AppState};
+use crate::{iconmenu, links, paths, shell_integration, tray, AppState};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -157,6 +157,22 @@ pub(crate) fn take_pending_uploads() -> Vec<String> {
         return Vec::new();
     }
     shell_integration::upload_args(&std::env::args().collect::<Vec<_>>())
+}
+
+/// The sftp:// link Bitcrane was started with (Windows), once.
+#[tauri::command]
+pub(crate) fn take_start_link() -> Option<String> {
+    static TAKEN: AtomicBool = AtomicBool::new(false);
+    if TAKEN.swap(true, Ordering::SeqCst) {
+        return None;
+    }
+    links::link_arg(&std::env::args().collect::<Vec<_>>())
+}
+
+/// Bitcrane as the program for sftp:// links on or off (Windows; the Mac declares it in the bundle).
+#[tauri::command]
+pub(crate) fn sftp_links_set(enable: bool) -> AppResult<()> {
+    links::set(enable)
 }
 
 /// "Mit Bitcrane hochladen" in the Explorer / Finder context menu on or off.

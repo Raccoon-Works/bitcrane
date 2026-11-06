@@ -430,51 +430,48 @@ export async function startShell() {
     }
   });
 
-  // sftp:// links: the first one may have started the app. Without the plugin, links are simply not handled.
-  const deepLink = await import('@tauri-apps/plugin-deep-link').catch(() => null);
-  if (deepLink) {
-    const open = (urls: string[] | null) => {
-      for (const u of urls ?? []) {
-        if (u.startsWith('sftp:')) openSftpLink(u);
-        // Finder Quick Action "Mit Bitcrane hochladen".
-        else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u));
-      }
-    };
-    const waitConfig = () =>
-      isConfigLoaded()
-        ? Promise.resolve()
-        : new Promise<void>((r) => {
-            const t = window.setInterval(() => {
-              if (isConfigLoaded()) {
-                window.clearInterval(t);
-                r();
-              }
-            }, 100);
-          });
-    // No start link and no link listener both just mean no link to open.
-    void waitConfig().then(() =>
-      deepLink
-        .getCurrent()
-        .then(open)
-        .catch(() => undefined),
-    );
-    await deepLink
-      .onOpenUrl((urls) => {
-        void waitConfig().then(() => open(urls));
-      })
-      .catch(() => undefined);
-    // Windows registers the link type when the setting is on (the Mac declares it in the app bundle).
-    if (getState().platform === 'win') {
-      let linksOn: boolean | null = null;
-      const syncLinks = () => {
-        const on = getState().settings.sftpLinks;
-        if (!isConfigLoaded() || on === linksOn) return;
-        linksOn = on;
-        void (on ? deepLink.register('sftp') : deepLink.unregister('sftp')).catch((e) => showError(e));
-      };
-      subscribeStore(syncLinks);
-      syncLinks();
+  // sftp:// links, and on the Mac the Finder Quick Action "Mit Bitcrane hochladen" (bitcrane://upload).
+  // The first link may have started the app; links are opened once the configuration is loaded.
+  const open = (urls: string[]) => {
+    for (const u of urls) {
+      if (u.toLowerCase().startsWith('sftp:')) openSftpLink(u);
+      else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u));
     }
+  };
+  const whenConfigLoaded = (run: () => void) => {
+    if (isConfigLoaded()) return run();
+    const t = window.setInterval(() => {
+      if (!isConfigLoaded()) return;
+      window.clearInterval(t);
+      run();
+    }, 100);
+  };
+  if (getState().platform === 'win') {
+    // Windows starts Bitcrane with the link as its argument (see links.rs); a link for the
+    // running Bitcrane arrives as an event.
+    const first = await backend.takeStartLink();
+    if (first) whenConfigLoaded(() => open([first]));
+    await listen<string>('open-link', (e) => whenConfigLoaded(() => open([e.payload])));
+    // The registration follows the setting; switching it off hands the links back to
+    // the program that had them before.
+    let linksOn = getState().settings.sftpLinks;
+    whenConfigLoaded(() => {
+      linksOn = getState().settings.sftpLinks;
+      if (linksOn) void backend.sftpLinksSet(true).catch((e) => showError(e));
+    });
+    subscribeStore(() => {
+      const on = getState().settings.sftpLinks;
+      if (!isConfigLoaded() || on === linksOn) return;
+      linksOn = on;
+      void backend.sftpLinksSet(on).catch((e) => showError(e));
+    });
+  } else {
+    // The Mac declares both schemes in the app bundle; the deep-link plugin delivers the links.
+    const deepLink = await import('@tauri-apps/plugin-deep-link');
+    // A start-link query or listener that fails only means there is no link to open.
+    const first = await deepLink.getCurrent().catch(() => null);
+    if (first) whenConfigLoaded(() => open(first));
+    await deepLink.onOpenUrl((urls) => whenConfigLoaded(() => open(urls))).catch(() => undefined);
   }
 
   // Clicks in the status menu, the Dock menu and the jump list (see iconmenu.rs).
