@@ -17,7 +17,7 @@ pub(crate) struct ProgressEvent {
 }
 
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Tauri passes the arguments of the interface one by one")]
 pub(crate) async fn transfer_upload(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -45,7 +45,7 @@ pub(crate) async fn transfer_upload(
 
 /// Server to server: copies a file between two connected servers.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Tauri passes the arguments of the interface one by one")]
 pub(crate) async fn transfer_cross(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -77,7 +77,7 @@ pub(crate) async fn transfer_cross(
 }
 
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Tauri passes the arguments of the interface one by one")]
 pub(crate) async fn transfer_download(
     app: tauri::AppHandle,
     state: State<'_, AppState>,

@@ -127,15 +127,13 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
   useEffect(() => {
     if (!LIVE || !places.length) return;
     let live = true;
-    void invoke<string[]>('local_real_paths', { list: places.map((p) => p.path) })
-      .then((r) => {
-        if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path])));
-      })
-      .catch(() => {});
+    void invoke<string[]>('local_real_paths', { list: places.map((p) => p.path) }).then((r) => {
+      if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path])));
+    });
     return () => {
       live = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolved again only when the set of places changes
   }, [key]);
   const seen = new Set<string>();
   const unique = places.filter((p) => {
@@ -172,11 +170,9 @@ function useNetworkHosts(enabled: boolean): Array<{ name: string; host: string }
     }
     let live = true;
     const run = () =>
-      void invoke<Array<{ name: string; host: string }>>('network_hosts')
-        .then((h) => {
-          if (live) setHosts(h);
-        })
-        .catch(() => {});
+      void invoke<Array<{ name: string; host: string }>>('network_hosts').then((h) => {
+        if (live) setHosts(h);
+      });
     run();
     const t = window.setInterval(run, 120000);
     return () => {
@@ -206,7 +202,7 @@ export function Sidebar() {
   const dropHere = useStore((s) => !!s.dropHint?.sidebar);
   const homeName = useStore((s) => s.homeName);
   const savedOrder = useStore((s) => s.settings.sidebarOrder);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- computed again when the saved order changes
   const order = useMemo(() => sidebarOrder(getState()), [savedOrder]);
   const collapsed = useStore((s) => s.settings.sidebarCollapsed ?? NONE);
   const hidden = useStore((s) => s.settings.sidebarHidden ?? NONE);

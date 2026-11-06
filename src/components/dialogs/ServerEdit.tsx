@@ -247,7 +247,7 @@ export function ServerEdit({
       cancelled = true;
       window.clearTimeout(t);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checked again only when the key or the login method changes
   }, [draft.keyPath, draft.auth]);
 
   const chooseKey = async () => {

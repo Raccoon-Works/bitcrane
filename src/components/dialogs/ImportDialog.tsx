@@ -90,8 +90,7 @@ export function ImportDialog() {
             .map(([, i]) => i),
         ),
       );
-    // Only when the list arrives.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the list arrives
   }, [found]);
 
   const [fileNote, setFileNote] = useState('');

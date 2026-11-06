@@ -41,7 +41,7 @@ fn read(path: &std::path::Path) -> Vec<Tag> {
 
 /// Tags of the entries of a folder: name → tags (entries without tags are left out).
 pub fn list(dir: &str) -> HashMap<String, Vec<Tag>> {
-    #[allow(unused_mut)]
+    #[allow(unused_mut, reason = "Finder tags exist on macOS only")]
     let mut out = HashMap::new();
     #[cfg(target_os = "macos")]
     if let Ok(rd) = std::fs::read_dir(crate::paths::to_native(dir)) {
@@ -98,7 +98,7 @@ pub struct Tagged {
 /// Files and folders with a tag of this name, through Spotlight (`mdfind`), like
 /// a click on a tag in the Finder's sidebar. At most `limit` results.
 pub fn find(name: &str, limit: usize) -> Vec<Tagged> {
-    #[allow(unused_mut)]
+    #[allow(unused_mut, reason = "Spotlight exists on macOS only")]
     let mut out = Vec::new();
     #[cfg(target_os = "macos")]
     {

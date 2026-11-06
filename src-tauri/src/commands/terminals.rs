@@ -195,7 +195,7 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
 
 /// Built-in terminal: a shell on the server's SSH session, optionally in `cwd`.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Tauri passes the arguments of the interface one by one")]
 pub(crate) async fn term_open(
     app: tauri::AppHandle,
     state: State<'_, AppState>,

@@ -7,10 +7,6 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-/// Edge length of the symbols in pixels on the Mac (the lists scale them down).
-#[allow(dead_code)]
-const SIZE: u32 = 64;
-
 fn cache() -> &'static Mutex<HashMap<String, Option<Vec<u8>>>> {
     static CACHE: OnceLock<Mutex<HashMap<String, Option<Vec<u8>>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -32,7 +28,7 @@ pub fn png_for_ext(ext: &str) -> Option<Vec<u8>> {
 }
 
 /// Encodes straight RGBA pixels as PNG.
-#[allow(dead_code)]
+#[cfg(windows)]
 fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     {
@@ -219,9 +215,12 @@ mod mac_icon {
     use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSBitmapImageRepPropertyKey, NSWorkspace};
     use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
 
+    /// Edge length of the symbols in pixels (the lists scale them down).
+    const SIZE: u32 = 64;
+
     pub fn lookup(ext: &str) -> Option<Vec<u8>> {
         let ws = NSWorkspace::sharedWorkspace();
-        #[allow(deprecated)]
+        #[allow(deprecated, reason = "iconForContentType needs a UTType; an extension is all there is here")]
         let image = ws.iconForFileType(&NSString::from_str(ext));
         to_png(&image)
     }
@@ -234,7 +233,7 @@ mod mac_icon {
     }
 
     fn to_png(image: &objc2_app_kit::NSImage) -> Option<Vec<u8>> {
-        let side = super::SIZE as f64;
+        let side = SIZE as f64;
         let mut rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(side, side));
         // SAFETY: `rect` is a valid pointer for the duration of the call; no context or hints.
         let cg = unsafe { image.CGImageForProposedRect_context_hints(&mut rect, None, None) }?;

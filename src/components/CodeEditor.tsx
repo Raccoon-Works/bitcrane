@@ -406,7 +406,7 @@ export function CodeEditor() {
       // Keep the state (text, history, cursor) for when the document is shown again.
       if (view.current && saved.has(doc.id)) saved.set(doc.id, view.current.state);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only when another document is shown or has loaded
   }, [doc?.id, doc?.loading, doc?.error]);
 
   // Text getters always read the live view for the shown document.
@@ -442,7 +442,7 @@ export function CodeEditor() {
     ];
     view.current?.dispatch({ effects });
     for (const [id, s] of states.current) if (id !== ed.active) states.current.set(id, s.update({ effects }).state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the two settings are applied; the views read the rest themselves
   }, [prefs.wrap, prefs.fontSize]);
 
   const chooseLanguage = (name: string) => {

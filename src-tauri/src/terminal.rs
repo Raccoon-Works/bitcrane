@@ -48,7 +48,7 @@ pub fn start_command(cwd: Option<&str>) -> String {
 }
 
 impl Terminals {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "takes the arguments of the term_open command unchanged")]
     pub async fn open(
         &self,
         app: AppHandle,
