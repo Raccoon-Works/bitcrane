@@ -11,7 +11,6 @@ import {
   setState,
   LIVE,
   showToast,
-  type AppState,
   serverById,
   uid,
   openServerIn,
@@ -19,6 +18,7 @@ import {
   watchForLocal,
   panePath,
 } from './core';
+import type { AppState } from './appState';
 import { openServer } from './tabs';
 import { openDialog } from './panels';
 import { updateSettings } from './settings';

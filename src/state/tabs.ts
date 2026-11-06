@@ -10,7 +10,6 @@ import type { PaneSide, Tab, Watch } from '../backend/types';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
-  type PaneSelection,
   setState,
   state,
   LIVE,
@@ -23,14 +22,13 @@ import {
   emptyTab,
   paneLoc,
   isOffline,
-  type AppState,
   paneShowsServers,
   listEntries,
   panePath,
-  type TransferRule,
   paneEntries,
   isDirEntry,
 } from './core';
+import type { PaneSelection, AppState, TransferRule } from './appState';
 import { openDialog } from './panels';
 import { deleteServer } from './servers';
 import { releaseServers } from './watches';

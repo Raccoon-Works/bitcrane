@@ -11,14 +11,9 @@ import { $t } from '../i18n';
 import {
   setState,
   activityExpanded,
-  SIDEBAR_MAX,
-  SIDEBAR_MIN,
-  type DialogState,
-  type SettingsTab,
   state,
   activeTab,
   emptyTab,
-  type AppState,
   paneShowsServers,
   paneLoc,
   serverById,
@@ -28,6 +23,8 @@ import {
   LIVE,
   uid,
 } from './core';
+import type { DialogState, SettingsTab, AppState } from './appState';
+import { SIDEBAR_MAX, SIDEBAR_MIN } from './defaults';
 import { clearSelection, navigate, openServerInNewTab } from './tabs';
 import { quickConnect } from './servers';
 

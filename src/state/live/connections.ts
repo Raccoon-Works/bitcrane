@@ -5,7 +5,8 @@
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Server, isCloudProtocol } from '../../backend/types';
 import { type StoredConfig } from './config';
-import { type AppState, serverById, getState, showToast, setState, subscribeStore, uid } from '../core';
+import { serverById, getState, showToast, setState, subscribeStore, uid } from '../core';
+import type { AppState } from '../appState';
 import { type AuthParams, type ConnectParams, toBackendError, type BackendError } from '../../backend/api';
 import { $t } from '../../i18n';
 import { bump, listings } from './listing';

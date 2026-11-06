@@ -8,21 +8,17 @@ import { TagFiles } from './components/dialogs/TagFiles';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { MacMenuBar } from './components/AppMenu';
 import { ContextMenu } from './components/ContextMenu';
-import {
-  AuthPrompt,
-  CloudPlacesDialog,
-  ConfirmDialog,
-  ConflictDialog,
-  About,
-  Licenses,
-  UpdateDialog,
-  ConfirmDelete,
-  Fingerprint,
-  PermsDialog,
-  QuickConnect,
-  SecretPrompt,
-  Shortcuts,
-} from './components/dialogs/SmallDialogs';
+import { About, Licenses } from './components/dialogs/About';
+import { CloudPlacesDialog } from './components/dialogs/CloudPlacesDialog';
+import { ConfirmDelete } from './components/dialogs/ConfirmDelete';
+import { ConfirmDialog } from './components/dialogs/ConfirmDialog';
+import { ConflictDialog } from './components/dialogs/ConflictDialog';
+import { Fingerprint } from './components/dialogs/Fingerprint';
+import { AuthPrompt, SecretPrompt } from './components/dialogs/LoginPrompts';
+import { PermsDialog } from './components/dialogs/PermsDialog';
+import { QuickConnect } from './components/dialogs/QuickConnect';
+import { Shortcuts } from './components/dialogs/Shortcuts';
+import { UpdateDialog } from './components/dialogs/UpdateDialog';
 import { DiffDialog, CompareFilesDialog } from './components/dialogs/DiffDialog';
 import {
   ChecksumDialog,

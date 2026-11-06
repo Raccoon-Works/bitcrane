@@ -4,7 +4,8 @@
  */
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type FileEntry, type PaneSide } from '../../backend/types';
-import { setState, activeTab, paneLoc, type AppState } from '../core';
+import { setState, activeTab, paneLoc } from '../core';
+import type { AppState } from '../appState';
 import { basename, join, parent } from '../../util/paths';
 import { connected, handleRemoteError } from './connections';
 import { addLog } from '../log';

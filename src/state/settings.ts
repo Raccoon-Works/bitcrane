@@ -5,7 +5,9 @@
 import type { Platform, Theme } from '../backend/types';
 
 import { $t, rememberLanguage } from '../i18n';
-import { type Settings, type TransferRule, state, LIVE, showToast, setState, type ToolId, detectTheme } from './core';
+import { state, LIVE, showToast, setState } from './core';
+import type { Settings, TransferRule, ToolId } from './appState';
+import { detectTheme } from './defaults';
 
 /** Stable empty rule list for store selectors (a new [] on every render would redraw endlessly). */
 export const NO_RULES: TransferRule[] = [];

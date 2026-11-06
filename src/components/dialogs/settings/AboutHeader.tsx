@@ -2,10 +2,10 @@
  * Top of Settings › Allgemein: the app symbol with name and version, the
  * update state and links to the project.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Bug, GithubLogo, Scroll, Sparkle } from '@phosphor-icons/react';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
-import { LIVE, PROTOTYPE_VERSION, openDialog, openExternal, useStore } from '../../../state/store';
+import { openDialog, openExternal, useStore } from '../../../state/store';
+import { useAppVersion } from '../../../state/updates';
 import { BMark } from '../../icons';
 import { Wordmark } from '../../ui';
 import { $t } from '../../../i18n';
@@ -13,15 +13,8 @@ import { $t } from '../../../i18n';
 const GITHUB_URL = 'https://github.com/Raccoon-Works/bitcrane';
 
 export function AboutHeader() {
-  const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
+  const version = useAppVersion();
   const update = useStore((st) => st.update);
-  useEffect(() => {
-    if (LIVE)
-      backend
-        .appInfo()
-        .then((i) => setVersion(i.version))
-        .catch(() => undefined);
-  }, []);
   const links: Array<{ label: string; note: string; icon: ReactNode; run: () => void }> = [
     {
       label: $t('Was ist neu?'),

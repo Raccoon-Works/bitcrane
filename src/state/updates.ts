@@ -10,9 +10,10 @@
  * the background and installs it when Bitcrane quits (or right away from the
  * update window), "notify" only shows the update window, "off" never looks.
  */
+import { useEffect, useState } from 'react';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { $t } from '../i18n';
-import { getState, LIVE, openDialog, setState, showToast } from './store';
+import { getState, LIVE, openDialog, PROTOTYPE_VERSION, setState, showToast } from './store';
 import { addLog } from './log';
 
 export interface UpdateState {
@@ -35,6 +36,22 @@ let downloaded = false;
 let timer: number | undefined;
 
 const SIX_HOURS = 6 * 3600 * 1000;
+
+/**
+ * Version of the running Bitcrane: asked from the core in the app (empty until
+ * it answers), the prototype's own number in the browser.
+ */
+export function useAppVersion(): string {
+  const [version, setVersion] = useState(LIVE ? '' : PROTOTYPE_VERSION);
+  useEffect(() => {
+    if (LIVE)
+      backend
+        .appInfo()
+        .then((i) => setVersion(i.version))
+        .catch(() => undefined);
+  }, []);
+  return version;
+}
 
 /** Looks for a newer version. `manual`: the user asked, so "up to date" and errors are shown too. */
 export async function checkForUpdates(manual: boolean) {
