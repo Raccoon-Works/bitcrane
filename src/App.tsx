@@ -47,7 +47,7 @@ import {
 } from './components/dialogs/ToolDialogs';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { ImportDialog } from './components/dialogs/ImportDialog';
-import { ServerEdit } from './components/dialogs/ServerEdit';
+import { ServerEdit } from './components/dialogs/serverEdit/ServerEdit';
 import { ToolbarCustomize } from './components/dialogs/ToolbarCustomize';
 import { TransfersDialog } from './components/dialogs/Transfers';
 import { WatchSetup } from './components/dialogs/WatchSetup';

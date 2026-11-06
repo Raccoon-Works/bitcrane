@@ -22,6 +22,14 @@ import { addLog } from './log';
 import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
 import { isConnected, refreshVisible } from './live';
 
+/** Editor settings with their standard values (CodeEditor.tsx and Settings › Allgemein). */
+export interface EditorPrefs {
+  fontSize: number;
+  wrap: boolean;
+  tabSize: number;
+}
+export const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
+
 export interface EditorDoc {
   id: string;
   /** Server of the file; '' for a file of this computer, null for a new, unsaved document. */

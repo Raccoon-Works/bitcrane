@@ -17,6 +17,7 @@ import {
   deleteWatch,
   getState,
   LIVE,
+  NO_RULES,
   openDialog,
   panePath,
   saveWatch,
@@ -32,9 +33,6 @@ import { ServerTile } from '../ServerTile';
 import { Button, Checkbox, Select, Switch, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
-
-/** Stable empty list for the store selector (a new [] would redraw endlessly). */
-const NO_RULES: import('../../state/store').TransferRule[] = [];
 
 const templates: Record<string, string[]> = {
   python: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp', '.venv'],

@@ -18,7 +18,7 @@ import { Inspector } from './Inspector';
 import { Pane } from './Pane';
 import { ConnectionTabs } from './Tabs';
 import { Toolbar } from './Toolbar';
-import { SettingsPage } from './dialogs/Settings';
+import { SettingsPage } from './dialogs/settings/SettingsPage';
 import { TrafficLights } from './TrafficLights';
 import { $t } from '../i18n';
 import { CheckCircle, DownloadSimple, Info, WarningCircle } from '@phosphor-icons/react';

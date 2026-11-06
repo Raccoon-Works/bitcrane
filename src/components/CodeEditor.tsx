@@ -64,6 +64,7 @@ import {
   closeDoc,
   closeNow,
   docPlace,
+  EDITOR_DEFAULTS,
   hideEditor,
   keepTexts,
   markDirty,
@@ -80,14 +81,6 @@ import {
 import { LIVE, updateSettings, useStore } from '../state/store';
 import { FileGlyph } from './icons';
 import { Button, IconButton } from './ui';
-
-/** Editor settings with their standard values. */
-export interface EditorPrefs {
-  fontSize: number;
-  wrap: boolean;
-  tabSize: number;
-}
-const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
 
 /** Syntax colours as CSS variables, so the light and the dark theme each set their own. */
 const highlight = HighlightStyle.define([
