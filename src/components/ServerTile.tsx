@@ -13,11 +13,25 @@ import { swatch } from './serverColors';
  * (default "gray" = none); when one is chosen, e.g. red for a live server,
  * it shows as a small dot on the symbol (like WinSCP's site colour).
  */
-export function ServerTile({ server, size = 20, color, protocol, image }: { server?: Server; size?: number; mono?: string; color?: ServerColor; protocol?: Server['protocol']; image?: string }) {
+export function ServerTile({
+  server,
+  size = 20,
+  color,
+  protocol,
+  image,
+}: {
+  server?: Server;
+  size?: number;
+  mono?: string;
+  color?: ServerColor;
+  protocol?: Server['protocol'];
+  image?: string;
+}) {
   const proto = protocol ?? server?.protocol ?? 'sftp';
   const picture = image ?? server?.image;
   // Cloud services show their own symbol (unless the user chose a picture).
-  if (!picture && (proto === 'dropbox' || proto === 'gdrive' || proto === 'onedrive')) return <CloudTile service={proto} size={size} />;
+  if (!picture && (proto === 'dropbox' || proto === 'gdrive' || proto === 'onedrive'))
+    return <CloudTile service={proto} size={size} />;
   // An own picture replaces the globe (the colour dot stays, so groups remain recognisable).
   if (picture) {
     const c = color ?? server?.color;
@@ -25,7 +39,9 @@ export function ServerTile({ server, size = 20, color, protocol, image }: { serv
     return (
       <span className="server-glyph has-image" aria-hidden="true" style={{ width: size, height: size }}>
         <img src={picture} alt="" width={size} height={size} draggable={false} />
-        {c && c !== 'gray' && <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />}
+        {c && c !== 'gray' && (
+          <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />
+        )}
       </span>
     );
   }
@@ -38,7 +54,9 @@ export function ServerTile({ server, size = 20, color, protocol, image }: { serv
   return (
     <span className={`server-glyph proto-${proto}`} aria-hidden="true" style={{ width: size, height: size }}>
       <Icon size={size} weight="fill" />
-      {c && c !== 'gray' && <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />}
+      {c && c !== 'gray' && (
+        <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />
+      )}
     </span>
   );
 }

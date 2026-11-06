@@ -51,7 +51,13 @@ fn not_set_up() -> AppError {
 /// Bitcrane path ("/" = top) to Dropbox path ("" = top).
 fn dbx_path(path: &str) -> String {
     let p = path.trim_end_matches('/');
-    if p.is_empty() { String::new() } else if p.starts_with('/') { p.to_string() } else { format!("/{p}") }
+    if p.is_empty() {
+        String::new()
+    } else if p.starts_with('/') {
+        p.to_string()
+    } else {
+        format!("/{p}")
+    }
 }
 
 fn parse_time(s: Option<&str>) -> i64 {
@@ -67,7 +73,9 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
         return None;
     }
     // The time the file was changed on the computer it came from; Dropbox keeps it as sent.
-    let mtime = parse_time(v.get("client_modified").and_then(|t| t.as_str()).or_else(|| v.get("server_modified").and_then(|t| t.as_str())));
+    let mtime = parse_time(
+        v.get("client_modified").and_then(|t| t.as_str()).or_else(|| v.get("server_modified").and_then(|t| t.as_str())),
+    );
     Some(FileEntry {
         name,
         kind: if dir { "dir".into() } else { "file".into() },
@@ -83,17 +91,32 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
 
 /// Turns an API error answer into a clear message.
 fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
-    let summary = serde_json::from_str::<Value>(body).ok().and_then(|v| v.get("error_summary").and_then(|s| s.as_str()).map(String::from)).unwrap_or_default();
+    let summary = serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|v| v.get("error_summary").and_then(|s| s.as_str()).map(String::from))
+        .unwrap_or_default();
     let detail = format!("{status}: {}", if summary.is_empty() { body } else { &summary });
     // The app's permissions in the Dropbox App Console do not cover this action.
     if summary.contains("missing_scope") || body.contains("missing_scope") {
-        return AppError::new(ErrorKind::Other, format!("{what}: Die Bitcrane-App bei Dropbox hat dafür keine Berechtigung.")).with_detail(detail);
+        return AppError::new(
+            ErrorKind::Other,
+            format!("{what}: Die Bitcrane-App bei Dropbox hat dafür keine Berechtigung."),
+        )
+        .with_detail(detail);
     }
     if status.as_u16() == 401 {
-        return AppError::new(ErrorKind::AuthFailed, "Die Anmeldung bei Dropbox ist nicht mehr gültig. Bitte neu anmelden.").with_detail(detail);
+        return AppError::new(
+            ErrorKind::AuthFailed,
+            "Die Anmeldung bei Dropbox ist nicht mehr gültig. Bitte neu anmelden.",
+        )
+        .with_detail(detail);
     }
     if status.as_u16() == 429 {
-        return AppError::new(ErrorKind::ConnectionLost, "Dropbox bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.").with_detail(detail);
+        return AppError::new(
+            ErrorKind::ConnectionLost,
+            "Dropbox bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.",
+        )
+        .with_detail(detail);
     }
     let (kind, msg) = if summary.contains("not_found") {
         (ErrorKind::NotFound, format!("{what}: nicht gefunden."))
@@ -101,7 +124,10 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
         (ErrorKind::AlreadyExists, format!("{what}: gibt es schon."))
     } else if summary.contains("insufficient_space") {
         (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in der Dropbox."))
-    } else if summary.contains("no_write_permission") || summary.contains("disallowed_name") || summary.contains("restricted") {
+    } else if summary.contains("no_write_permission")
+        || summary.contains("disallowed_name")
+        || summary.contains("restricted")
+    {
         (ErrorKind::PermissionDenied, format!("{what}: nicht erlaubt."))
     } else {
         (ErrorKind::Other, format!("{what} fehlgeschlagen."))
@@ -134,9 +160,31 @@ pub async fn sign_in(open: impl FnOnce(&str) -> AppResult<()>) -> AppResult<oaut
         .append_pair("state", &state);
     let code = oauth::wait_for_code(url.as_str(), &state, open).await?;
     let client = oauth::http_client()?;
-    let answer = oauth::token_request(&client, TOKEN_URL, &[("code", &code), ("grant_type", "authorization_code"), ("client_id", key), ("code_verifier", &verifier), ("redirect_uri", &redirect)]).await?;
-    let refresh = answer.refresh_token.ok_or_else(|| AppError::other("Dropbox hat keine dauerhafte Anmeldung geschickt."))?;
-    let conn = DropboxConn { client, key, refresh: refresh.clone(), token: tokio::sync::Mutex::new(Token { access: answer.access_token, valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) }), write_lock: tokio::sync::Mutex::new(()), home: "/".into() };
+    let answer = oauth::token_request(
+        &client,
+        TOKEN_URL,
+        &[
+            ("code", &code),
+            ("grant_type", "authorization_code"),
+            ("client_id", key),
+            ("code_verifier", &verifier),
+            ("redirect_uri", &redirect),
+        ],
+    )
+    .await?;
+    let refresh =
+        answer.refresh_token.ok_or_else(|| AppError::other("Dropbox hat keine dauerhafte Anmeldung geschickt."))?;
+    let conn = DropboxConn {
+        client,
+        key,
+        refresh: refresh.clone(),
+        token: tokio::sync::Mutex::new(Token {
+            access: answer.access_token,
+            valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)),
+        }),
+        write_lock: tokio::sync::Mutex::new(()),
+        home: "/".into(),
+    };
     let account = conn.account().await.unwrap_or_else(|_| "Dropbox".into());
     Ok(oauth::SignedIn { refresh_token: refresh, account })
 }
@@ -161,7 +209,12 @@ impl DropboxConn {
     async fn access(&self) -> AppResult<String> {
         let mut t = self.token.lock().await;
         if t.access.is_empty() || Instant::now() >= t.valid_until {
-            let a = oauth::token_request(&self.client, TOKEN_URL, &[("grant_type", "refresh_token"), ("refresh_token", &self.refresh), ("client_id", self.key)]).await?;
+            let a = oauth::token_request(
+                &self.client,
+                TOKEN_URL,
+                &[("grant_type", "refresh_token"), ("refresh_token", &self.refresh), ("client_id", self.key)],
+            )
+            .await?;
             t.access = a.access_token;
             t.valid_until = Instant::now() + Duration::from_secs(a.expires_in.unwrap_or(3600).saturating_sub(60));
         }
@@ -176,7 +229,12 @@ impl DropboxConn {
     /// is repeated after the time Dropbox asks for (`Retry-After` header or
     /// `retry_after` in the body, at least one second, growing with each try).
     /// Only after several refusals the error goes up to the caller.
-    async fn post_retry(&self, url: &str, headers: &[(&str, String)], body: Vec<u8>) -> AppResult<(reqwest::StatusCode, String)> {
+    async fn post_retry(
+        &self,
+        url: &str,
+        headers: &[(&str, String)],
+        body: Vec<u8>,
+    ) -> AppResult<(reqwest::StatusCode, String)> {
         const TRIES: u32 = 6;
         let mut attempt: u32 = 0;
         loop {
@@ -187,10 +245,16 @@ impl DropboxConn {
             }
             let resp = req.body(body.clone()).send().await.map_err(net)?;
             let status = resp.status();
-            let header_wait = resp.headers().get("Retry-After").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<u64>().ok());
+            let header_wait = resp
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.trim().parse::<u64>().ok());
             let text = resp.text().await.map_err(net)?;
             if status.as_u16() == 429 && attempt + 1 < TRIES {
-                let body_wait = serde_json::from_str::<Value>(&text).ok().and_then(|v| v.pointer("/error/retry_after").and_then(|r| r.as_u64()));
+                let body_wait = serde_json::from_str::<Value>(&text)
+                    .ok()
+                    .and_then(|v| v.pointer("/error/retry_after").and_then(|r| r.as_u64()));
                 // Dropbox often says "retry_after: 0": then wait briefly and longer with each try.
                 let asked_ms = header_wait.or(body_wait).unwrap_or(0) * 1000;
                 let wait_ms = asked_ms.max(500 * (attempt as u64 + 1)).min(30_000);
@@ -204,11 +268,18 @@ impl DropboxConn {
 
     /// RPC call with a JSON body; returns the JSON answer.
     async fn rpc(&self, endpoint: &str, body: Value, what: &str) -> AppResult<Value> {
-        let (status, text) = self.post_retry(&format!("{API}/{endpoint}"), &[("Content-Type", "application/json".into())], body.to_string().into_bytes()).await?;
+        let (status, text) = self
+            .post_retry(
+                &format!("{API}/{endpoint}"),
+                &[("Content-Type", "application/json".into())],
+                body.to_string().into_bytes(),
+            )
+            .await?;
         if !status.is_success() {
             return Err(api_err(status, &text, what));
         }
-        serde_json::from_str(&text).map_err(|e| AppError::other("Unerwartete Antwort von Dropbox.").with_detail(e.to_string()))
+        serde_json::from_str(&text)
+            .map_err(|e| AppError::other("Unerwartete Antwort von Dropbox.").with_detail(e.to_string()))
     }
 
     /// Link to share a file or folder (Transmit "Copy Link"). An existing link is
@@ -236,7 +307,9 @@ impl DropboxConn {
             return Err(api_err(status, &text, &what));
         }
         // A link exists already: take it.
-        let v = self.rpc("sharing/list_shared_links", json!({ "path": dbx_path(path), "direct_only": true }), &what).await?;
+        let v = self
+            .rpc("sharing/list_shared_links", json!({ "path": dbx_path(path), "direct_only": true }), &what)
+            .await?;
         v.pointer("/links/0/url")
             .and_then(|u| u.as_str())
             .map(String::from)
@@ -246,14 +319,24 @@ impl DropboxConn {
     /// E-mail address of the signed-in account.
     pub async fn account(&self) -> AppResult<String> {
         let token = self.access().await?;
-        let resp = self.client.post(format!("{API}/users/get_current_account")).bearer_auth(token).send().await.map_err(net)?;
+        let resp = self
+            .client
+            .post(format!("{API}/users/get_current_account"))
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(net)?;
         let status = resp.status();
         let text = resp.text().await.map_err(net)?;
         if !status.is_success() {
             return Err(api_err(status, &text, "Konto lesen"));
         }
         let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
-        Ok(v.get("email").and_then(|e| e.as_str()).or_else(|| v.pointer("/name/display_name").and_then(|e| e.as_str())).unwrap_or("Dropbox").to_string())
+        Ok(v.get("email")
+            .and_then(|e| e.as_str())
+            .or_else(|| v.pointer("/name/display_name").and_then(|e| e.as_str()))
+            .unwrap_or("Dropbox")
+            .to_string())
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
@@ -282,10 +365,21 @@ impl DropboxConn {
         let p = dbx_path(path);
         if p.is_empty() {
             // The top folder has no metadata of its own.
-            return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: "755".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+            return Ok(FileEntry {
+                name: "/".into(),
+                kind: "dir".into(),
+                size: 0,
+                mtime: 0,
+                perms: "755".into(),
+                owner: String::new(),
+                group: String::new(),
+                link: None,
+                hidden: 0,
+            });
         }
         let v = self.rpc("files/get_metadata", json!({ "path": p }), &format!("„{}“", remote_name(path))).await?;
-        entry_of(&v).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v)
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -293,7 +387,13 @@ impl DropboxConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        self.rpc("files/create_folder_v2", json!({ "path": dbx_path(path), "autorename": false }), &format!("Ordner „{}“ anlegen", remote_name(path))).await.map(|_| ())
+        self.rpc(
+            "files/create_folder_v2",
+            json!({ "path": dbx_path(path), "autorename": false }),
+            &format!("Ordner „{}“ anlegen", remote_name(path)),
+        )
+        .await
+        .map(|_| ())
     }
 
     /// Dropbox creates missing parent folders by itself.
@@ -308,7 +408,13 @@ impl DropboxConn {
     }
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
-        self.rpc("files/move_v2", json!({ "from_path": dbx_path(from), "to_path": dbx_path(to), "autorename": false }), &format!("„{}“ umbenennen", remote_name(from))).await.map(|_| ())
+        self.rpc(
+            "files/move_v2",
+            json!({ "from_path": dbx_path(from), "to_path": dbx_path(to), "autorename": false }),
+            &format!("„{}“ umbenennen", remote_name(from)),
+        )
+        .await
+        .map(|_| ())
     }
 
     pub async fn replace(&self, from: &str, to: &str) -> AppResult<()> {
@@ -319,7 +425,10 @@ impl DropboxConn {
     }
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
-        match self.rpc("files/delete_v2", json!({ "path": dbx_path(path) }), &format!("„{}“ löschen", remote_name(path))).await {
+        match self
+            .rpc("files/delete_v2", json!({ "path": dbx_path(path) }), &format!("„{}“ löschen", remote_name(path)))
+            .await
+        {
             Err(e) if e.kind == ErrorKind::NotFound => Ok(()),
             r => r.map(|_| ()),
         }
@@ -327,7 +436,8 @@ impl DropboxConn {
 
     /// Copy inside the Dropbox, with "Kopie" names on clashes.
     pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -347,10 +457,17 @@ impl DropboxConn {
         let root = self.stat(path).await?;
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: path.to_string(),
+                relative: rel(path),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let what = format!("„{}“ lesen", remote_name(path));
-        let mut v = self.rpc("files/list_folder", json!({ "path": dbx_path(path), "recursive": true, "limit": 2000 }), &what).await?;
+        let mut v = self
+            .rpc("files/list_folder", json!({ "path": dbx_path(path), "recursive": true, "limit": 2000 }), &what)
+            .await?;
         let mut out = Vec::new();
         loop {
             for e in v.get("entries").and_then(|e| e.as_array()).into_iter().flatten() {
@@ -375,7 +492,11 @@ impl DropboxConn {
     /// Reads a file from `offset` (HTTP Range).
     pub async fn reader(&self, path: &str, offset: u64) -> AppResult<Box<dyn AsyncRead + Unpin + Send>> {
         let token = self.access().await?;
-        let mut req = self.client.post(format!("{CONTENT}/files/download")).bearer_auth(token).header("Dropbox-API-Arg", ascii_json(&json!({ "path": dbx_path(path) })));
+        let mut req = self
+            .client
+            .post(format!("{CONTENT}/files/download"))
+            .bearer_auth(token)
+            .header("Dropbox-API-Arg", ascii_json(&json!({ "path": dbx_path(path) })));
         if offset > 0 {
             req = req.header("Range", format!("bytes={offset}-"));
         }
@@ -416,7 +537,11 @@ impl DropboxConn {
 
     /// Writes a file. Bitcrane writes into the returned stream; the task
     /// sends it to Dropbox in pieces and finishes the upload.
-    pub fn writer(self: &std::sync::Arc<Self>, path: &str, mtime: Option<u32>) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
+    pub fn writer(
+        self: &std::sync::Arc<Self>,
+        path: &str,
+        mtime: Option<u32>,
+    ) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
         let (w, mut r) = tokio::io::duplex(1024 * 1024);
         let conn = self.clone();
         let path = path.to_string();
@@ -429,7 +554,9 @@ impl DropboxConn {
                 let mut buf = Vec::with_capacity(CHUNK);
                 while buf.len() < CHUNK {
                     let mut part = vec![0u8; (CHUNK - buf.len()).min(256 * 1024)];
-                    let n = r.read(&mut part).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string()))?;
+                    let n = r.read(&mut part).await.map_err(|e| {
+                        AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
+                    })?;
                     if n == 0 {
                         break;
                     }
@@ -443,7 +570,9 @@ impl DropboxConn {
                         return Ok(());
                     }
                     (None, false) => {
-                        let v = conn.content_call("files/upload_session/start", json!({ "close": false }), buf.clone(), &what).await?;
+                        let v = conn
+                            .content_call("files/upload_session/start", json!({ "close": false }), buf.clone(), &what)
+                            .await?;
                         session = v.get("session_id").and_then(|s| s.as_str()).map(String::from);
                         if session.is_none() {
                             return Err(AppError::other("Dropbox hat das Hochladen in Teilen nicht gestartet."));
@@ -451,7 +580,13 @@ impl DropboxConn {
                         offset += buf.len() as u64;
                     }
                     (Some(id), false) => {
-                        conn.content_call("files/upload_session/append_v2", json!({ "cursor": { "session_id": id, "offset": offset }, "close": false }), buf.clone(), &what).await?;
+                        conn.content_call(
+                            "files/upload_session/append_v2",
+                            json!({ "cursor": { "session_id": id, "offset": offset }, "close": false }),
+                            buf.clone(),
+                            &what,
+                        )
+                        .await?;
                         offset += buf.len() as u64;
                     }
                     (Some(id), true) => {

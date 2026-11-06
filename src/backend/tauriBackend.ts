@@ -40,7 +40,8 @@ export const tauriBackend: Backend = {
   localZip: (paths) => invoke('local_zip', { paths }),
   takePendingUploads: () => invoke('take_pending_uploads'),
   takeStartAction: () => invoke('take_start_action'),
-  mountStart: (connectionId, serverId, name, remoteRoot) => invoke('mount_start', { connectionId, serverId, name, remoteRoot }),
+  mountStart: (connectionId, serverId, name, remoteRoot) =>
+    invoke('mount_start', { connectionId, serverId, name, remoteRoot }),
   mountStop: (serverId, removeFolder) => invoke('mount_stop', { serverId, removeFolder }),
   mountFolder: (serverId) => invoke('mount_folder', { serverId }),
   archiveExtractTemp: (paths) => invoke('archive_extract_temp', { paths }),
@@ -65,11 +66,14 @@ export const tauriBackend: Backend = {
   connectDav: (serverId, params) => invoke('dav_connect', { serverId, params }),
   connectS3: (serverId, params) => invoke('s3_connect', { serverId, params }),
   connectSmb: (serverId, params) => invoke('smb_connect', { serverId, params }),
-  vaultOpen: (serverId, location, storageId, password) => invoke('vault_open', { serverId, location, storageId: storageId ?? null, password }),
-  vaultCreate: (location, storageId, password) => invoke('vault_create', { location, storageId: storageId ?? null, password }),
+  vaultOpen: (serverId, location, storageId, password) =>
+    invoke('vault_open', { serverId, location, storageId: storageId ?? null, password }),
+  vaultCreate: (location, storageId, password) =>
+    invoke('vault_create', { location, storageId: storageId ?? null, password }),
   connectDropbox: (serverId, params) => invoke('dropbox_connect', { serverId, params }),
   cloudServices: () => invoke('cloud_services'),
-  cloudSignIn: (service, clientId, clientSecret) => invoke('cloud_sign_in', { service, clientId: clientId ?? null, clientSecret: clientSecret ?? null }),
+  cloudSignIn: (service, clientId, clientSecret) =>
+    invoke('cloud_sign_in', { service, clientId: clientId ?? null, clientSecret: clientSecret ?? null }),
   connectGDrive: (serverId, params) => invoke('gdrive_connect', { serverId, params }),
   connectOneDrive: (serverId, params) => invoke('onedrive_connect', { serverId, params }),
   cloudSignInCancel: () => invoke('cloud_sign_in_cancel'),
@@ -114,7 +118,8 @@ export const tauriBackend: Backend = {
     }
   },
   cancel: (id, discard) => invoke('transfer_cancel', { id, discard }),
-  discardPartial: (serverId, direction, localPath, remotePath) => invoke('transfer_discard', { serverId, direction, localPath, remotePath }),
+  discardPartial: (serverId, direction, localPath, remotePath) =>
+    invoke('transfer_discard', { serverId, direction, localPath, remotePath }),
 
   async watchStart(watchId, localPath, recursive, excludes, delayMs, onBatch) {
     await ensureListeners();

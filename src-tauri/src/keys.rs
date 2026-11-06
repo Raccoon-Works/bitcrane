@@ -31,9 +31,15 @@ fn write_private(path: &Path, content: &str) -> AppResult<()> {
 /// Creates `path` (private key) and `path.pub` (public key). Returns the public key line.
 pub fn generate(path: &str, comment: &str, passphrase: Option<&str>) -> AppResult<String> {
     let native = to_native(path);
-    let pub_path = native.with_file_name(format!("{}.pub", native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()));
+    let pub_path = native.with_file_name(format!(
+        "{}.pub",
+        native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+    ));
     if native.exists() || pub_path.exists() {
-        return Err(AppError::new(ErrorKind::AlreadyExists, "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen."));
+        return Err(AppError::new(
+            ErrorKind::AlreadyExists,
+            "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.",
+        ));
     }
     if let Some(dir) = native.parent() {
         std::fs::create_dir_all(dir)?;
@@ -47,14 +53,22 @@ pub fn generate(path: &str, comment: &str, passphrase: Option<&str>) -> AppResul
         }
     }
     let mut rng = rand::rng();
-    let mut key = PrivateKey::random(&mut rng, Algorithm::Ed25519).map_err(|e| AppError::other("Schlüssel konnte nicht erzeugt werden.").with_detail(e.to_string()))?;
+    let mut key = PrivateKey::random(&mut rng, Algorithm::Ed25519)
+        .map_err(|e| AppError::other("Schlüssel konnte nicht erzeugt werden.").with_detail(e.to_string()))?;
     key.set_comment(comment);
-    let public = key.public_key().to_openssh().map_err(|e| AppError::other("Öffentlicher Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
+    let public = key
+        .public_key()
+        .to_openssh()
+        .map_err(|e| AppError::other("Öffentlicher Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
     let stored = match passphrase.filter(|p| !p.is_empty()) {
-        Some(p) => key.encrypt(&mut rng, p).map_err(|e| AppError::other("Verschlüsseln fehlgeschlagen.").with_detail(e.to_string()))?,
+        Some(p) => key
+            .encrypt(&mut rng, p)
+            .map_err(|e| AppError::other("Verschlüsseln fehlgeschlagen.").with_detail(e.to_string()))?,
         None => key,
     };
-    let private = stored.to_openssh(LineEnding::LF).map_err(|e| AppError::other("Schlüssel konnte nicht gespeichert werden.").with_detail(e.to_string()))?;
+    let private = stored
+        .to_openssh(LineEnding::LF)
+        .map_err(|e| AppError::other("Schlüssel konnte nicht gespeichert werden.").with_detail(e.to_string()))?;
     write_private(&native, &private)?;
     std::fs::write(&pub_path, format!("{public}\n"))?;
     Ok(public)
@@ -63,7 +77,10 @@ pub fn generate(path: &str, comment: &str, passphrase: Option<&str>) -> AppResul
 /// Public key line of a private key: from `path.pub`, or derived from the key itself.
 pub fn public_of(path: &str) -> AppResult<String> {
     let native = to_native(path);
-    let pub_path = native.with_file_name(format!("{}.pub", native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()));
+    let pub_path = native.with_file_name(format!(
+        "{}.pub",
+        native.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+    ));
     if let Ok(text) = std::fs::read_to_string(&pub_path) {
         if let Some(line) = text.lines().find(|l| l.starts_with("ssh-") || l.starts_with("ecdsa-")) {
             return Ok(line.trim().to_string());
@@ -73,8 +90,11 @@ pub fn public_of(path: &str) -> AppResult<String> {
     if text.starts_with("PuTTY-User-Key-File") {
         return ppk_public(&text);
     }
-    let key = PrivateKey::from_openssh(text.trim()).map_err(|e| AppError::other("Das ist kein privater SSH-Schlüssel.").with_detail(e.to_string()))?;
-    key.public_key().to_openssh().map_err(|e| AppError::other("Öffentlicher Schlüssel fehlerhaft.").with_detail(e.to_string()))
+    let key = PrivateKey::from_openssh(text.trim())
+        .map_err(|e| AppError::other("Das ist kein privater SSH-Schlüssel.").with_detail(e.to_string()))?;
+    key.public_key()
+        .to_openssh()
+        .map_err(|e| AppError::other("Öffentlicher Schlüssel fehlerhaft.").with_detail(e.to_string()))
 }
 
 /// The public part of a PuTTY key is stored unencrypted ("Public-Lines").
@@ -94,8 +114,11 @@ fn ppk_public(text: &str) -> AppResult<String> {
             }
         }
     }
-    let bytes = base64::engine::general_purpose::STANDARD.decode(blob.as_bytes()).map_err(|e| AppError::other("PuTTY-Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
-    let mut key = russh::keys::PublicKey::from_bytes(&bytes).map_err(|e| AppError::other("PuTTY-Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(blob.as_bytes())
+        .map_err(|e| AppError::other("PuTTY-Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
+    let mut key = russh::keys::PublicKey::from_bytes(&bytes)
+        .map_err(|e| AppError::other("PuTTY-Schlüssel fehlerhaft.").with_detail(e.to_string()))?;
     key.set_comment(comment);
     key.to_openssh().map_err(|e| AppError::other("Öffentlicher Schlüssel fehlerhaft.").with_detail(e.to_string()))
 }

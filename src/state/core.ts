@@ -16,7 +16,20 @@ import { useSyncExternalStore } from 'react';
 import { isTauri, type CloudPlace, type Place } from '../backend/api';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
-import type { Conflict, FileEntry, HostKey, PaneSide, Platform, Protocol, Server, Tab, Theme, Transfer, Watch, WatchOptions } from '../backend/types';
+import type {
+  Conflict,
+  FileEntry,
+  HostKey,
+  PaneSide,
+  Platform,
+  Protocol,
+  Server,
+  Tab,
+  Theme,
+  Transfer,
+  Watch,
+  WatchOptions,
+} from '../backend/types';
 
 import { describeFile } from '../util/format';
 import * as paths from '../util/paths';
@@ -38,7 +51,15 @@ export const LIVE = isTauri;
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
   | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }
-  | { type: 'confirm'; title: string; text: string; confirm: string; danger?: boolean; run: () => void; detail?: string }
+  | {
+      type: 'confirm';
+      title: string;
+      text: string;
+      confirm: string;
+      danger?: boolean;
+      run: () => void;
+      detail?: string;
+    }
   | { type: 'checksum'; side: PaneSide; name: string }
   | { type: 'presign'; side: PaneSide; name: string }
   | { type: 'editWith'; side: PaneSide; name: string }
@@ -78,9 +99,26 @@ export type DialogState =
   | { type: 'compare'; favoriteId?: string }
   | { type: 'import'; firstStart?: boolean }
   | { type: 'cloudPlaces'; found: CloudPlace[] }
-  | { type: 'authPrompt'; id: string; serverId: string; host: string; name: string; instructions: string; prompts: Array<{ text: string; echo: boolean }> };
+  | {
+      type: 'authPrompt';
+      id: string;
+      serverId: string;
+      host: string;
+      name: string;
+      instructions: string;
+      prompts: Array<{ text: string; echo: boolean }>;
+    };
 
-export type SettingsTab = 'general' | 'watch' | 'transfers' | 'rules' | 'connections' | 'appearance' | 'terminal' | 'keys' | 'advanced';
+export type SettingsTab =
+  | 'general'
+  | 'watch'
+  | 'transfers'
+  | 'rules'
+  | 'connections'
+  | 'appearance'
+  | 'terminal'
+  | 'keys'
+  | 'advanced';
 
 export interface PaneSelection {
   names: string[];
@@ -101,7 +139,20 @@ export interface ContextMenuState {
    * "paneSource": the location button of a half; "place": a place in its places bar;
    * "crumbs": the folders above the ones shown in the path bar.
    */
-  kind?: 'files' | 'columns' | 'server' | 'paneSource' | 'place' | 'sidebarPlace' | 'sidebarRecent' | 'sidebarSection' | 'crumbs' | 'serverGroup' | 'placesMore' | 'git' | 'tab';
+  kind?:
+    | 'files'
+    | 'columns'
+    | 'server'
+    | 'paneSource'
+    | 'place'
+    | 'sidebarPlace'
+    | 'sidebarRecent'
+    | 'sidebarSection'
+    | 'crumbs'
+    | 'serverGroup'
+    | 'placesMore'
+    | 'git'
+    | 'tab';
   /** Tab right-clicked in the tab bar ("tab"). */
   tabId?: string;
   /** Group right-clicked in the server list ("serverGroup"). */
@@ -304,7 +355,12 @@ export interface Settings {
   /** Saved folder comparisons ("Abgleich als Favorit"). */
   syncFavorites: SyncFavorite[];
   /** Starting values for new servers ("Als Vorlage für neue Server"). */
-  serverDefaults: Partial<Pick<Server, 'port' | 'user' | 'auth' | 'keyPath' | 'localStart' | 'remoteStart' | 'group' | 'color' | 'jumpServerId' | 'proxy'>>;
+  serverDefaults: Partial<
+    Pick<
+      Server,
+      'port' | 'user' | 'auth' | 'keyPath' | 'localStart' | 'remoteStart' | 'group' | 'color' | 'jumpServerId' | 'proxy'
+    >
+  >;
   /** Places bar of this computer; missing until the user changes it (then the system places are used). */
   localPlaces?: Place[];
   /** List or icons, per half. */
@@ -365,11 +421,19 @@ export interface SyncSchedule {
 export type AfterQueue = 'none' | 'disconnect' | 'quit' | 'sleep' | 'shutdown';
 
 /** An own command run on the server for the selected files. Placeholders: {file}, {files}, {name}, {dir}. */
-export interface CustomCommand { id: string; name: string; command: string }
+export interface CustomCommand {
+  id: string;
+  name: string;
+  command: string;
+}
 
 /** A tab as saved in a workspace or for the next start. */
 export interface SavedTab {
-  serverId: string; localPath: string; remotePath: string; leftServerId?: string; rightLocal?: boolean;
+  serverId: string;
+  localPath: string;
+  remotePath: string;
+  leftServerId?: string;
+  rightLocal?: boolean;
   /** Terminals of the tab ('' = this computer), when "Terminals wieder öffnen" is on. */
   terminals?: string[];
   terminalOpen?: boolean;
@@ -378,7 +442,12 @@ export interface SavedTab {
 }
 
 /** A named set of tabs that can be opened again later. */
-export interface Workspace { id: string; name: string; tabs: SavedTab[]; active?: number }
+export interface Workspace {
+  id: string;
+  name: string;
+  tabs: SavedTab[];
+  active?: number;
+}
 
 export type ExistingRule = 'ask' | 'overwrite' | 'newer' | 'keepBoth' | 'skip';
 
@@ -411,8 +480,27 @@ export interface WatchTemplate {
 }
 
 export type ToolId =
-  | 'nav' | 'newFolder' | 'refresh' | 'info' | 'activity' | 'upload' | 'download' | 'delete' | 'rename'
-  | 'perms' | 'hidden' | 'terminal' | 'disconnect' | 'copyPath' | 'editor' | 'codeEditor' | 'sync' | 'syncBrowse' | 'palette' | 'compareDirs' | 'selectMask';
+  | 'nav'
+  | 'newFolder'
+  | 'refresh'
+  | 'info'
+  | 'activity'
+  | 'upload'
+  | 'download'
+  | 'delete'
+  | 'rename'
+  | 'perms'
+  | 'hidden'
+  | 'terminal'
+  | 'disconnect'
+  | 'copyPath'
+  | 'editor'
+  | 'codeEditor'
+  | 'sync'
+  | 'syncBrowse'
+  | 'palette'
+  | 'compareDirs'
+  | 'selectMask';
 
 export interface AppState {
   platform: Platform;
@@ -528,26 +616,93 @@ export const defaultWatchOptions: WatchOptions = {
 export function sampleServers(): Server[] {
   const base = { port: 22, auth: 'key' as const, keyPath: '~/.ssh/id_ed25519', online: false };
   return [
-    { ...base, id: 'ob', name: 'Webshop · Live', mono: 'WL', color: 'gray', ruleId: 'rule-app', host: 'shop.example', user: 'deploy', keyPath: '~/.ssh/shop_ed25519', group: 'Webshop', localStart: '~/Projekte/webshop/live', remoteStart: '/home/deploy/apps/webshop', online: true, lastUsed: Date.now() - 5 * 60000,
-      places: [{ name: 'deploy', path: '/home/deploy' }, { name: 'webshop', path: '/home/deploy/apps/webshop' }, { name: 'blog', path: '/home/deploy/apps/blog' }] },
-    { ...base, id: 'cw', name: 'Portfolio', mono: 'PF', color: 'gray', host: 'portfolio.example', user: 'web', group: 'Websites', localStart: '~/Projekte/portfolio', remoteStart: '/var/www/portfolio', online: true, lastUsed: Date.now() - 26 * 3600000,
-      places: [{ name: 'portfolio', path: '/var/www/portfolio' }] },
-    { ...base, id: 'ts', name: 'Testserver', mono: 'TS', color: 'green', host: 'test.portfolio.example', user: 'test', group: 'Websites', localStart: '~', remoteStart: '/home/test' },
-    { ...base, id: 'nas', name: 'Backup NAS', mono: 'NA', color: 'gray', host: 'nas.local', user: 'admin', auth: 'password', group: 'Privat', localStart: '~/Downloads', remoteStart: '/volume1/backups' },
+    {
+      ...base,
+      id: 'ob',
+      name: 'Webshop · Live',
+      mono: 'WL',
+      color: 'gray',
+      ruleId: 'rule-app',
+      host: 'shop.example',
+      user: 'deploy',
+      keyPath: '~/.ssh/shop_ed25519',
+      group: 'Webshop',
+      localStart: '~/Projekte/webshop/live',
+      remoteStart: '/home/deploy/apps/webshop',
+      online: true,
+      lastUsed: Date.now() - 5 * 60000,
+      places: [
+        { name: 'deploy', path: '/home/deploy' },
+        { name: 'webshop', path: '/home/deploy/apps/webshop' },
+        { name: 'blog', path: '/home/deploy/apps/blog' },
+      ],
+    },
+    {
+      ...base,
+      id: 'cw',
+      name: 'Portfolio',
+      mono: 'PF',
+      color: 'gray',
+      host: 'portfolio.example',
+      user: 'web',
+      group: 'Websites',
+      localStart: '~/Projekte/portfolio',
+      remoteStart: '/var/www/portfolio',
+      online: true,
+      lastUsed: Date.now() - 26 * 3600000,
+      places: [{ name: 'portfolio', path: '/var/www/portfolio' }],
+    },
+    {
+      ...base,
+      id: 'ts',
+      name: 'Testserver',
+      mono: 'TS',
+      color: 'green',
+      host: 'test.portfolio.example',
+      user: 'test',
+      group: 'Websites',
+      localStart: '~',
+      remoteStart: '/home/test',
+    },
+    {
+      ...base,
+      id: 'nas',
+      name: 'Backup NAS',
+      mono: 'NA',
+      color: 'gray',
+      host: 'nas.local',
+      user: 'admin',
+      auth: 'password',
+      group: 'Privat',
+      localStart: '~/Downloads',
+      remoteStart: '/volume1/backups',
+    },
   ];
 }
 
 function sampleWatches(): Watch[] {
   return [
     {
-      id: 'w1', name: 'webshop live', localPath: '~/Projekte/webshop/live', serverId: 'ob', remotePath: '/home/deploy/apps/webshop',
-      state: 'active', lastFile: 'cart.py', lastTime: Date.now() - 12000,
+      id: 'w1',
+      name: 'webshop live',
+      localPath: '~/Projekte/webshop/live',
+      serverId: 'ob',
+      remotePath: '/home/deploy/apps/webshop',
+      state: 'active',
+      lastFile: 'cart.py',
+      lastTime: Date.now() - 12000,
       excludes: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp', '.venv'],
       options: { ...defaultWatchOptions, commandEnabled: true, command: 'pm2 restart webshop' },
     },
     {
-      id: 'w2', name: 'blog live', localPath: '~/Projekte/blog', serverId: 'ob', remotePath: '/home/deploy/apps/blog',
-      state: 'paused', lastFile: '', lastTime: Date.now() - 2 * 3600 * 1000,
+      id: 'w2',
+      name: 'blog live',
+      localPath: '~/Projekte/blog',
+      serverId: 'ob',
+      remotePath: '/home/deploy/apps/blog',
+      state: 'paused',
+      lastFile: '',
+      lastTime: Date.now() - 2 * 3600 * 1000,
       excludes: ['.git', '__pycache__', '.DS_Store'],
       options: { ...defaultWatchOptions, command: 'pm2 restart blog' },
     },
@@ -557,9 +712,48 @@ function sampleWatches(): Watch[] {
 function sampleTransfers(): Transfer[] {
   const now = Date.now();
   return [
-    { id: 't-welcome', name: 'cart.py', direction: 'up', serverId: 'ob', folder: 'routes', source: '~/Projekte/webshop/live/routes/cart.py', target: '/home/deploy/apps/webshop/routes/cart.py', size: 8192, done: 8192, state: 'done', watchId: 'w1', finishedAt: now - 12000 },
-    { id: 't-cmd0', name: 'pm2 restart webshop', direction: 'command', serverId: 'ob', folder: '', source: '', target: '', size: 1, done: 1, state: 'done', watchId: 'w1', finishedAt: now - 10000, output: '[PM2] Applying action restartProcessId on app [webshop]\n[PM2] [webshop](0) ✓' },
-    { id: 't-app', name: 'app.css', direction: 'up', serverId: 'ob', folder: 'admin/static', source: '~/Projekte/webshop/live/admin/static/app.css', target: '/home/deploy/apps/webshop/admin/static/app.css', size: 48 * 1024, done: 0, state: 'queued', watchId: 'w1' },
+    {
+      id: 't-welcome',
+      name: 'cart.py',
+      direction: 'up',
+      serverId: 'ob',
+      folder: 'routes',
+      source: '~/Projekte/webshop/live/routes/cart.py',
+      target: '/home/deploy/apps/webshop/routes/cart.py',
+      size: 8192,
+      done: 8192,
+      state: 'done',
+      watchId: 'w1',
+      finishedAt: now - 12000,
+    },
+    {
+      id: 't-cmd0',
+      name: 'pm2 restart webshop',
+      direction: 'command',
+      serverId: 'ob',
+      folder: '',
+      source: '',
+      target: '',
+      size: 1,
+      done: 1,
+      state: 'done',
+      watchId: 'w1',
+      finishedAt: now - 10000,
+      output: '[PM2] Applying action restartProcessId on app [webshop]\n[PM2] [webshop](0) ✓',
+    },
+    {
+      id: 't-app',
+      name: 'app.css',
+      direction: 'up',
+      serverId: 'ob',
+      folder: 'admin/static',
+      source: '~/Projekte/webshop/live/admin/static/app.css',
+      target: '/home/deploy/apps/webshop/admin/static/app.css',
+      size: 48 * 1024,
+      done: 0,
+      state: 'queued',
+      watchId: 'w1',
+    },
   ];
 }
 
@@ -592,9 +786,23 @@ export const allTools: Array<{ id: ToolId; label: string }> = [
  * else is in the menus, the context menu and the command palette, and can be
  * added via "Werkzeugleiste anpassen".
  */
-export const defaultToolbar: ToolId[] = ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'terminal', 'info', 'activity'];
+export const defaultToolbar: ToolId[] = [
+  'nav',
+  'upload',
+  'download',
+  'newFolder',
+  'refresh',
+  'sync',
+  'syncBrowse',
+  'terminal',
+  'info',
+  'activity',
+];
 /** Earlier standard toolbars (up to 0.2.38, up to 0.2.43): users who never changed theirs get the new one. */
-export const oldDefaultToolbars: ToolId[][] = [['nav', 'newFolder', 'refresh', 'info', 'activity'], ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity']];
+export const oldDefaultToolbars: ToolId[][] = [
+  ['nav', 'newFolder', 'refresh', 'info', 'activity'],
+  ['nav', 'upload', 'download', 'newFolder', 'refresh', 'sync', 'syncBrowse', 'info', 'activity'],
+];
 
 function detectPlatform(): Platform {
   if (DEMO_PLATFORM) return DEMO_PLATFORM;
@@ -641,10 +849,19 @@ export function initialState(): AppState {
     palette: 'auto',
     firstRun: false,
     servers,
-    tabs: LIVE ? [] : [
-      { id: 'tab1', serverId: 'ob', localPath: servers[0].localStart, remotePath: servers[0].remoteStart, back: [], forward: [] },
-      { id: 'tab2', serverId: '', localPath: '~', remotePath: '', back: [], forward: [] },
-    ],
+    tabs: LIVE
+      ? []
+      : [
+          {
+            id: 'tab1',
+            serverId: 'ob',
+            localPath: servers[0].localStart,
+            remotePath: servers[0].remoteStart,
+            back: [],
+            forward: [],
+          },
+          { id: 'tab2', serverId: '', localPath: '~', remotePath: '', back: [], forward: [] },
+        ],
     activeTabId: LIVE ? '' : 'tab1',
     watches: LIVE ? [] : sampleWatches(),
     transfers: LIVE ? [] : sampleTransfers(),
@@ -679,17 +896,72 @@ export function initialState(): AppState {
     toolbar: [...defaultToolbar],
     toolbarLabels: 'icons',
     settings: {
-      runInBackground: true, showMenuBarIcon: true, startAtLogin: false, defaultDelay: 2,
-      defaultExcludes: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp'], defaultMirrorDeletes: false,
-      notify: 'errors', soundOnError: true, soundOnDone: false, dockProgress: true, themeSetting: 'system',
-      showHidden: true, confirmDelete: true, parallel: 2,
-      language: LANG, startLocal: '~', startServer: '', fileDoubleClick: 'open', uploadFilePerms: '', uploadDirPerms: '', cloudAsked: false, serverGroups: [], splitRatio: 0.5, serverSourcesWidth: 200, activityHeight: 240, uploadTempName: true, keepMtime: true, existingFiles: 'ask', existingDownload: 'ask', bandwidthLimit: 0,
-      autoRetry: true, updateMode: 'auto', skipUnchanged: true, skipPatterns: ['.DS_Store', 'Thumbs.db', 'desktop.ini'], skipLargerMb: 0,
+      runInBackground: true,
+      showMenuBarIcon: true,
+      startAtLogin: false,
+      defaultDelay: 2,
+      defaultExcludes: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp'],
+      defaultMirrorDeletes: false,
+      notify: 'errors',
+      soundOnError: true,
+      soundOnDone: false,
+      dockProgress: true,
+      themeSetting: 'system',
+      showHidden: true,
+      confirmDelete: true,
+      parallel: 2,
+      language: LANG,
+      startLocal: '~',
+      startServer: '',
+      fileDoubleClick: 'open',
+      uploadFilePerms: '',
+      uploadDirPerms: '',
+      cloudAsked: false,
+      serverGroups: [],
+      splitRatio: 0.5,
+      serverSourcesWidth: 200,
+      activityHeight: 240,
+      uploadTempName: true,
+      keepMtime: true,
+      existingFiles: 'ask',
+      existingDownload: 'ask',
+      bandwidthLimit: 0,
+      autoRetry: true,
+      updateMode: 'auto',
+      skipUnchanged: true,
+      skipPatterns: ['.DS_Store', 'Thumbs.db', 'desktop.ini'],
+      skipLargerMb: 0,
       // The prototype shows one example rule, used by "Webshop · Live".
-      rules: LIVE ? [] : [{ id: 'rule-app', name: 'Python-App', excludes: ['venv', '__pycache__', '*.log', '.git'], filePerms: '644', dirPerms: '755', existingUp: 'overwrite', keepOldVersion: true }],
-      autoReconnect: true, keepAlive: true, readSshConfig: true, writeLog: false, watchTemplates: [],
-      showPerms: false, sort: { local: { key: 'name', dir: 1 }, remote: { key: 'name', dir: 1 } }, swapSides: false, editorApp: '', editorByExt: {},
-      shortcuts: {}, columns: { mtime: true, size: true }, logLevel: 'normal', recentAddresses: [], serverDefaults: {}, syncFavorites: [], sftpLinks: false,
+      rules: LIVE
+        ? []
+        : [
+            {
+              id: 'rule-app',
+              name: 'Python-App',
+              excludes: ['venv', '__pycache__', '*.log', '.git'],
+              filePerms: '644',
+              dirPerms: '755',
+              existingUp: 'overwrite',
+              keepOldVersion: true,
+            },
+          ],
+      autoReconnect: true,
+      keepAlive: true,
+      readSshConfig: true,
+      writeLog: false,
+      watchTemplates: [],
+      showPerms: false,
+      sort: { local: { key: 'name', dir: 1 }, remote: { key: 'name', dir: 1 } },
+      swapSides: false,
+      editorApp: '',
+      editorByExt: {},
+      shortcuts: {},
+      columns: { mtime: true, size: true },
+      logLevel: 'normal',
+      recentAddresses: [],
+      serverDefaults: {},
+      syncFavorites: [],
+      sftpLinks: false,
       viewMode: { local: 'list', remote: 'list' },
     },
     offline: {},
@@ -809,7 +1081,15 @@ export function tabTitle(t: Tab, s: AppState = state): string {
 export function emptyTab(localPath = '~', right: 'servers' | 'local' | undefined = state.settings.newTabRight): Tab {
   // Setting "Neuer Tab rechts": the server list (default) or this computer (two local halves).
   const local = right === 'local';
-  return { id: uid('tab'), serverId: '', localPath, remotePath: local ? localPath : '', back: [], forward: [], ...(local ? { rightLocal: true } : {}) };
+  return {
+    id: uid('tab'),
+    serverId: '',
+    localPath,
+    remotePath: local ? localPath : '',
+    back: [],
+    forward: [],
+    ...(local ? { rightLocal: true } : {}),
+  };
 }
 
 /**
@@ -821,8 +1101,21 @@ export function setRightLocal(path?: string) {
   if (!t) return;
   if (t.serverId) closePaneServer('remote');
   const cur = activeTab() ?? t;
-  updateTab({ rightLocal: true, serverId: '', remotePath: path ?? (cur.rightLocal && cur.remotePath ? cur.remotePath : cur.leftServerId ? '~' : cur.localPath), back: [], forward: [], syncBrowse: undefined, serverList: { ...cur.serverList, remote: false } });
-  setState((s) => ({ selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } }, expanded: { ...s.expanded, remote: [] }, focusSide: 'remote', contextMenu: null }));
+  updateTab({
+    rightLocal: true,
+    serverId: '',
+    remotePath: path ?? (cur.rightLocal && cur.remotePath ? cur.remotePath : cur.leftServerId ? '~' : cur.localPath),
+    back: [],
+    forward: [],
+    syncBrowse: undefined,
+    serverList: { ...cur.serverList, remote: false },
+  });
+  setState((s) => ({
+    selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+    expanded: { ...s.expanded, remote: [] },
+    focusSide: 'remote',
+    contextMenu: null,
+  }));
 }
 
 /**
@@ -834,7 +1127,10 @@ export function openServerIn(side: PaneSide, serverId: string) {
   const t = activeTab();
   const srv = serverById(serverId);
   if (!t || !srv) return;
-  setState((st) => ({ servers: st.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)), firstRun: false }));
+  setState((st) => ({
+    servers: st.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)),
+    firstRun: false,
+  }));
   if (side === 'local') {
     updateTab({ serverList: { ...t.serverList, local: false } });
     setLeftServer(serverId);
@@ -842,10 +1138,23 @@ export function openServerIn(side: PaneSide, serverId: string) {
   }
   // Without a start folder the server's home folder is used; it is known only once connected
   // (an already open connection, e.g. of a folder watch, does not report it again).
-  const start = srv.remoteStart || (LIVE && live.isConnected(serverId) ? live.homeOf(serverId) ?? '' : '');
+  const start = srv.remoteStart || (LIVE && live.isConnected(serverId) ? (live.homeOf(serverId) ?? '') : '');
   const linked = linkedStart(srv, start);
-  updateTab({ serverId, rightLocal: false, remotePath: start, back: [], forward: [], syncBrowse: linked, ...(linked ? { localPath: linked.local } : {}), serverList: { ...t.serverList, remote: false } });
-  setState((s) => ({ selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } }, expanded: { ...s.expanded, remote: [] }, focusSide: 'remote' }));
+  updateTab({
+    serverId,
+    rightLocal: false,
+    remotePath: start,
+    back: [],
+    forward: [],
+    syncBrowse: linked,
+    ...(linked ? { localPath: linked.local } : {}),
+    serverList: { ...t.serverList, remote: false },
+  });
+  setState((s) => ({
+    selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+    expanded: { ...s.expanded, remote: [] },
+    focusSide: 'remote',
+  }));
   if (LIVE) {
     if (!live.isConnected(serverId)) live.connectNow(serverId);
   } else {
@@ -877,14 +1186,19 @@ export function setLeftServer(serverId: string) {
     return;
   }
   // An empty path is filled with the server's home folder once connected.
-  const localPath = srv ? srv.remoteStart || (LIVE ? (live.isConnected(srv.id) ? live.homeOf(srv.id) ?? '' : '') : '/') : (state.servers.find((x) => x.id === t.serverId)?.localStart || '~');
+  const localPath = srv
+    ? srv.remoteStart || (LIVE ? (live.isConnected(srv.id) ? (live.homeOf(srv.id) ?? '') : '') : '/')
+    : state.servers.find((x) => x.id === t.serverId)?.localStart || '~';
   setState((s) => ({
-    tabs: s.tabs.map((x) => (x.id === t.id ? { ...x, leftServerId: srv?.id, localPath, back: [], forward: [], syncBrowse: undefined } : x)),
+    tabs: s.tabs.map((x) =>
+      x.id === t.id ? { ...x, leftServerId: srv?.id, localPath, back: [], forward: [], syncBrowse: undefined } : x,
+    ),
     selection: { ...s.selection, local: { names: [], cursor: -1, anchor: -1 } },
     contextMenu: null,
   }));
   if (srv && LIVE && !live.isConnected(srv.id)) live.connectNow(srv.id);
-  if (srv && !LIVE) setState((s) => ({ servers: s.servers.map((x) => (x.id === srv.id ? { ...x, online: true } : x)) }));
+  if (srv && !LIVE)
+    setState((s) => ({ servers: s.servers.map((x) => (x.id === srv.id ? { ...x, online: true } : x)) }));
 }
 
 /** Folder listing: mock file system, or the live listing cache (undefined until loaded). */
@@ -903,12 +1217,23 @@ export function isDirEntry(side: PaneSide, serverId: string, path: string): bool
 }
 
 /** Loading / error / connection state of a pane (live mode only). */
-export function paneStatus(side: PaneSide, s: AppState = state): { loading: boolean; error?: string; hint?: string; missing?: boolean; notConnected?: boolean; connecting?: boolean } {
+export function paneStatus(
+  side: PaneSide,
+  s: AppState = state,
+): {
+  loading: boolean;
+  error?: string;
+  hint?: string;
+  missing?: boolean;
+  notConnected?: boolean;
+  connecting?: boolean;
+} {
   if (!LIVE) return { loading: false };
   const t = activeTab(s);
   if (!t) return { loading: false };
   const [ls, sid] = paneLoc(side, t);
-  if (ls === 'remote' && !live.isConnected(sid)) return { loading: false, notConnected: true, connecting: live.isConnecting(sid) };
+  if (ls === 'remote' && !live.isConnected(sid))
+    return { loading: false, notConnected: true, connecting: live.isConnecting(sid) };
   return live.listingStatus(ls, sid, panePath(side, s));
 }
 
@@ -1075,8 +1400,10 @@ export function setIconSize(side: PaneSide, step: number) {
   setState((s) => ({ settings: { ...s.settings, iconSize: { ...s.settings.iconSize, [side]: v } } }));
 }
 
-export const togglePermsColumn = () => setState((s) => ({ settings: { ...s.settings, showPerms: !s.settings.showPerms } }));
-export const toggleSwapSides = () => setState((s) => ({ settings: { ...s.settings, swapSides: !s.settings.swapSides } }));
+export const togglePermsColumn = () =>
+  setState((s) => ({ settings: { ...s.settings, showPerms: !s.settings.showPerms } }));
+export const toggleSwapSides = () =>
+  setState((s) => ({ settings: { ...s.settings, swapSides: !s.settings.swapSides } }));
 
 /** Watch that covers the given local path, if any. */
 export function watchForLocal(path: string, s: AppState = state): Watch | undefined {
@@ -1097,7 +1424,12 @@ export function activityExpanded(s: AppState = state): boolean {
 /* ------------------------------------------------------------------------ */
 
 let toastTimer: number | undefined;
-export function showToast(text: string, tone: 'info' | 'ok' | 'error' | 'update' = 'info', hint?: string, sticky = false) {
+export function showToast(
+  text: string,
+  tone: 'info' | 'ok' | 'error' | 'update' = 'info',
+  hint?: string,
+  sticky = false,
+) {
   setState({ toast: { text, tone, hint: hint || undefined } });
   window.clearTimeout(toastTimer);
   // Sticky: stays until the next message replaces it (a running operation reports its end).

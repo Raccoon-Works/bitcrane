@@ -160,7 +160,14 @@ fn servers(ctx: &Ctx) {
             "" => "sftp",
             p => p,
         };
-        println!("{}\t{}\t{}@{}:{}", str_of(s, "name"), protocol, str_of(s, "user"), str_of(s, "host"), s.get("port").and_then(Value::as_u64).unwrap_or(0));
+        println!(
+            "{}\t{}\t{}@{}:{}",
+            str_of(s, "name"),
+            protocol,
+            str_of(s, "user"),
+            str_of(s, "host"),
+            s.get("port").and_then(Value::as_u64).unwrap_or(0)
+        );
     }
 }
 
@@ -170,8 +177,14 @@ fn split_target<'a>(ctx: &'a Ctx, spec: &str) -> AppResult<(&'a Value, Option<St
         Some((n, p)) => (n, Some(p.to_string()).filter(|p| !p.is_empty())),
         None => (spec, None),
     };
-    let found = ctx.servers.iter().find(|s| str_of(s, "id") == name).or_else(|| ctx.servers.iter().find(|s| str_of(s, "name").eq_ignore_ascii_case(name)));
-    found.map(|s| (s, path)).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("No saved server called \"{name}\" (see: bitcrane servers).")))
+    let found = ctx
+        .servers
+        .iter()
+        .find(|s| str_of(s, "id") == name)
+        .or_else(|| ctx.servers.iter().find(|s| str_of(s, "name").eq_ignore_ascii_case(name)));
+    found.map(|s| (s, path)).ok_or_else(|| {
+        AppError::new(ErrorKind::NotFound, format!("No saved server called \"{name}\" (see: bitcrane servers)."))
+    })
 }
 
 fn secret(account: &str) -> Option<String> {
@@ -191,9 +204,16 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
         "agent" => json!({ "method": "agent" }),
         "password" => match password {
             Some(p) => json!({ "method": "password", "password": p }),
-            None => return Err(AppError::new(ErrorKind::PasswordRequired, format!("No password saved for {}. Connect once in Bitcrane and save it.", str_of(s, "name")))),
+            None => {
+                return Err(AppError::new(
+                    ErrorKind::PasswordRequired,
+                    format!("No password saved for {}. Connect once in Bitcrane and save it.", str_of(s, "name")),
+                ))
+            }
         },
-        _ => json!({ "method": "auto", "keyPath": if key_path.is_empty() { Value::Null } else { json!(key_path) }, "passphrase": passphrase, "password": password }),
+        _ => {
+            json!({ "method": "auto", "keyPath": if key_path.is_empty() { Value::Null } else { json!(key_path) }, "passphrase": passphrase, "password": password })
+        }
     };
     let jump = match s.get("jumpServerId").and_then(Value::as_str) {
         Some(id) if depth < 4 && id != str_of(s, "id") => match ctx.servers.iter().find(|x| str_of(x, "id") == id) {
@@ -221,7 +241,13 @@ fn proxy(s: &Value) -> Option<crate::proxy::ProxyParams> {
     let port = p.get("port").and_then(Value::as_u64).unwrap_or(1080);
     let user = p.get("user").and_then(Value::as_str).filter(|u| !u.is_empty()).map(str::to_string);
     let password = user.as_ref().and_then(|u| secret(&format!("proxy:{u}@{host}:{port}")));
-    Some(crate::proxy::ProxyParams { kind: str_of(p, "kind").to_string(), host: host.to_string(), port: port as u16, user, password })
+    Some(crate::proxy::ProxyParams {
+        kind: str_of(p, "kind").to_string(),
+        host: host.to_string(),
+        port: port as u16,
+        user,
+        password,
+    })
 }
 
 /// Connects to a saved server with any protocol.
@@ -234,12 +260,23 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
     let port = s.get("port").and_then(Value::as_u64).unwrap_or(0) as u16;
     let user = str_of(s, "user").to_string();
     let password = || secret(&format!("password:{user}@{host}:{port}"));
-    let cloud_token = || secret(&format!("cloud:{}", str_of(s, "id"))).ok_or_else(|| AppError::new(ErrorKind::AuthFailed, format!("{name} is not signed in. Sign in once in Bitcrane.")));
+    let cloud_token = || {
+        secret(&format!("cloud:{}", str_of(s, "id"))).ok_or_else(|| {
+            AppError::new(ErrorKind::AuthFailed, format!("{name} is not signed in. Sign in once in Bitcrane."))
+        })
+    };
     let protocol = str_of(s, "protocol");
     let conn = match protocol {
         "ftp" | "ftps" => {
-            let tls = if protocol == "ftp" { "none" } else if s.get("implicitTls").and_then(Value::as_bool).unwrap_or(false) { "implicit" } else { "explicit" };
-            let params = crate::ftp::FtpParams { timeout: None,
+            let tls = if protocol == "ftp" {
+                "none"
+            } else if s.get("implicitTls").and_then(Value::as_bool).unwrap_or(false) {
+                "implicit"
+            } else {
+                "explicit"
+            };
+            let params = crate::ftp::FtpParams {
+                timeout: None,
                 host: host.clone(),
                 port,
                 user: user.clone(),
@@ -256,20 +293,31 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
         }
         "webdav" => {
             let https = s.get("davHttps").and_then(Value::as_bool).unwrap_or(true);
-            let port_part = if port == 0 || port == if https { 443 } else { 80 } { String::new() } else { format!(":{port}") };
+            let port_part =
+                if port == 0 || port == if https { 443 } else { 80 } { String::new() } else { format!(":{port}") };
             let path = match str_of(s, "davPath") {
                 "" => "/".to_string(),
                 p if p.starts_with('/') => p.to_string(),
                 p => format!("/{p}"),
             };
             let url = format!("{}://{host}{port_part}{path}", if https { "https" } else { "http" });
-            let params = crate::dav::DavParams { timeout: None, url, user: user.clone(), password: password(), tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false), trust: None, proxy: proxy(s) };
+            let params = crate::dav::DavParams {
+                timeout: None,
+                url,
+                user: user.clone(),
+                password: password(),
+                tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
+                trust: None,
+                proxy: proxy(s),
+            };
             Remote::Dav(crate::dav::DavConn::connect(params, ctx.known.clone()).await?)
         }
         "s3" => {
             let http = s.get("s3Http").and_then(Value::as_bool).unwrap_or(false);
-            let port_part = if port == 0 || port == if http { 80 } else { 443 } { String::new() } else { format!(":{port}") };
-            let params = crate::s3::S3Params { timeout: None,
+            let port_part =
+                if port == 0 || port == if http { 80 } else { 443 } { String::new() } else { format!(":{port}") };
+            let params = crate::s3::S3Params {
+                timeout: None,
                 endpoint: format!("{}://{host}{port_part}", if http { "http" } else { "https" }),
                 region: str_of(s, "s3Region").to_string(),
                 bucket: str_of(s, "s3Bucket").to_string(),
@@ -283,7 +331,8 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             Remote::S3(Arc::new(crate::s3::S3Conn::connect(params, ctx.known.clone()).await?))
         }
         "smb" => {
-            let params = crate::smb::SmbParams { timeout: None,
+            let params = crate::smb::SmbParams {
+                timeout: None,
                 host: host.clone(),
                 port: if port == 0 { 445 } else { port },
                 user: user.clone(),
@@ -293,9 +342,17 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             };
             Remote::Smb(Arc::new(crate::smb::SmbConn::connect(params).await?))
         }
-        "dropbox" => Remote::Dropbox(Arc::new(crate::dropbox::DropboxConn::connect(crate::dropbox::DropboxParams { refresh_token: cloud_token()? }).await?)),
+        "dropbox" => Remote::Dropbox(Arc::new(
+            crate::dropbox::DropboxConn::connect(crate::dropbox::DropboxParams { refresh_token: cloud_token()? })
+                .await?,
+        )),
         "onedrive" => {
-            let conn = Arc::new(crate::onedrive::OneDriveConn::connect(crate::onedrive::OneDriveParams { refresh_token: cloud_token()? }).await?);
+            let conn = Arc::new(
+                crate::onedrive::OneDriveConn::connect(crate::onedrive::OneDriveParams {
+                    refresh_token: cloud_token()?,
+                })
+                .await?,
+            );
             // Microsoft renews the sign-in with each use; keep the newest one.
             let _ = crate::config::secret_set(&format!("cloud:{}", str_of(s, "id")), &conn.refresh_token().await);
             Remote::OneDrive(conn)
@@ -306,10 +363,22 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
             if client_id.is_empty() || client_secret.is_empty() {
                 return Err(AppError::other("The Google app key is missing. Enter it once in Bitcrane."));
             }
-            Remote::GDrive(Arc::new(crate::gdrive::GDriveConn::connect(crate::gdrive::GDriveParams { pdf_export: false, refresh_token: cloud_token()?, client_id, client_secret }).await?))
+            Remote::GDrive(Arc::new(
+                crate::gdrive::GDriveConn::connect(crate::gdrive::GDriveParams {
+                    pdf_export: false,
+                    refresh_token: cloud_token()?,
+                    client_id,
+                    client_secret,
+                })
+                .await?,
+            ))
         }
-        _ => crate::remote::connect_ssh(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e.kind {
-            ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => AppError::new(e.kind, format!("The host key of {name} is not confirmed. Connect once in Bitcrane.")),
+        _ => crate::remote::connect_ssh(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e
+            .kind
+        {
+            ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => {
+                AppError::new(e.kind, format!("The host key of {name} is not confirmed. Connect once in Bitcrane."))
+            }
             _ => e,
         })?,
     };
@@ -336,9 +405,15 @@ async fn ls(ctx: &Ctx, args: &[String]) -> AppResult<()> {
     let list = conn.list(&dir).await;
     conn.close().await;
     for e in list? {
-        let when = chrono::DateTime::from_timestamp_millis(e.mtime).map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_default();
+        let when = chrono::DateTime::from_timestamp_millis(e.mtime)
+            .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+            .unwrap_or_default();
         let size = if e.kind == "dir" { "-".to_string() } else { e.size.to_string() };
-        println!("{}\t{size}\t{when}\t{}", if e.kind == "dir" { "d" } else { "f" }, if e.kind == "dir" { format!("{}/", e.name) } else { e.name });
+        println!(
+            "{}\t{size}\t{when}\t{}",
+            if e.kind == "dir" { "d" } else { "f" },
+            if e.kind == "dir" { format!("{}/", e.name) } else { e.name }
+        );
     }
     Ok(())
 }
@@ -363,11 +438,15 @@ async fn upload(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
     let opts = options(ctx);
     let mut failed = 0;
     for local in &args {
-        let abs = std::fs::canonicalize(local).map_err(|e| AppError::new(ErrorKind::NotFound, format!("\"{local}\" not found.")).with_detail(e.to_string()))?;
+        let abs = std::fs::canonicalize(local).map_err(|e| {
+            AppError::new(ErrorKind::NotFound, format!("\"{local}\" not found.")).with_detail(e.to_string())
+        })?;
         let ui = to_ui(&abs);
         for item in crate::local::walk(&ui)? {
             let target = remote_join(&dest, &item.relative);
-            match crate::transfer::upload(&conn, &item.path, &target, &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await {
+            match crate::transfer::upload(&conn, &item.path, &target, &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN)))
+                .await
+            {
                 Ok(n) => {
                     if !ctx.quiet {
                         println!("uploaded {target} ({n} bytes)");
@@ -392,7 +471,9 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
     if args.is_empty() {
         return Err(usage("download needs at least one <server>:<path>"));
     }
-    let dest = std::fs::canonicalize(&to).map_err(|e| AppError::new(ErrorKind::NotFound, format!("Local folder \"{to}\" not found.")).with_detail(e.to_string()))?;
+    let dest = std::fs::canonicalize(&to).map_err(|e| {
+        AppError::new(ErrorKind::NotFound, format!("Local folder \"{to}\" not found.")).with_detail(e.to_string())
+    })?;
     let dest_ui = to_ui(&dest);
     let mut failed = 0;
     // One connection per server, even when several paths name the same one.
@@ -412,7 +493,16 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
         }
         for item in items {
             let target = remote_join(&dest_ui, &item.relative);
-            match crate::transfer::download(conn, &item.path, &target, &options(ctx), &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await {
+            match crate::transfer::download(
+                conn,
+                &item.path,
+                &target,
+                &options(ctx),
+                &|_, _| {},
+                Arc::new(AtomicU8::new(RUN)),
+            )
+            .await
+            {
                 Ok(n) => {
                     if !ctx.quiet {
                         println!("downloaded {} ({n} bytes)", item.relative);

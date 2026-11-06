@@ -36,7 +36,11 @@ export function cachedList(side: PaneSide, serverId: string, path: string): File
 }
 
 /** Loading and error state of a folder listing. */
-export function listingStatus(side: PaneSide, serverId: string, path: string): { loading: boolean; error?: string; hint?: string; missing?: boolean } {
+export function listingStatus(
+  side: PaneSide,
+  serverId: string,
+  path: string,
+): { loading: boolean; error?: string; hint?: string; missing?: boolean } {
   const l = listings.get(key(side, serverId, path));
   return { loading: !l || l.loading, error: l?.error, hint: l?.hint, missing: l?.missing };
 }
@@ -63,7 +67,12 @@ async function load(side: PaneSide, serverId: string, path: string) {
     const t0 = Date.now();
     const entries = side === 'local' ? await backend.localList(path) : await backend.remoteList(serverId, path);
     listings.set(k, { entries, loading: false });
-    if (side === 'remote') addLog('debug', $t('Ordner gelesen: {0} ({1} Einträge, {2} ms)', path, entries.length, Date.now() - t0), serverId);
+    if (side === 'remote')
+      addLog(
+        'debug',
+        $t('Ordner gelesen: {0} ({1} Einträge, {2} ms)', path, entries.length, Date.now() - t0),
+        serverId,
+      );
   } catch (e) {
     const err = toBackendError(e);
     // Same wording as the error messages: what happened, then what to do.
@@ -93,12 +102,23 @@ export function ensureVisible(s: AppState) {
   const t = s.tabs.find((x) => x.id === s.activeTabId);
   if (!t) return;
   const [ls, lsid] = paneLoc('local', t);
-  if (ls === 'local' ? !listings.has(key(ls, lsid, t.localPath)) : t.localPath && connected.has(lsid) && !listings.has(key(ls, lsid, t.localPath))) void load(ls, lsid, t.localPath);
-  if (t.serverId && t.remotePath && connected.has(t.serverId) && !listings.has(key('remote', t.serverId, t.remotePath))) {
+  if (
+    ls === 'local'
+      ? !listings.has(key(ls, lsid, t.localPath))
+      : t.localPath && connected.has(lsid) && !listings.has(key(ls, lsid, t.localPath))
+  )
+    void load(ls, lsid, t.localPath);
+  if (
+    t.serverId &&
+    t.remotePath &&
+    connected.has(t.serverId) &&
+    !listings.has(key('remote', t.serverId, t.remotePath))
+  ) {
     void load('remote', t.serverId, t.remotePath);
   }
   // Two local halves (Total Commander): the right half lists this computer too.
-  if (t.rightLocal && !t.serverId && t.remotePath && !listings.has(key('local', '', t.remotePath))) void load('local', '', t.remotePath);
+  if (t.rightLocal && !t.serverId && t.remotePath && !listings.has(key('local', '', t.remotePath)))
+    void load('local', '', t.remotePath);
   // Folders opened in place (triangle) are read again after a refresh.
   for (const side of ['local', 'remote'] as PaneSide[]) {
     const [sd, sid] = paneLoc(side, t);

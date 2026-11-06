@@ -1,11 +1,11 @@
 //! Transfers with progress events, folder watches and the sync state of places.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::{AppState, paths, transfer};
+use crate::{paths, transfer, AppState};
 use serde::Serialize;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
 use tauri::{Emitter, State};
 
 #[derive(Clone, Serialize)]
@@ -114,7 +114,13 @@ pub(crate) fn transfer_cancel(state: State<'_, AppState>, id: String, discard: O
 
 /// Deletes the partial file of a transfer that will not be continued.
 #[tauri::command]
-pub(crate) async fn transfer_discard(state: State<'_, AppState>, server_id: String, direction: String, local_path: String, remote_path: String) -> AppResult<()> {
+pub(crate) async fn transfer_discard(
+    state: State<'_, AppState>,
+    server_id: String,
+    direction: String,
+    local_path: String,
+    remote_path: String,
+) -> AppResult<()> {
     if direction == "up" {
         if let Ok(conn) = state.conn(&server_id).await {
             transfer::discard_upload_part(&conn, &remote_path).await;
@@ -126,7 +132,15 @@ pub(crate) async fn transfer_discard(state: State<'_, AppState>, server_id: Stri
 }
 
 #[tauri::command]
-pub(crate) fn watch_start(app: tauri::AppHandle, state: State<'_, AppState>, watch_id: String, local_path: String, recursive: bool, excludes: Vec<String>, delay_ms: u64) -> AppResult<()> {
+pub(crate) fn watch_start(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    watch_id: String,
+    local_path: String,
+    recursive: bool,
+    excludes: Vec<String>,
+    delay_ms: u64,
+) -> AppResult<()> {
     state.watches.start(watch_id, &local_path, recursive, &excludes, delay_ms, move |batch| {
         let _ = app.emit("watch-batch", batch);
     })
@@ -160,7 +174,12 @@ pub(crate) fn sync_read(dir: String) -> AppResult<Option<SyncFile>> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e.into()),
     };
-    let mtime = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
     Ok(Some(SyncFile { text: std::fs::read_to_string(&p)?, mtime }))
 }
 
@@ -169,12 +188,20 @@ pub(crate) fn sync_read(dir: String) -> AppResult<Option<SyncFile>> {
 pub(crate) fn sync_write(dir: String, text: String) -> AppResult<i64> {
     let p = sync_file(&dir);
     if !paths::to_native(&dir).is_dir() {
-        return Err(AppError::new(ErrorKind::NotFound, "Der Ordner für den Abgleich ist nicht da (Cloud-Programm nicht angemeldet oder Ordner verschoben?)."));
+        return Err(AppError::new(
+            ErrorKind::NotFound,
+            "Der Ordner für den Abgleich ist nicht da (Cloud-Programm nicht angemeldet oder Ordner verschoben?).",
+        ));
     }
     std::fs::create_dir_all(p.parent().unwrap())?;
     let tmp = p.with_extension("json.tmp");
     std::fs::write(&tmp, text)?;
     std::fs::rename(&tmp, &p)?;
-    let mtime = std::fs::metadata(&p)?.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+    let mtime = std::fs::metadata(&p)?
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
     Ok(mtime)
 }

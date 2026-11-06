@@ -53,11 +53,17 @@
 }
 
 /* Bars at the top of a half (places, path, column header) sit between chrome and list. */
-.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] :is(.places-bar, .pane-head, .col-head, .server-panel-head) {
+.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark']
+  :is(.places-bar, .pane-head, .col-head, .server-panel-head) {
   background: var(--bg-pane-head);
 }
-.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] .col-head { padding-top: var(--space-1); border-bottom: 1px solid var(--line); }
-.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] .pane { border-color: var(--line-strong); }
+.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] .col-head {
+  padding-top: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.page:is([data-palette='explorer'], [data-palette='transmit'])[data-theme='dark'] .pane {
+  border-color: var(--line-strong);
+}
 
 /*
  * "midnight" (default for the dark mode since 0.2.50): near-black neutral
@@ -99,22 +105,53 @@
   --sel-row-inactive: rgba(255, 255, 255, 0.06);
   --paper: #262626;
 }
-.page[data-palette='midnight'][data-theme='dark'] :is(.places-bar, .pane-head, .col-head, .server-panel-head) { background: var(--bg-pane-head); }
-.page[data-palette='midnight'][data-theme='dark'] .col-head { padding-top: var(--space-1); border-bottom: 1px solid var(--line); }
-.page[data-palette='midnight'][data-theme='dark'] .pane { border-color: var(--line-strong); }
+.page[data-palette='midnight'][data-theme='dark'] :is(.places-bar, .pane-head, .col-head, .server-panel-head) {
+  background: var(--bg-pane-head);
+}
+.page[data-palette='midnight'][data-theme='dark'] .col-head {
+  padding-top: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.page[data-palette='midnight'][data-theme='dark'] .pane {
+  border-color: var(--line-strong);
+}
 /* The connection panel loses its blue-grey and joins the same near-black. */
 .page[data-palette='midnight'][data-theme='dark'] .pane.is-servers {
-  --bg-card: #171717; --bg-pane-head: #141414; --bg-section: #1d1d1d;
-  --bg-control: #222222; --bg-control-on: #2e2e2e; --bg-field: #1d1d1d; --field-line: #333333;
-  --bg-second: #262626; --bg-second-hover: #303030; --bg-second-pressed: #1f1f1f;
-  --sel-row: #5fb0ff; --sel-fg: #0d0d0d; --sel-sub: #1a2a3a; --accent-text: #5fb0ff; --focus: #5fb0ff; --accent-tint: rgba(95, 176, 255, 0.12);
+  --bg-card: #171717;
+  --bg-pane-head: #141414;
+  --bg-section: #1d1d1d;
+  --bg-control: #222222;
+  --bg-control-on: #2e2e2e;
+  --bg-field: #1d1d1d;
+  --field-line: #333333;
+  --bg-second: #262626;
+  --bg-second-hover: #303030;
+  --bg-second-pressed: #1f1f1f;
+  --sel-row: #5fb0ff;
+  --sel-fg: #0d0d0d;
+  --sel-sub: #1a2a3a;
+  --accent-text: #5fb0ff;
+  --focus: #5fb0ff;
+  --accent-tint: rgba(95, 176, 255, 0.12);
   --paper: #262626;
 }
 /* Mac title bar with the tabs: as dark as the Windows title bar; the tab in front joins the toolbar below. */
-.page[data-palette='midnight'][data-theme='dark'] .mac-titlebar { background: var(--bg-titlebar); box-shadow: inset 0 -1px 0 var(--line); }
-.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab { border-right-color: var(--line); }
-.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab.is-sel { background: var(--bg-window); box-shadow: -1px 0 0 var(--line-strong), 1px 0 0 var(--line-strong); }
-.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tabs { border-left-color: var(--line); }
+.page[data-palette='midnight'][data-theme='dark'] .mac-titlebar {
+  background: var(--bg-titlebar);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab {
+  border-right-color: var(--line);
+}
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tab.is-sel {
+  background: var(--bg-window);
+  box-shadow:
+    -1px 0 0 var(--line-strong),
+    1px 0 0 var(--line-strong);
+}
+.page[data-palette='midnight'][data-theme='dark'][data-platform='mac'] .mac-tabs {
+  border-left-color: var(--line);
+}
 
 /*
  * Light mode: the accent is a deeper shade of the logo's light blue, so white
@@ -131,5 +168,9 @@
   --accent-ring: rgba(27, 116, 219, 0.25);
 }
 /* The Mac shows selections filled with the accent; Windows keeps its light grey (Explorer). */
-.page[data-platform='mac'][data-theme='light'] { --sel-row: #1b74db; }
-.page[data-theme='light'] .server-glyph { --glyph-server: #1b74db; }
+.page[data-platform='mac'][data-theme='light'] {
+  --sel-row: #1b74db;
+}
+.page[data-theme='light'] .server-glyph {
+  --glyph-server: #1b74db;
+}

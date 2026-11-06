@@ -19,7 +19,8 @@ fn cache() -> &'static Mutex<HashMap<String, Option<Vec<u8>>>> {
 /// PNG of the system symbol for a file extension ("jpg", "py" …), or None
 /// when the system has none or the platform is not supported.
 pub fn png_for_ext(ext: &str) -> Option<Vec<u8>> {
-    let ext: String = ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(16).collect::<String>().to_ascii_lowercase();
+    let ext: String =
+        ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(16).collect::<String>().to_ascii_lowercase();
     if let Some(hit) = cache().lock().ok()?.get(&ext) {
         return hit.clone();
     }
@@ -47,7 +48,8 @@ fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
 /// PNG of the Finder symbol of one item (an app's own icon, a library's icon …),
 /// cached per path. Mac only; elsewhere None.
 pub fn png_for_path(uri_path: &str) -> Option<Vec<u8>> {
-    let decoded = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()?.into_owned();
+    let decoded =
+        percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()?.into_owned();
     let key = format!("path:{decoded}");
     if let Some(hit) = cache().lock().ok()?.get(&key) {
         return hit.clone();
@@ -86,13 +88,15 @@ mod windows_icon {
     use std::ptr::null_mut;
     use windows_sys::core::GUID;
     use windows_sys::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+        CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
+        BI_RGB, DIB_RGB_COLORS,
     };
     use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
     use windows_sys::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
     use windows_sys::Win32::UI::Controls::{ImageList_GetIcon, HIMAGELIST, ILD_TRANSPARENT};
     use windows_sys::Win32::UI::Shell::{
-        SHGetFileInfoW, SHGetImageList, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_SYSICONINDEX, SHGFI_USEFILEATTRIBUTES, SHIL_EXTRALARGE,
+        SHGetFileInfoW, SHGetImageList, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_SYSICONINDEX,
+        SHGFI_USEFILEATTRIBUTES, SHIL_EXTRALARGE,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
@@ -107,7 +111,14 @@ mod windows_icon {
             let _ = CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32);
             let mut info: SHFILEINFOW = zeroed();
             let mut icon: HICON = null_mut();
-            if SHGetFileInfoW(name.as_ptr(), FILE_ATTRIBUTE_NORMAL, &mut info, size_of::<SHFILEINFOW>() as u32, SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES) != 0 {
+            if SHGetFileInfoW(
+                name.as_ptr(),
+                FILE_ATTRIBUTE_NORMAL,
+                &mut info,
+                size_of::<SHFILEINFOW>() as u32,
+                SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES,
+            ) != 0
+            {
                 let mut list: *mut core::ffi::c_void = null_mut();
                 if SHGetImageList(SHIL_EXTRALARGE as i32, &IID_IIMAGELIST, &mut list) >= 0 && !list.is_null() {
                     // An IImageList pointer may be used as HIMAGELIST (documented by Microsoft).
@@ -116,7 +127,14 @@ mod windows_icon {
             }
             if icon.is_null() {
                 let mut small: SHFILEINFOW = zeroed();
-                if SHGetFileInfoW(name.as_ptr(), FILE_ATTRIBUTE_NORMAL, &mut small, size_of::<SHFILEINFOW>() as u32, SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES) != 0 {
+                if SHGetFileInfoW(
+                    name.as_ptr(),
+                    FILE_ATTRIBUTE_NORMAL,
+                    &mut small,
+                    size_of::<SHFILEINFOW>() as u32,
+                    SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
+                ) != 0
+                {
                     icon = small.hIcon;
                 }
             }
@@ -137,7 +155,9 @@ mod windows_icon {
         }
         let result = (|| {
             let mut bm: BITMAP = zeroed();
-            if ii.hbmColor.is_null() || GetObjectW(ii.hbmColor, size_of::<BITMAP>() as i32, &mut bm as *mut _ as *mut _) == 0 {
+            if ii.hbmColor.is_null()
+                || GetObjectW(ii.hbmColor, size_of::<BITMAP>() as i32, &mut bm as *mut _ as *mut _) == 0
+            {
                 return None;
             }
             let (w, h) = (bm.bmWidth, bm.bmHeight.abs());
@@ -150,7 +170,13 @@ mod windows_icon {
             // Old icons without alpha: the mask says which pixels are transparent.
             let mask = if has_alpha { None } else { read_bits(ii.hbmMask, w, h) };
             for (i, p) in color.chunks_exact(4).enumerate() {
-                let a = if has_alpha { p[3] } else if mask.as_ref().map(|m| m[i * 4] == 0).unwrap_or(true) { 255 } else { 0 };
+                let a = if has_alpha {
+                    p[3]
+                } else if mask.as_ref().map(|m| m[i * 4] == 0).unwrap_or(true) {
+                    255
+                } else {
+                    0
+                };
                 rgba.extend_from_slice(&[p[2], p[1], p[0], a]);
             }
             super::encode_png(w as u32, h as u32, &rgba)

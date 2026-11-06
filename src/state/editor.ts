@@ -55,10 +55,17 @@ const set = (patch: Partial<EditorState>) => {
   st = { ...st, ...patch };
   listeners.forEach((l) => l());
 };
-const patchDoc = (id: string, patch: Partial<EditorDoc>) => set({ docs: st.docs.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
+const patchDoc = (id: string, patch: Partial<EditorDoc>) =>
+  set({ docs: st.docs.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
 
 export function useEditor(): EditorState {
-  return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => st);
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => st,
+  );
 }
 export const editorState = () => st;
 
@@ -96,7 +103,9 @@ function restoreDocs(): boolean {
 // Remembers the open files (not new, unsaved documents) for the next start.
 let lastSaved = '';
 listeners.add(() => {
-  const list = st.docs.filter((d) => d.serverId !== null && !d.error).map((d) => ({ serverId: d.serverId as string, path: d.path }));
+  const list = st.docs
+    .filter((d) => d.serverId !== null && !d.error)
+    .map((d) => ({ serverId: d.serverId as string, path: d.path }));
   const key = JSON.stringify(list);
   if (key === lastSaved || (!restored && !list.length)) return;
   lastSaved = key;
@@ -117,7 +126,18 @@ export function toggleEditor() {
 /** A new, empty document ("Unbenannt"), saved later with "Sichern unter". */
 export function newDocument() {
   const n = st.docs.filter((d) => d.serverId === null).length + 1;
-  const doc: EditorDoc = { id: newId(), serverId: null, path: '', name: n === 1 ? $t('Unbenannt') : `${$t('Unbenannt')} ${n}`, initial: '', mtime: 0, eol: '\n', bom: false, dirty: false, loading: false };
+  const doc: EditorDoc = {
+    id: newId(),
+    serverId: null,
+    path: '',
+    name: n === 1 ? $t('Unbenannt') : `${$t('Unbenannt')} ${n}`,
+    initial: '',
+    mtime: 0,
+    eol: '\n',
+    bom: false,
+    dirty: false,
+    loading: false,
+  };
   set({ docs: [...st.docs, doc], active: doc.id, open: true });
 }
 
@@ -135,7 +155,18 @@ export async function openFile(serverId: string, path: string) {
     }
     return;
   }
-  const doc: EditorDoc = { id: newId(), serverId, path, name: paths.basename(path) || path, initial: '', mtime: 0, eol: '\n', bom: false, dirty: false, loading: true };
+  const doc: EditorDoc = {
+    id: newId(),
+    serverId,
+    path,
+    name: paths.basename(path) || path,
+    initial: '',
+    mtime: 0,
+    eol: '\n',
+    bom: false,
+    dirty: false,
+    loading: true,
+  };
   // A single empty, untouched new document is replaced by the file (like most editors).
   const keep = st.docs.filter((d) => !(d.serverId === null && !d.dirty && !(textOf.get(d.id)?.() ?? d.initial)));
   set({ docs: [...keep, doc], active: doc.id, open: true });
@@ -144,8 +175,17 @@ export async function openFile(serverId: string, path: string) {
     return;
   }
   try {
-    const f = await invoke<{ text: string; mtime: number; eol: string; bom: boolean }>('editor_read', { serverId: serverId || null, path });
-    patchDoc(doc.id, { loading: false, initial: f.text, mtime: f.mtime, eol: f.eol === '\r\n' ? '\r\n' : '\n', bom: f.bom });
+    const f = await invoke<{ text: string; mtime: number; eol: string; bom: boolean }>('editor_read', {
+      serverId: serverId || null,
+      path,
+    });
+    patchDoc(doc.id, {
+      loading: false,
+      initial: f.text,
+      mtime: f.mtime,
+      eol: f.eol === '\r\n' ? '\r\n' : '\n',
+      bom: f.bom,
+    });
     if (serverId) addLog('info', $t('Im Editor geöffnet: {0}', path), serverId);
   } catch (e) {
     patchDoc(doc.id, { loading: false, error: (e as { message?: string }).message ?? String(e) });
@@ -182,7 +222,10 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
   if (!LIVE) {
     patchDoc(id, { dirty: false, conflict: false });
     // Same message as the app, so the preview shows that a server file goes straight back.
-    showToast(d.serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name), 'ok');
+    showToast(
+      d.serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name),
+      'ok',
+    );
     return true;
   }
   const serverId = d.serverId || null;
@@ -200,7 +243,10 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
     // The saved text is the new reference; the editor shows it again after being closed and reopened.
     patchDoc(id, { dirty: false, conflict: false, mtime, initial: text, text: undefined });
     if (serverId) addLog('ok', $t('Gesichert und hochgeladen: {0}', d.path), serverId);
-    showToast(serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name), 'ok');
+    showToast(
+      serverId ? $t('„{0}“ gesichert und auf den Server geladen.', d.name) : $t('„{0}“ gesichert.', d.name),
+      'ok',
+    );
     // The file lists show the new size and time.
     setState((s) => ({ fsRev: s.fsRev + 1 }));
     refreshVisible();
@@ -222,13 +268,24 @@ export async function saveAs(id: string): Promise<boolean> {
     return true;
   }
   const { save } = await import('@tauri-apps/plugin-dialog');
-  const picked = await save({ title: $t('Sichern unter'), defaultPath: d.serverId === null ? d.name : d.name }).catch(() => null);
+  const picked = await save({ title: $t('Sichern unter'), defaultPath: d.serverId === null ? d.name : d.name }).catch(
+    () => null,
+  );
   if (!picked) return false;
   const path = await invoke<string>('path_to_ui', { path: picked });
   try {
     const text = get();
     const mtime = await invoke<number>('editor_write', { serverId: null, path, text, eol: d.eol, bom: d.bom });
-    patchDoc(id, { serverId: '', path, name: paths.basename(path) || path, dirty: false, conflict: false, mtime, initial: text, text: undefined });
+    patchDoc(id, {
+      serverId: '',
+      path,
+      name: paths.basename(path) || path,
+      dirty: false,
+      conflict: false,
+      mtime,
+      initial: text,
+      text: undefined,
+    });
     showToast($t('„{0}“ gesichert.', paths.basename(path)), 'ok');
     setState((s) => ({ fsRev: s.fsRev + 1 }));
     return true;
@@ -272,8 +329,13 @@ export function closeNow(id: string) {
   if (i < 0) return;
   const docs = st.docs.filter((x) => x.id !== id);
   textOf.delete(id);
-  const active = st.active === id ? (docs[i] ?? docs[i - 1])?.id ?? null : st.active;
-  set({ docs, active, confirmClose: st.confirmClose === id ? null : st.confirmClose, open: docs.length ? st.open : false });
+  const active = st.active === id ? ((docs[i] ?? docs[i - 1])?.id ?? null) : st.active;
+  set({
+    docs,
+    active,
+    confirmClose: st.confirmClose === id ? null : st.confirmClose,
+    open: docs.length ? st.open : false,
+  });
 }
 
 export function cancelClose() {
@@ -287,9 +349,12 @@ export function unsavedDocs(): EditorDoc[] {
 
 /** Example text for the browser prototype, which reads no real files. */
 function sampleText(name: string): string {
-  if (/\.py$/i.test(name)) return 'from flask import Blueprint, jsonify, request\n\nfrom .models import Cart, Product\n\ncart = Blueprint("cart", __name__)\n\n\n@cart.post("/cart/items")\ndef add_item():\n    """Adds a product to the cart of the visitor."""\n    data = request.get_json()\n    product = Product.query.get_or_404(data["id"])\n    Cart.current().add(product, qty=data.get("qty", 1))\n    return jsonify(ok=True)\n';
-  if (/\.(json)$/i.test(name)) return '{\n  "name": "webshop",\n  "version": "1.4.2",\n  "currency": "EUR",\n  "shipping": {\n    "free_from": 50,\n    "countries": ["DE", "AT", "CH"]\n  }\n}\n';
-  if (/\.(md)$/i.test(name)) return '# Webshop\n\nEin kleiner Shop mit Flask.\n\n## Start\n\n```bash\nflask --app app run\n```\n';
+  if (/\.py$/i.test(name))
+    return 'from flask import Blueprint, jsonify, request\n\nfrom .models import Cart, Product\n\ncart = Blueprint("cart", __name__)\n\n\n@cart.post("/cart/items")\ndef add_item():\n    """Adds a product to the cart of the visitor."""\n    data = request.get_json()\n    product = Product.query.get_or_404(data["id"])\n    Cart.current().add(product, qty=data.get("qty", 1))\n    return jsonify(ok=True)\n';
+  if (/\.(json)$/i.test(name))
+    return '{\n  "name": "webshop",\n  "version": "1.4.2",\n  "currency": "EUR",\n  "shipping": {\n    "free_from": 50,\n    "countries": ["DE", "AT", "CH"]\n  }\n}\n';
+  if (/\.(md)$/i.test(name))
+    return '# Webshop\n\nEin kleiner Shop mit Flask.\n\n## Start\n\n```bash\nflask --app app run\n```\n';
   if (/^\.env$|\.ini$|\.conf$/i.test(name)) return 'SECRET_KEY=…\nDATABASE_URL=sqlite:///data.db\nLOG_LEVEL=info\n';
   return `${name}\n`;
 }
@@ -304,10 +369,14 @@ export function editorCanQuit(): boolean {
   if (!n || Date.now() - warnedAt < 15000) return true;
   warnedAt = Date.now();
   set({ open: true, active: unsavedDocs()[0].id });
-  showToast(n === 1 ? $t('Ein Dokument im Editor ist noch nicht gesichert. Nochmal beenden verwirft die Änderungen.') : $t('{0} Dokumente im Editor sind noch nicht gesichert. Nochmal beenden verwirft die Änderungen.', n), 'error');
+  showToast(
+    n === 1
+      ? $t('Ein Dokument im Editor ist noch nicht gesichert. Nochmal beenden verwirft die Änderungen.')
+      : $t('{0} Dokumente im Editor sind noch nicht gesichert. Nochmal beenden verwirft die Änderungen.', n),
+    'error',
+  );
   return false;
 }
-
 
 /**
  * The Mac's menu bar takes ⌘ shortcuts before the page sees them (⌘W closes the
@@ -321,7 +390,13 @@ export function setMenuKeyHandler(h: ((key: string) => boolean) | null) {
 // Where the keyboard was last: while a menu of the menu bar is in use, the page has
 // no focused element, so the last element that received focus is what counts.
 let focusInEditor = false;
-document.addEventListener('focusin', (e) => { focusInEditor = !!(e.target as HTMLElement).closest('.cm-editor'); }, true);
+document.addEventListener(
+  'focusin',
+  (e) => {
+    focusInEditor = !!(e.target as HTMLElement).closest('.cm-editor');
+  },
+  true,
+);
 export function editorMenuKey(key: string): boolean {
   if (!st.open || !menuKeyHandler) return false;
   if (!focusInEditor && !document.activeElement?.closest('.cm-editor')) return false;

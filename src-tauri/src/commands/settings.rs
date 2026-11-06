@@ -1,7 +1,7 @@
 //! Configuration files and importing servers from other apps and from ~/.ssh/config.
 
 use crate::error::{AppError, AppResult};
-use crate::{AppState, config, import, sshconfig};
+use crate::{config, import, sshconfig, AppState};
 use serde_json::Value;
 use tauri::State;
 

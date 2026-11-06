@@ -33,7 +33,8 @@ function sentence(s: string): string {
  * its own does not happen and the settings are the likely cause.
  */
 export function explainError(e: unknown, opts: { connecting?: boolean; logged?: boolean } = {}): ErrorText {
-  const err: BackendError = e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
+  const err: BackendError =
+    e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
   const text = sentence(err.message);
   let hint = '';
   switch (err.kind) {
@@ -72,8 +73,12 @@ export function explainError(e: unknown, opts: { connecting?: boolean; logged?: 
  * the first line names what it concerns. Details go to the protocol.
  * Cancelled operations show nothing.
  */
-export function showError(e: unknown, opts: { prefix?: string; serverId?: string; connecting?: boolean; log?: boolean | 'done' } = {}) {
-  const err: BackendError = e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
+export function showError(
+  e: unknown,
+  opts: { prefix?: string; serverId?: string; connecting?: boolean; log?: boolean | 'done' } = {},
+) {
+  const err: BackendError =
+    e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
   if (err.kind === 'cancelled') return;
   // 'done': the caller already wrote the error to the protocol.
   const logged = opts.log !== false && !!err.detail;

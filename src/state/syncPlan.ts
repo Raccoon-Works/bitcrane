@@ -16,11 +16,24 @@ import { winNameFromSafe } from '../util/paths';
 
 export type Direction = 'up' | 'down' | 'both';
 
-export interface Side { size: number; mtime: number; path: string }
+export interface Side {
+  size: number;
+  mtime: number;
+  path: string;
+}
 /** 'conflict': both sides changed since the last sync; the user decides (never done by itself). */
-export interface Line { rel: string; local?: Side; remote?: Side; action: SyncAction['kind'] | 'none' | 'conflict' }
+export interface Line {
+  rel: string;
+  local?: Side;
+  remote?: Side;
+  action: SyncAction['kind'] | 'none' | 'conflict';
+}
 /** One half as a place: this computer ('') or a server id, with the folder. */
-export interface Place { serverId: string; dir: string; name: string }
+export interface Place {
+  serverId: string;
+  dir: string;
+  name: string;
+}
 
 export interface PlanOptions {
   direction: Direction;
@@ -96,7 +109,11 @@ const DAY_MS = 24 * 3600 * 1000;
 
 /** Whether a relative path has a segment matching one of the patterns (a name or "*.ext"). */
 export function isExcluded(rel: string, excludes: string[]): boolean {
-  return rel.split('/').some((seg) => excludes.some((p) => (p.startsWith('*.') ? seg.toLowerCase().endsWith(p.slice(1).toLowerCase()) : seg === p)));
+  return rel
+    .split('/')
+    .some((seg) =>
+      excludes.some((p) => (p.startsWith('*.') ? seg.toLowerCase().endsWith(p.slice(1).toLowerCase()) : seg === p)),
+    );
 }
 
 /**
@@ -106,8 +123,15 @@ export function isExcluded(rel: string, excludes: string[]): boolean {
 export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   const side = place.serverId ? 'remote' : 'local';
   let items: WalkItem[];
-  if (LIVE) items = side === 'local' ? await backend.localWalk(place.dir) : await backend.remoteWalk(place.serverId, place.dir);
-  else items = fs.walkFiles(side, place.serverId, place.dir).map((f) => ({ path: f.path, relative: f.path.slice(place.dir.length + 1), size: f.entry.size, mtime: f.entry.mtime }));
+  if (LIVE)
+    items = side === 'local' ? await backend.localWalk(place.dir) : await backend.remoteWalk(place.serverId, place.dir);
+  else
+    items = fs.walkFiles(side, place.serverId, place.dir).map((f) => ({
+      path: f.path,
+      relative: f.path.slice(place.dir.length + 1),
+      size: f.entry.size,
+      mtime: f.entry.mtime,
+    }));
   const offset = LIVE && place.serverId ? clockOffset(place.serverId) : 0;
   const map = new Map<string, Side>();
   const winLocal = side === 'local' && getState().platform === 'win';
@@ -128,15 +152,24 @@ function checksum(place: Place, path: string): Promise<string> {
 }
 
 /** Checksums of files that have the same size on both sides (key: relative path; true = content differs). */
-export async function contentDiffers(left: Place, right: Place, pairs: Array<{ rel: string; local: Side; remote: Side }>): Promise<Map<string, boolean>> {
+export async function contentDiffers(
+  left: Place,
+  right: Place,
+  pairs: Array<{ rel: string; local: Side; remote: Side }>,
+): Promise<Map<string, boolean>> {
   const out = new Map<string, boolean>();
   // A few at a time, so a large folder does not open dozens of channels at once.
   for (let i = 0; i < pairs.length; i += 4) {
-    await Promise.all(pairs.slice(i, i + 4).map(async (p) => {
-      if (!LIVE) { out.set(p.rel, false); return; }
-      const [a, b] = await Promise.all([checksum(left, p.local.path), checksum(right, p.remote.path)]);
-      out.set(p.rel, a !== b);
-    }));
+    await Promise.all(
+      pairs.slice(i, i + 4).map(async (p) => {
+        if (!LIVE) {
+          out.set(p.rel, false);
+          return;
+        }
+        const [a, b] = await Promise.all([checksum(left, p.local.path), checksum(right, p.remote.path)]);
+        out.set(p.rel, a !== b);
+      }),
+    );
   }
   return out;
 }
@@ -163,7 +196,12 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
     // With "Inhalt prüfen" files of equal size count as equal when their checksums match.
     const sameContent = l && r && l.size === r.size && o.differs?.get(rel) === false;
     const contentChanged = l && r && o.differs?.get(rel) === true;
-    const differsNow = l && r && !sameContent && (contentChanged || (o.bySize ? l.size !== r.size : Math.abs(l.mtime - r.mtime) > TOLERANCE_MS || l.size !== r.size));
+    const differsNow =
+      l &&
+      r &&
+      !sameContent &&
+      (contentChanged ||
+        (o.bySize ? l.size !== r.size : Math.abs(l.mtime - r.mtime) > TOLERANCE_MS || l.size !== r.size));
     const localNewer = l && r && l.mtime - r.mtime > TOLERANCE_MS;
     const remoteNewer = l && r && r.mtime - l.mtime > TOLERANCE_MS;
     let action: Line['action'] = 'none';
@@ -177,12 +215,24 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
       else action = o.direction === 'up' ? (o.deletes ? 'deleteRemote' : 'none') : 'download';
     } else if (differsNow) {
       if (o.direction === 'up') action = o.bySize || contentChanged || localNewer || !remoteNewer ? 'upload' : 'none';
-      else if (o.direction === 'down') action = o.bySize || contentChanged || remoteNewer || !localNewer ? 'download' : 'none';
+      else if (o.direction === 'down')
+        action = o.bySize || contentChanged || remoteNewer || !localNewer ? 'download' : 'none';
       else if (agreed && l && r) {
         // The side that changed since the last sync wins; both changed = conflict.
         const lc = changedSince(l, agreed);
         const rc = changedSince(r, agreed);
-        action = lc && rc ? 'conflict' : lc ? 'upload' : rc ? 'download' : localNewer ? 'upload' : remoteNewer ? 'download' : 'conflict';
+        action =
+          lc && rc
+            ? 'conflict'
+            : lc
+              ? 'upload'
+              : rc
+                ? 'download'
+                : localNewer
+                  ? 'upload'
+                  : remoteNewer
+                    ? 'download'
+                    : 'conflict';
       } else action = localNewer ? 'upload' : remoteNewer ? 'download' : 'conflict';
     }
     out.push({ rel, local: l, remote: r, action });
@@ -192,10 +242,12 @@ export function planLines(local: Map<string, Side>, remote: Map<string, Side>, o
 
 /** Sync actions for the lines with something to do. */
 export function actionsOf(lines: Line[]): SyncAction[] {
-  return lines.filter((l) => l.action !== 'none' && l.action !== 'conflict').map((l) => {
-    const fromRight = l.action === 'download' || l.action === 'deleteRemote';
-    const src = fromRight ? l.remote : l.local;
-    const dst = fromRight ? l.local : l.remote;
-    return { kind: l.action as SyncAction['kind'], rel: l.rel, size: src?.size ?? 0, from: src?.path, to: dst?.path };
-  });
+  return lines
+    .filter((l) => l.action !== 'none' && l.action !== 'conflict')
+    .map((l) => {
+      const fromRight = l.action === 'download' || l.action === 'deleteRemote';
+      const src = fromRight ? l.remote : l.local;
+      const dst = fromRight ? l.local : l.remote;
+      return { kind: l.action as SyncAction['kind'], rel: l.rel, size: src?.size ?? 0, from: src?.path, to: dst?.path };
+    });
 }

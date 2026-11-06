@@ -60,8 +60,16 @@ pub(crate) async fn git_status(dir: String) -> Option<git::GitStatus> {
 
 /// Add, commit, pull or push in a working copy (see git.rs).
 #[tauri::command]
-pub(crate) async fn git_action(root: String, what: String, paths: Vec<String>, message: String, all: bool) -> AppResult<String> {
-    tokio::task::spawn_blocking(move || git::action(&root, &what, &paths, &message, all)).await.map_err(|e| AppError::other(e.to_string()))?
+pub(crate) async fn git_action(
+    root: String,
+    what: String,
+    paths: Vec<String>,
+    message: String,
+    all: bool,
+) -> AppResult<String> {
+    tokio::task::spawn_blocking(move || git::action(&root, &what, &paths, &message, all))
+        .await
+        .map_err(|e| AppError::other(e.to_string()))?
 }
 
 #[tauri::command]
@@ -178,7 +186,9 @@ pub(crate) fn local_open(path: String, app: Option<String>) -> AppResult<()> {
     };
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = {
-        let mut c = std::process::Command::new(app.as_deref().map(|a| a.as_os_str()).unwrap_or_else(|| std::ffi::OsStr::new("xdg-open")));
+        let mut c = std::process::Command::new(
+            app.as_deref().map(|a| a.as_os_str()).unwrap_or_else(|| std::ffi::OsStr::new("xdg-open")),
+        );
         c.arg(&native);
         c
     };
@@ -201,15 +211,16 @@ pub(crate) fn local_free_space(path: String) -> Option<u64> {
 /// Computers in the local network that offer SMB shares (Bonjour), searched for about two seconds.
 #[tauri::command]
 pub(crate) async fn network_hosts() -> Vec<netshares::NetHost> {
-    tokio::task::spawn_blocking(|| netshares::discover(std::time::Duration::from_millis(2200))).await.unwrap_or_default()
+    tokio::task::spawn_blocking(|| netshares::discover(std::time::Duration::from_millis(2200)))
+        .await
+        .unwrap_or_default()
 }
 
 /// Real target of each folder (links resolved), in the UI form; unchanged when
 /// it cannot be resolved. Lets the sidebar show a folder reached by two paths once.
 #[tauri::command]
 pub(crate) fn local_real_paths(list: Vec<String>) -> Vec<String> {
-    list
-        .into_iter()
+    list.into_iter()
         .map(|p| std::fs::canonicalize(paths::to_native(&p)).map(|c| paths::to_ui(&c)).unwrap_or(p))
         .collect()
 }
@@ -243,5 +254,7 @@ pub(crate) fn local_reveal(path: String) -> AppResult<()> {
 /// "Inhalt durchsuchen" on this computer.
 #[tauri::command]
 pub(crate) async fn local_grep(path: String, query: String, max: Option<usize>) -> AppResult<Vec<model::GrepHit>> {
-    tokio::task::spawn_blocking(move || local::grep(&path, &query, max.unwrap_or(500))).await.map_err(|e| AppError::other("Suche abgebrochen.").with_detail(e.to_string()))?
+    tokio::task::spawn_blocking(move || local::grep(&path, &query, max.unwrap_or(500)))
+        .await
+        .map_err(|e| AppError::other("Suche abgebrochen.").with_detail(e.to_string()))?
 }

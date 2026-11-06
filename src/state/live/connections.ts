@@ -58,7 +58,12 @@ export function proxyAccount(p: { user?: string; host: string; port: number }) {
 
 /** Removes the stored secrets of a deleted server, unless a remaining server uses the same account. */
 export async function forgetSecrets(removed: Server, remaining: Server[]) {
-  const accounts = (x: Server) => [passwordAccount(x), passphraseAccount(x), ...(x.proxy?.user ? [proxyAccount(x.proxy)] : []), ...(isCloudProtocol(x.protocol) ? [cloudAccount(x)] : [])];
+  const accounts = (x: Server) => [
+    passwordAccount(x),
+    passphraseAccount(x),
+    ...(x.proxy?.user ? [proxyAccount(x.proxy)] : []),
+    ...(isCloudProtocol(x.protocol) ? [cloudAccount(x)] : []),
+  ];
   const inUse = new Set(remaining.flatMap(accounts));
   for (const a of accounts(removed)) if (!inUse.has(a)) await backend.secretDelete(a).catch(() => undefined);
 }
@@ -83,7 +88,13 @@ export async function collectSecrets(servers: Server[]): Promise<Record<string, 
 export async function restoreSecrets(secrets: Record<string, string>): Promise<number> {
   let n = 0;
   for (const [account, value] of Object.entries(secrets)) {
-    if (await backend.secretSet(account, value).then(() => true, () => false)) n++;
+    if (
+      await backend.secretSet(account, value).then(
+        () => true,
+        () => false,
+      )
+    )
+      n++;
   }
   return n;
 }
@@ -96,7 +107,10 @@ export const isSftp = (srv: Pick<Server, 'protocol'>) => !srv.protocol || srv.pr
  * its button once (before "Informationen"), so it can be found. Removing it
  * afterwards sticks (settings.toolbarTerminalAdded).
  */
-export function withTerminalButton(cfg: Partial<StoredConfig> | null | undefined, toolbar: AppState['toolbar']): AppState['toolbar'] {
+export function withTerminalButton(
+  cfg: Partial<StoredConfig> | null | undefined,
+  toolbar: AppState['toolbar'],
+): AppState['toolbar'] {
   const settings = cfg?.settings as { toolbarTerminalAdded?: boolean } | undefined;
   if (!cfg?.toolbar || settings?.toolbarTerminalAdded || toolbar.includes('terminal')) return toolbar;
   const at = toolbar.indexOf('info');
@@ -112,58 +126,124 @@ export function davUrl(srv: Server): string {
 }
 
 /** Connects with the server's protocol; resolves to the start folder (and SSH clock offset). */
-async function openConnection(id: string, srv: Server, auth: AuthParams, password: string | undefined, trust: string | undefined, jump: ConnectParams | undefined, proxy: ConnectParams['proxy']) {
+async function openConnection(
+  id: string,
+  srv: Server,
+  auth: AuthParams,
+  password: string | undefined,
+  trust: string | undefined,
+  jump: ConnectParams | undefined,
+  proxy: ConnectParams['proxy'],
+) {
   if (srv.protocol === 'ftp' || srv.protocol === 'ftps') {
     return backend.connectFtp(id, {
-      host: srv.host, port: srv.port, user: srv.user, password, trust, proxy,
+      host: srv.host,
+      port: srv.port,
+      user: srv.user,
+      password,
+      trust,
+      proxy,
       tls: srv.protocol === 'ftp' ? 'none' : srv.implicitTls ? 'implicit' : 'explicit',
-      tls13Only: !!srv.tls13Only, encoding: srv.ftpEncoding ?? 'utf8', tzOffsetMin: srv.ftpTimezone ?? 0, mode: srv.ftpMode ?? 'binary',
+      tls13Only: !!srv.tls13Only,
+      encoding: srv.ftpEncoding ?? 'utf8',
+      tzOffsetMin: srv.ftpTimezone ?? 0,
+      mode: srv.ftpMode ?? 'binary',
       timeout: srv.connectTimeout,
     });
   }
   if (srv.protocol === 'webdav') {
-    return backend.connectDav(id, { url: davUrl(srv), user: srv.user, password, trust, proxy, tls13Only: !!srv.tls13Only, timeout: srv.connectTimeout });
+    return backend.connectDav(id, {
+      url: davUrl(srv),
+      user: srv.user,
+      password,
+      trust,
+      proxy,
+      tls13Only: !!srv.tls13Only,
+      timeout: srv.connectTimeout,
+    });
   }
   if (srv.protocol === 's3') {
     const port = srv.port && srv.port !== (srv.s3Http ? 80 : 443) ? `:${srv.port}` : '';
     return backend.connectS3(id, {
-      endpoint: `${srv.s3Http ? 'http' : 'https'}://${srv.host}${port}`, region: srv.s3Region ?? '', bucket: srv.s3Bucket ?? '',
-      accessKey: srv.user, secret: password, pathStyle: !!srv.s3PathStyle, tls13Only: !!srv.tls13Only, trust, proxy, timeout: srv.connectTimeout,
+      endpoint: `${srv.s3Http ? 'http' : 'https'}://${srv.host}${port}`,
+      region: srv.s3Region ?? '',
+      bucket: srv.s3Bucket ?? '',
+      accessKey: srv.user,
+      secret: password,
+      pathStyle: !!srv.s3PathStyle,
+      tls13Only: !!srv.tls13Only,
+      trust,
+      proxy,
+      timeout: srv.connectTimeout,
     });
   }
   if (srv.protocol === 'vault') {
     // The vault's files lie on another server, which has to be connected first.
     const storage = srv.vaultStorageId ? serverById(srv.vaultStorageId) : undefined;
     if (srv.vaultStorageId && !connected.has(srv.vaultStorageId)) {
-      throw { kind: 'notConnected', message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', storage?.name ?? '?') };
+      throw {
+        kind: 'notConnected',
+        message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', storage?.name ?? '?'),
+      };
     }
     return backend.vaultOpen(id, srv.host, srv.vaultStorageId, password ?? '');
   }
   if (srv.protocol === 'smb') {
-    return backend.connectSmb(id, { host: srv.host, port: srv.port || 445, user: srv.user, password, share: srv.smbShare ?? '', encrypt: !!srv.smbEncrypt, timeout: srv.connectTimeout });
+    return backend.connectSmb(id, {
+      host: srv.host,
+      port: srv.port || 445,
+      user: srv.user,
+      password,
+      share: srv.smbShare ?? '',
+      encrypt: !!srv.smbEncrypt,
+      timeout: srv.connectTimeout,
+    });
   }
   if (srv.protocol === 'dropbox') {
     // The sign-in from the browser, kept in the keychain (see addCloudService).
     const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    if (!refreshToken)
+      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     return backend.connectDropbox(id, { refreshToken });
   }
   if (srv.protocol === 'onedrive') {
     const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    if (!refreshToken)
+      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     const r = await backend.connectOneDrive(id, { refreshToken });
     // Microsoft renews the sign-in with each use; keep the newest one.
-    if (r.refreshToken && r.refreshToken !== refreshToken) void backend.secretSet(cloudAccount(srv), r.refreshToken).catch(() => undefined);
+    if (r.refreshToken && r.refreshToken !== refreshToken)
+      void backend.secretSet(cloudAccount(srv), r.refreshToken).catch(() => undefined);
     return r;
   }
   if (srv.protocol === 'gdrive') {
     const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken) throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
+    if (!refreshToken)
+      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
     const key = await (await import('../cloud')).googleKey();
-    if (!key) throw { kind: 'other', message: $t('Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.') };
+    if (!key)
+      throw {
+        kind: 'other',
+        message: $t(
+          'Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.',
+        ),
+      };
     return backend.connectGDrive(id, { refreshToken, ...key, pdfExport: srv.gdocExport === 'pdf' });
   }
-  return backend.connect(id, { host: srv.host, port: srv.port, user: srv.user, auth, trust, keepalive: getState().settings.keepAlive, scp: !!srv.scp, jump, proxy, timeout: srv.connectTimeout, forwardAgent: !!srv.forwardAgent, sftpCommand: srv.sftpCommand?.trim() || undefined });
+  return backend.connect(id, {
+    host: srv.host,
+    port: srv.port,
+    user: srv.user,
+    auth,
+    trust,
+    keepalive: getState().settings.keepAlive,
+    scp: !!srv.scp,
+    jump,
+    proxy,
+    timeout: srv.connectTimeout,
+    forwardAgent: !!srv.forwardAgent,
+    sftpCommand: srv.sftpCommand?.trim() || undefined,
+  });
 }
 
 /**
@@ -174,7 +254,10 @@ async function openConnection(id: string, srv: Server, auth: AuthParams, passwor
 export async function connectAs(connectionId: string, srv: Server): Promise<string> {
   const { auth, password } = await buildAuth(srv);
   if (srv.auth === 'password' && srv.user && password === undefined) {
-    throw { kind: 'passwordRequired', message: $t('Für {0} ist kein Passwort gespeichert. Einmal normal verbinden und das Passwort sichern.', srv.name) };
+    throw {
+      kind: 'passwordRequired',
+      message: $t('Für {0} ist kein Passwort gespeichert. Einmal normal verbinden und das Passwort sichern.', srv.name),
+    };
   }
   const jump = isSftp(srv) ? await jumpParams(srv) : undefined;
   const { home } = await openConnection(connectionId, srv, auth, password, undefined, jump, await proxyParams(srv));
@@ -185,7 +268,13 @@ export async function connectAs(connectionId: string, srv: Server): Promise<stri
 async function proxyParams(srv: Server): Promise<ConnectParams['proxy']> {
   const p = srv.proxy;
   if (!p?.host) return undefined;
-  return { kind: p.kind, host: p.host, port: p.port, user: p.user || undefined, password: p.user ? await keychain(proxyAccount(p)) : undefined };
+  return {
+    kind: p.kind,
+    host: p.host,
+    port: p.port,
+    user: p.user || undefined,
+    password: p.user ? await keychain(proxyAccount(p)) : undefined,
+  };
 }
 
 interface ConnectOptions {
@@ -213,15 +302,36 @@ async function keychain(account: string): Promise<string | undefined> {
  * Login data of a server. Passphrase and password come from the prompt
  * (`typed`) or from the system keychain.
  */
-async function buildAuth(srv: Server, typed?: { secret?: string; kind?: 'passphrase' | 'password' }): Promise<{ auth: AuthParams; passphrase?: string; password?: string }> {
+async function buildAuth(
+  srv: Server,
+  typed?: { secret?: string; kind?: 'passphrase' | 'password' },
+): Promise<{ auth: AuthParams; passphrase?: string; password?: string }> {
   const kind = typed?.kind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
-  const passphrase = typed?.secret !== undefined && kind === 'passphrase' ? typed.secret : srv.auth === 'key' || srv.auth === 'auto' ? await keychain(passphraseAccount(srv)) : undefined;
-  const password = typed?.secret !== undefined && kind === 'password' ? typed.secret : srv.auth === 'password' || srv.auth === 'auto' ? await keychain(passwordAccount(srv)) : undefined;
+  const passphrase =
+    typed?.secret !== undefined && kind === 'passphrase'
+      ? typed.secret
+      : srv.auth === 'key' || srv.auth === 'auto'
+        ? await keychain(passphraseAccount(srv))
+        : undefined;
+  const password =
+    typed?.secret !== undefined && kind === 'password'
+      ? typed.secret
+      : srv.auth === 'password' || srv.auth === 'auto'
+        ? await keychain(passwordAccount(srv))
+        : undefined;
   switch (srv.auth) {
-    case 'key': return { auth: { method: 'key', path: srv.keyPath, passphrase }, passphrase };
-    case 'agent': return { auth: { method: 'agent' } };
-    case 'password': return { auth: { method: 'password', password: password ?? '' }, password };
-    default: return { auth: { method: 'auto', keyPath: srv.keyPath || undefined, passphrase, password }, passphrase, password };
+    case 'key':
+      return { auth: { method: 'key', path: srv.keyPath, passphrase }, passphrase };
+    case 'agent':
+      return { auth: { method: 'agent' } };
+    case 'password':
+      return { auth: { method: 'password', password: password ?? '' }, password };
+    default:
+      return {
+        auth: { method: 'auto', keyPath: srv.keyPath || undefined, passphrase, password },
+        passphrase,
+        password,
+      };
   }
 }
 
@@ -230,11 +340,40 @@ async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | 
   const j = srv.jumpServerId ? serverById(srv.jumpServerId) : undefined;
   if (!j || j.id === srv.id) return undefined;
   const { auth } = await buildAuth(j);
-  return { host: j.host, port: j.port, user: j.user, auth, trust, keepalive: getState().settings.keepAlive, proxy: await proxyParams(j) };
+  return {
+    host: j.host,
+    port: j.port,
+    user: j.user,
+    auth,
+    trust,
+    keepalive: getState().settings.keepAlive,
+    proxy: await proxyParams(j),
+  };
 }
 
-const PROTOCOL_LABEL: Record<string, string> = { ftp: 'FTP', ftps: 'FTPS', webdav: 'WebDAV', smb: 'SMB', s3: 'S3', vault: 'Cryptomator', dropbox: 'Dropbox', gdrive: 'Google Drive', onedrive: 'OneDrive' };
-const authLabel = (srv: Server) => (isCloudProtocol(srv.protocol) ? $t('Anmeldung über den Browser') : !isSftp(srv) ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : srv.protocol === 'smb' ? $t(', Gast') : $t(', anonym')}` : srv.auth === 'key' ? $t('Schlüssel {0}', srv.keyPath) : srv.auth === 'agent' ? 'SSH-Agent' : srv.auth === 'password' ? $t('Passwort') : $t('automatisch'));
+const PROTOCOL_LABEL: Record<string, string> = {
+  ftp: 'FTP',
+  ftps: 'FTPS',
+  webdav: 'WebDAV',
+  smb: 'SMB',
+  s3: 'S3',
+  vault: 'Cryptomator',
+  dropbox: 'Dropbox',
+  gdrive: 'Google Drive',
+  onedrive: 'OneDrive',
+};
+const authLabel = (srv: Server) =>
+  isCloudProtocol(srv.protocol)
+    ? $t('Anmeldung über den Browser')
+    : !isSftp(srv)
+      ? `${PROTOCOL_LABEL[srv.protocol ?? ''] ?? ''}${srv.user ? $t(', Passwort') : srv.protocol === 'smb' ? $t(', Gast') : $t(', anonym')}`
+      : srv.auth === 'key'
+        ? $t('Schlüssel {0}', srv.keyPath)
+        : srv.auth === 'agent'
+          ? 'SSH-Agent'
+          : srv.auth === 'password'
+            ? $t('Passwort')
+            : $t('automatisch');
 
 /** Opens an SSH session for a saved server. Resolves to true when connected. */
 /** Home folder of each connected server: a half that opens an already connected server starts there. */
@@ -270,18 +409,28 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
   if (!srv) return false;
   const { auth, passphrase, password } = await buildAuth(srv, { secret: opts.secret, kind: opts.secretKind });
   // FTP without a user name logs in anonymously, SMB as guest; everything else needs the password.
-  const needsPassword = srv.auth === 'password' && !(srv.protocol === 'ftp' || srv.protocol === 'ftps' || srv.protocol === 'smb') ? true : srv.auth === 'password' && !!srv.user;
+  const needsPassword =
+    srv.auth === 'password' && !(srv.protocol === 'ftp' || srv.protocol === 'ftps' || srv.protocol === 'smb')
+      ? true
+      : srv.auth === 'password' && !!srv.user;
   if (needsPassword && password === undefined) {
     if (opts.trust) pendingLogin.set(serverId, { trust: opts.trust });
     if (!opts.silent) openDialog({ type: 'secret', serverId, kind: 'password' });
     return false;
   }
   try {
-    if (!opts.silent) addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', srv.user, srv.host, srv.port, authLabel(srv)), serverId);
+    if (!opts.silent)
+      addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', srv.user, srv.host, srv.port, authLabel(srv)), serverId);
     const jump = isSftp(srv) ? await jumpParams(srv, opts.trust) : undefined;
-    if (jump && !opts.silent) addLog('info', $t('Über den Sprungserver {0}@{1}:{2}', jump.user, jump.host, jump.port), serverId);
+    if (jump && !opts.silent)
+      addLog('info', $t('Über den Sprungserver {0}@{1}:{2}', jump.user, jump.host, jump.port), serverId);
     const proxy = jump ? undefined : await proxyParams(srv);
-    if (proxy && !opts.silent) addLog('info', $t('Über {0}-Proxy {1}:{2}', proxy.kind === 'http' ? 'HTTP' : 'SOCKS5', proxy.host, proxy.port), serverId);
+    if (proxy && !opts.silent)
+      addLog(
+        'info',
+        $t('Über {0}-Proxy {1}:{2}', proxy.kind === 'http' ? 'HTTP' : 'SOCKS5', proxy.host, proxy.port),
+        serverId,
+      );
     const { home, clockOffsetMs } = await openConnection(serverId, srv, auth, password, opts.trust, jump, proxy);
     connected.add(serverId);
     homes.set(serverId, home);
@@ -291,7 +440,13 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
       clockOffsets.set(serverId, Math.abs(clockOffsetMs) <= 1500 ? 0 : clockOffsetMs);
       if (Math.abs(clockOffsetMs) > 60000) {
         const min = Math.round(Math.abs(clockOffsetMs) / 60000);
-        const text = $t('Die Uhr von {0} geht {1} {2} {3}. Bitcrane berücksichtigt das beim Vergleich von Änderungszeiten.', srv.name, min, min === 1 ? $t('Minute') : $t('Minuten'), clockOffsetMs > 0 ? $t('vor') : $t('nach'));
+        const text = $t(
+          'Die Uhr von {0} geht {1} {2} {3}. Bitcrane berücksichtigt das beim Vergleich von Änderungszeiten.',
+          srv.name,
+          min,
+          min === 1 ? $t('Minute') : $t('Minuten'),
+          clockOffsetMs > 0 ? $t('vor') : $t('nach'),
+        );
         addLog('warn', text, serverId);
         if (!opts.silent) showToast(text);
       } else if (Math.abs(clockOffsetMs) > 1500) {
@@ -301,9 +456,15 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     failed.delete(serverId);
     if (opts.saveSecret && opts.secret !== undefined) {
       const kind = opts.secretKind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
-      backend.secretSet(kind === 'passphrase' ? passphraseAccount(srv) : passwordAccount(srv), opts.secret).catch(() => {
-        showToast($t('Konnte das Kennwort nicht im Schlüsselbund sichern.'), 'error', $t('Beim nächsten Verbinden fragt Bitcrane wieder danach.'));
-      });
+      backend
+        .secretSet(kind === 'passphrase' ? passphraseAccount(srv) : passwordAccount(srv), opts.secret)
+        .catch(() => {
+          showToast(
+            $t('Konnte das Kennwort nicht im Schlüsselbund sichern.'),
+            'error',
+            $t('Beim nächsten Verbinden fragt Bitcrane wieder danach.'),
+          );
+        });
     }
     setState((s) => {
       const offline = { ...s.offline };
@@ -317,10 +478,15 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
           // Server to server: the left half starts in this server's home folder.
           if (t.leftServerId === serverId && (!t.localPath || t.localPath === '~')) t = { ...t, localPath: home };
           if (t.serverId !== serverId || (t.remotePath && t.remotePath !== '~')) return t;
-          const w = s.watches.find((x) => x.serverId === serverId && (t.localPath === x.localPath || t.localPath.startsWith(x.localPath + '/')));
+          const w = s.watches.find(
+            (x) =>
+              x.serverId === serverId && (t.localPath === x.localPath || t.localPath.startsWith(x.localPath + '/')),
+          );
           return { ...t, remotePath: w ? w.remotePath + t.localPath.slice(w.localPath.length) : home };
         }),
-        watches: s.watches.map((w) => (w.serverId === serverId && w.state === 'waiting' ? { ...w, state: 'active' } : w)),
+        watches: s.watches.map((w) =>
+          w.serverId === serverId && w.state === 'waiting' ? { ...w, state: 'active' } : w,
+        ),
       };
     });
     if (!opts.silent) showToast($t('Verbunden mit {0}', srv.name), 'ok');
@@ -330,17 +496,29 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     void startAutoForwards(serverId);
     // Start comparison for watches of this server that have not synced yet.
     for (const w of getState().watches) {
-      if (w.serverId === serverId && w.state !== 'paused' && w.options.syncOnStart && !synced.has(w.id)) void initialSync(w);
+      if (w.serverId === serverId && w.state !== 'paused' && w.options.syncOnStart && !synced.has(w.id))
+        void initialSync(w);
     }
     return true;
   } catch (e) {
     const err = toBackendError(e);
     connected.delete(serverId);
-    addLog(opts.silent ? 'warn' : 'error', opts.silent ? $t('Neuer Verbindungsversuch fehlgeschlagen: {0}', err.message) : err.message, serverId, err.detail);
+    addLog(
+      opts.silent ? 'warn' : 'error',
+      opts.silent ? $t('Neuer Verbindungsversuch fehlgeschlagen: {0}', err.message) : err.message,
+      serverId,
+      err.detail,
+    );
     if (opts.silent) return false;
     failed.add(serverId);
     // Keep what was answered so far for the next question of this login.
-    if (opts.secret !== undefined || opts.trust) pendingLogin.set(serverId, { secret: opts.secret, secretKind: opts.secretKind, saveSecret: opts.saveSecret, trust: opts.trust });
+    if (opts.secret !== undefined || opts.trust)
+      pendingLogin.set(serverId, {
+        secret: opts.secret,
+        secretKind: opts.secretKind,
+        saveSecret: opts.saveSecret,
+        trust: opts.trust,
+      });
     switch (err.kind) {
       case 'hostKeyUnknown':
         if (err.hostKey) openDialog({ type: 'fingerprint', mode: 'new', serverId, key: err.hostKey });
@@ -357,7 +535,8 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
       case 'authFailed':
         // A cloud service's sign-in was revoked or is missing: sign in again in the browser.
         if (isCloudProtocol(srv.protocol)) openDialog({ type: 'cloudSignIn', service: srv.protocol!, serverId });
-        else if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined)) openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
+        else if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined))
+          openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
         else showError(err, { prefix: srv.name, serverId, connecting: true, log: 'done' });
         break;
       case 'cancelled':
@@ -384,7 +563,12 @@ export async function firstStartOffers() {
       openDialog({ type: 'import', firstStart: true });
       // The cloud folders wait until this dialog is closed.
       await new Promise<void>((done) => {
-        const stop = subscribeStore(() => { if (getState().dialog?.type !== 'import') { stop(); done(); } });
+        const stop = subscribeStore(() => {
+          if (getState().dialog?.type !== 'import') {
+            stop();
+            done();
+          }
+        });
       });
     }
   }
@@ -399,7 +583,10 @@ export async function hasStoredSecret(srv: Server): Promise<boolean> {
 
 /** Adds a public key to ~/.ssh/authorized_keys on a connected server. */
 export async function installPublicKey(serverId: string, publicKey: string): Promise<string | null> {
-  if (!connected.has(serverId)) return $t('Dafür muss Bitcrane mit diesem Server verbunden sein (z. B. noch mit Passwort oder dem bisherigen Schlüssel).');
+  if (!connected.has(serverId))
+    return $t(
+      'Dafür muss Bitcrane mit diesem Server verbunden sein (z. B. noch mit Passwort oder dem bisherigen Schlüssel).',
+    );
   // A public key line never contains single quotes; refuse anything else to keep the command safe.
   if (!/^[A-Za-z0-9@.+/=_ :-]+$/.test(publicKey)) return $t('Der öffentliche Schlüssel enthält unerwartete Zeichen.');
   const cmd = `umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && (grep -qxF '${publicKey}' ~/.ssh/authorized_keys || printf '%s
@@ -417,7 +604,8 @@ export async function installPublicKey(serverId: string, publicKey: string): Pro
 /** "Verbindung testen" in the server dialog: logs in once and closes again. */
 export async function testServer(srv: Server): Promise<{ ok: boolean; text: string }> {
   const { auth, passphrase, password } = await buildAuth(srv);
-  if (srv.auth === 'password' && password === undefined) return { ok: true, text: $t('Das Passwort fragt Bitcrane beim Verbinden ab.') };
+  if (srv.auth === 'password' && password === undefined)
+    return { ok: true, text: $t('Das Passwort fragt Bitcrane beim Verbinden ab.') };
   try {
     if (!isSftp(srv)) {
       // Other protocols: a short connection with a temporary id.
@@ -427,13 +615,36 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
       return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
     }
     const jump = await jumpParams(srv);
-    const home = await backend.sshTest({ host: srv.host, port: srv.port, user: srv.user, auth, keepalive: false, scp: !!srv.scp, jump, proxy: jump ? undefined : await proxyParams(srv) });
-    return { ok: true, text: home ? $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.') };
+    const home = await backend.sshTest({
+      host: srv.host,
+      port: srv.port,
+      user: srv.user,
+      auth,
+      keepalive: false,
+      scp: !!srv.scp,
+      jump,
+      proxy: jump ? undefined : await proxyParams(srv),
+    });
+    return {
+      ok: true,
+      text: home
+        ? $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home)
+        : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.'),
+    };
   } catch (e) {
     const err = toBackendError(e);
-    if (err.kind === 'passphraseRequired' && passphrase === undefined) return { ok: true, text: $t('Erreichbar. Die Passphrase des Schlüssels fragt Bitcrane beim Verbinden ab.') };
-    if (err.kind === 'passwordRequired') return { ok: true, text: $t('Erreichbar. Das Passwort fragt Bitcrane beim Verbinden ab.') };
-    if (err.kind === 'hostKeyUnknown') return { ok: true, text: err.hostKey?.algorithm === 'TLS-Zertifikat' ? $t('Erreichbar. Das Zertifikat bestätigst du beim ersten Verbinden.') : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.') };
+    if (err.kind === 'passphraseRequired' && passphrase === undefined)
+      return { ok: true, text: $t('Erreichbar. Die Passphrase des Schlüssels fragt Bitcrane beim Verbinden ab.') };
+    if (err.kind === 'passwordRequired')
+      return { ok: true, text: $t('Erreichbar. Das Passwort fragt Bitcrane beim Verbinden ab.') };
+    if (err.kind === 'hostKeyUnknown')
+      return {
+        ok: true,
+        text:
+          err.hostKey?.algorithm === 'TLS-Zertifikat'
+            ? $t('Erreichbar. Das Zertifikat bestätigst du beim ersten Verbinden.')
+            : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.'),
+      };
     return { ok: false, text: err.message + (err.detail && err.kind !== 'unreachable' ? ` (${err.detail})` : '') };
   }
 }
@@ -462,12 +673,14 @@ export function connectNow(serverId: string) {
 
 /** Connects when a tab of the server becomes visible, unless the last attempt failed. */
 export function autoConnect(serverId: string) {
-  if (!connected.has(serverId) && !connecting.has(serverId) && !failed.has(serverId) && !getState().offline[serverId]) void connectServer(serverId);
+  if (!connected.has(serverId) && !connecting.has(serverId) && !failed.has(serverId) && !getState().offline[serverId])
+    void connectServer(serverId);
 }
 
 /** Server to server: connects the right server first, then the left one (password prompts one after the other). */
 export function autoConnectPair(right: string, left: string) {
-  const needsRight = !connected.has(right) && !connecting.has(right) && !failed.has(right) && !getState().offline[right];
+  const needsRight =
+    !connected.has(right) && !connecting.has(right) && !failed.has(right) && !getState().offline[right];
   if (needsRight) void connectServer(right).then(() => autoConnect(left));
   else autoConnect(left);
 }
@@ -492,7 +705,12 @@ export function trustAndConnect(serverId: string, fingerprint: string) {
 /** Answer from the passphrase / password prompt. */
 export function submitSecret(serverId: string, secret: string, save: boolean, kind: 'passphrase' | 'password') {
   failed.delete(serverId);
-  void connectServer(serverId, { trust: pendingLogin.get(serverId)?.trust, secret, secretKind: kind, saveSecret: save });
+  void connectServer(serverId, {
+    trust: pendingLogin.get(serverId)?.trust,
+    secret,
+    secretKind: kind,
+    saveSecret: save,
+  });
 }
 
 /** Marks a server as dropped; a timer tries to reconnect in the background. */
@@ -503,7 +721,11 @@ export function markOffline(serverId: string) {
   if (!getState().settings.autoReconnect) {
     // No automatic reconnect: the pane shows "Nicht verbunden" with a button.
     failed.add(serverId);
-    showToast($t('Verbindung zu {0} unterbrochen.', serverById(serverId)?.name ?? $t('dem Server')), 'error', $t('Bitcrane verbindet sich neu, sobald der Server wieder erreichbar ist.'));
+    showToast(
+      $t('Verbindung zu {0} unterbrochen.', serverById(serverId)?.name ?? $t('dem Server')),
+      'error',
+      $t('Bitcrane verbindet sich neu, sobald der Server wieder erreichbar ist.'),
+    );
     setState((s) => ({
       servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: false } : x)),
       watches: s.watches.map((w) => (w.serverId === serverId && w.state === 'active' ? { ...w, state: 'waiting' } : w)),
@@ -528,9 +750,19 @@ export async function retryOffline(now: number) {
     if (now < info.nextRetry || connecting.has(id)) continue;
     const ok = await connectServer(id, { silent: true });
     if (!ok) {
-      setState((st) => (st.offline[id]
-        ? { offline: { ...st.offline, [id]: { attempt: info.attempt + 1, nextRetry: Date.now() + Math.min(60, 5 * (info.attempt + 1)) * 1000 } } }
-        : {}));
+      setState((st) =>
+        st.offline[id]
+          ? {
+              offline: {
+                ...st.offline,
+                [id]: {
+                  attempt: info.attempt + 1,
+                  nextRetry: Date.now() + Math.min(60, 5 * (info.attempt + 1)) * 1000,
+                },
+              },
+            }
+          : {},
+      );
     } else {
       for (const k of [...listings.keys()]) if (k.startsWith(`R|${id}|`)) listings.delete(k);
       bump();

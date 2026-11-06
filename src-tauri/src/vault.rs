@@ -47,7 +47,8 @@ fn bad_vault(detail: impl Into<String>) -> AppError {
 }
 
 fn crypto_err(what: &str) -> AppError {
-    AppError::other(format!("Entschlüsseln fehlgeschlagen ({what}). Die Datei im Tresor ist beschädigt.")).with_detail("integrity")
+    AppError::other(format!("Entschlüsseln fehlgeschlagen ({what}). Die Datei im Tresor ist beschädigt."))
+        .with_detail("integrity")
 }
 
 /* ------------------------------------------------------------------ Storage */
@@ -71,7 +72,10 @@ impl StoreWriter {
             StoreWriter::Local(f) => f.write_all(data).await,
             StoreWriter::Remote(w) => w.write_all(data).await,
         };
-        r.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Schreiben in den Tresor fehlgeschlagen.").with_detail(e.to_string()))
+        r.map_err(|e| {
+            AppError::new(ErrorKind::ConnectionLost, "Schreiben in den Tresor fehlgeschlagen.")
+                .with_detail(e.to_string())
+        })
     }
 
     async fn finish(self) -> AppResult<()> {
@@ -89,7 +93,12 @@ impl StoreWriter {
 }
 
 fn local_entry(name: String, meta: &std::fs::Metadata) -> FileEntry {
-    let mtime = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
     FileEntry {
         name,
         kind: if meta.is_dir() { "dir" } else { "file" }.into(),
@@ -107,13 +116,11 @@ impl Store {
     async fn remote(&self) -> AppResult<Arc<Remote>> {
         match self {
             Store::Local => unreachable!("local storage has no connection"),
-            Store::Remote { connections, id } => connections
-                .lock()
-                .await
-                .get(id)
-                .filter(|c| !c.is_closed())
-                .cloned()
-                .ok_or_else(|| AppError::new(ErrorKind::NotConnected, "Keine Verbindung zum Server, auf dem der Tresor liegt.")),
+            Store::Remote { connections, id } => {
+                connections.lock().await.get(id).filter(|c| !c.is_closed()).cloned().ok_or_else(|| {
+                    AppError::new(ErrorKind::NotConnected, "Keine Verbindung zum Server, auf dem der Tresor liegt.")
+                })
+            }
         }
     }
 
@@ -147,7 +154,9 @@ impl Store {
                 let r = self.remote().await?;
                 let mut reader = Box::pin(r.reader(path, 0)).await?;
                 let mut buf = Vec::new();
-                reader.read_to_end(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen fehlgeschlagen.").with_detail(e.to_string()))?;
+                reader.read_to_end(&mut buf).await.map_err(|e| {
+                    AppError::new(ErrorKind::ConnectionLost, "Lesen fehlgeschlagen.").with_detail(e.to_string())
+                })?;
                 Box::pin(reader.close(true)).await?;
                 Ok(buf)
             }
@@ -170,7 +179,9 @@ impl Store {
     async fn writer(&self, path: &str, size: Option<u64>) -> AppResult<StoreWriter> {
         match self {
             Store::Local => Ok(StoreWriter::Local(tokio::fs::File::create(to_native(path)).await?)),
-            Store::Remote { .. } => Ok(StoreWriter::Remote(Box::pin(self.remote().await?.writer(path, 0, size, None)).await?)),
+            Store::Remote { .. } => {
+                Ok(StoreWriter::Remote(Box::pin(self.remote().await?.writer(path, 0, size, None)).await?))
+            }
         }
     }
 
@@ -296,7 +307,8 @@ impl Keys {
             return Err(crypto_err("Dateikopf"));
         }
         let gcm = Aes256Gcm::new((&self.enc).into());
-        let payload = gcm.decrypt(Nonce::from_slice(&header[..12]), &header[12..HEADER]).map_err(|_| crypto_err("Dateikopf"))?;
+        let payload =
+            gcm.decrypt(Nonce::from_slice(&header[..12]), &header[12..HEADER]).map_err(|_| crypto_err("Dateikopf"))?;
         let mut nonce = [0u8; 12];
         nonce.copy_from_slice(&header[..12]);
         let mut key = [0u8; 32];
@@ -320,7 +332,10 @@ fn chunk_aad(number: u64, header_nonce: &[u8; 12]) -> [u8; 20] {
 fn encrypt_chunk(gcm: &Aes256Gcm, number: u64, header_nonce: &[u8; 12], clear: &[u8]) -> Vec<u8> {
     let nonce: [u8; 12] = rand::rng().random();
     let mut out = nonce.to_vec();
-    out.extend(gcm.encrypt(Nonce::from_slice(&nonce), Payload { msg: clear, aad: &chunk_aad(number, header_nonce) }).expect("gcm"));
+    out.extend(
+        gcm.encrypt(Nonce::from_slice(&nonce), Payload { msg: clear, aad: &chunk_aad(number, header_nonce) })
+            .expect("gcm"),
+    );
     out
 }
 
@@ -328,7 +343,8 @@ fn decrypt_chunk(gcm: &Aes256Gcm, number: u64, header_nonce: &[u8; 12], chunk: &
     if chunk.len() < 28 {
         return Err(crypto_err("Block"));
     }
-    gcm.decrypt(Nonce::from_slice(&chunk[..12]), Payload { msg: &chunk[12..], aad: &chunk_aad(number, header_nonce) }).map_err(|_| crypto_err("Block"))
+    gcm.decrypt(Nonce::from_slice(&chunk[..12]), Payload { msg: &chunk[12..], aad: &chunk_aad(number, header_nonce) })
+        .map_err(|_| crypto_err("Block"))
 }
 
 /// Size of the decrypted content for an encrypted file of `size` bytes.
@@ -368,7 +384,11 @@ fn derive_kek(password: &str, salt: &[u8], n: u64, r: u32) -> AppResult<[u8; 32]
 
 fn unlock(masterkey_json: &[u8], password: &str) -> AppResult<Keys> {
     let v: Value = serde_json::from_slice(masterkey_json).map_err(|e| bad_vault(e.to_string()))?;
-    let b64 = |k: &str| -> AppResult<Vec<u8>> { BASE64.decode(v.get(k).and_then(Value::as_str).unwrap_or("").as_bytes()).map_err(|e| bad_vault(format!("{k}: {e}"))) };
+    let b64 = |k: &str| -> AppResult<Vec<u8>> {
+        BASE64
+            .decode(v.get(k).and_then(Value::as_str).unwrap_or("").as_bytes())
+            .map_err(|e| bad_vault(format!("{k}: {e}")))
+    };
     let salt = b64("scryptSalt")?;
     let n = v.get("scryptCostParam").and_then(Value::as_u64).unwrap_or(32768);
     let r = v.get("scryptBlockSize").and_then(Value::as_u64).unwrap_or(8) as u32;
@@ -413,7 +433,8 @@ fn read_vault_config(jwt: &str, keys: &Keys) -> AppResult<usize> {
     mac.update(format!("{header}.{payload}").as_bytes());
     let sig = b64url(signature).ok_or_else(|| bad_vault("signature encoding"))?;
     mac.verify_slice(&sig).map_err(|_| bad_vault("signature of vault.cryptomator"))?;
-    let payload: Value = serde_json::from_slice(&b64url(payload).ok_or_else(|| bad_vault("payload encoding"))?).map_err(|e| bad_vault(e.to_string()))?;
+    let payload: Value = serde_json::from_slice(&b64url(payload).ok_or_else(|| bad_vault("payload encoding"))?)
+        .map_err(|e| bad_vault(e.to_string()))?;
     if payload.get("format").and_then(Value::as_u64) != Some(8) {
         return Err(AppError::other("Dieses Tresor-Format unterstützt Bitcrane nicht. Bitte den Tresor mit einer aktuellen Cryptomator-Version öffnen, die ihn umstellt."));
     }
@@ -424,7 +445,9 @@ fn read_vault_config(jwt: &str, keys: &Keys) -> AppResult<usize> {
 }
 
 fn vault_config(keys: &Keys) -> String {
-    let header = BASE64URL_NOPAD.encode(json!({ "kid": "masterkeyfile:masterkey.cryptomator", "typ": "JWT", "alg": "HS256" }).to_string().as_bytes());
+    let header = BASE64URL_NOPAD.encode(
+        json!({ "kid": "masterkeyfile:masterkey.cryptomator", "typ": "JWT", "alg": "HS256" }).to_string().as_bytes(),
+    );
     let payload = BASE64URL_NOPAD.encode(json!({ "jti": uuid::Uuid::new_v4().to_string(), "format": 8, "cipherCombo": "SIV_GCM", "shorteningThreshold": DEFAULT_THRESHOLD }).to_string().as_bytes());
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.jwt_key()).expect("hmac");
     mac.update(format!("{header}.{payload}").as_bytes());
@@ -477,8 +500,20 @@ fn not_found(path: &str) -> AppError {
 impl VaultConn {
     /// Opens the vault in the folder `root` with the password.
     pub async fn open(store: Store, root: &str, password: &str) -> AppResult<VaultConn> {
-        let masterkey = store.read_all(&remote_join(root, "masterkey.cryptomator")).await.map_err(|e| if e.kind == ErrorKind::NotFound { bad_vault("masterkey.cryptomator missing") } else { e })?;
-        let config = store.read_all(&remote_join(root, "vault.cryptomator")).await.map_err(|e| if e.kind == ErrorKind::NotFound { bad_vault("vault.cryptomator missing") } else { e })?;
+        let masterkey = store.read_all(&remote_join(root, "masterkey.cryptomator")).await.map_err(|e| {
+            if e.kind == ErrorKind::NotFound {
+                bad_vault("masterkey.cryptomator missing")
+            } else {
+                e
+            }
+        })?;
+        let config = store.read_all(&remote_join(root, "vault.cryptomator")).await.map_err(|e| {
+            if e.kind == ErrorKind::NotFound {
+                bad_vault("vault.cryptomator missing")
+            } else {
+                e
+            }
+        })?;
         let keys = tokio::task::spawn_blocking({
             let password = password.to_string();
             move || unlock(&masterkey, &password)
@@ -494,20 +529,31 @@ impl VaultConn {
     /// Creates a new, empty vault in the folder `root` (which must not exist yet).
     pub async fn create(store: Store, root: &str, password: &str) -> AppResult<()> {
         if store.stat(root).await.is_some() {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(root))));
+            return Err(AppError::new(
+                ErrorKind::AlreadyExists,
+                format!("„{}“ gibt es hier schon.", remote_name(root)),
+            ));
         }
         let keys = {
             let mut rng = rand::rng();
             Keys { enc: rng.random(), mac: rng.random() }
         };
         let password = password.to_string();
-        let (masterkey, keys) = tokio::task::spawn_blocking(move || masterkey_file(&keys, &password).map(|m| (m, keys)))
-            .await
-            .map_err(|e| AppError::other("Anlegen abgebrochen.").with_detail(e.to_string()))??;
+        let (masterkey, keys) =
+            tokio::task::spawn_blocking(move || masterkey_file(&keys, &password).map(|m| (m, keys)))
+                .await
+                .map_err(|e| AppError::other("Anlegen abgebrochen.").with_detail(e.to_string()))??;
         store.mkdir_all(root).await?;
         store.write_all(&remote_join(root, "masterkey.cryptomator"), &masterkey).await?;
         store.write_all(&remote_join(root, "vault.cryptomator"), vault_config(&keys).as_bytes()).await?;
-        let vault = VaultConn { store, root: root.to_string(), keys, threshold: DEFAULT_THRESHOLD, dir_ids: Mutex::new(HashMap::new()), home: "/".into() };
+        let vault = VaultConn {
+            store,
+            root: root.to_string(),
+            keys,
+            threshold: DEFAULT_THRESHOLD,
+            dir_ids: Mutex::new(HashMap::new()),
+            home: "/".into(),
+        };
         vault.store.mkdir_all(&vault.content_dir("")).await
     }
 
@@ -564,7 +610,8 @@ impl VaultConn {
             if node.kind != Kind::Dir {
                 return Err(AppError::other(format!("„{seg}“ ist kein Ordner.")));
             }
-            id = String::from_utf8(self.store.read_all(&remote_join(&node.path, "dir.c9r")).await?).map_err(|_| bad_vault("dir.c9r"))?;
+            id = String::from_utf8(self.store.read_all(&remote_join(&node.path, "dir.c9r")).await?)
+                .map_err(|_| bad_vault("dir.c9r"))?;
             self.dir_ids.lock().unwrap().insert(current.clone(), id.clone());
         }
         Ok(id)
@@ -590,7 +637,9 @@ impl VaultConn {
             } else if e.name.ends_with(".c9s") && e.kind == "dir" {
                 let node = remote_join(&dir, &e.name);
                 let Ok(long) = self.store.read_all(&remote_join(&node, "name.c9s")).await else { continue };
-                let Some(name) = self.keys.decrypt_name(String::from_utf8_lossy(&long).trim(), &dir_id) else { continue };
+                let Some(name) = self.keys.decrypt_name(String::from_utf8_lossy(&long).trim(), &dir_id) else {
+                    continue;
+                };
                 match self.store.stat(&remote_join(&node, "contents.c9r")).await {
                     Some(c) => (name, Kind::File, clear_size(c.size), c.mtime),
                     None => (name, Kind::Dir, 0, e.mtime),
@@ -620,7 +669,17 @@ impl VaultConn {
 
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
         if path == "/" || path.is_empty() {
-            return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: String::new(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+            return Ok(FileEntry {
+                name: "/".into(),
+                kind: "dir".into(),
+                size: 0,
+                mtime: 0,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                link: None,
+                hidden: 0,
+            });
         }
         let n = self.node_of(path).await?;
         Ok(FileEntry {
@@ -741,7 +800,12 @@ impl VaultConn {
         let root = self.stat(path).await?;
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: path.to_string(),
+                relative: rel(path),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let mut out = Vec::new();
         let mut stack = vec![path.to_string()];
@@ -809,7 +873,11 @@ impl VaultConn {
     }
 
     /// Encrypts and writes a file. The task finishes the upload.
-    pub async fn writer(self: &Arc<Self>, path: &str, size: Option<u64>) -> AppResult<(Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>)> {
+    pub async fn writer(
+        self: &Arc<Self>,
+        path: &str,
+        size: Option<u64>,
+    ) -> AppResult<(Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>)> {
         let parent_id = self.dir_id(&remote_parent(path)).await?;
         let (storage, encrypted, shortened) = self.storage_name(&remote_name(path), &parent_id);
         let node = remote_join(&self.content_dir(&parent_id), &storage);
@@ -836,7 +904,10 @@ impl VaultConn {
                 loop {
                     let mut filled = 0;
                     while filled < CHUNK {
-                        let n = r.read(&mut buf[filled..]).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string()))?;
+                        let n = r.read(&mut buf[filled..]).await.map_err(|e| {
+                            AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.")
+                                .with_detail(e.to_string())
+                        })?;
                         if n == 0 {
                             break;
                         }
@@ -883,7 +954,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = format!("{}/Tresor", dir.path().to_string_lossy().replace('\\', "/"));
         VaultConn::create(Store::Local, &root, "geheim").await.unwrap();
-        assert_eq!(VaultConn::open(Store::Local, &root, "falsch").await.err().map(|e| e.kind), Some(ErrorKind::AuthFailed));
+        assert_eq!(
+            VaultConn::open(Store::Local, &root, "falsch").await.err().map(|e| e.kind),
+            Some(ErrorKind::AuthFailed)
+        );
         let vault = Arc::new(VaultConn::open(Store::Local, &root, "geheim").await.unwrap());
         vault.mkdir_all("/Projekte/Über uns").await.unwrap();
         let data: Vec<u8> = (0..100_000u32).map(|i| (i % 251) as u8).collect();
@@ -927,7 +1001,12 @@ mod interop {
             VaultConn::create(Store::Local, &out, "geheim").await.unwrap();
             let v = Arc::new(VaultConn::open(Store::Local, &out, "geheim").await.unwrap());
             v.mkdir_all("/Ordner/Unterordner").await.unwrap();
-            for (path, len) in [("/Ordner/klein.txt", 5usize), ("/Ordner/Unterordner/gross.bin", 70_000), (&*format!("/{}.txt", "lang".repeat(60)), 10), ("/leer.txt", 0)] {
+            for (path, len) in [
+                ("/Ordner/klein.txt", 5usize),
+                ("/Ordner/Unterordner/gross.bin", 70_000),
+                (&*format!("/{}.txt", "lang".repeat(60)), 10),
+                ("/leer.txt", 0),
+            ] {
                 let data: Vec<u8> = (0..len as u32).map(|i| (i % 251) as u8).collect();
                 let (mut w, t) = v.writer(path, Some(len as u64)).await.unwrap();
                 w.write_all(&data).await.unwrap();
@@ -941,7 +1020,12 @@ mod interop {
             for item in v.walk("/").await.unwrap() {
                 let mut data = Vec::new();
                 v.reader(&item.path, 0).await.unwrap().read_to_end(&mut data).await.unwrap();
-                println!("IN {} {} {}", item.path, item.size, String::from_utf8_lossy(&data).chars().take(30).collect::<String>());
+                println!(
+                    "IN {} {} {}",
+                    item.path,
+                    item.size,
+                    String::from_utf8_lossy(&data).chars().take(30).collect::<String>()
+                );
             }
         }
     }

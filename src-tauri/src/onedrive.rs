@@ -33,7 +33,24 @@ const SIMPLE_MAX: u64 = 4 * 1024 * 1024;
 /// Size of one upload piece: 32 × 320 KiB.
 const CHUNK: usize = 32 * 320 * 1024;
 /// Characters escaped in a path segment.
-const SEGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'%').add(b'<').add(b'>').add(b'?').add(b'`').add(b'{').add(b'}').add(b'/').add(b'[').add(b']').add(b'^').add(b'|').add(b'\\').add(b':');
+const SEGMENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'%')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}')
+    .add(b'/')
+    .add(b'[')
+    .add(b']')
+    .add(b'^')
+    .add(b'|')
+    .add(b'\\')
+    .add(b':');
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -61,17 +78,31 @@ fn not_set_up() -> AppError {
 /// Normalised path: "/" for the top, else "/a/b".
 fn norm(path: &str) -> String {
     let p = path.trim_end_matches('/');
-    if p.is_empty() { "/".into() } else if p.starts_with('/') { p.to_string() } else { format!("/{p}") }
+    if p.is_empty() {
+        "/".into()
+    } else if p.starts_with('/') {
+        p.to_string()
+    } else {
+        format!("/{p}")
+    }
 }
 
 /// Graph address of an item: "…/me/drive/root" or "…/me/drive/root:/a/b:" (with `suffix` after it).
 fn item_url(path: &str, suffix: &str) -> String {
     let p = norm(path);
     if p == "/" {
-        return format!("{GRAPH}/me/drive/root{}", if suffix.is_empty() { String::new() } else { format!("/{suffix}") });
+        return format!(
+            "{GRAPH}/me/drive/root{}",
+            if suffix.is_empty() { String::new() } else { format!("/{suffix}") }
+        );
     }
-    let encoded: Vec<String> = p.trim_start_matches('/').split('/').map(|s| utf8_percent_encode(s, SEGMENT).to_string()).collect();
-    format!("{GRAPH}/me/drive/root:/{}:{}", encoded.join("/"), if suffix.is_empty() { String::new() } else { format!("/{suffix}") })
+    let encoded: Vec<String> =
+        p.trim_start_matches('/').split('/').map(|s| utf8_percent_encode(s, SEGMENT).to_string()).collect();
+    format!(
+        "{GRAPH}/me/drive/root:/{}:{}",
+        encoded.join("/"),
+        if suffix.is_empty() { String::new() } else { format!("/{suffix}") }
+    )
 }
 
 fn parse_time(s: Option<&str>) -> i64 {
@@ -90,7 +121,11 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
         return None;
     }
     // The time the file was changed on the computer it came from, else the server's.
-    let mtime = parse_time(v.pointer("/fileSystemInfo/lastModifiedDateTime").and_then(|t| t.as_str()).or_else(|| v.get("lastModifiedDateTime").and_then(|t| t.as_str())));
+    let mtime = parse_time(
+        v.pointer("/fileSystemInfo/lastModifiedDateTime")
+            .and_then(|t| t.as_str())
+            .or_else(|| v.get("lastModifiedDateTime").and_then(|t| t.as_str())),
+    );
     Some(FileEntry {
         name,
         kind: if dir { "dir".into() } else { "file".into() },
@@ -111,11 +146,21 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
     let message = v.pointer("/error/message").and_then(|m| m.as_str()).unwrap_or(body).to_string();
     let detail = format!("{status}: {code} {message}");
     match status.as_u16() {
-        401 => AppError::new(ErrorKind::AuthFailed, "Die Anmeldung bei OneDrive ist nicht mehr gültig. Bitte neu anmelden.").with_detail(detail),
+        401 => AppError::new(
+            ErrorKind::AuthFailed,
+            "Die Anmeldung bei OneDrive ist nicht mehr gültig. Bitte neu anmelden.",
+        )
+        .with_detail(detail),
         404 => AppError::new(ErrorKind::NotFound, format!("{what}: nicht gefunden.")).with_detail(detail),
         409 => AppError::new(ErrorKind::AlreadyExists, format!("{what}: gibt es schon.")).with_detail(detail),
-        429 | 503 => AppError::new(ErrorKind::ConnectionLost, "OneDrive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.").with_detail(detail),
-        507 => AppError::new(ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in OneDrive.")).with_detail(detail),
+        429 | 503 => AppError::new(
+            ErrorKind::ConnectionLost,
+            "OneDrive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.",
+        )
+        .with_detail(detail),
+        507 => {
+            AppError::new(ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in OneDrive.")).with_detail(detail)
+        }
         403 => AppError::new(ErrorKind::PermissionDenied, format!("{what}: nicht erlaubt.")).with_detail(detail),
         _ => AppError::new(ErrorKind::Other, format!("{what} fehlgeschlagen.")).with_detail(detail),
     }
@@ -148,12 +193,29 @@ pub async fn sign_in(open: impl FnOnce(&str) -> AppResult<()>) -> AppResult<oaut
         .append_pair("state", &state);
     let code = oauth::wait_for_code(url.as_str(), &state, open).await?;
     let client = oauth::http_client()?;
-    let answer = oauth::token_request(&client, TOKEN_URL, &[("code", &code), ("grant_type", "authorization_code"), ("client_id", key), ("code_verifier", &verifier), ("redirect_uri", &redirect), ("scope", SCOPE)]).await?;
-    let refresh = answer.refresh_token.ok_or_else(|| AppError::other("OneDrive hat keine dauerhafte Anmeldung geschickt."))?;
+    let answer = oauth::token_request(
+        &client,
+        TOKEN_URL,
+        &[
+            ("code", &code),
+            ("grant_type", "authorization_code"),
+            ("client_id", key),
+            ("code_verifier", &verifier),
+            ("redirect_uri", &redirect),
+            ("scope", SCOPE),
+        ],
+    )
+    .await?;
+    let refresh =
+        answer.refresh_token.ok_or_else(|| AppError::other("OneDrive hat keine dauerhafte Anmeldung geschickt."))?;
     let conn = OneDriveConn {
         client,
         key,
-        token: tokio::sync::Mutex::new(Token { access: answer.access_token, refresh: refresh.clone(), valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) }),
+        token: tokio::sync::Mutex::new(Token {
+            access: answer.access_token,
+            refresh: refresh.clone(),
+            valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)),
+        }),
         home: "/".into(),
     };
     let account = conn.account().await.unwrap_or_else(|_| "OneDrive".into());
@@ -166,7 +228,11 @@ impl OneDriveConn {
         let conn = OneDriveConn {
             client: oauth::http_client()?,
             key,
-            token: tokio::sync::Mutex::new(Token { access: String::new(), refresh: params.refresh_token, valid_until: Instant::now() }),
+            token: tokio::sync::Mutex::new(Token {
+                access: String::new(),
+                refresh: params.refresh_token,
+                valid_until: Instant::now(),
+            }),
             home: "/".into(),
         };
         // Renews the access token and checks the account at once.
@@ -184,7 +250,17 @@ impl OneDriveConn {
         let mut t = self.token.lock().await;
         if t.access.is_empty() || Instant::now() >= t.valid_until {
             let refresh = t.refresh.clone();
-            let a = oauth::token_request(&self.client, TOKEN_URL, &[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", self.key), ("scope", SCOPE)]).await?;
+            let a = oauth::token_request(
+                &self.client,
+                TOKEN_URL,
+                &[
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", &refresh),
+                    ("client_id", self.key),
+                    ("scope", SCOPE),
+                ],
+            )
+            .await?;
             t.access = a.access_token;
             if let Some(r) = a.refresh_token {
                 t.refresh = r;
@@ -212,13 +288,27 @@ impl OneDriveConn {
 
     /// E-mail address (or name) of the signed-in account.
     pub async fn account(&self) -> AppResult<String> {
-        let v = self.call(reqwest::Method::GET, &format!("{GRAPH}/me?$select=mail,userPrincipalName,displayName"), None, "Konto lesen").await?;
-        Ok(["mail", "userPrincipalName", "displayName"].iter().find_map(|k| v.get(*k).and_then(|x| x.as_str()).filter(|x| !x.is_empty())).unwrap_or("OneDrive").to_string())
+        let v = self
+            .call(
+                reqwest::Method::GET,
+                &format!("{GRAPH}/me?$select=mail,userPrincipalName,displayName"),
+                None,
+                "Konto lesen",
+            )
+            .await?;
+        Ok(["mail", "userPrincipalName", "displayName"]
+            .iter()
+            .find_map(|k| v.get(*k).and_then(|x| x.as_str()).filter(|x| !x.is_empty()))
+            .unwrap_or("OneDrive")
+            .to_string())
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
         let what = format!("„{}“ lesen", remote_name(path));
-        let mut url = format!("{}?$top=1000&$select=name,size,folder,file,fileSystemInfo,lastModifiedDateTime", item_url(path, "children"));
+        let mut url = format!(
+            "{}?$top=1000&$select=name,size,folder,file,fileSystemInfo,lastModifiedDateTime",
+            item_url(path, "children")
+        );
         let mut out = Vec::new();
         loop {
             let v = self.call(reqwest::Method::GET, &url, None, &what).await?;
@@ -238,10 +328,21 @@ impl OneDriveConn {
 
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
         if norm(path) == "/" {
-            return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: "755".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+            return Ok(FileEntry {
+                name: "/".into(),
+                kind: "dir".into(),
+                size: 0,
+                mtime: 0,
+                perms: "755".into(),
+                owner: String::new(),
+                group: String::new(),
+                link: None,
+                hidden: 0,
+            });
         }
         let v = self.call(reqwest::Method::GET, &item_url(path, ""), None, &format!("„{}“", remote_name(path))).await?;
-        entry_of(&v).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v)
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -251,7 +352,9 @@ impl OneDriveConn {
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
         let what = format!("Ordner „{}“ anlegen", remote_name(path));
         let body = json!({ "name": remote_name(path), "folder": {}, "@microsoft.graph.conflictBehavior": "fail" });
-        self.call(reqwest::Method::POST, &item_url(&remote_parent(&norm(path)), "children"), Some(body), &what).await.map(|_| ())
+        self.call(reqwest::Method::POST, &item_url(&remote_parent(&norm(path)), "children"), Some(body), &what)
+            .await
+            .map(|_| ())
     }
 
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
@@ -295,7 +398,10 @@ impl OneDriveConn {
 
     /// Moves to the OneDrive recycle bin.
     pub async fn remove(&self, path: &str) -> AppResult<()> {
-        match self.call(reqwest::Method::DELETE, &item_url(path, ""), None, &format!("„{}“ löschen", remote_name(path))).await {
+        match self
+            .call(reqwest::Method::DELETE, &item_url(path, ""), None, &format!("„{}“ löschen", remote_name(path)))
+            .await
+        {
             Err(e) if e.kind == ErrorKind::NotFound => Ok(()),
             r => r.map(|_| ()),
         }
@@ -304,7 +410,8 @@ impl OneDriveConn {
     /// Copy inside the OneDrive, with "Kopie" names on clashes. Graph copies in
     /// the background; Bitcrane waits until it is done (at most two minutes per item).
     pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -314,7 +421,15 @@ impl OneDriveConn {
             let what = format!("„{}“ kopieren", remote_name(from));
             let token = self.access().await?;
             let body = json!({ "parentReference": Self::parent_ref(dest_dir), "name": name });
-            let resp = self.client.post(item_url(from, "copy")).bearer_auth(token).header("Content-Type", "application/json").body(body.to_string()).send().await.map_err(net)?;
+            let resp = self
+                .client
+                .post(item_url(from, "copy"))
+                .bearer_auth(token)
+                .header("Content-Type", "application/json")
+                .body(body.to_string())
+                .send()
+                .await
+                .map_err(net)?;
             let status = resp.status();
             let monitor = resp.headers().get("location").and_then(|l| l.to_str().ok()).map(String::from);
             if !status.is_success() {
@@ -338,13 +453,17 @@ impl OneDriveConn {
             let v: Value = serde_json::from_str(&resp.text().await.unwrap_or_default()).unwrap_or(Value::Null);
             match v.get("status").and_then(|s| s.as_str()) {
                 Some("completed") => return Ok(()),
-                Some("failed") => return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(v.to_string())),
+                Some("failed") => {
+                    return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(v.to_string()))
+                }
                 // A finished copy redirects to the new item and has no status any more.
                 None if v.get("id").is_some() => return Ok(()),
                 _ => {}
             }
             if Instant::now() > deadline {
-                return Err(AppError::other(format!("{what}: OneDrive kopiert noch im Hintergrund. Bitte gleich neu laden.")));
+                return Err(AppError::other(format!(
+                    "{what}: OneDrive kopiert noch im Hintergrund. Bitte gleich neu laden."
+                )));
             }
             tokio::time::sleep(Duration::from_millis(800)).await;
         }
@@ -356,7 +475,12 @@ impl OneDriveConn {
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         let root = self.stat(path).await?;
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: norm(path), relative: rel(&norm(path)), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: norm(path),
+                relative: rel(&norm(path)),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let mut out = Vec::new();
         let mut todo = vec![norm(path)];
@@ -378,12 +502,21 @@ impl OneDriveConn {
     pub async fn share_link(&self, path: &str) -> AppResult<String> {
         let what = format!("Link für „{}“", remote_name(path));
         let url = item_url(path, "createLink");
-        let v = match self.call(reqwest::Method::POST, &url, Some(json!({ "type": "view", "scope": "anonymous" })), &what).await {
+        let v = match self
+            .call(reqwest::Method::POST, &url, Some(json!({ "type": "view", "scope": "anonymous" })), &what)
+            .await
+        {
             Ok(v) => v,
-            Err(e) if e.kind == ErrorKind::PermissionDenied || e.kind == ErrorKind::Other => self.call(reqwest::Method::POST, &url, Some(json!({ "type": "view", "scope": "organization" })), &what).await?,
+            Err(e) if e.kind == ErrorKind::PermissionDenied || e.kind == ErrorKind::Other => {
+                self.call(reqwest::Method::POST, &url, Some(json!({ "type": "view", "scope": "organization" })), &what)
+                    .await?
+            }
             Err(e) => return Err(e),
         };
-        v.pointer("/link/webUrl").and_then(|u| u.as_str()).map(String::from).ok_or_else(|| AppError::other(format!("{what}: OneDrive hat keinen Link geliefert.")))
+        v.pointer("/link/webUrl")
+            .and_then(|u| u.as_str())
+            .map(String::from)
+            .ok_or_else(|| AppError::other(format!("{what}: OneDrive hat keinen Link geliefert.")))
     }
 
     /// Reads a file from `offset` (HTTP Range; Graph redirects to the download address).
@@ -400,7 +533,9 @@ impl OneDriveConn {
             return Err(api_err(status, &text, &format!("„{}“ lesen", remote_name(path))));
         }
         if offset > 0 && status != reqwest::StatusCode::PARTIAL_CONTENT {
-            return Err(AppError::other("OneDrive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range"));
+            return Err(
+                AppError::other("OneDrive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range")
+            );
         }
         let stream = resp.bytes_stream().map_err(|e| std::io::Error::other(e.to_string()));
         Ok(Box::new(tokio_util::io::StreamReader::new(stream)))
@@ -409,12 +544,27 @@ impl OneDriveConn {
     /// Keeps the modification time after a simple upload.
     async fn set_mtime(&self, path: &str, mtime: Option<u32>) -> AppResult<()> {
         let Some(t) = mtime.and_then(rfc3339) else { return Ok(()) };
-        self.call(reqwest::Method::PATCH, &item_url(path, ""), Some(json!({ "fileSystemInfo": { "lastModifiedDateTime": t } })), &format!("„{}“ schreiben", remote_name(path))).await.map(|_| ())
+        self.call(
+            reqwest::Method::PATCH,
+            &item_url(path, ""),
+            Some(json!({ "fileSystemInfo": { "lastModifiedDateTime": t } })),
+            &format!("„{}“ schreiben", remote_name(path)),
+        )
+        .await
+        .map(|_| ())
     }
 
     async fn put_simple(&self, path: &str, body: Vec<u8>, what: &str) -> AppResult<()> {
         let token = self.access().await?;
-        let resp = self.client.put(item_url(path, "content")).bearer_auth(token).header("Content-Type", "application/octet-stream").body(body).send().await.map_err(net)?;
+        let resp = self
+            .client
+            .put(item_url(path, "content"))
+            .bearer_auth(token)
+            .header("Content-Type", "application/octet-stream")
+            .body(body)
+            .send()
+            .await
+            .map_err(net)?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
@@ -424,13 +574,20 @@ impl OneDriveConn {
     }
 
     /// Writes a file of `size` bytes (unknown size: the file is collected first).
-    pub fn writer(self: &std::sync::Arc<Self>, path: &str, size: Option<u64>, mtime: Option<u32>) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
+    pub fn writer(
+        self: &std::sync::Arc<Self>,
+        path: &str,
+        size: Option<u64>,
+        mtime: Option<u32>,
+    ) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
         let (w, mut r) = tokio::io::duplex(1024 * 1024);
         let conn = self.clone();
         let path = norm(path);
         let task = tokio::spawn(async move {
             let what = format!("„{}“ schreiben", remote_name(&path));
-            let read_err = |e: std::io::Error| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string());
+            let read_err = |e: std::io::Error| {
+                AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
+            };
             // Small or unknown size: one request.
             let total = match size {
                 Some(s) if s > SIMPLE_MAX => s,
@@ -471,14 +628,26 @@ impl OneDriveConn {
         if let Some(t) = mtime.and_then(rfc3339) {
             item["fileSystemInfo"] = json!({ "lastModifiedDateTime": t });
         }
-        let v = self.call(reqwest::Method::POST, &item_url(path, "createUploadSession"), Some(json!({ "item": item })), what).await?;
-        v.get("uploadUrl").and_then(|u| u.as_str()).map(String::from).ok_or_else(|| AppError::other("OneDrive hat das Hochladen in Teilen nicht gestartet."))
+        let v = self
+            .call(reqwest::Method::POST, &item_url(path, "createUploadSession"), Some(json!({ "item": item })), what)
+            .await?;
+        v.get("uploadUrl")
+            .and_then(|u| u.as_str())
+            .map(String::from)
+            .ok_or_else(|| AppError::other("OneDrive hat das Hochladen in Teilen nicht gestartet."))
     }
 
     /// Sends one piece to an upload session (the session address needs no sign-in).
     async fn send_piece(&self, session: &str, start: u64, piece: Vec<u8>, total: u64, what: &str) -> AppResult<()> {
         let end = start + piece.len() as u64 - 1;
-        let resp = self.client.put(session).header("Content-Range", format!("bytes {start}-{end}/{total}")).body(piece).send().await.map_err(net)?;
+        let resp = self
+            .client
+            .put(session)
+            .header("Content-Range", format!("bytes {start}-{end}/{total}"))
+            .body(piece)
+            .send()
+            .await
+            .map_err(net)?;
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
@@ -495,7 +664,10 @@ mod tests {
     #[test]
     fn addresses_and_entries() {
         assert_eq!(item_url("/", "children"), format!("{GRAPH}/me/drive/root/children"));
-        assert_eq!(item_url("/Fotos/Mai 2026/a#1.jpg", "content"), format!("{GRAPH}/me/drive/root:/Fotos/Mai%202026/a%231.jpg:/content"));
+        assert_eq!(
+            item_url("/Fotos/Mai 2026/a#1.jpg", "content"),
+            format!("{GRAPH}/me/drive/root:/Fotos/Mai%202026/a%231.jpg:/content")
+        );
         assert_eq!(item_url("/Übersicht", ""), format!("{GRAPH}/me/drive/root:/%C3%9Cbersicht:"));
         let f = entry_of(&json!({ "name": "a.txt", "size": 42, "file": {}, "fileSystemInfo": { "lastModifiedDateTime": "2026-10-29T08:00:00Z" } })).unwrap();
         assert_eq!((f.kind.as_str(), f.size, f.mtime), ("file", 42, 1793260800000));

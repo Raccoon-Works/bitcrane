@@ -9,7 +9,28 @@ import type { PaneSide, Tab, Watch } from '../backend/types';
 
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { type PaneSelection, setState, state, LIVE, serverById, uid, linkedStart, showToast, activeTab, openServerIn, emptyTab, paneLoc, isOffline, type AppState, paneShowsServers, listEntries, panePath, type TransferRule, paneEntries, isDirEntry } from './core';
+import {
+  type PaneSelection,
+  setState,
+  state,
+  LIVE,
+  serverById,
+  uid,
+  linkedStart,
+  showToast,
+  activeTab,
+  openServerIn,
+  emptyTab,
+  paneLoc,
+  isOffline,
+  type AppState,
+  paneShowsServers,
+  listEntries,
+  panePath,
+  type TransferRule,
+  paneEntries,
+  isDirEntry,
+} from './core';
 import { openDialog } from './panels';
 import { deleteServer } from './servers';
 import { releaseServers } from './watches';
@@ -22,7 +43,14 @@ export function clearSelection(): Record<PaneSide, PaneSelection> {
 }
 
 export function selectTab(id: string) {
-  setState({ activeTabId: id, selection: clearSelection(), renaming: null, search: '', popoverOpen: false, expanded: { local: [], remote: [] } });
+  setState({
+    activeTabId: id,
+    selection: clearSelection(),
+    renaming: null,
+    search: '',
+    popoverOpen: false,
+    expanded: { local: [], remote: [] },
+  });
   const t = state.tabs.find((x) => x.id === id);
   if (LIVE && t) {
     if (t.leftServerId && t.serverId) live.autoConnectPair(t.serverId, t.leftServerId);
@@ -40,8 +68,22 @@ export function openServerInNewTab(serverId: string) {
     void import('./terminal').then((m) => m.openServerTerminal(serverId));
     return;
   }
-  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [], syncBrowse: linkedStart(srv, srv.remoteStart) };
-  setState((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), firstRun: false, contextMenu: null }));
+  const tab: Tab = {
+    id: uid('tab'),
+    serverId,
+    localPath: srv.localStart || '~',
+    remotePath: srv.remoteStart,
+    back: [],
+    forward: [],
+    syncBrowse: linkedStart(srv, srv.remoteStart),
+  };
+  setState((s) => ({
+    tabs: [...s.tabs, tab],
+    activeTabId: tab.id,
+    selection: clearSelection(),
+    firstRun: false,
+    contextMenu: null,
+  }));
   if (LIVE && !live.isConnected(serverId)) live.connectNow(serverId);
 }
 
@@ -51,12 +93,21 @@ export function askRemoveServer(id: string) {
   if (!srv) return;
   const watches = state.watches.filter((w) => w.serverId === id);
   openDialog({
-    type: 'confirm', danger: true, confirm: $t('Entfernen'),
+    type: 'confirm',
+    danger: true,
+    confirm: $t('Entfernen'),
     title: $t('„{0}“ entfernen?', srv.name),
     text: watches.length
       ? watches.length === 1
-        ? $t('Auch die Überwachung {0} wird entfernt. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.', `„${watches[0].name}“`)
-        : $t('Auch die {0} Überwachungen {1} werden entfernt. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.', watches.length, watches.map((w) => `„${w.name}“`).join(', '))
+        ? $t(
+            'Auch die Überwachung {0} wird entfernt. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.',
+            `„${watches[0].name}“`,
+          )
+        : $t(
+            'Auch die {0} Überwachungen {1} werden entfernt. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.',
+            watches.length,
+            watches.map((w) => `„${w.name}“`).join(', '),
+          )
       : $t('Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.'),
     run: () => {
       deleteServer(id);
@@ -89,9 +140,23 @@ export function openServer(serverId: string, files = false) {
   }
   const srv = serverById(serverId);
   if (!srv) return;
-  const tab: Tab = { id: uid('tab'), serverId, localPath: srv.localStart || '~', remotePath: srv.remoteStart, back: [], forward: [], syncBrowse: linkedStart(srv, srv.remoteStart) };
+  const tab: Tab = {
+    id: uid('tab'),
+    serverId,
+    localPath: srv.localStart || '~',
+    remotePath: srv.remoteStart,
+    back: [],
+    forward: [],
+    syncBrowse: linkedStart(srv, srv.remoteStart),
+  };
   if (LIVE) {
-    setState({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), expanded: { local: [], remote: [] }, firstRun: false });
+    setState({
+      tabs: [...s.tabs, tab],
+      activeTabId: tab.id,
+      selection: clearSelection(),
+      expanded: { local: [], remote: [] },
+      firstRun: false,
+    });
     if (!live.isConnected(serverId)) live.connectNow(serverId);
     return;
   }
@@ -108,7 +173,13 @@ export function openServer(serverId: string, files = false) {
 export function newTab() {
   const t = activeTab();
   const tab = emptyTab(t && !t.leftServerId ? t.localPath : '~');
-  setState((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selection: clearSelection(), expanded: { local: [], remote: [] }, contextMenu: null }));
+  setState((s) => ({
+    tabs: [...s.tabs, tab],
+    activeTabId: tab.id,
+    selection: clearSelection(),
+    expanded: { local: [], remote: [] },
+    contextMenu: null,
+  }));
 }
 
 /** Closes a tab; the last one becomes a new, empty tab (like WinSCP). */
@@ -119,7 +190,12 @@ export function closeTab(id: string) {
   let tabs = s.tabs.filter((t) => t.id !== id);
   if (!tabs.length) tabs = [emptyTab(s.tabs[idx].leftServerId ? '~' : s.tabs[idx].localPath)];
   const activeTabId = s.activeTabId === id ? tabs[Math.max(0, Math.min(idx - 1, tabs.length - 1))].id : s.activeTabId;
-  setState({ tabs, activeTabId, selection: s.activeTabId === id ? clearSelection() : s.selection, expanded: s.activeTabId === id ? { local: [], remote: [] } : s.expanded });
+  setState({
+    tabs,
+    activeTabId,
+    selection: s.activeTabId === id ? clearSelection() : s.selection,
+    expanded: s.activeTabId === id ? { local: [], remote: [] } : s.expanded,
+  });
   releaseServers([s.tabs[idx]]);
 }
 
@@ -128,7 +204,12 @@ export function closeOtherTabs(id: string) {
   const keep = state.tabs.find((t) => t.id === id);
   if (!keep) return;
   const closed = state.tabs.filter((t) => t.id !== id);
-  setState((s) => ({ tabs: [keep], activeTabId: id, selection: s.activeTabId === id ? s.selection : clearSelection(), contextMenu: null }));
+  setState((s) => ({
+    tabs: [keep],
+    activeTabId: id,
+    selection: s.activeTabId === id ? s.selection : clearSelection(),
+    contextMenu: null,
+  }));
   releaseServers(closed);
 }
 
@@ -139,7 +220,12 @@ export function closeTabsRight(id: string) {
   const tabs = state.tabs.slice(0, idx + 1);
   const closed = state.tabs.slice(idx + 1);
   const activeTabId = tabs.some((t) => t.id === state.activeTabId) ? state.activeTabId : id;
-  setState((s) => ({ tabs, activeTabId, selection: activeTabId === s.activeTabId ? s.selection : clearSelection(), contextMenu: null }));
+  setState((s) => ({
+    tabs,
+    activeTabId,
+    selection: activeTabId === s.activeTabId ? s.selection : clearSelection(),
+    contextMenu: null,
+  }));
   releaseServers(closed);
 }
 
@@ -149,7 +235,12 @@ export function duplicateTab(id: string) {
   const t = state.tabs[idx];
   if (!t || t.settings) return;
   const copy: Tab = { ...t, id: uid('tab'), back: [], forward: [] };
-  setState((s) => ({ tabs: [...s.tabs.slice(0, idx + 1), copy, ...s.tabs.slice(idx + 1)], activeTabId: copy.id, selection: clearSelection(), contextMenu: null }));
+  setState((s) => ({
+    tabs: [...s.tabs.slice(0, idx + 1), copy, ...s.tabs.slice(idx + 1)],
+    activeTabId: copy.id,
+    selection: clearSelection(),
+    contextMenu: null,
+  }));
 }
 
 export function updateTab(patch: Partial<Tab>) {
@@ -181,7 +272,8 @@ export function navigate(side: PaneSide, path: string, record = true) {
     const rel = path.slice(base.length).replace(/^\//, '');
     const otherBase = side === 'local' ? sb.remote : sb.local;
     const otherPath = rel ? paths.join(otherBase, rel) : otherBase;
-    if (other === 'local') patch.localPath = otherPath; else patch.remotePath = otherPath;
+    if (other === 'local') patch.localPath = otherPath;
+    else patch.remotePath = otherPath;
   } else if (sb) {
     // Left the shared folders: synchronized browsing ends.
     patch.syncBrowse = undefined;
@@ -190,9 +282,14 @@ export function navigate(side: PaneSide, path: string, record = true) {
   updateTab(patch);
   if (ls === 'local') rememberRecentDir(path);
   setState((s) => ({
-    selection: { ...s.selection, [side]: { names: [], cursor: 0, anchor: 0 }, ...(other ? { [other]: { names: [], cursor: -1, anchor: -1 } } : {}) },
+    selection: {
+      ...s.selection,
+      [side]: { names: [], cursor: 0, anchor: 0 },
+      ...(other ? { [other]: { names: [], cursor: -1, anchor: -1 } } : {}),
+    },
     expanded: { ...s.expanded, [side]: [], ...(other ? { [other]: [] } : {}) },
-    focusSide: side, renaming: null,
+    focusSide: side,
+    renaming: null,
   }));
 }
 
@@ -226,7 +323,10 @@ export function goBack() {
     forward: [...t.forward, { side: last.side, path: current }],
     ...(last.side === 'local' ? { localPath: last.path } : { remotePath: last.path }),
   });
-  setState((s) => ({ selection: { ...s.selection, [last.side]: { names: [], cursor: 0, anchor: 0 } }, focusSide: last.side }));
+  setState((s) => ({
+    selection: { ...s.selection, [last.side]: { names: [], cursor: 0, anchor: 0 } },
+    focusSide: last.side,
+  }));
 }
 
 export function goForward() {
@@ -246,17 +346,27 @@ export function hiddenCount(side: PaneSide, s: AppState = state): number {
   const t = activeTab(s);
   if (!t || paneShowsServers(side, t)) return 0;
   const list = listEntries(...paneLoc(side, t), panePath(side, s)) ?? [];
-  return list.filter((e) => (!s.settings.showSystem && (e.hidden ?? 0) >= 2) || (!s.settings.showHidden && (e.name.startsWith('.') || !!e.hidden))).length;
+  return list.filter(
+    (e) =>
+      (!s.settings.showSystem && (e.hidden ?? 0) >= 2) ||
+      (!s.settings.showHidden && (e.name.startsWith('.') || !!e.hidden)),
+  ).length;
 }
 
 /**
  * Rule in effect for a server, or for a watch (its own choice, else its server's).
  * Undefined = the general settings.
  */
-export function ruleFor(serverId: string, watchId?: string, s: AppState = state, useChoice = true): TransferRule | undefined {
+export function ruleFor(
+  serverId: string,
+  watchId?: string,
+  s: AppState = state,
+  useChoice = true,
+): TransferRule | undefined {
   const rules = s.settings.rules ?? [];
   // Transfers by hand follow the rule chosen in the activity area (WinSCP "Transfer settings"), if any.
-  if (!watchId && useChoice && s.transferRule) return s.transferRule === 'none' ? undefined : rules.find((r) => r.id === s.transferRule);
+  if (!watchId && useChoice && s.transferRule)
+    return s.transferRule === 'none' ? undefined : rules.find((r) => r.id === s.transferRule);
   const w = watchId ? s.watches.find((x) => x.id === watchId) : undefined;
   if (w?.ruleId === 'none') return undefined;
   const id = w?.ruleId ?? s.servers.find((x) => x.id === serverId)?.ruleId;
@@ -273,7 +383,12 @@ export function watchExcludes(w: Watch, s: AppState = state): string[] {
 export function saveRule(rule: TransferRule) {
   setState((s) => {
     const list = s.settings.rules ?? [];
-    return { settings: { ...s.settings, rules: list.some((r) => r.id === rule.id) ? list.map((r) => (r.id === rule.id ? rule : r)) : [...list, rule] } };
+    return {
+      settings: {
+        ...s.settings,
+        rules: list.some((r) => r.id === rule.id) ? list.map((r) => (r.id === rule.id ? rule : r)) : [...list, rule],
+      },
+    };
   });
 }
 
@@ -303,7 +418,10 @@ export function goUp(side: PaneSide) {
     // Put the cursor on the folder we came from.
     const entries = paneEntries(side);
     const idx = entries.findIndex((e) => e.name === paths.basename(path));
-    if (idx >= 0) setState((s) => ({ selection: { ...s.selection, [side]: { names: [entries[idx].name], cursor: idx, anchor: idx } } }));
+    if (idx >= 0)
+      setState((s) => ({
+        selection: { ...s.selection, [side]: { names: [entries[idx].name], cursor: idx, anchor: idx } },
+      }));
   }
 }
 
@@ -320,7 +438,12 @@ export function openEntry(side: PaneSide, name: string) {
     // Local files open with their default program; server files in the editor (uploaded on save).
     if (ls === 'local') live.openLocal(path);
     else openInEditor(side, name);
-  } else showToast(ls === 'local' ? $t('„{0}“ wird im Standard-Programm geöffnet.', name) : $t('„{0}“ wird geladen und im Editor geöffnet. Änderungen gehen beim Sichern zurück auf den Server.', name));
+  } else
+    showToast(
+      ls === 'local'
+        ? $t('„{0}“ wird im Standard-Programm geöffnet.', name)
+        : $t('„{0}“ wird geladen und im Editor geöffnet. Änderungen gehen beim Sichern zurück auf den Server.', name),
+    );
 }
 
 /**
@@ -328,7 +451,8 @@ export function openEntry(side: PaneSide, name: string) {
  * "Doppelklick auf eine Datei" says (Transmit: open, edit or transfer).
  */
 /** Folders the Finder shows as one item (apps, bundles, Photos libraries …). */
-const PACKAGE_EXT = /\.(app|bundle|framework|plugin|kext|prefPane|saver|appex|xpc|pkg|mpkg|photoslibrary|musiclibrary|tvlibrary|imovielibrary|fcpbundle|rtfd|pages|numbers|key|playground|xcodeproj|xcworkspace|scptd|workflow)$/i;
+const PACKAGE_EXT =
+  /\.(app|bundle|framework|plugin|kext|prefPane|saver|appex|xpc|pkg|mpkg|photoslibrary|musiclibrary|tvlibrary|imovielibrary|fcpbundle|rtfd|pages|numbers|key|playground|xcodeproj|xcworkspace|scptd|workflow)$/i;
 
 /** True for a package folder on the Mac's own disk (shown and opened like a file, "Paketinhalt zeigen" goes in). */
 export function isPackage(side: PaneSide, entry: { name: string; kind: string }, s: AppState = state): boolean {
@@ -386,7 +510,11 @@ export function openInEditor(side: PaneSide, name: string) {
     return;
   }
   if (!LIVE) {
-    showToast(ls === 'local' ? $t('„{0}“ wird im Editor geöffnet.', name) : $t('„{0}“ wird geladen und im Editor geöffnet. Änderungen gehen beim Sichern zurück auf den Server.', name));
+    showToast(
+      ls === 'local'
+        ? $t('„{0}“ wird im Editor geöffnet.', name)
+        : $t('„{0}“ wird geladen und im Editor geöffnet. Änderungen gehen beim Sichern zurück auf den Server.', name),
+    );
     return;
   }
   if (ls === 'local') live.openLocal(path, editorFor(path));
@@ -405,12 +533,25 @@ export function openTerminal(side: PaneSide = state.focusSide) {
     return;
   }
   if (!LIVE) {
-    showToast(onServer ? $t('Terminal mit {0} wird geöffnet.', srv?.name ?? $t('dem Server')) : $t('Terminal im lokalen Ordner wird geöffnet.'));
+    showToast(
+      onServer
+        ? $t('Terminal mit {0} wird geöffnet.', srv?.name ?? $t('dem Server'))
+        : $t('Terminal im lokalen Ordner wird geöffnet.'),
+    );
     return;
   }
   const home = t?.leftServerId ? '~' : panePath('local');
-  const target = onServer && srv
-    ? { host: srv.host, port: srv.port, user: srv.user, keyPath: srv.auth === 'key' ? srv.keyPath : undefined, remotePath: panePath(side), localPath: home, app: state.settings.externalTerminal }
-    : { localPath: home, app: state.settings.externalTerminal };
+  const target =
+    onServer && srv
+      ? {
+          host: srv.host,
+          port: srv.port,
+          user: srv.user,
+          keyPath: srv.auth === 'key' ? srv.keyPath : undefined,
+          remotePath: panePath(side),
+          localPath: home,
+          app: state.settings.externalTerminal,
+        }
+      : { localPath: home, app: state.settings.externalTerminal };
   void invoke('open_terminal', { target }).catch((e) => showError(e));
 }

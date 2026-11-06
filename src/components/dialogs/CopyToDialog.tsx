@@ -31,14 +31,29 @@ export function CopyToDialog({ side, names }: { side: 'local' | 'remote'; names:
     <Dialog
       label={$t('Kopieren nach')}
       title={move ? $t('{0} bewegen nach …', what) : $t('{0} kopieren nach …', what)}
-      subtitle={onServer ? $t('Vom Server auf diesen Computer, ohne den Ordner erst zu öffnen.') : $t('In einen Ordner dieses Computers, ohne ihn erst zu öffnen.')}
+      subtitle={
+        onServer
+          ? $t('Vom Server auf diesen Computer, ohne den Ordner erst zu öffnen.')
+          : $t('In einen Ordner dieses Computers, ohne ihn erst zu öffnen.')
+      }
       width={520}
-      footer={<><Button onClick={() => void pick()}>{$t('Anderer Ordner …')}</Button><span className="flex-1" /><Button onClick={closeDialog}>{$t('Abbrechen')}</Button></>}
+      footer={
+        <>
+          <Button onClick={() => void pick()}>{$t('Anderer Ordner …')}</Button>
+          <span className="flex-1" />
+          <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
+        </>
+      }
     >
       <div className="form-stack">
         <div className="recent-list copyto-list">
           {targets.map((t) => (
-            <button key={t.path} type="button" className="recent-item" onClick={() => copyTo(side, names, t.path, move)}>
+            <button
+              key={t.path}
+              type="button"
+              className="recent-item"
+              onClick={() => copyTo(side, names, t.path, move)}
+            >
               <span className="col-text min-w-0 flex-1">
                 <span className="ellipsis">{t.name}</span>
                 <span className="small muted mono ellipsis">{t.path}</span>

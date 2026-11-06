@@ -11,7 +11,25 @@
  */
 import { showError } from '../state/errors';
 import type { PaneSide } from '../backend/types';
-import { getState, LIVE, panePath, paneLoc, paneOnServer, setState, showToast, upload, uploadLocalPaths, download, isOffline, activeTab, addPlace, addLocalPlace, moveIntoFolder, navigate, listEntries } from '../state/store';
+import {
+  getState,
+  LIVE,
+  panePath,
+  paneLoc,
+  paneOnServer,
+  setState,
+  showToast,
+  upload,
+  uploadLocalPaths,
+  download,
+  isOffline,
+  activeTab,
+  addPlace,
+  addLocalPlace,
+  moveIntoFolder,
+  navigate,
+  listEntries,
+} from '../state/store';
 import { invoke } from '@tauri-apps/api/core';
 import { join } from './paths';
 import { $t } from '../i18n';
@@ -92,7 +110,9 @@ function targetAt(x: number, y: number, from?: PaneSide, names: string[] = []): 
 }
 
 function isDirName(side: PaneSide, name: string): boolean {
-  return !!document.querySelector(`.pane[data-side="${side}"] [role="option"][data-dir="true"][data-name="${CSS.escape(name)}"]`);
+  return !!document.querySelector(
+    `.pane[data-side="${side}"] [role="option"][data-dir="true"][data-name="${CSS.escape(name)}"]`,
+  );
 }
 
 /** Folder a drop goes into. */
@@ -103,7 +123,14 @@ function dirOf(t: Target): string {
 
 function setHint(hint: Target | null) {
   const cur = getState().dropHint;
-  if (cur?.side === hint?.side && cur?.name === hint?.name && cur?.place === hint?.place && cur?.addPlace === hint?.addPlace && cur?.sidebar === hint?.sidebar) return;
+  if (
+    cur?.side === hint?.side &&
+    cur?.name === hint?.name &&
+    cur?.place === hint?.place &&
+    cur?.addPlace === hint?.addPlace &&
+    cur?.sidebar === hint?.sidebar
+  )
+    return;
   setState({ dropHint: hint });
 }
 
@@ -148,11 +175,17 @@ async function handOut(d: DragState) {
   const loc = paneLoc(d.side, t);
   const list = outEligible(d);
   if (!list) {
-    showToast($t('Ordner und große Dateien vom Server bitte in die andere Hälfte ziehen; dort werden sie heruntergeladen.'));
+    showToast(
+      $t('Ordner und große Dateien vom Server bitte in die andere Hälfte ziehen; dort werden sie heruntergeladen.'),
+    );
     return;
   }
   if (!LIVE) {
-    showToast(d.names.length === 1 ? $t('„{0}“ in den Finder gezogen (Prototyp).', d.names[0]) : $t('{0} Objekte herausgezogen (Prototyp).', d.names.length));
+    showToast(
+      d.names.length === 1
+        ? $t('„{0}“ in den Finder gezogen (Prototyp).', d.names[0])
+        : $t('{0} Objekte herausgezogen (Prototyp).', d.names.length),
+    );
     return;
   }
   try {
@@ -173,13 +206,20 @@ async function handOut(d: DragState) {
 function onMove(e: PointerEvent) {
   if (!drag) return;
   // Outside the window: the system takes over the drag (the web view keeps getting moves while the button is held).
-  if (drag.active && (e.clientX < 0 || e.clientY < 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+  if (
+    drag.active &&
+    (e.clientX < 0 || e.clientY < 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)
+  ) {
     const d = drag;
     finish(e, true);
     void handOut(d);
     return;
   }
-  if (drag.active && (e.clientX < 40 || e.clientY < 40 || e.clientX > window.innerWidth - 40 || e.clientY > window.innerHeight - 40)) prepareOut(drag);
+  if (
+    drag.active &&
+    (e.clientX < 40 || e.clientY < 40 || e.clientX > window.innerWidth - 40 || e.clientY > window.innerHeight - 40)
+  )
+    prepareOut(drag);
   if (!drag.active) {
     if (Math.abs(e.clientX - drag.x) < THRESHOLD && Math.abs(e.clientY - drag.y) < THRESHOLD) return;
     drag.active = true;
@@ -194,8 +234,12 @@ function onMove(e: PointerEvent) {
   const t = targetAt(e.clientX, e.clientY, drag.side, drag.names);
   // In the same half only a folder that is not part of the drag is a target (moves it there).
   // After a spring-loaded folder opened, the empty part of the list is a target too.
-  const sameOk = !!t && t.side === drag.side && !t.place && canDropOn(t.side)
-    && (t.name ? !(panePath(t.side) === drag.fromDir && drag.names.includes(t.name)) : panePath(t.side) !== drag.fromDir);
+  const sameOk =
+    !!t &&
+    t.side === drag.side &&
+    !t.place &&
+    canDropOn(t.side) &&
+    (t.name ? !(panePath(t.side) === drag.fromDir && drag.names.includes(t.name)) : panePath(t.side) !== drag.fromDir);
   const ok = t && (t.addPlace || (t.side !== drag.side && canDropOn(t.side)) || sameOk) ? t : null;
   setHint(ok);
   armSpring(ok && !ok.addPlace ? ok : null);
@@ -270,7 +314,12 @@ export async function startNativeDrop() {
     setHint(null);
     if (!t || t.addPlace) return;
     // Files just dragged out of Bitcrane and dropped back in: nothing to do.
-    if (handedOut && Date.now() < handedOut.until && p.paths.every((x) => handedOut?.names.has(x.split(/[\\/]/).pop() ?? ''))) return;
+    if (
+      handedOut &&
+      Date.now() < handedOut.until &&
+      p.paths.every((x) => handedOut?.names.has(x.split(/[\\/]/).pop() ?? ''))
+    )
+      return;
     if (!paneOnServer(t.side)) {
       showToast($t('Zum Hochladen die Dateien auf die Server-Seite ziehen.'));
       return;

@@ -37,5 +37,8 @@ export function setTheme(theme: Theme) {
 }
 
 export function setThemeSetting(themeSetting: 'system' | Theme) {
-  setState((s) => ({ settings: { ...s.settings, themeSetting }, theme: themeSetting === 'system' ? detectTheme() : themeSetting }));
+  setState((s) => ({
+    settings: { ...s.settings, themeSetting },
+    theme: themeSetting === 'system' ? detectTheme() : themeSetting,
+  }));
 }

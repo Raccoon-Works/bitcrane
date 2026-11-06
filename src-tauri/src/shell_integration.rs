@@ -32,7 +32,8 @@ fn reg(args: &[&str]) -> AppResult<()> {
 /// Adds or removes the entry; `label` is the menu text in the interface language.
 #[cfg(windows)]
 pub fn set(enable: bool, label: &str) -> AppResult<()> {
-    const KEYS: [&str; 2] = [r"HKCU\Software\Classes\*\shell\Bitcrane.Upload", r"HKCU\Software\Classes\Directory\shell\Bitcrane.Upload"];
+    const KEYS: [&str; 2] =
+        [r"HKCU\Software\Classes\*\shell\Bitcrane.Upload", r"HKCU\Software\Classes\Directory\shell\Bitcrane.Upload"];
     if !enable {
         for k in KEYS {
             let _ = reg(&["delete", k, "/f"]);
@@ -70,7 +71,8 @@ pub fn set(enable: bool, label: &str) -> AppResult<()> {
     std::fs::create_dir_all(&contents).map_err(fail)?;
     let label = xml_escape(label);
     std::fs::write(contents.join("Info.plist"), INFO_PLIST.replace("{LABEL}", &label)).map_err(fail)?;
-    std::fs::write(contents.join("document.wflow"), DOCUMENT_WFLOW.replace("{COMMAND}", &xml_escape(SCRIPT))).map_err(fail)?;
+    std::fs::write(contents.join("document.wflow"), DOCUMENT_WFLOW.replace("{COMMAND}", &xml_escape(SCRIPT)))
+        .map_err(fail)?;
     refresh_services();
     Ok(())
 }
@@ -297,7 +299,8 @@ pub fn upload_args(args: &[String]) -> Vec<String> {
 mod tests {
     #[test]
     fn reads_upload_arguments() {
-        let a: Vec<String> = ["bitcrane.exe", "--upload", r"C:\Users\x\a b.txt", "--autostart"].iter().map(|s| s.to_string()).collect();
+        let a: Vec<String> =
+            ["bitcrane.exe", "--upload", r"C:\Users\x\a b.txt", "--autostart"].iter().map(|s| s.to_string()).collect();
         assert_eq!(super::upload_args(&a), vec![r"C:\Users\x\a b.txt".to_string()]);
     }
 }

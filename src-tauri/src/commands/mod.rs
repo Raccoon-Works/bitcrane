@@ -11,14 +11,14 @@ macro_rules! remote {
     }};
 }
 
-pub mod local;
 pub mod app;
 pub mod cloud;
 pub mod connect;
-pub mod mount;
-pub mod terminals;
-pub mod server;
 pub mod content;
 pub mod credentials;
-pub mod transfers;
+pub mod local;
+pub mod mount;
+pub mod server;
 pub mod settings;
+pub mod terminals;
+pub mod transfers;

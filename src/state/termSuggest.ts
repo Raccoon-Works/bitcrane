@@ -109,7 +109,12 @@ function wantsPath(input: string): boolean {
 }
 
 /** Candidates for the typed line, best first. `names` lists the folder of the word being typed. */
-export function candidatesFor(serverId: string, input: string, snippets: Snippet[], names: string[] | null): Candidate[] {
+export function candidatesFor(
+  serverId: string,
+  input: string,
+  snippets: Snippet[],
+  names: string[] | null,
+): Candidate[] {
   if (!input.trim()) return [];
   const out: Candidate[] = [];
   const seen = new Set<string>([input]);
@@ -121,10 +126,13 @@ export function candidatesFor(serverId: string, input: string, snippets: Snippet
   if (names) {
     const { token } = lastToken(input);
     const base = token.slice(token.lastIndexOf('/') + 1);
-    for (const n of names) if (n.startsWith(base) && n !== base && !(base === '' && n.startsWith('.'))) push({ text: input + n.slice(base.length), kind: n.endsWith('/') ? 'folder' : 'file', label: n });
+    for (const n of names)
+      if (n.startsWith(base) && n !== base && !(base === '' && n.startsWith('.')))
+        push({ text: input + n.slice(base.length), kind: n.endsWith('/') ? 'folder' : 'file', label: n });
   }
   for (const c of load()[keyFor(serverId)] ?? []) if (c.startsWith(input)) push({ text: c, kind: 'history' });
-  for (const sn of snippets) if (sn.command.startsWith(input)) push({ text: sn.command, kind: 'snippet', label: sn.name || undefined });
+  for (const sn of snippets)
+    if (sn.command.startsWith(input)) push({ text: sn.command, kind: 'snippet', label: sn.name || undefined });
   for (const c of COMMAND_CATALOG) if (c.startsWith(input)) push({ text: c, kind: 'command' });
   return out;
 }
@@ -177,7 +185,13 @@ export class Suggester {
   private opts: SuggesterOptions;
   private send: (data: string) => void;
 
-  constructor(term: Terminal, host: HTMLElement, serverId: string, opts: SuggesterOptions, send: (data: string) => void) {
+  constructor(
+    term: Terminal,
+    host: HTMLElement,
+    serverId: string,
+    opts: SuggesterOptions,
+    send: (data: string) => void,
+  ) {
     this.term = term;
     this.host = host;
     this.serverId = serverId;
@@ -248,7 +262,8 @@ export class Suggester {
   private promptDir(): string {
     if (!this.anchor) return this.opts.startDir();
     const prompt = this.term.buffer.active.getLine(this.anchor.row)?.translateToString(false, 0, this.anchor.col) ?? '';
-    const unix = /:\s*(~[^\s$#>]*|\/[^\s$#>]*)\s*[$#%]\s*$/.exec(prompt) ?? /\s(~[^\s$#>]*|\/[^\s$#>]*)\s*[$#%>]\s*$/.exec(prompt);
+    const unix =
+      /:\s*(~[^\s$#>]*|\/[^\s$#>]*)\s*[$#%]\s*$/.exec(prompt) ?? /\s(~[^\s$#>]*|\/[^\s$#>]*)\s*[$#%>]\s*$/.exec(prompt);
     if (unix) return unix[1];
     const ps = /PS ([A-Za-z]:\\[^>]*)>\s*$/.exec(prompt);
     if (ps) return ps[1].replace(/\\/g, '/');
@@ -262,7 +277,8 @@ export class Suggester {
     const cut = token.lastIndexOf('/');
     let dir = cut >= 0 ? token.slice(0, cut + 1) || '/' : '';
     const here = this.promptDir();
-    if (!dir.startsWith('/') && !dir.startsWith('~') && !/^[A-Za-z]:/.test(dir)) dir = `${here.replace(/\/$/, '')}/${dir}`;
+    if (!dir.startsWith('/') && !dir.startsWith('~') && !/^[A-Za-z]:/.test(dir))
+      dir = `${here.replace(/\/$/, '')}/${dir}`;
     if (this.serverId && dir.startsWith('~')) {
       const home = homeOf(this.serverId);
       if (!home) return null;
@@ -278,12 +294,27 @@ export class Suggester {
     if (hit && Date.now() - hit.at < 60_000) return hit.names;
     if (!hit) {
       dirCache.set(key, { at: 0, names: [] });
-      const read = !LIVE ? Promise.resolve([{ name: 'logs', kind: 'dir' }, { name: 'routes', kind: 'dir' }, { name: 'app.py', kind: 'file' }, { name: 'config.py', kind: 'file' }])
-        : this.serverId ? backend.remoteList(this.serverId, dir) : backend.localList(dir);
-      void read.then((entries) => {
-        dirCache.set(key, { at: Date.now(), names: entries.map((e) => (e.kind === 'dir' ? `${e.name}/` : e.name)).sort((a, b) => Number(b.endsWith('/')) - Number(a.endsWith('/')) || a.localeCompare(b)) });
-        this.schedule();
-      }).catch(() => dirCache.set(key, { at: Date.now(), names: [] }));
+      const read = !LIVE
+        ? Promise.resolve([
+            { name: 'logs', kind: 'dir' },
+            { name: 'routes', kind: 'dir' },
+            { name: 'app.py', kind: 'file' },
+            { name: 'config.py', kind: 'file' },
+          ])
+        : this.serverId
+          ? backend.remoteList(this.serverId, dir)
+          : backend.localList(dir);
+      void read
+        .then((entries) => {
+          dirCache.set(key, {
+            at: Date.now(),
+            names: entries
+              .map((e) => (e.kind === 'dir' ? `${e.name}/` : e.name))
+              .sort((a, b) => Number(b.endsWith('/')) - Number(a.endsWith('/')) || a.localeCompare(b)),
+          });
+          this.schedule();
+        })
+        .catch(() => dirCache.set(key, { at: Date.now(), names: [] }));
     }
     return hit?.names.length ? hit.names : null;
   }
@@ -398,26 +429,36 @@ export class Suggester {
     const rest = this.items[this.sel].text.slice(this.typed.length);
     this.ghost.textContent = rest;
     this.ghost.style.display = rest ? 'block' : 'none';
-    Object.assign(this.ghost.style, { left: `${left}px`, top: `${top}px`, height: `${ch}px`, lineHeight: `${ch}px`, maxWidth: `${Math.max(0, (this.term.cols - b.cursorX) * cw)}px`, fontFamily: font.family, fontSize: font.size });
+    Object.assign(this.ghost.style, {
+      left: `${left}px`,
+      top: `${top}px`,
+      height: `${ch}px`,
+      lineHeight: `${ch}px`,
+      maxWidth: `${Math.max(0, (this.term.cols - b.cursorX) * cw)}px`,
+      fontFamily: font.family,
+      fontSize: font.size,
+    });
     if (this.opts.mode() !== 'list' || this.dismissed !== null) {
       this.list.style.display = 'none';
       return;
     }
-    this.list.replaceChildren(...this.items.map((c, i) => {
-      const row = document.createElement('div');
-      row.className = `term-complete-item${i === this.sel ? ' is-sel' : ''}`;
-      row.dataset.i = String(i);
-      row.setAttribute('role', 'option');
-      row.setAttribute('aria-selected', String(i === this.sel));
-      const text = document.createElement('span');
-      text.className = 'term-complete-text';
-      text.textContent = c.label && c.kind !== 'snippet' ? c.label : c.text;
-      const kind = document.createElement('span');
-      kind.className = `term-complete-kind is-${c.kind}`;
-      kind.textContent = c.kind === 'snippet' && c.label ? c.label : KIND_LABEL[c.kind]();
-      row.append(text, kind);
-      return row;
-    }));
+    this.list.replaceChildren(
+      ...this.items.map((c, i) => {
+        const row = document.createElement('div');
+        row.className = `term-complete-item${i === this.sel ? ' is-sel' : ''}`;
+        row.dataset.i = String(i);
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', String(i === this.sel));
+        const text = document.createElement('span');
+        text.className = 'term-complete-text';
+        text.textContent = c.label && c.kind !== 'snippet' ? c.label : c.text;
+        const kind = document.createElement('span');
+        kind.className = `term-complete-kind is-${c.kind}`;
+        kind.textContent = c.kind === 'snippet' && c.label ? c.label : KIND_LABEL[c.kind]();
+        row.append(text, kind);
+        return row;
+      }),
+    );
     this.list.style.fontFamily = font.family;
     this.list.style.fontSize = font.size;
     this.list.style.display = 'block';

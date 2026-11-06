@@ -1,7 +1,7 @@
 //! Terminals: the built-in terminal sessions, SSH tunnels and opening the system terminal.
 
 use crate::error::{AppError, AppResult};
-use crate::{AppState, forward, paths, terminal};
+use crate::{forward, paths, terminal, AppState};
 use serde::Deserialize;
 use tauri::State;
 
@@ -45,7 +45,9 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
     let key = target.key_path.as_ref().filter(|k| !k.is_empty()).map(|k| paths::to_native(k).display().to_string());
     #[cfg(windows)]
     if dir.contains(CMD_UNSAFE) || key.as_deref().is_some_and(|k| k.contains(CMD_UNSAFE)) {
-        return Err(AppError::other("Dieser Ordner kann nicht im Terminal geöffnet werden (ungewöhnliche Zeichen im Namen)."));
+        return Err(AppError::other(
+            "Dieser Ordner kann nicht im Terminal geöffnet werden (ungewöhnliche Zeichen im Namen).",
+        ));
     }
     // "~" stays unquoted so the server shell expands it.
     let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", sh_quote(&dir)) };
@@ -106,18 +108,34 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
         let apple = |cmd: &str| cmd.replace('\\', "\\\\").replace('"', "\\\"");
         let status = match (target.app.as_deref().unwrap_or("terminal"), &ssh_cmd) {
             ("iterm", Some(cmd)) => std::process::Command::new("osascript")
-                .arg("-e").arg("tell application \"iTerm\"")
-                .arg("-e").arg(format!("create window with default profile command \"{}\"", apple(cmd)))
-                .arg("-e").arg("activate")
-                .arg("-e").arg("end tell")
+                .arg("-e")
+                .arg("tell application \"iTerm\"")
+                .arg("-e")
+                .arg(format!("create window with default profile command \"{}\"", apple(cmd)))
+                .arg("-e")
+                .arg("activate")
+                .arg("-e")
+                .arg("end tell")
                 .spawn(),
             ("iterm", None) => std::process::Command::new("open").arg("-a").arg("iTerm").arg(&local).spawn(),
             // Ghostty takes its options after --args (it cannot be started from its own CLI on the Mac).
-            ("ghostty", Some(cmd)) => std::process::Command::new("open").args(["-na", "Ghostty", "--args"]).arg(format!("--working-directory={}", local.display())).arg("-e").arg("/bin/sh").arg("-c").arg(cmd).spawn(),
-            ("ghostty", None) => std::process::Command::new("open").args(["-na", "Ghostty", "--args"]).arg(format!("--working-directory={}", local.display())).spawn(),
+            ("ghostty", Some(cmd)) => std::process::Command::new("open")
+                .args(["-na", "Ghostty", "--args"])
+                .arg(format!("--working-directory={}", local.display()))
+                .arg("-e")
+                .arg("/bin/sh")
+                .arg("-c")
+                .arg(cmd)
+                .spawn(),
+            ("ghostty", None) => std::process::Command::new("open")
+                .args(["-na", "Ghostty", "--args"])
+                .arg(format!("--working-directory={}", local.display()))
+                .spawn(),
             (_, Some(cmd)) => std::process::Command::new("osascript")
-                .arg("-e").arg(format!("tell application \"Terminal\" to do script \"{}\"", apple(cmd)))
-                .arg("-e").arg("tell application \"Terminal\" to activate")
+                .arg("-e")
+                .arg(format!("tell application \"Terminal\" to do script \"{}\"", apple(cmd)))
+                .arg("-e")
+                .arg("tell application \"Terminal\" to activate")
                 .spawn(),
             (_, None) => std::process::Command::new("open").arg("-a").arg("Terminal").arg(&local).spawn(),
         };
@@ -145,7 +163,13 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
         }
         // Windows Terminal when installed (and chosen), otherwise a classic console window.
         if app == "wt" {
-            let wt = std::process::Command::new("wt.exe").arg("-d").arg(&local).args(ssh_cmd.as_ref().map(|c| vec!["cmd".to_string(), "/k".to_string(), c.clone()]).unwrap_or_default()).spawn();
+            let wt = std::process::Command::new("wt.exe")
+                .arg("-d")
+                .arg(&local)
+                .args(
+                    ssh_cmd.as_ref().map(|c| vec!["cmd".to_string(), "/k".to_string(), c.clone()]).unwrap_or_default(),
+                )
+                .spawn();
             if wt.is_ok() {
                 return Ok(());
             }
@@ -172,7 +196,17 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
 /// Built-in terminal: a shell on the server's SSH session, optionally in `cwd`.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>, id: String, server_id: String, cols: u32, rows: u32, cwd: Option<String>, startup: Option<String>, shell: Option<String>) -> AppResult<()> {
+pub(crate) async fn term_open(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    server_id: String,
+    cols: u32,
+    rows: u32,
+    cwd: Option<String>,
+    startup: Option<String>,
+    shell: Option<String>,
+) -> AppResult<()> {
     // An empty server id is a terminal on this computer.
     if server_id.is_empty() {
         return state.terminals.open_local(app, id, cols, rows, cwd, shell);
@@ -183,7 +217,11 @@ pub(crate) async fn term_open(app: tauri::AppHandle, state: State<'_, AppState>,
 
 /// Starts an SSH tunnel (port forwarding) on a connected server.
 #[tauri::command]
-pub(crate) async fn forward_start(state: State<'_, AppState>, server_id: String, spec: forward::ForwardSpec) -> AppResult<()> {
+pub(crate) async fn forward_start(
+    state: State<'_, AppState>,
+    server_id: String,
+    spec: forward::ForwardSpec,
+) -> AppResult<()> {
     let conn = state.conn(&server_id).await?;
     state.forwards.start(&server_id, conn, spec).await
 }
@@ -226,7 +264,15 @@ mod tests {
     use super::*;
 
     fn target(dir: &str, user: &str) -> TerminalTarget {
-        TerminalTarget { app: None, local_path: None, host: Some("example.com".into()), port: Some(2222), user: Some(user.into()), key_path: None, remote_path: Some(dir.into()) }
+        TerminalTarget {
+            app: None,
+            local_path: None,
+            host: Some("example.com".into()),
+            port: Some(2222),
+            user: Some(user.into()),
+            key_path: None,
+            remote_path: Some(dir.into()),
+        }
     }
 
     #[test]
@@ -234,7 +280,11 @@ mod tests {
         let cmd = terminal_ssh_command("example.com", &target("/srv/$(touch pwned)", "deploy")).unwrap();
         assert_eq!(cmd, "ssh -t -p 2222 deploy@example.com 'cd '\\''/srv/$(touch pwned)'\\'' && exec $SHELL -l'");
         // The local shell must see exactly four plain words plus one quoted argument.
-        let out = std::process::Command::new("sh").arg("-c").arg(format!("printf '%s\\n' {}", cmd.trim_start_matches("ssh "))).output().unwrap();
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("printf '%s\\n' {}", cmd.trim_start_matches("ssh ")))
+            .output()
+            .unwrap();
         let args: Vec<_> = String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect();
         assert_eq!(args.last().unwrap(), "cd '/srv/$(touch pwned)' && exec $SHELL -l");
         assert!(terminal_ssh_command("example.com", &target("/x", "a;b")).is_err());

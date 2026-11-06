@@ -7,16 +7,16 @@
 
 use crate::dav::DavConn;
 use crate::dropbox::DropboxConn;
-use crate::gdrive::GDriveConn;
-use crate::onedrive::OneDriveConn;
-use crate::smb::SmbConn;
-use crate::scp::ScpConn;
-use crate::vault::VaultConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
+use crate::gdrive::GDriveConn;
 use crate::model::{FileEntry, WalkItem};
+use crate::onedrive::OneDriveConn;
 use crate::paths::{remote_join, remote_name};
+use crate::scp::ScpConn;
+use crate::smb::SmbConn;
 use crate::ssh::Connection;
+use crate::vault::VaultConn;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -95,7 +95,12 @@ impl Remote {
             Remote::Ftp(c) => c.close().await,
             Remote::Smb(c) => c.close().await,
             Remote::Scp(c) => c.close().await,
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) | Remote::S3(_) => {}
+            Remote::Dav(_)
+            | Remote::Dropbox(_)
+            | Remote::GDrive(_)
+            | Remote::OneDrive(_)
+            | Remote::Vault(_)
+            | Remote::S3(_) => {}
         }
     }
 
@@ -164,7 +169,10 @@ impl Remote {
     /// "Neue Datei": an empty file, refused when the name is taken.
     pub async fn new_file(&self, path: &str) -> AppResult<()> {
         if self.exists(path).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(path))));
+            return Err(AppError::new(
+                ErrorKind::AlreadyExists,
+                format!("„{}“ gibt es hier schon.", remote_name(path)),
+            ));
         }
         let w = self.writer(path, 0, Some(0), None).await?;
         w.close().await
@@ -241,7 +249,8 @@ impl Remote {
         if !self.exists(to).await {
             return self.rename(from, to).await;
         }
-        let aside = crate::paths::remote_join(&crate::paths::remote_parent(to), &format!(".{}.bitcrane-old", remote_name(to)));
+        let aside =
+            crate::paths::remote_join(&crate::paths::remote_parent(to), &format!(".{}.bitcrane-old", remote_name(to)));
         if self.exists(&aside).await {
             self.remove_file(&aside).await?;
         }
@@ -345,7 +354,10 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.exec(command).await,
             Remote::Scp(c) => c.exec(command).await,
-            _ => Err(AppError::new(ErrorKind::Other, format!("Befehle auf dem Server gibt es nur mit SFTP (SSH), nicht über {}.", self.protocol()))),
+            _ => Err(AppError::new(
+                ErrorKind::Other,
+                format!("Befehle auf dem Server gibt es nur mit SFTP (SSH), nicht über {}.", self.protocol()),
+            )),
         }
     }
 
@@ -353,11 +365,19 @@ impl Remote {
     /// (SSH only; other protocols would have to download every file).
     pub async fn grep(&self, base: &str, query: &str, max: usize) -> AppResult<Vec<crate::model::GrepHit>> {
         if !matches!(self, Remote::Sftp(_) | Remote::Scp(_)) {
-            return Err(AppError::other(format!("Die Suche im Inhalt gibt es auf diesem Computer und auf SSH-Servern, nicht über {}.", self.protocol())));
+            return Err(AppError::other(format!(
+                "Die Suche im Inhalt gibt es auf diesem Computer und auf SSH-Servern, nicht über {}.",
+                self.protocol()
+            )));
         }
         let q = crate::scp::quote;
         // -I skips binary files, -m 1 stops at the first hit per file, -F searches the text literally.
-        let cmd = format!("grep -rIinF -m 1 --exclude-dir=.git --exclude-dir=node_modules -- {} {} 2>/dev/null | head -n {}", q(query), q(base), max);
+        let cmd = format!(
+            "grep -rIinF -m 1 --exclude-dir=.git --exclude-dir=node_modules -- {} {} 2>/dev/null | head -n {}",
+            q(query),
+            q(base),
+            max
+        );
         let (_, out) = self.exec(&cmd).await?;
         let prefix = format!("{}/", base.trim_end_matches('/'));
         let mut hits = Vec::new();
@@ -366,26 +386,46 @@ impl Remote {
             let Some((path, rest)) = split_grep_line(line) else { continue };
             let Some((no, text)) = rest.split_once(':') else { continue };
             let rel = path.strip_prefix(&prefix).unwrap_or(path).to_string();
-            hits.push(crate::model::GrepHit { path: path.to_string(), rel, size: 0, mtime: 0, line: crate::local::snippet(text), line_no: no.parse().unwrap_or(0) });
+            hits.push(crate::model::GrepHit {
+                path: path.to_string(),
+                rel,
+                size: 0,
+                mtime: 0,
+                line: crate::local::snippet(text),
+                line_no: no.parse().unwrap_or(0),
+            });
         }
         Ok(hits)
     }
 
     /// Interactive shell for the built-in terminal (SSH only).
-    pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<russh::client::Msg>> {
+    pub async fn open_shell(
+        &self,
+        cols: u32,
+        rows: u32,
+        command: &str,
+    ) -> AppResult<russh::Channel<russh::client::Msg>> {
         match self {
             Remote::Sftp(c) => c.open_shell(cols, rows, command).await,
             Remote::Scp(c) => c.open_shell(cols, rows, command).await,
-            _ => Err(AppError::new(ErrorKind::Other, format!("Ein Terminal gibt es nur mit SSH, nicht über {}.", self.protocol()))),
+            _ => Err(AppError::new(
+                ErrorKind::Other,
+                format!("Ein Terminal gibt es nur mit SSH, nicht über {}.", self.protocol()),
+            )),
         }
     }
 
     /// SSH handle and remote forwards of an SSH connection (port forwarding).
-    pub(crate) fn tunnel(&self) -> AppResult<(&russh::client::Handle<crate::ssh::Handler>, &crate::ssh::RemoteForwards)> {
+    pub(crate) fn tunnel(
+        &self,
+    ) -> AppResult<(&russh::client::Handle<crate::ssh::Handler>, &crate::ssh::RemoteForwards)> {
         match self {
             Remote::Sftp(c) => Ok(c.tunnel()),
             Remote::Scp(c) => Ok(c.tunnel()),
-            _ => Err(AppError::new(ErrorKind::Other, format!("Port-Weiterleitungen gibt es nur mit SSH, nicht über {}.", self.protocol()))),
+            _ => Err(AppError::new(
+                ErrorKind::Other,
+                format!("Port-Weiterleitungen gibt es nur mit SSH, nicht über {}.", self.protocol()),
+            )),
         }
     }
 
@@ -411,7 +451,10 @@ impl Remote {
                 let r = self.reader(path, 0).await?;
                 let mut buf = Vec::new();
                 let mut limited = r.take(max as u64);
-                limited.read_to_end(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
+                limited.read_to_end(&mut buf).await.map_err(|e| {
+                    AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.")
+                        .with_detail(e.to_string())
+                })?;
                 let _ = limited.into_inner().close(false).await;
                 Ok(buf)
             }
@@ -431,7 +474,10 @@ impl Remote {
                 let mut h = algo.hasher();
                 let mut buf = vec![0u8; 256 * 1024];
                 loop {
-                    let n = r.read(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
+                    let n = r.read(&mut buf).await.map_err(|e| {
+                        AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.")
+                            .with_detail(e.to_string())
+                    })?;
                     if n == 0 {
                         break;
                     }
@@ -456,7 +502,8 @@ impl Remote {
             Remote::Smb(c) => c.copy_within(paths, dest_dir).await,
             Remote::Scp(c) => c.copy_within(paths, dest_dir).await,
             Remote::Ftp(_) | Remote::Vault(_) => {
-                let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+                let mut taken: std::collections::HashSet<String> =
+                    self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
                 let mut out = Vec::new();
                 for from in paths {
                     if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -495,7 +542,8 @@ impl Remote {
             },
             Err(e) => {
                 w.abort();
-                Err(AppError::new(ErrorKind::ConnectionLost, "Kopieren auf dem Server fehlgeschlagen.").with_detail(e.to_string()))
+                Err(AppError::new(ErrorKind::ConnectionLost, "Kopieren auf dem Server fehlgeschlagen.")
+                    .with_detail(e.to_string()))
             }
         }
     }
@@ -504,7 +552,11 @@ impl Remote {
 
     pub async fn meta(&self, path: &str) -> Option<Meta> {
         match self {
-            Remote::Sftp(c) => c.sftp.metadata(path).await.ok().map(|a| Meta { size: a.size.unwrap_or(0), mtime: a.mtime, perms: a.permissions }),
+            Remote::Sftp(c) => c.sftp.metadata(path).await.ok().map(|a| Meta {
+                size: a.size.unwrap_or(0),
+                mtime: a.mtime,
+                perms: a.permissions,
+            }),
             _ => self.stat(path).await.ok().filter(|e| e.kind == "file").map(|e| Meta {
                 size: e.size,
                 mtime: (e.mtime > 0).then_some((e.mtime / 1000) as u32),
@@ -533,7 +585,12 @@ impl Remote {
         match self {
             Remote::Sftp(_) | Remote::Smb(_) | Remote::Scp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
-            Remote::Dav(_) | Remote::Dropbox(_) | Remote::GDrive(_) | Remote::OneDrive(_) | Remote::Vault(_) | Remote::S3(_) => false,
+            Remote::Dav(_)
+            | Remote::Dropbox(_)
+            | Remote::GDrive(_)
+            | Remote::OneDrive(_)
+            | Remote::Vault(_)
+            | Remote::S3(_) => false,
         }
     }
 
@@ -551,7 +608,10 @@ impl Remote {
                 use tokio::io::AsyncSeekExt;
                 let mut f = c.sftp.open(path).await?;
                 if offset > 0 {
-                    f.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.").with_detail(e.to_string()))?;
+                    f.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| {
+                        AppError::new(ErrorKind::ConnectionLost, "Lesen vom Server fehlgeschlagen.")
+                            .with_detail(e.to_string())
+                    })?;
                 }
                 RemoteReader::Plain(Box::new(f))
             }
@@ -571,14 +631,23 @@ impl Remote {
     }
 
     /// Opens a file for writing. `offset > 0` appends to a partial file.
-    pub async fn writer(&self, path: &str, offset: u64, size: Option<u64>, mtime: Option<u32>) -> AppResult<RemoteWriter> {
+    pub async fn writer(
+        &self,
+        path: &str,
+        offset: u64,
+        size: Option<u64>,
+        mtime: Option<u32>,
+    ) -> AppResult<RemoteWriter> {
         Ok(match self {
             Remote::Sftp(c) => {
                 use russh_sftp::protocol::OpenFlags;
                 use tokio::io::AsyncSeekExt;
                 let f = if offset > 0 {
                     let mut f = c.sftp.open_with_flags(path, OpenFlags::WRITE).await?;
-                    f.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Schreiben auf dem Server fehlgeschlagen.").with_detail(e.to_string()))?;
+                    f.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| {
+                        AppError::new(ErrorKind::ConnectionLost, "Schreiben auf dem Server fehlgeschlagen.")
+                            .with_detail(e.to_string())
+                    })?;
                     f
                 } else {
                     c.sftp.open_with_flags(path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE).await?
@@ -628,7 +697,12 @@ impl Remote {
     pub async fn set_attrs(&self, path: &str, mtime: Option<u32>, perms: Option<u32>) {
         match self {
             Remote::Sftp(c) => {
-                let attrs = russh_sftp::protocol::FileAttributes { atime: mtime, mtime, permissions: perms, ..Default::default() };
+                let attrs = russh_sftp::protocol::FileAttributes {
+                    atime: mtime,
+                    mtime,
+                    permissions: perms,
+                    ..Default::default()
+                };
                 let _ = c.sftp.set_metadata(path, attrs).await;
             }
             Remote::Ftp(c) => c.set_attrs(path, mtime, perms).await,
@@ -691,7 +765,10 @@ pub enum RemoteWriter {
 impl RemoteWriter {
     /// Completes the file on the server.
     pub async fn close(mut self) -> AppResult<()> {
-        let done = |e: std::io::Error| AppError::new(ErrorKind::ConnectionLost, "Datei konnte nicht abgeschlossen werden.").with_detail(e.to_string());
+        let done = |e: std::io::Error| {
+            AppError::new(ErrorKind::ConnectionLost, "Datei konnte nicht abgeschlossen werden.")
+                .with_detail(e.to_string())
+        };
         match &mut self {
             RemoteWriter::Plain(w) => w.shutdown().await.map_err(done),
             RemoteWriter::Ftp(io, fin) => {
@@ -702,7 +779,10 @@ impl RemoteWriter {
                 let mut w = w.take().expect("open");
                 w.shutdown().await.map_err(done)?;
                 drop(w);
-                task.take().expect("open").await.map_err(|e| AppError::other("Hochladen abgebrochen.").with_detail(e.to_string()))?
+                task.take()
+                    .expect("open")
+                    .await
+                    .map_err(|e| AppError::other("Hochladen abgebrochen.").with_detail(e.to_string()))?
             }
         }
     }
@@ -787,8 +867,19 @@ pub(crate) mod integration {
         stopper.await.unwrap();
         assert_eq!(paused.err().map(|e| e.kind), Some(ErrorKind::Cancelled), "{}", conn.protocol());
         let first = std::sync::Mutex::new(None);
-        let seen = |d: u64, _t: u64| { first.lock().unwrap().get_or_insert(d); };
-        crate::transfer::upload(&conn, &local_ui, &target, &TransferOptions::default(), &seen, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        let seen = |d: u64, _t: u64| {
+            first.lock().unwrap().get_or_insert(d);
+        };
+        crate::transfer::upload(
+            &conn,
+            &local_ui,
+            &target,
+            &TransferOptions::default(),
+            &seen,
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         let resumed_at = first.lock().unwrap().unwrap();
         if conn.can_append(&target) {
             assert!(resumed_at > 0, "{}: continued", conn.protocol());
@@ -797,12 +888,24 @@ pub(crate) mod integration {
         assert!(!conn.exists(&crate::transfer::temp_name(&target)).await, "no partial file left");
 
         let back = dir.path().join("back.bin");
-        crate::transfer::download(&conn, &target, &back.to_string_lossy().replace('\\', "/"), &TransferOptions::default(), &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await.unwrap();
+        crate::transfer::download(
+            &conn,
+            &target,
+            &back.to_string_lossy().replace('\\', "/"),
+            &TransferOptions::default(),
+            &|_, _| {},
+            Arc::new(AtomicU8::new(RUN)),
+        )
+        .await
+        .unwrap();
         assert_eq!(std::fs::read(&back).unwrap(), data, "{}", conn.protocol());
         assert_eq!(conn.read_head(&target, 10).await.unwrap(), data[..10].to_vec());
         let local_sum = crate::local::checksum(&local_ui).unwrap();
         assert_eq!(conn.checksum(&target).await.unwrap(), local_sum);
-        assert_eq!(conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub")).await.unwrap(), vec!["big Kopie.bin".to_string()]);
+        assert_eq!(
+            conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub")).await.unwrap(),
+            vec!["big Kopie.bin".to_string()]
+        );
         assert_eq!(conn.stat(&format!("{base}/sub/big Kopie.bin")).await.unwrap().size, 1_500_000);
         // Only SSH connections (SFTP, SCP) run commands.
         assert_eq!(conn.exec("true").await.is_ok(), matches!(conn, Remote::Sftp(_) | Remote::Scp(_)));
@@ -815,10 +918,21 @@ pub(crate) mod integration {
         let known = Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
         if let Ok(v) = std::env::var("BITCRANE_TEST_FTP") {
             let (host, ports) = v.split_once(':').unwrap();
-            for (port, tls) in ports.split(',').map(|p| p.parse::<u16>().unwrap()).zip(["none", "explicit", "implicit"]) {
-                let mut p = crate::ftp::FtpParams { timeout: None,
-                    host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: tls.into(), tls13_only: false,
-                    encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
+            for (port, tls) in ports.split(',').map(|p| p.parse::<u16>().unwrap()).zip(["none", "explicit", "implicit"])
+            {
+                let mut p = crate::ftp::FtpParams {
+                    timeout: None,
+                    host: host.into(),
+                    port,
+                    user: "test".into(),
+                    password: Some("geheim123".into()),
+                    tls: tls.into(),
+                    tls13_only: false,
+                    encoding: "utf8".into(),
+                    tz_offset_min: 0,
+                    mode: "binary".into(),
+                    trust: None,
+                    proxy: None,
                 };
                 let c = match FtpConn::connect(p.clone(), known.clone()).await {
                     Ok(c) => c,
@@ -833,9 +947,25 @@ pub(crate) mod integration {
         }
         if let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") {
             // A fresh bucket on the test server, then the same checks as everywhere.
-            let params = |bucket: &str| crate::s3::S3Params { endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None, timeout: None };
+            let params = |bucket: &str| crate::s3::S3Params {
+                endpoint: endpoint.clone(),
+                region: "eu-central-1".into(),
+                bucket: bucket.into(),
+                access_key: "test".into(),
+                secret: Some("geheim".into()),
+                path_style: true,
+                tls13_only: false,
+                trust: None,
+                proxy: None,
+                timeout: None,
+            };
             let bucket = format!("bitcrane-tr-{}", uuid::Uuid::new_v4().simple());
-            crate::s3::S3Conn::connect(params(""), known.clone()).await.unwrap().mkdir(&format!("/{bucket}")).await.unwrap();
+            crate::s3::S3Conn::connect(params(""), known.clone())
+                .await
+                .unwrap()
+                .mkdir(&format!("/{bucket}"))
+                .await
+                .unwrap();
             let c = crate::s3::S3Conn::connect(params(&bucket), known.clone()).await.unwrap();
             check(Remote::S3(Arc::new(c)), "/".into()).await;
         }
@@ -846,7 +976,15 @@ pub(crate) mod integration {
         }
         if let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") {
             for url in urls.split(',') {
-                let mut p = crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None, timeout: None };
+                let mut p = crate::dav::DavParams {
+                    url: url.into(),
+                    user: "test".into(),
+                    password: Some("geheim123".into()),
+                    tls13_only: false,
+                    trust: None,
+                    proxy: None,
+                    timeout: None,
+                };
                 let c = match DavConn::connect(p.clone(), known.clone()).await {
                     Ok(c) => c,
                     Err(e) => {
@@ -862,15 +1000,27 @@ pub(crate) mod integration {
     /// Server to server: FTP -> WebDAV and back, through this computer.
     #[tokio::test]
     async fn copies_between_two_servers() {
-        let (Ok(ftp), Ok(dav)) = (std::env::var("BITCRANE_TEST_FTP"), std::env::var("BITCRANE_TEST_DAV")) else { return };
+        let (Ok(ftp), Ok(dav)) = (std::env::var("BITCRANE_TEST_FTP"), std::env::var("BITCRANE_TEST_DAV")) else {
+            return;
+        };
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
         let (host, ports) = ftp.split_once(':').unwrap();
         let port: u16 = ports.split(',').next().unwrap().parse().unwrap();
         let f = FtpConn::connect(
-            crate::ftp::FtpParams { timeout: None,
-                host: host.into(), port, user: "test".into(), password: Some("geheim123".into()), tls: "none".into(), tls13_only: false,
-                encoding: "utf8".into(), tz_offset_min: 0, mode: "binary".into(), trust: None, proxy: None,
+            crate::ftp::FtpParams {
+                timeout: None,
+                host: host.into(),
+                port,
+                user: "test".into(),
+                password: Some("geheim123".into()),
+                tls: "none".into(),
+                tls13_only: false,
+                encoding: "utf8".into(),
+                tz_offset_min: 0,
+                mode: "binary".into(),
+                trust: None,
+                proxy: None,
             },
             known.clone(),
         )
@@ -879,7 +1029,22 @@ pub(crate) mod integration {
         let ftp_home = f.home.clone();
         let ftp = Remote::Ftp(Arc::new(f));
         let url = dav.split(',').find(|u| u.starts_with("http://")).unwrap();
-        let dav = Remote::Dav(DavConn::connect(crate::dav::DavParams { url: url.into(), user: "test".into(), password: Some("geheim123".into()), tls13_only: false, trust: None, proxy: None, timeout: None }, known).await.unwrap());
+        let dav = Remote::Dav(
+            DavConn::connect(
+                crate::dav::DavParams {
+                    url: url.into(),
+                    user: "test".into(),
+                    password: Some("geheim123".into()),
+                    tls13_only: false,
+                    trust: None,
+                    proxy: None,
+                    timeout: None,
+                },
+                known,
+            )
+            .await
+            .unwrap(),
+        );
 
         let data: Vec<u8> = (0..700_000u32).map(|i| (i % 241) as u8).collect();
         let local = dir.path().join("x.bin");
@@ -888,14 +1053,36 @@ pub(crate) mod integration {
         let on_ftp = remote_join(&ftp_home, &format!("bitcrane-x-{tag}.bin"));
         let on_dav = format!("/bitcrane-x-{tag}/copy.bin");
         let run = || Arc::new(AtomicU8::new(RUN));
-        crate::transfer::upload(&ftp, &local.to_string_lossy(), &on_ftp, &TransferOptions::default(), &|_, _| {}, run()).await.unwrap();
-        let n = crate::transfer::cross(&ftp, &on_ftp, &dav, &on_dav, &TransferOptions::default(), &|_, _| {}, run()).await.unwrap();
+        crate::transfer::upload(
+            &ftp,
+            &local.to_string_lossy(),
+            &on_ftp,
+            &TransferOptions::default(),
+            &|_, _| {},
+            run(),
+        )
+        .await
+        .unwrap();
+        let n = crate::transfer::cross(&ftp, &on_ftp, &dav, &on_dav, &TransferOptions::default(), &|_, _| {}, run())
+            .await
+            .unwrap();
         assert_eq!(n, 700_000);
         assert_eq!(dav.stat(&on_dav).await.unwrap().size, 700_000);
         // And back again, replacing the original.
-        crate::transfer::cross(&dav, &on_dav, &ftp, &on_ftp, &TransferOptions::default(), &|_, _| {}, run()).await.unwrap();
+        crate::transfer::cross(&dav, &on_dav, &ftp, &on_ftp, &TransferOptions::default(), &|_, _| {}, run())
+            .await
+            .unwrap();
         let back = dir.path().join("back.bin");
-        crate::transfer::download(&ftp, &on_ftp, &back.to_string_lossy(), &TransferOptions::default(), &|_, _| {}, run()).await.unwrap();
+        crate::transfer::download(
+            &ftp,
+            &on_ftp,
+            &back.to_string_lossy(),
+            &TransferOptions::default(),
+            &|_, _| {},
+            run(),
+        )
+        .await
+        .unwrap();
         assert_eq!(std::fs::read(&back).unwrap(), data);
         ftp.remove(&on_ftp).await.unwrap();
         dav.remove(&crate::paths::remote_parent(&on_dav)).await.unwrap();
@@ -930,7 +1117,11 @@ mod name_tests {
 
 /// Opens an SSH connection: SFTP, or shell commands when the server has no
 /// SFTP (or the server settings ask for SCP).
-pub async fn connect_ssh(params: &crate::ssh::ConnectParams, known: Arc<crate::ssh::KnownHosts>, prompter: Option<crate::ssh::Prompter>) -> AppResult<Remote> {
+pub async fn connect_ssh(
+    params: &crate::ssh::ConnectParams,
+    known: Arc<crate::ssh::KnownHosts>,
+    prompter: Option<crate::ssh::Prompter>,
+) -> AppResult<Remote> {
     let session = crate::ssh::open(params, known, prompter).await?;
     if params.scp {
         return Ok(Remote::Scp(Arc::new(ScpConn::new(session).await?)));

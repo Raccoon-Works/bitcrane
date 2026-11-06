@@ -18,7 +18,8 @@ pub struct FileEntry {
     pub group: String,
     /// Target of a symbolic link (the entry itself shows what the link points to).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub link: Option<String>,    /// Local only: 1 = marked hidden by the system (Windows "hidden"
+    pub link: Option<String>,
+    /// Local only: 1 = marked hidden by the system (Windows "hidden"
     /// attribute, macOS "hidden" flag), 2 = protected system item (Windows
     /// "hidden" plus "system", e.g. the old "Anwendungsdaten" junctions).
     #[serde(default, skip_serializing_if = "is_zero")]

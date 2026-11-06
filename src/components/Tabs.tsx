@@ -37,8 +37,15 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
   void servers; // re-render when names or connection states change
   const cls = variant === 'mac' ? 'mac-tab' : 'win-tab';
   return (
-    <div role="tablist" aria-label={$t('Verbindungen')} className={variant === 'mac' ? 'mac-tabs' : 'win-tabs'} data-tauri-drag-region
-      onDoubleClick={(e) => { if (e.target === e.currentTarget) newTab(); }}>
+    <div
+      role="tablist"
+      aria-label={$t('Verbindungen')}
+      className={variant === 'mac' ? 'mac-tabs' : 'win-tabs'}
+      data-tauri-drag-region
+      onDoubleClick={(e) => {
+        if (e.target === e.currentTarget) newTab();
+      }}
+    >
       {tabs.map((t) => {
         const sel = t.id === activeId;
         const srv = t.serverId ? serverById(t.serverId) : undefined;
@@ -51,11 +58,25 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
               aria-selected={sel}
               tabIndex={sel ? 0 : -1}
               className={`${cls}${sel ? ' is-sel' : ''}${srv?.color && srv.color !== 'gray' ? ' has-srv-color' : ''}`}
-              style={srv?.color && srv.color !== 'gray' ? ({ '--srv-color': swatch[srv.color] } as CSSProperties) : undefined}
-              onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side: 'local', names: [], kind: 'tab', tabId: t.id } }); }}
+              style={
+                srv?.color && srv.color !== 'gray' ? ({ '--srv-color': swatch[srv.color] } as CSSProperties) : undefined
+              }
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setState({
+                  contextMenu: { x: e.clientX, y: e.clientY, side: 'local', names: [], kind: 'tab', tabId: t.id },
+                });
+              }}
               onClick={() => selectTab(t.id)}
-              onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(t.id); } }}
-              onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  closeTab(t.id);
+                }
+              }}
+              onMouseDown={(e) => {
+                if (e.button === 1) e.preventDefault();
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') selectTab(t.id);
                 // Arrow keys move between tabs (ARIA tabs pattern).
@@ -67,17 +88,36 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
                 }
               }}
             >
-              {t.settings ? <span className="tab-gear" aria-hidden="true"><Gear size={16} strokeWidth={1.75} /></span> : srv ? <ServerTile server={srv} size={18} /> : <LocalTile size={18} />}
+              {t.settings ? (
+                <span className="tab-gear" aria-hidden="true">
+                  <Gear size={16} strokeWidth={1.75} />
+                </span>
+              ) : srv ? (
+                <ServerTile server={srv} size={18} />
+              ) : (
+                <LocalTile size={18} />
+              )}
               <span className="tab-name">{title}</span>
               {state && <span className={`dot${state}`} aria-hidden="true" />}
-              <button type="button" className="tab-close" tabIndex={-1} aria-label={$t('Tab „{0}“ schließen', title)} onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}>
+              <button
+                type="button"
+                className="tab-close"
+                tabIndex={-1}
+                aria-label={$t('Tab „{0}“ schließen', title)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(t.id);
+                }}
+              >
                 <X size={variant === 'mac' ? 10 : 11} strokeWidth={2.2} />
               </button>
             </div>
           </Tooltip>
         );
       })}
-      <IconButton label={$t('Neuer Tab')} shortcut={sk('newTab')} className="tab-new" onClick={newTab}><Plus size={14} strokeWidth={1.75} /></IconButton>
+      <IconButton label={$t('Neuer Tab')} shortcut={sk('newTab')} className="tab-new" onClick={newTab}>
+        <Plus size={14} strokeWidth={1.75} />
+      </IconButton>
     </div>
   );
 }

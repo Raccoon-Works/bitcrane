@@ -6,10 +6,31 @@
  */
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowsInSimple, ArrowsOutSimple, BracketsCurly, CaretDown, MagnifyingGlass, Plus, Trash, X } from '@phosphor-icons/react';
+import {
+  ArrowsInSimple,
+  ArrowsOutSimple,
+  BracketsCurly,
+  CaretDown,
+  MagnifyingGlass,
+  Plus,
+  Trash,
+  X,
+} from '@phosphor-icons/react';
 import { $t } from '../i18n';
 import { openDialog, serverById, updateSettings, useStore } from '../state/store';
-import { themeFor, attachTerminal, clearTerminal, closeTerminal, findInTerminal, fitTerminal, sendSnippet, setActiveTerminal, terminalBackToPanel, terminalInOwnTab, toggleTerminal } from '../state/terminal';
+import {
+  themeFor,
+  attachTerminal,
+  clearTerminal,
+  closeTerminal,
+  findInTerminal,
+  fitTerminal,
+  sendSnippet,
+  setActiveTerminal,
+  terminalBackToPanel,
+  terminalInOwnTab,
+  toggleTerminal,
+} from '../state/terminal';
 import type { Snippet } from '../state/terminal';
 import { ResizeHandle } from './ResizeHandle';
 import { TermNewMenu } from './TermNewMenu';
@@ -41,7 +62,10 @@ function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
   const shown = snippets.filter((x) => !x.hidden && x.command.trim());
   const groupNames = [...(order ?? [])];
   for (const x of shown) if (x.group && !groupNames.includes(x.group)) groupNames.push(x.group);
-  const sections: Array<[string, Snippet[]]> = [['', shown.filter((x) => !x.group)] as [string, Snippet[]], ...groupNames.map((g) => [g, shown.filter((x) => x.group === g)] as [string, Snippet[]])].filter(([, l]) => l.length);
+  const sections: Array<[string, Snippet[]]> = [
+    ['', shown.filter((x) => !x.group)] as [string, Snippet[]],
+    ...groupNames.map((g) => [g, shown.filter((x) => x.group === g)] as [string, Snippet[]]),
+  ].filter(([, l]) => l.length);
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('.term-snippets')) onClose();
@@ -51,12 +75,26 @@ function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
   }, [onClose]);
   return (
     <div className="term-snippets menu" role="menu">
-      {shown.length === 0 && <span className="small muted term-snippets-empty">{$t('Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.')}</span>}
+      {shown.length === 0 && (
+        <span className="small muted term-snippets-empty">
+          {$t('Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.')}
+        </span>
+      )}
       {sections.map(([group, list]) => (
         <div key={group || '-'} role="group" aria-label={group || undefined}>
           {group && <div className="menu-head">{group}</div>}
           {list.map((sn) => (
-            <button key={sn.id} type="button" role="menuitem" className="menu-item term-snippet-item" title={sn.command} onClick={() => { void sendSnippet(id, sn); onClose(); }}>
+            <button
+              key={sn.id}
+              type="button"
+              role="menuitem"
+              className="menu-item term-snippet-item"
+              title={sn.command}
+              onClick={() => {
+                void sendSnippet(id, sn);
+                onClose();
+              }}
+            >
               <span className="col-text min-w-0">
                 <span className="ellipsis">{sn.name || sn.command}</span>
                 {sn.name && <span className="small muted mono ellipsis">{sn.command}</span>}
@@ -67,7 +105,15 @@ function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       ))}
       <div className="menu-sep" />
-      <button type="button" role="menuitem" className="menu-item" onClick={() => { onClose(); openDialog({ type: 'settings', tab: 'terminal' }); }}>
+      <button
+        type="button"
+        role="menuitem"
+        className="menu-item"
+        onClick={() => {
+          onClose();
+          openDialog({ type: 'settings', tab: 'terminal' });
+        }}
+      >
         {$t('Snippets verwalten …')}
       </button>
     </div>
@@ -90,42 +136,121 @@ export function TerminalPanel() {
   if (!tab || !t?.open || !sessions.length) return null;
   const active = sessions.find((x) => x.id === t.active) ?? sessions[0];
   const full = !!t.full;
-  const label = (x: { number: number; serverId: string; shellName?: string }) => `${x.serverId ? serverById(x.serverId)?.name ?? '' : x.shellName ?? $t('Lokal')}${x.number > 1 ? ` ${x.number}` : ''}`;
+  const label = (x: { number: number; serverId: string; shellName?: string }) =>
+    `${x.serverId ? (serverById(x.serverId)?.name ?? '') : (x.shellName ?? $t('Lokal'))}${x.number > 1 ? ` ${x.number}` : ''}`;
   return (
-    <section className={`term-panel${full ? ' is-full' : ''}`} style={{ ...(full ? {} : { height }), '--term-bg': themeFor(active.serverId).background, '--term-fg': themeFor(active.serverId).foreground } as CSSProperties} aria-label={$t('Terminal')}>
+    <section
+      className={`term-panel${full ? ' is-full' : ''}`}
+      style={
+        {
+          ...(full ? {} : { height }),
+          '--term-bg': themeFor(active.serverId).background,
+          '--term-fg': themeFor(active.serverId).foreground,
+        } as CSSProperties
+      }
+      aria-label={$t('Terminal')}
+    >
       {!full && (
-        <ResizeHandle orientation="horizontal" label={$t('Höhe des Terminals (ziehen, Doppelklick: zurücksetzen)')} value={height} min={120} max={900} step={20}
-          toValue={(start, d) => start - d} onChange={(v) => updateSettings({ terminalHeight: Math.round(v) })} onReset={() => updateSettings({ terminalHeight: 260 })} className="term-handle" />
+        <ResizeHandle
+          orientation="horizontal"
+          label={$t('Höhe des Terminals (ziehen, Doppelklick: zurücksetzen)')}
+          value={height}
+          min={120}
+          max={900}
+          step={20}
+          toValue={(start, d) => start - d}
+          onChange={(v) => updateSettings({ terminalHeight: Math.round(v) })}
+          onReset={() => updateSettings({ terminalHeight: 260 })}
+          className="term-handle"
+        />
       )}
       <div className="term-bar">
         <div className="term-tabs" role="tablist">
           {sessions.map((x) => (
-            <span key={x.id} role="tab" aria-selected={x.id === active.id} className={`term-tab${x.id === active.id ? ' is-active' : ''}${x.alive ? '' : ' is-ended'}`}
-              onClick={() => setActiveTerminal(tab.id, x.id)}>
+            <span
+              key={x.id}
+              role="tab"
+              aria-selected={x.id === active.id}
+              className={`term-tab${x.id === active.id ? ' is-active' : ''}${x.alive ? '' : ' is-ended'}`}
+              onClick={() => setActiveTerminal(tab.id, x.id)}
+            >
               <span className="ellipsis">{label(x)}</span>
-              <button type="button" className="term-tab-close" aria-label={$t('Terminal schließen')} onClick={(e) => { e.stopPropagation(); closeTerminal(x.id); }}><X size={11} weight="bold" /></button>
+              <button
+                type="button"
+                className="term-tab-close"
+                aria-label={$t('Terminal schließen')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTerminal(x.id);
+                }}
+              >
+                <X size={11} weight="bold" />
+              </button>
             </span>
           ))}
-          <IconButton label={$t('Neues Terminal')} aria-haspopup="menu" aria-expanded={!!newMenu}
-            onMouseDown={(e) => { if (newMenu) e.stopPropagation(); }}
-            onClick={(e) => { if (newMenu) { setNewMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setNewMenu({ x: r.left, y: r.bottom + 4 }); }}><Plus size={15} weight="bold" /></IconButton>
+          <IconButton
+            label={$t('Neues Terminal')}
+            aria-haspopup="menu"
+            aria-expanded={!!newMenu}
+            onMouseDown={(e) => {
+              if (newMenu) e.stopPropagation();
+            }}
+            onClick={(e) => {
+              if (newMenu) {
+                setNewMenu(null);
+                return;
+              }
+              const r = e.currentTarget.getBoundingClientRect();
+              setNewMenu({ x: r.left, y: r.bottom + 4 });
+            }}
+          >
+            <Plus size={15} weight="bold" />
+          </IconButton>
         </div>
         {newMenu && <TermNewMenu x={newMenu.x} y={newMenu.y} onClose={() => setNewMenu(null)} />}
         <span className="flex-1" />
         {find !== null && (
-          <input className="term-find" autoFocus value={find} placeholder={$t('Im Terminal suchen')} onChange={(e) => { setFind(e.target.value); findInTerminal(active.id, e.target.value); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') findInTerminal(active.id, find, e.shiftKey); if (e.key === 'Escape') setFind(null); }} />
+          <input
+            className="term-find"
+            autoFocus
+            value={find}
+            placeholder={$t('Im Terminal suchen')}
+            onChange={(e) => {
+              setFind(e.target.value);
+              findInTerminal(active.id, e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') findInTerminal(active.id, find, e.shiftKey);
+              if (e.key === 'Escape') setFind(null);
+            }}
+          />
         )}
-        <IconButton label={$t('Suchen')} onClick={() => setFind(find === null ? '' : null)}><MagnifyingGlass size={16} /></IconButton>
+        <IconButton label={$t('Suchen')} onClick={() => setFind(find === null ? '' : null)}>
+          <MagnifyingGlass size={16} />
+        </IconButton>
         <span className="term-snippets-anchor">
-          <IconButton label={$t('Snippets')} onClick={() => setSnippets(!snippets)}><BracketsCurly size={16} /></IconButton>
+          <IconButton label={$t('Snippets')} onClick={() => setSnippets(!snippets)}>
+            <BracketsCurly size={16} />
+          </IconButton>
           {snippets && <SnippetMenu id={active.id} onClose={() => setSnippets(false)} />}
         </span>
-        <IconButton label={$t('Leeren')} onClick={() => clearTerminal(active.id)}><Trash size={16} /></IconButton>
-        {full
-          ? <IconButton label={$t('Zurück unter die Dateien')} onClick={terminalBackToPanel}><ArrowsInSimple size={16} /></IconButton>
-          : <IconButton label={$t('In eigenem Tab öffnen')} onClick={() => terminalInOwnTab(active.id)}><ArrowsOutSimple size={16} /></IconButton>}
-        {!full && <IconButton label={$t('Terminal ausblenden')} onClick={() => toggleTerminal()}><CaretDown size={16} weight="bold" /></IconButton>}
+        <IconButton label={$t('Leeren')} onClick={() => clearTerminal(active.id)}>
+          <Trash size={16} />
+        </IconButton>
+        {full ? (
+          <IconButton label={$t('Zurück unter die Dateien')} onClick={terminalBackToPanel}>
+            <ArrowsInSimple size={16} />
+          </IconButton>
+        ) : (
+          <IconButton label={$t('In eigenem Tab öffnen')} onClick={() => terminalInOwnTab(active.id)}>
+            <ArrowsOutSimple size={16} />
+          </IconButton>
+        )}
+        {!full && (
+          <IconButton label={$t('Terminal ausblenden')} onClick={() => toggleTerminal()}>
+            <CaretDown size={16} weight="bold" />
+          </IconButton>
+        )}
       </div>
       <TerminalView key={active.id} id={active.id} />
     </section>

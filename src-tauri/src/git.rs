@@ -46,10 +46,19 @@ pub fn parse_status(out: &str) -> GitStatus {
             // "main...origin/main [ahead 1, behind 2]" or "No commits yet on main".
             let (name, rest) = head.split_once(' ').unwrap_or((head, ""));
             let name = name.split("...").next().unwrap_or(name);
-            st.branch = if head.starts_with("No commits yet on ") { head.trim_start_matches("No commits yet on ").to_string() } else { name.to_string() };
+            st.branch = if head.starts_with("No commits yet on ") {
+                head.trim_start_matches("No commits yet on ").to_string()
+            } else {
+                name.to_string()
+            };
             for (key, field) in [("ahead ", &mut st.ahead), ("behind ", &mut st.behind)] {
                 if let Some(i) = rest.find(key) {
-                    *field = rest[i + key.len()..].chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().unwrap_or(0);
+                    *field = rest[i + key.len()..]
+                        .chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect::<String>()
+                        .parse()
+                        .unwrap_or(0);
                 }
             }
             continue;
@@ -87,7 +96,11 @@ pub fn status(dir: &str) -> Option<GitStatus> {
     let native = to_native(dir);
     let top = git(&native).args(["rev-parse", "--show-toplevel"]).output().ok().filter(|o| o.status.success())?;
     let root = String::from_utf8_lossy(&top.stdout).trim().to_string();
-    let out = git(std::path::Path::new(&root)).args(["status", "--porcelain=v1", "-b", "-z", "--untracked-files=normal"]).output().ok().filter(|o| o.status.success())?;
+    let out = git(std::path::Path::new(&root))
+        .args(["status", "--porcelain=v1", "-b", "-z", "--untracked-files=normal"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())?;
     let mut st = parse_status(&String::from_utf8_lossy(&out.stdout));
     st.root = to_ui(std::path::Path::new(&root));
     Some(st)
@@ -100,12 +113,20 @@ pub fn status(dir: &str) -> Option<GitStatus> {
 pub fn action(root: &str, what: &str, paths: &[String], message: &str, all: bool) -> AppResult<String> {
     let native = to_native(root);
     let run = |args: &[&str]| -> AppResult<String> {
-        let out = git(&native).args(args).output().map_err(|e| AppError::other("Git ist auf diesem Computer nicht installiert.").with_detail(e.to_string()))?;
-        let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)).trim().to_string();
+        let out = git(&native).args(args).output().map_err(|e| {
+            AppError::other("Git ist auf diesem Computer nicht installiert.").with_detail(e.to_string())
+        })?;
+        let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr))
+            .trim()
+            .to_string();
         if out.status.success() {
             Ok(text)
         } else {
-            Err(AppError::other(format!("Git: {}", text.lines().find(|l| !l.trim().is_empty()).unwrap_or("fehlgeschlagen"))).with_detail(text))
+            Err(AppError::other(format!(
+                "Git: {}",
+                text.lines().find(|l| !l.trim().is_empty()).unwrap_or("fehlgeschlagen")
+            ))
+            .with_detail(text))
         }
     };
     match what {
@@ -140,7 +161,10 @@ mod tests {
         let st = parse_status(out);
         assert_eq!((st.branch.as_str(), st.ahead, st.behind), ("main", 2, 1));
         let get = |k: &str| st.files.get(k).map(String::as_str);
-        assert_eq!((get("src/a.rs"), get("neu.txt"), get("b.txt"), get("c.txt"), get("d.txt"), get("e.txt")), (Some("M"), Some("?"), Some("A"), Some("R"), Some("U"), Some("D")));
+        assert_eq!(
+            (get("src/a.rs"), get("neu.txt"), get("b.txt"), get("c.txt"), get("d.txt"), get("e.txt")),
+            (Some("M"), Some("?"), Some("A"), Some("R"), Some("U"), Some("D"))
+        );
         assert!(get("alt.txt").is_none());
         assert_eq!(parse_status("## No commits yet on main\0").branch, "main");
     }

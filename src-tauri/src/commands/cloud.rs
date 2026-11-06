@@ -1,9 +1,9 @@
 //! Cloud services: signing in with OAuth and connecting Dropbox, Google Drive and OneDrive.
 
-use crate::error::{AppError, AppResult};
-use crate::{AppState, dropbox, gdrive, oauth, onedrive, remote};
 use super::app::open_url;
 use super::connect::ConnectResult;
+use crate::error::{AppError, AppResult};
+use crate::{dropbox, gdrive, oauth, onedrive, remote, AppState};
 use std::sync::Arc;
 use tauri::State;
 
@@ -16,13 +16,19 @@ pub(crate) fn cloud_services() -> oauth::CloudServices {
 /// Signs in to a cloud service in the browser; returns the refresh token (the
 /// interface keeps it in the keychain) and the account name.
 #[tauri::command]
-pub(crate) async fn cloud_sign_in(service: String, client_id: Option<String>, client_secret: Option<String>) -> AppResult<oauth::SignedIn> {
+pub(crate) async fn cloud_sign_in(
+    service: String,
+    client_id: Option<String>,
+    client_secret: Option<String>,
+) -> AppResult<oauth::SignedIn> {
     let open = |url: &str| open_url(url.to_string());
     match service.as_str() {
         "dropbox" => dropbox::sign_in(open).await,
         // Google Drive: with the user's own app key (see docs/google-drive.md).
         "onedrive" => onedrive::sign_in(open).await,
-        "gdrive" => gdrive::sign_in(client_id.as_deref().unwrap_or(""), client_secret.as_deref().unwrap_or(""), open).await,
+        "gdrive" => {
+            gdrive::sign_in(client_id.as_deref().unwrap_or(""), client_secret.as_deref().unwrap_or(""), open).await
+        }
         _ => Err(AppError::other("Diesen Cloud-Dienst kennt Bitcrane noch nicht.")),
     }
 }
@@ -34,7 +40,11 @@ pub(crate) fn cloud_sign_in_cancel() {
 }
 
 #[tauri::command]
-pub(crate) async fn dropbox_connect(state: State<'_, AppState>, server_id: String, params: dropbox::DropboxParams) -> AppResult<ConnectResult> {
+pub(crate) async fn dropbox_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: dropbox::DropboxParams,
+) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::Dropbox(Arc::new(dropbox::DropboxConn::connect(params).await?));
     let home = conn.home().to_string();
@@ -43,7 +53,11 @@ pub(crate) async fn dropbox_connect(state: State<'_, AppState>, server_id: Strin
 }
 
 #[tauri::command]
-pub(crate) async fn gdrive_connect(state: State<'_, AppState>, server_id: String, params: gdrive::GDriveParams) -> AppResult<ConnectResult> {
+pub(crate) async fn gdrive_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: gdrive::GDriveParams,
+) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::GDrive(Arc::new(gdrive::GDriveConn::connect(params).await?));
     let home = conn.home().to_string();
@@ -52,7 +66,11 @@ pub(crate) async fn gdrive_connect(state: State<'_, AppState>, server_id: String
 }
 
 #[tauri::command]
-pub(crate) async fn onedrive_connect(state: State<'_, AppState>, server_id: String, params: onedrive::OneDriveParams) -> AppResult<ConnectResult> {
+pub(crate) async fn onedrive_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: onedrive::OneDriveParams,
+) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = Arc::new(onedrive::OneDriveConn::connect(params).await?);
     let refresh_token = Some(conn.refresh_token().await);

@@ -147,15 +147,19 @@ pub struct TokenAnswer {
 
 /// Posts a form to a token endpoint and reads the answer.
 pub async fn token_request(client: &reqwest::Client, url: &str, form: &[(&str, &str)]) -> AppResult<TokenAnswer> {
-    let resp = client.post(url).form(form).send().await.map_err(|e| AppError::new(ErrorKind::Unreachable, "Der Anmeldedienst ist nicht erreichbar.").with_detail(e.to_string()))?;
+    let resp = client.post(url).form(form).send().await.map_err(|e| {
+        AppError::new(ErrorKind::Unreachable, "Der Anmeldedienst ist nicht erreichbar.").with_detail(e.to_string())
+    })?;
     let status = resp.status();
     let text = resp.text().await.unwrap_or_default();
     if !status.is_success() {
         // invalid_grant: the stored sign-in was revoked or has expired.
         let kind = if text.contains("invalid_grant") { ErrorKind::AuthFailed } else { ErrorKind::Other };
-        return Err(AppError::new(kind, "Die Anmeldung beim Dienst ist nicht mehr gültig. Bitte neu anmelden.").with_detail(format!("{status}: {text}")));
+        return Err(AppError::new(kind, "Die Anmeldung beim Dienst ist nicht mehr gültig. Bitte neu anmelden.")
+            .with_detail(format!("{status}: {text}")));
     }
-    serde_json::from_str(&text).map_err(|e| AppError::other("Unerwartete Antwort des Anmeldedienstes.").with_detail(format!("{e}: {text}")))
+    serde_json::from_str(&text)
+        .map_err(|e| AppError::other("Unerwartete Antwort des Anmeldedienstes.").with_detail(format!("{e}: {text}")))
 }
 
 /// HTTP client for the cloud services (public certificates only).

@@ -11,8 +11,9 @@ use crate::paths::{remote_join, remote_name, remote_parent};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use smb::{
-    Client, ClientConfig, CreateOptions, DirAccessMask, Directory, File, FileAccessMask, FileAttributes, FileBasicInformation, FileCreateArgs, FileDispositionInformation,
-    FileIdBothDirectoryInformation, FileNetworkOpenInformation, FileRenameInformation, Resource, UncPath,
+    Client, ClientConfig, CreateOptions, DirAccessMask, Directory, File, FileAccessMask, FileAttributes,
+    FileBasicInformation, FileCreateArgs, FileDispositionInformation, FileIdBothDirectoryInformation,
+    FileNetworkOpenInformation, FileRenameInformation, Resource, UncPath,
 };
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
@@ -95,18 +96,28 @@ fn map_err(e: smb::Error, what: &str) -> AppError {
     let detail = e.to_string();
     let err = match status_of(&e) {
         Some(status::ACCESS_DENIED) => AppError::new(ErrorKind::PermissionDenied, format!("Kein Zugriff auf {what}.")),
-        Some(status::NAME_NOT_FOUND | status::PATH_NOT_FOUND) => AppError::new(ErrorKind::NotFound, format!("{what} gibt es nicht.")),
+        Some(status::NAME_NOT_FOUND | status::PATH_NOT_FOUND) => {
+            AppError::new(ErrorKind::NotFound, format!("{what} gibt es nicht."))
+        }
         Some(status::NAME_COLLISION) => AppError::new(ErrorKind::AlreadyExists, format!("{what} gibt es hier schon.")),
         Some(status::SHARING_VIOLATION) => AppError::other(format!("{what} ist auf dem Server gerade geöffnet.")),
         Some(status::DELETE_PENDING) => AppError::new(ErrorKind::NotFound, format!("{what} wird gerade gelöscht.")),
-        Some(status::LOGON_FAILURE) => AppError::new(ErrorKind::AuthFailed, "Benutzername oder Passwort stimmen nicht."),
-        Some(status::ACCOUNT_RESTRICTION | status::ACCOUNT_DISABLED) => AppError::new(ErrorKind::AuthFailed, "Das Konto darf sich so nicht anmelden (gesperrt oder ohne Passwort)."),
+        Some(status::LOGON_FAILURE) => {
+            AppError::new(ErrorKind::AuthFailed, "Benutzername oder Passwort stimmen nicht.")
+        }
+        Some(status::ACCOUNT_RESTRICTION | status::ACCOUNT_DISABLED) => {
+            AppError::new(ErrorKind::AuthFailed, "Das Konto darf sich so nicht anmelden (gesperrt oder ohne Passwort).")
+        }
         Some(status::PASSWORD_EXPIRED) => AppError::new(ErrorKind::AuthFailed, "Das Passwort ist abgelaufen."),
-        Some(status::BAD_NETWORK_NAME) => AppError::new(ErrorKind::NotFound, format!("Die Freigabe {what} gibt es auf dem Server nicht.")),
+        Some(status::BAD_NETWORK_NAME) => {
+            AppError::new(ErrorKind::NotFound, format!("Die Freigabe {what} gibt es auf dem Server nicht."))
+        }
         Some(status::DIRECTORY_NOT_EMPTY) => AppError::other(format!("{what} ist nicht leer.")),
         Some(status::NOT_A_DIRECTORY) => AppError::other(format!("{what} ist kein Ordner.")),
         Some(status::FILE_IS_A_DIRECTORY) => AppError::other(format!("{what} ist ein Ordner.")),
-        _ if is_connection_error(&e) => AppError::new(ErrorKind::ConnectionLost, "Die Verbindung zum Server ist abgebrochen."),
+        _ if is_connection_error(&e) => {
+            AppError::new(ErrorKind::ConnectionLost, "Die Verbindung zum Server ist abgebrochen.")
+        }
         _ => AppError::other(format!("Der Server hat {what} abgelehnt.")),
     };
     err.with_detail(detail)
@@ -133,7 +144,8 @@ fn split(path: &str) -> Option<(String, String)> {
 }
 
 fn need_share(path: &str) -> AppResult<(String, String)> {
-    split(path).ok_or_else(|| AppError::other("In der Liste der Freigaben lassen sich keine Dateien anlegen oder ändern."))
+    split(path)
+        .ok_or_else(|| AppError::other("In der Liste der Freigaben lassen sich keine Dateien anlegen oder ändern."))
 }
 
 /// Windows file time (100 ns since 1601) -> milliseconds since 1970.
@@ -192,7 +204,12 @@ impl SmbConn {
         }
         let params = SmbParams { host, share: params.share.trim().trim_matches(['/', '\\']).to_string(), ..params };
         let home = if params.share.is_empty() { "/".to_string() } else { format!("/{}", params.share) };
-        let conn = SmbConn { client: Mutex::new(Arc::new(Self::new_client(&params))), shares: Mutex::new(HashSet::new()), params, home };
+        let conn = SmbConn {
+            client: Mutex::new(Arc::new(Self::new_client(&params))),
+            shares: Mutex::new(HashSet::new()),
+            params,
+            home,
+        };
         // Check the login right away, so wrong passwords show up when connecting.
         if conn.params.share.is_empty() {
             conn.list_shares().await?;
@@ -213,9 +230,9 @@ impl SmbConn {
     }
 
     fn unc(&self, share: &str) -> AppResult<UncPath> {
-        UncPath::new(&self.params.host)
-            .and_then(|u| u.with_share(share))
-            .map_err(|e| AppError::other(format!("„{share}“ ist kein gültiger Name einer Freigabe.")).with_detail(e.to_string()))
+        UncPath::new(&self.params.host).and_then(|u| u.with_share(share)).map_err(|e| {
+            AppError::other(format!("„{share}“ ist kein gültiger Name einer Freigabe.")).with_detail(e.to_string())
+        })
     }
 
     async fn client(&self) -> Arc<Client> {
@@ -233,7 +250,11 @@ impl SmbConn {
 
     fn connect_err(&self, e: smb::Error, share: &str) -> AppError {
         if matches!(e, smb::Error::TransportError(_) | smb::Error::IoError(_)) {
-            return AppError::new(ErrorKind::Unreachable, format!("{} ist nicht erreichbar (Port {}).", self.params.host, self.params.port)).with_detail(e.to_string());
+            return AppError::new(
+                ErrorKind::Unreachable,
+                format!("{} ist nicht erreichbar (Port {}).", self.params.host, self.params.port),
+            )
+            .with_detail(e.to_string());
         }
         map_err(e, &format!("„{share}“"))
     }
@@ -272,7 +293,10 @@ impl SmbConn {
 
     async fn open_dir(&self, path: &str) -> AppResult<Arc<Directory>> {
         let access = DirAccessMask::new().with_list_directory(true).with_read_attributes(true).with_synchronize(true);
-        let args = FileCreateArgs { options: CreateOptions::new().with_directory_file(true), ..FileCreateArgs::make_open_existing(access.into()) };
+        let args = FileCreateArgs {
+            options: CreateOptions::new().with_directory_file(true),
+            ..FileCreateArgs::make_open_existing(access.into())
+        };
         match self.open(path, &args).await? {
             Resource::Directory(d) => Ok(Arc::new(d)),
             other => {
@@ -283,7 +307,10 @@ impl SmbConn {
     }
 
     async fn open_file(&self, path: &str, access: FileAccessMask) -> AppResult<File> {
-        let args = FileCreateArgs { options: CreateOptions::new().with_non_directory_file(true), ..FileCreateArgs::make_open_existing(access) };
+        let args = FileCreateArgs {
+            options: CreateOptions::new().with_non_directory_file(true),
+            ..FileCreateArgs::make_open_existing(access)
+        };
         match self.open(path, &args).await? {
             Resource::File(f) => Ok(f),
             other => {
@@ -318,14 +345,20 @@ impl SmbConn {
                     retried = true;
                     self.reset().await;
                 }
-                Err(e) if status_of(&e).is_some() || matches!(e, smb::Error::TransportError(_) | smb::Error::IoError(_)) => {
+                Err(e)
+                    if status_of(&e).is_some()
+                        || matches!(e, smb::Error::TransportError(_) | smb::Error::IoError(_)) =>
+                {
                     let err = self.connect_err(e, "IPC$");
                     if matches!(err.kind, ErrorKind::AuthFailed | ErrorKind::Unreachable) {
                         return Err(err);
                     }
                     return Err(AppError::other("Der Server gibt seine Freigaben nicht heraus. Trage die Freigabe in den Servereinstellungen ein.").with_detail(err.detail.unwrap_or_default()));
                 }
-                Err(e) => return Err(AppError::other("Der Server gibt seine Freigaben nicht heraus. Trage die Freigabe in den Servereinstellungen ein.").with_detail(e.to_string())),
+                Err(e) => return Err(AppError::other(
+                    "Der Server gibt seine Freigaben nicht heraus. Trage die Freigabe in den Servereinstellungen ein.",
+                )
+                .with_detail(e.to_string())),
             }
         }
     }
@@ -359,7 +392,9 @@ impl SmbConn {
         let Some((share, rest)) = split(path) else {
             return Ok(entry("/".into(), true, 0, 0));
         };
-        let args = FileCreateArgs::make_open_existing(FileAccessMask::new().with_file_read_attributes(true).with_synchronize(true));
+        let args = FileCreateArgs::make_open_existing(
+            FileAccessMask::new().with_file_read_attributes(true).with_synchronize(true),
+        );
         let res = self.open(path, &args).await?;
         let info = match &res {
             Resource::File(f) => f.query_info::<FileNetworkOpenInformation>().await,
@@ -381,7 +416,10 @@ impl SmbConn {
         if rest.is_empty() {
             return Err(AppError::other("Neue Freigaben lassen sich nur auf dem Server selbst anlegen."));
         }
-        let args = FileCreateArgs::make_create_new(FileAttributes::new().with_directory(true), CreateOptions::new().with_directory_file(true));
+        let args = FileCreateArgs::make_create_new(
+            FileAttributes::new().with_directory(true),
+            CreateOptions::new().with_directory_file(true),
+        );
         close(self.open(path, &args).await?).await;
         Ok(())
     }
@@ -411,9 +449,15 @@ impl SmbConn {
         if share_a != share_b {
             return Err(AppError::other("Zwischen zwei Freigaben lässt sich nur kopieren, nicht verschieben."));
         }
-        let args = FileCreateArgs::make_open_existing(FileAccessMask::new().with_delete(true).with_file_read_attributes(true).with_synchronize(true));
+        let args = FileCreateArgs::make_open_existing(
+            FileAccessMask::new().with_delete(true).with_file_read_attributes(true).with_synchronize(true),
+        );
         let res = self.open(from, &args).await?;
-        let info = FileRenameInformation { replace_if_exists: replace.into(), root_directory: 0, file_name: rest_b.replace('/', "\\").as_str().into() };
+        let info = FileRenameInformation {
+            replace_if_exists: replace.into(),
+            root_directory: 0,
+            file_name: rest_b.replace('/', "\\").as_str().into(),
+        };
         let result = match &res {
             Resource::File(f) => f.set_info(info).await,
             Resource::Directory(d) => d.set_info(info).await,
@@ -490,7 +534,12 @@ impl SmbConn {
         let root = self.stat(path).await?;
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: path.to_string(),
+                relative: rel(path),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let mut out = Vec::new();
         let mut stack = vec![path.to_string()];
@@ -511,7 +560,10 @@ impl SmbConn {
     /// (same share), otherwise through this computer.
     async fn copy_file(&self, from: &str, to: &str) -> AppResult<()> {
         let src = self.open_file(from, FileAccessMask::new().with_generic_read(true)).await?;
-        let args = FileCreateArgs { options: CreateOptions::new().with_non_directory_file(true), ..FileCreateArgs::make_create_new(FileAttributes::new(), CreateOptions::new()) };
+        let args = FileCreateArgs {
+            options: CreateOptions::new().with_non_directory_file(true),
+            ..FileCreateArgs::make_create_new(FileAttributes::new(), CreateOptions::new())
+        };
         let dst = match self.open(to, &args).await? {
             Resource::File(f) => f,
             other => {
@@ -520,7 +572,11 @@ impl SmbConn {
                 return Err(AppError::other(format!("{} lässt sich nicht anlegen.", quoted(to))));
             }
         };
-        let mut result = if dst.same_tree(&src) { dst.srv_copy(&src).await.map_err(|e| map_err(e, &quoted(to))) } else { Err(AppError::other("")) };
+        let mut result = if dst.same_tree(&src) {
+            dst.srv_copy(&src).await.map_err(|e| map_err(e, &quoted(to)))
+        } else {
+            Err(AppError::other(""))
+        };
         if result.is_err() {
             result = async {
                 let len = smb::GetLen::get_len(&src).await.map_err(|e| map_err(e, &quoted(from)))?;
@@ -635,12 +691,23 @@ impl SmbConn {
 
     /// Writes a file (`offset > 0` continues a partial one). The task returned
     /// finishes the upload; `mtime` (seconds) is set at the end.
-    pub async fn writer(&self, path: &str, offset: u64, mtime: Option<u32>) -> AppResult<(Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>)> {
+    pub async fn writer(
+        &self,
+        path: &str,
+        offset: u64,
+        mtime: Option<u32>,
+    ) -> AppResult<(Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>)> {
         let access = FileAccessMask::new().with_generic_read(true).with_generic_write(true).with_synchronize(true);
         let args = if offset > 0 {
-            FileCreateArgs { options: CreateOptions::new().with_non_directory_file(true), ..FileCreateArgs::make_open_existing(access) }
+            FileCreateArgs {
+                options: CreateOptions::new().with_non_directory_file(true),
+                ..FileCreateArgs::make_open_existing(access)
+            }
         } else {
-            FileCreateArgs { options: CreateOptions::new().with_non_directory_file(true), ..FileCreateArgs::make_overwrite(FileAttributes::new(), CreateOptions::new()) }
+            FileCreateArgs {
+                options: CreateOptions::new().with_non_directory_file(true),
+                ..FileCreateArgs::make_overwrite(FileAttributes::new(), CreateOptions::new())
+            }
         };
         let file = match self.open(path, &args).await? {
             Resource::File(f) => OpenFile(Arc::new(f)),
@@ -705,7 +772,11 @@ impl SmbConn {
 
     /// Modification time after an upload or copy.
     pub async fn set_mtime(&self, path: &str, mtime: u32) {
-        let Ok(f) = self.open_file(path, FileAccessMask::new().with_file_write_attributes(true).with_synchronize(true)).await else { return };
+        let Ok(f) =
+            self.open_file(path, FileAccessMask::new().with_file_write_attributes(true).with_synchronize(true)).await
+        else {
+            return;
+        };
         let _ = f.set_info(basic_times(mtime)).await;
         let _ = f.close().await;
     }
@@ -719,7 +790,13 @@ impl SmbConn {
 fn basic_times(secs: u32) -> FileBasicInformation {
     let t = from_secs(secs);
     let keep = smb::binrw_util::prelude::FileTime::ZERO;
-    FileBasicInformation { creation_time: keep, last_access_time: t, last_write_time: t, change_time: keep, file_attributes: FileAttributes::new() }
+    FileBasicInformation {
+        creation_time: keep,
+        last_access_time: t,
+        last_write_time: t,
+        change_time: keep,
+        file_attributes: FileAttributes::new(),
+    }
 }
 
 async fn join(t: tokio::task::JoinHandle<AppResult<()>>) -> AppResult<()> {
@@ -761,7 +838,10 @@ async fn write_all_at(f: &File, buf: &[u8], at: u64) -> AppResult<()> {
     while done < buf.len() {
         let n = f.write_block(&buf[done..], at + done as u64, None).await.map_err(io_err)?;
         if n == 0 {
-            return Err(AppError::new(ErrorKind::ConnectionLost, "Der Server hat nichts mehr angenommen (Speicher voll?)."));
+            return Err(AppError::new(
+                ErrorKind::ConnectionLost,
+                "Der Server hat nichts mehr angenommen (Speicher voll?).",
+            ));
         }
         done += n;
     }
@@ -801,7 +881,15 @@ pub fn test_params() -> Option<SmbParams> {
     let v = std::env::var("BITCRANE_TEST_SMB").ok()?;
     let mut it = v.split('/');
     let (host, port) = it.next()?.split_once(':')?;
-    Some(SmbParams { host: host.into(), port: port.parse().ok()?, share: it.next()?.into(), user: it.next()?.into(), password: Some(it.next()?.into()), encrypt: false, timeout: None })
+    Some(SmbParams {
+        host: host.into(),
+        port: port.parse().ok()?,
+        share: it.next()?.into(),
+        user: it.next()?.into(),
+        password: Some(it.next()?.into()),
+        encrypt: false,
+        timeout: None,
+    })
 }
 
 /// Integration test against an SMB server: `BITCRANE_TEST_SMB=host:port/share/user/password`.
@@ -830,8 +918,14 @@ mod integration {
         let mut got = String::new();
         r.read_to_string(&mut got).await.unwrap();
         assert_eq!(got, "welt!");
-        assert_eq!(conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(), vec!["über Kopie.txt".to_string()]);
-        assert_eq!(conn.rename(&file, &format!("{base}/a b/über Kopie.txt")).await.err().map(|e| e.kind), Some(ErrorKind::AlreadyExists));
+        assert_eq!(
+            conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(),
+            vec!["über Kopie.txt".to_string()]
+        );
+        assert_eq!(
+            conn.rename(&file, &format!("{base}/a b/über Kopie.txt")).await.err().map(|e| e.kind),
+            Some(ErrorKind::AlreadyExists)
+        );
         conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();
         assert_eq!(conn.walk(&base).await.unwrap().len(), 2);
         assert_eq!(conn.stat(&format!("{base}/fehlt")).await.err().map(|e| e.kind), Some(ErrorKind::NotFound));
@@ -842,4 +936,3 @@ mod integration {
         assert!(conn.list(&conn.home).await.is_ok());
     }
 }
-

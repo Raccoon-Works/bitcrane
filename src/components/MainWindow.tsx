@@ -29,15 +29,32 @@ function WinTitleBar({ menu = true }: { menu?: boolean }) {
       className="win-titlebar"
       // Free space in the title bar moves the window; a double click maximizes (handled by Tauri).
       data-tauri-drag-region
-      onContextMenu={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); setState({ appMenu: 'system' }); } }}
+      onContextMenu={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          setState({ appMenu: 'system' });
+        }
+      }}
     >
       {menu && <WinSystemMenu />}
       <ConnectionTabs variant="win" />
       <span className="flex-1 drag-area" data-tauri-drag-region />
       <div className="caption-buttons">
-        <button type="button" tabIndex={-1} aria-label={$t('Minimieren')} onClick={minimizeWindow}><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1"><path d="M0 5h10" /></svg></button>
-        <button type="button" tabIndex={-1} aria-label={$t('Maximieren')} onClick={toggleMaximizeWindow}><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="9" height="9" rx="1.5" /></svg></button>
-        <button type="button" tabIndex={-1} aria-label={$t('Schließen')} className="is-close" onClick={closeWindow}><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1"><path d="m0 0 10 10M10 0 0 10" /></svg></button>
+        <button type="button" tabIndex={-1} aria-label={$t('Minimieren')} onClick={minimizeWindow}>
+          <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1">
+            <path d="M0 5h10" />
+          </svg>
+        </button>
+        <button type="button" tabIndex={-1} aria-label={$t('Maximieren')} onClick={toggleMaximizeWindow}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+            <rect x="0.5" y="0.5" width="9" height="9" rx="1.5" />
+          </svg>
+        </button>
+        <button type="button" tabIndex={-1} aria-label={$t('Schließen')} className="is-close" onClick={closeWindow}>
+          <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1">
+            <path d="m0 0 10 10M10 0 0 10" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -61,7 +78,11 @@ export function MainWindow() {
   const showSide = sidebar;
   // The built-in editor takes the place of the two halves while it is shown.
   const editorOpen = useEditor().open;
-  const termFull = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full && s.terminals.some((x) => x.tabId === s.activeTabId));
+  const termFull = useStore(
+    (s) =>
+      !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.full &&
+      s.terminals.some((x) => x.tabId === s.activeTabId),
+  );
 
   return (
     <div className="window" role="application" aria-label="Bitcrane">
@@ -77,52 +98,105 @@ export function MainWindow() {
               {/* The settings show their areas here, so there is no second column beside the sidebar. */}
               {settingsTab ? <div className="side-settings" id="side-settings-slot" /> : <Sidebar />}
             </div>
-            <ResizeHandle orientation="vertical" label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')} value={sideWidth} min={150} max={340} step={10}
-              toValue={(start, d) => start + d} onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })} onReset={() => updateSettings({ sidebarWidth: 200 })} className="side-handle" />
+            <ResizeHandle
+              orientation="vertical"
+              label={$t('Breite der Seitenleiste (ziehen, Doppelklick: zurücksetzen)')}
+              value={sideWidth}
+              min={150}
+              max={340}
+              step={10}
+              toValue={(start, d) => start + d}
+              onChange={(v) => updateSettings({ sidebarWidth: Math.round(v) })}
+              onReset={() => updateSettings({ sidebarWidth: 200 })}
+              className="side-handle"
+            />
           </>
         )}
         <div className="window-col">
-      {platform === 'win' && <WinTitleBar menu={!showSide} />}
-      {/* Mac: the title bar holds the window buttons and the tabs (Transmit); the toolbar sits below, as on Windows. */}
-      {platform === 'mac' && (
-        <div className="mac-titlebar" data-tauri-drag-region>
-          {!showSide && <TrafficLights />}
-          <ConnectionTabs variant="mac" />
-        </div>
-      )}
-      <div className="window-body">
-          {settingsTab ? <SettingsPage section={settingsTab} /> : <div className="main-col">
-            <Toolbar />
-            <div className="content">
-              <div className="content-main">
-                {/* A terminal in a tab of its own fills the place of the two halves. */}
-                {editorOpen && !termFull && <Suspense fallback={<div className="code-editor" />}><CodeEditor /></Suspense>}
-                {!termFull && !editorOpen && <div className={`panes${stacked ? ' is-stacked' : ''}${single ? ' is-single' : ''}`} ref={panesRef} style={{ '--split': split } as CSSProperties}>
-                  {single ? <Pane side={focusSide} /> : <>
-                  {swap ? <Pane side="remote" /> : <Pane side="local" />}
-                  {/* The line between the halves: drag to share the width differently (double click: half and half). */}
-                  <ResizeHandle orientation={stacked ? 'horizontal' : 'vertical'} label={stacked ? $t('Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)') : $t('Breite der Hälften (ziehen, Doppelklick: zurücksetzen)')} value={split} min={0.2} max={0.8} step={0.02}
-                    toValue={(start, d) => start + d / Math.max(1, (stacked ? panesRef.current?.offsetHeight : panesRef.current?.offsetWidth) ?? 1)}
-                    onChange={(v) => updateSettings({ splitRatio: v })} onReset={() => updateSettings({ splitRatio: 0.5 })} className="split-handle" />
-                  {swap ? <Pane side="local" /> : <Pane side="remote" />}
-                  </>}
-                </div>}
-                <TerminalPanel />
-                {!termFull && <Activity />}
-              </div>
-              {inspector && <Inspector />}
+          {platform === 'win' && <WinTitleBar menu={!showSide} />}
+          {/* Mac: the title bar holds the window buttons and the tabs (Transmit); the toolbar sits below, as on Windows. */}
+          {platform === 'mac' && (
+            <div className="mac-titlebar" data-tauri-drag-region>
+              {!showSide && <TrafficLights />}
+              <ConnectionTabs variant="mac" />
             </div>
-          </div>}
-      </div>
+          )}
+          <div className="window-body">
+            {settingsTab ? (
+              <SettingsPage section={settingsTab} />
+            ) : (
+              <div className="main-col">
+                <Toolbar />
+                <div className="content">
+                  <div className="content-main">
+                    {/* A terminal in a tab of its own fills the place of the two halves. */}
+                    {editorOpen && !termFull && (
+                      <Suspense fallback={<div className="code-editor" />}>
+                        <CodeEditor />
+                      </Suspense>
+                    )}
+                    {!termFull && !editorOpen && (
+                      <div
+                        className={`panes${stacked ? ' is-stacked' : ''}${single ? ' is-single' : ''}`}
+                        ref={panesRef}
+                        style={{ '--split': split } as CSSProperties}
+                      >
+                        {single ? (
+                          <Pane side={focusSide} />
+                        ) : (
+                          <>
+                            {swap ? <Pane side="remote" /> : <Pane side="local" />}
+                            {/* The line between the halves: drag to share the width differently (double click: half and half). */}
+                            <ResizeHandle
+                              orientation={stacked ? 'horizontal' : 'vertical'}
+                              label={
+                                stacked
+                                  ? $t('Höhe der Hälften (ziehen, Doppelklick: zurücksetzen)')
+                                  : $t('Breite der Hälften (ziehen, Doppelklick: zurücksetzen)')
+                              }
+                              value={split}
+                              min={0.2}
+                              max={0.8}
+                              step={0.02}
+                              toValue={(start, d) =>
+                                start +
+                                d /
+                                  Math.max(
+                                    1,
+                                    (stacked ? panesRef.current?.offsetHeight : panesRef.current?.offsetWidth) ?? 1,
+                                  )
+                              }
+                              onChange={(v) => updateSettings({ splitRatio: v })}
+                              onReset={() => updateSettings({ splitRatio: 0.5 })}
+                              className="split-handle"
+                            />
+                            {swap ? <Pane side="local" /> : <Pane side="remote" />}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <TerminalPanel />
+                    {!termFull && <Activity />}
+                  </div>
+                  {inspector && <Inspector />}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {/* Neutral card in the normal text colour; only the small symbol shows the kind of message. */}
       {toast && (
         <div className={`toast toast-${toast.tone}`} role={toast.tone === 'error' ? 'alert' : 'status'}>
-          {toast.tone === 'ok' ? <CheckCircle size={18} className="toast-icon" aria-hidden="true" />
-            : toast.tone === 'error' ? <WarningCircle size={18} className="toast-icon" aria-hidden="true" />
-              : toast.tone === 'update' ? <DownloadSimple size={18} className="toast-icon" aria-hidden="true" />
-                : <Info size={18} className="toast-icon" aria-hidden="true" />}
+          {toast.tone === 'ok' ? (
+            <CheckCircle size={18} className="toast-icon" aria-hidden="true" />
+          ) : toast.tone === 'error' ? (
+            <WarningCircle size={18} className="toast-icon" aria-hidden="true" />
+          ) : toast.tone === 'update' ? (
+            <DownloadSimple size={18} className="toast-icon" aria-hidden="true" />
+          ) : (
+            <Info size={18} className="toast-icon" aria-hidden="true" />
+          )}
           <span className="toast-body">
             <span>{toast.text}</span>
             {toast.hint && <span className="toast-hint">{toast.hint}</span>}

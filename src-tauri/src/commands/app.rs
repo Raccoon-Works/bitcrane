@@ -2,7 +2,7 @@
 //! system settings.
 
 use crate::error::{AppError, AppResult};
-use crate::{AppState, iconmenu, paths, shell_integration, tray};
+use crate::{iconmenu, paths, shell_integration, tray, AppState};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -142,7 +142,8 @@ pub(crate) fn mark_update_restart(app: tauri::AppHandle) -> AppResult<()> {
     if let Some(dir) = marker.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    std::fs::write(&marker, b"1").map_err(|e| AppError::other("Update-Hinweis konnte nicht gespeichert werden.").with_detail(e.to_string()))
+    std::fs::write(&marker, b"1")
+        .map_err(|e| AppError::other("Update-Hinweis konnte nicht gespeichert werden.").with_detail(e.to_string()))
 }
 
 /// The interface has decided whether the window stays hidden (no fallback needed).
@@ -215,9 +216,16 @@ pub(crate) fn log_path(state: State<'_, AppState>) -> String {
 
 /// Shows or hides the status icon and sets its tooltip and menu.
 #[tauri::command]
-pub(crate) fn tray_update(app: tauri::AppHandle, visible: bool, tooltip: String, items: Vec<tray::TrayItem>) -> AppResult<()> {
+pub(crate) fn tray_update(
+    app: tauri::AppHandle,
+    visible: bool,
+    tooltip: String,
+    items: Vec<tray::TrayItem>,
+) -> AppResult<()> {
     iconmenu::update(&app, &items);
-    tray::update(&app, visible, &tooltip, &items).map_err(|e| AppError::other("Das Symbol in der Menüleiste konnte nicht gesetzt werden.").with_detail(e.to_string()))
+    tray::update(&app, visible, &tooltip, &items).map_err(|e| {
+        AppError::other("Das Symbol in der Menüleiste konnte nicht gesetzt werden.").with_detail(e.to_string())
+    })
 }
 
 /// Quits the app for real (also when it would otherwise keep running in the background).

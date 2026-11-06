@@ -47,7 +47,13 @@ function file(size: number, mtime: number, perms = '644', owner = 'deploy', grou
   return { kind: 'file', size, mtime, perms, owner, group };
 }
 
-function dir(children: Record<string, Node>, mtime = ago(2 * DAY), perms = '755', owner = 'deploy', group = 'deploy'): DirNode {
+function dir(
+  children: Record<string, Node>,
+  mtime = ago(2 * DAY),
+  perms = '755',
+  owner = 'deploy',
+  group = 'deploy',
+): DirNode {
   return { kind: 'dir', mtime, perms, owner, group, children };
 }
 
@@ -57,71 +63,108 @@ const ld = (children: Record<string, Node>, mtime?: number) => dir(children, mti
 
 /** Creates the sample project that appears both locally and on the server. */
 function shopLocal(): DirNode {
-  return ld({
-    routes: ld({
-      'cart.py': lf(8 * 1024, ago(3 * MIN)),
-      'products.py': lf(21 * 1024, ago(2 * DAY)),
-      'checkout.py': lf(12 * 1024, ago(5 * DAY)),
-    }, ago(1 * MIN)),
-    admin: ld({
-      static: ld({
-        'app.css': lf(48 * 1024, ago(2 * MIN)),
-        'logo.png': lf(96 * 1024, ago(2 * MIN)),
-        'style.css': lf(18 * 1024, ago(3 * DAY)),
-      }, ago(2 * MIN)),
-      templates: ld({
-        'index.html': lf(9 * 1024, ago(4 * DAY)),
-        'login.html': lf(4 * 1024, ago(9 * DAY)),
-      }),
-      'views.py': lf(16 * 1024, ago(6 * DAY)),
-    }, ago(2 * MIN)),
-    'app.py': lf(14 * 1024, ago(9 * MIN)),
-    'config.py': lf(3 * 1024, ago(1 * DAY + 4 * HOUR)),
-    'requirements.txt': lf(1 * 1024, onDay(12, 10)),
-    'README.md': lf(6 * 1024, onDay(8, 10)),
-    '.env': lf(1 * 1024, onDay(2, 10)),
-  }, ago(1 * MIN));
+  return ld(
+    {
+      routes: ld(
+        {
+          'cart.py': lf(8 * 1024, ago(3 * MIN)),
+          'products.py': lf(21 * 1024, ago(2 * DAY)),
+          'checkout.py': lf(12 * 1024, ago(5 * DAY)),
+        },
+        ago(1 * MIN),
+      ),
+      admin: ld(
+        {
+          static: ld(
+            {
+              'app.css': lf(48 * 1024, ago(2 * MIN)),
+              'logo.png': lf(96 * 1024, ago(2 * MIN)),
+              'style.css': lf(18 * 1024, ago(3 * DAY)),
+            },
+            ago(2 * MIN),
+          ),
+          templates: ld({
+            'index.html': lf(9 * 1024, ago(4 * DAY)),
+            'login.html': lf(4 * 1024, ago(9 * DAY)),
+          }),
+          'views.py': lf(16 * 1024, ago(6 * DAY)),
+        },
+        ago(2 * MIN),
+      ),
+      'app.py': lf(14 * 1024, ago(9 * MIN)),
+      'config.py': lf(3 * 1024, ago(1 * DAY + 4 * HOUR)),
+      'requirements.txt': lf(1 * 1024, onDay(12, 10)),
+      'README.md': lf(6 * 1024, onDay(8, 10)),
+      '.env': lf(1 * 1024, onDay(2, 10)),
+    },
+    ago(1 * MIN),
+  );
 }
 
 function shopRemote(): DirNode {
-  return dir({
-    routes: dir({
-      'cart.py': file(8 * 1024, ago(3 * MIN)),
-      'products.py': file(21 * 1024, ago(2 * DAY)),
-      'checkout.py': file(12 * 1024, ago(5 * DAY)),
-    }, ago(1 * MIN)),
-    admin: dir({
-      static: dir({
-        'app.css': file(47 * 1024, ago(1 * DAY)),
-        'style.css': file(18 * 1024, ago(3 * DAY)),
-      }, ago(1 * DAY)),
-      templates: dir({
-        'index.html': file(9 * 1024, ago(4 * DAY)),
-        'login.html': file(4 * 1024, ago(9 * DAY)),
-      }),
-      'views.py': file(16 * 1024, ago(6 * DAY)),
-    }, ago(55 * MIN)),
-    logs: dir({
-      'app.log': file(412 * 1024, ago(1 * MIN)),
-      'error.log': file(18 * 1024, ago(2 * HOUR)),
-      // A large folder (rotated hourly logs), to try long lists in the prototype.
-      archiv: dir(Object.fromEntries(Array.from({ length: 2400 }, (_, i) => [`app-${String(Math.floor(i / 24) + 1).padStart(3, '0')}-${String(i % 24).padStart(2, '0')}h.log`, file(20 * 1024 + ((i * 7919) % 90000), ago((i + 1) * HOUR))]))),
-    }, ago(1 * MIN)),
-    'app.py': file(14 * 1024, ago(9 * MIN)),
-    'config.py': file(3 * 1024, ago(1 * DAY + 4 * HOUR)),
-    'data.db': file(Math.round(2.4 * 1024 * 1024), ago(1 * MIN)),
-    '.env': file(1 * 1024, onDay(2, 10), '600'),
-  }, ago(1 * MIN));
+  return dir(
+    {
+      routes: dir(
+        {
+          'cart.py': file(8 * 1024, ago(3 * MIN)),
+          'products.py': file(21 * 1024, ago(2 * DAY)),
+          'checkout.py': file(12 * 1024, ago(5 * DAY)),
+        },
+        ago(1 * MIN),
+      ),
+      admin: dir(
+        {
+          static: dir(
+            {
+              'app.css': file(47 * 1024, ago(1 * DAY)),
+              'style.css': file(18 * 1024, ago(3 * DAY)),
+            },
+            ago(1 * DAY),
+          ),
+          templates: dir({
+            'index.html': file(9 * 1024, ago(4 * DAY)),
+            'login.html': file(4 * 1024, ago(9 * DAY)),
+          }),
+          'views.py': file(16 * 1024, ago(6 * DAY)),
+        },
+        ago(55 * MIN),
+      ),
+      logs: dir(
+        {
+          'app.log': file(412 * 1024, ago(1 * MIN)),
+          'error.log': file(18 * 1024, ago(2 * HOUR)),
+          // A large folder (rotated hourly logs), to try long lists in the prototype.
+          archiv: dir(
+            Object.fromEntries(
+              Array.from({ length: 2400 }, (_, i) => [
+                `app-${String(Math.floor(i / 24) + 1).padStart(3, '0')}-${String(i % 24).padStart(2, '0')}h.log`,
+                file(20 * 1024 + ((i * 7919) % 90000), ago((i + 1) * HOUR)),
+              ]),
+            ),
+          ),
+        },
+        ago(1 * MIN),
+      ),
+      'app.py': file(14 * 1024, ago(9 * MIN)),
+      'config.py': file(3 * 1024, ago(1 * DAY + 4 * HOUR)),
+      'data.db': file(Math.round(2.4 * 1024 * 1024), ago(1 * MIN)),
+      '.env': file(1 * 1024, onDay(2, 10), '600'),
+    },
+    ago(1 * MIN),
+  );
 }
 
 function blog(local: boolean): DirNode {
   const f = local ? lf : file;
   const d = local ? ld : dir;
-  return d({
-    'main.py': f(11 * 1024, ago(3 * DAY)),
-    'feed.py': f(27 * 1024, ago(3 * DAY)),
-    'requirements.txt': f(1024, ago(20 * DAY)),
-  }, ago(3 * DAY));
+  return d(
+    {
+      'main.py': f(11 * 1024, ago(3 * DAY)),
+      'feed.py': f(27 * 1024, ago(3 * DAY)),
+      'requirements.txt': f(1024, ago(20 * DAY)),
+    },
+    ago(3 * DAY),
+  );
 }
 
 /** Local file system of the user's computer. Home is "~". */
@@ -168,11 +211,17 @@ function createRemote(serverId: string): DirNode {
       return dir({
         var: dir({
           www: dir({
-            portfolio: dir({
-              assets: dir({ templates: dir({ 'index.php': file(5 * 1024, ago(7 * DAY)) }) }),
-              'index.php': file(5 * 1024, ago(7 * DAY), '644', 'www-data', 'www-data'),
-              'style.css': file(21 * 1024, ago(9 * DAY), '644', 'www-data', 'www-data'),
-            }, ago(7 * DAY), '755', 'www-data', 'www-data'),
+            portfolio: dir(
+              {
+                assets: dir({ templates: dir({ 'index.php': file(5 * 1024, ago(7 * DAY)) }) }),
+                'index.php': file(5 * 1024, ago(7 * DAY), '644', 'www-data', 'www-data'),
+                'style.css': file(21 * 1024, ago(9 * DAY), '644', 'www-data', 'www-data'),
+              },
+              ago(7 * DAY),
+              '755',
+              'www-data',
+              'www-data',
+            ),
           }),
         }),
       });
@@ -247,7 +296,9 @@ export function list(side: 'local' | 'remote', serverId: string, path: string): 
   if (!d) return [];
   return Object.entries(d.children)
     .map(([name, n]) => toEntry(name, n))
-    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }) : a.kind === 'dir' ? -1 : 1));
+    .sort((a, b) =>
+      a.kind === b.kind ? a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }) : a.kind === 'dir' ? -1 : 1,
+    );
 }
 
 export function stat(side: 'local' | 'remote', serverId: string, path: string): FileEntry | undefined {
@@ -260,7 +311,11 @@ export function isDir(side: 'local' | 'remote', serverId: string, path: string):
 }
 
 /** Counts all files below a path (used for folder uploads). */
-export function walkFiles(side: 'local' | 'remote', serverId: string, path: string): Array<{ path: string; entry: FileEntry }> {
+export function walkFiles(
+  side: 'local' | 'remote',
+  serverId: string,
+  path: string,
+): Array<{ path: string; entry: FileEntry }> {
   const n = find(side, serverId, path);
   if (!n) return [];
   if (n.kind === 'file') return [{ path, entry: toEntry(basename(path), n) }];
@@ -322,7 +377,15 @@ export function move(side: 'local' | 'remote', serverId: string, path: string, t
   return true;
 }
 
-export function chmod(side: 'local' | 'remote', serverId: string, path: string, perms: string, owner?: string, group?: string, recursive = false) {
+export function chmod(
+  side: 'local' | 'remote',
+  serverId: string,
+  path: string,
+  perms: string,
+  owner?: string,
+  group?: string,
+  recursive = false,
+) {
   const n = find(side, serverId, path);
   if (!n) return;
   const apply = (node: Node) => {

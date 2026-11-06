@@ -48,7 +48,8 @@ fn bind_error(spec: &ForwardSpec, e: std::io::Error) -> AppError {
     if e.kind() == std::io::ErrorKind::AddrInUse {
         AppError::new(ErrorKind::Other, format!("Der Port {what} ist auf diesem Computer schon belegt."))
     } else {
-        AppError::new(ErrorKind::Other, format!("Der Port {what} kann nicht geöffnet werden.")).with_detail(e.to_string())
+        AppError::new(ErrorKind::Other, format!("Der Port {what} kann nicht geöffnet werden."))
+            .with_detail(e.to_string())
     }
 }
 
@@ -127,7 +128,9 @@ impl Forwards {
         self.stop(&spec.id).await;
         let running = match spec.kind.as_str() {
             "local" | "dynamic" => {
-                let listener = TcpListener::bind((spec.bind_host.as_str(), spec.bind_port)).await.map_err(|e| bind_error(&spec, e))?;
+                let listener = TcpListener::bind((spec.bind_host.as_str(), spec.bind_port))
+                    .await
+                    .map_err(|e| bind_error(&spec, e))?;
                 let dynamic = spec.kind == "dynamic";
                 let (host, port) = (spec.dest_host.clone(), spec.dest_port);
                 let c = conn.clone();
@@ -148,14 +151,21 @@ impl Forwards {
             }
             "remote" => {
                 let (handle, map) = conn.tunnel()?;
-                let port = handle
-                    .tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32)
-                    .await
-                    .map_err(|e| AppError::new(ErrorKind::Other, format!("Der Server lehnt die Weiterleitung von Port {} ab.", spec.bind_port)).with_detail(e.to_string()))?;
+                let port = handle.tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32).await.map_err(|e| {
+                    AppError::new(
+                        ErrorKind::Other,
+                        format!("Der Server lehnt die Weiterleitung von Port {} ab.", spec.bind_port),
+                    )
+                    .with_detail(e.to_string())
+                })?;
                 // Port 0: the server chose one.
                 let port = if spec.bind_port == 0 { port } else { spec.bind_port as u32 };
                 map.lock().unwrap().insert(port, (spec.dest_host.clone(), spec.dest_port));
-                Running { server_id: server_id.into(), task: None, remote: Some((conn.clone(), spec.bind_host.clone(), port)) }
+                Running {
+                    server_id: server_id.into(),
+                    task: None,
+                    remote: Some((conn.clone(), spec.bind_host.clone(), port)),
+                }
             }
             other => return Err(AppError::other(format!("Unbekannte Art der Weiterleitung: {other}"))),
         };
@@ -180,7 +190,8 @@ impl Forwards {
 
     /// Ends every tunnel of a server (on disconnect).
     pub async fn stop_server(&self, server_id: &str) {
-        let ids: Vec<String> = self.0.lock().unwrap().iter().filter(|(_, r)| r.server_id == server_id).map(|(id, _)| id.clone()).collect();
+        let ids: Vec<String> =
+            self.0.lock().unwrap().iter().filter(|(_, r)| r.server_id == server_id).map(|(id, _)| id.clone()).collect();
         for id in ids {
             self.stop(&id).await;
         }

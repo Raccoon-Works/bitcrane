@@ -22,7 +22,9 @@ use cloud_filter::filter::{info, ticket, Filter, Request};
 use cloud_filter::metadata::Metadata;
 use cloud_filter::placeholder::{ConvertOptions, Placeholder, UpdateOptions};
 use cloud_filter::placeholder_file::PlaceholderFile;
-use cloud_filter::root::{HydrationType, PopulationType, SecurityId, Session, SyncRootId, SyncRootIdBuilder, SyncRootInfo};
+use cloud_filter::root::{
+    HydrationType, PopulationType, SecurityId, Session, SyncRootId, SyncRootIdBuilder, SyncRootInfo,
+};
 use cloud_filter::utility::{FileTime, WriteAt};
 use notify::{EventKind, RecursiveMode};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
@@ -72,7 +74,8 @@ fn fail(message: &str, e: impl std::fmt::Debug) -> AppError {
 
 /// Folder for a server: %USERPROFILE%\Bitcrane\<name>.
 fn folder_for(name: &str) -> PathBuf {
-    let clean: String = name.chars().map(|c| if r#"<>:"/\|?*"#.contains(c) || c.is_control() { '_' } else { c }).collect();
+    let clean: String =
+        name.chars().map(|c| if r#"<>:"/\|?*"#.contains(c) || c.is_control() { '_' } else { c }).collect();
     let clean = clean.trim().trim_end_matches('.').to_string();
     crate::paths::home().join("Bitcrane").join(if clean.is_empty() { "Server".to_string() } else { clean })
 }
@@ -85,13 +88,24 @@ fn sync_root_id(server_id: &str) -> AppResult<SyncRootId> {
 impl Mounts {
     /// Shows a server as a folder in the Explorer. Returns the folder.
     #[allow(clippy::too_many_arguments)]
-    pub fn start(&self, app: AppHandle, connections: Connections, connection_id: String, server_id: String, name: String, remote_root: String) -> AppResult<String> {
+    pub fn start(
+        &self,
+        app: AppHandle,
+        connections: Connections,
+        connection_id: String,
+        server_id: String,
+        name: String,
+        remote_root: String,
+    ) -> AppResult<String> {
         if !cloud_filter::root::is_supported().unwrap_or(false) {
-            return Err(AppError::other("Diese Windows-Version kann Server nicht als Ordner im Explorer zeigen (ab Windows 10, Version 1709)."));
+            return Err(AppError::other(
+                "Diese Windows-Version kann Server nicht als Ordner im Explorer zeigen (ab Windows 10, Version 1709).",
+            ));
         }
         self.stop_inner(&server_id, false);
         let root = folder_for(&name);
-        std::fs::create_dir_all(&root).map_err(|e| fail("Der Ordner für den Server konnte nicht angelegt werden.", e))?;
+        std::fs::create_dir_all(&root)
+            .map_err(|e| fail("Der Ordner für den Server konnte nicht angelegt werden.", e))?;
         let id = sync_root_id(&server_id)?;
         // A renamed server gets a new folder: the old registration goes first.
         if id.is_registered().unwrap_or(false) && id.info().map(|i| i.path() != root).unwrap_or(true) {
@@ -123,9 +137,21 @@ impl Mounts {
         let session = Session::new()
             .connect_async(&root, filter, move |f| rt.block_on(f))
             .map_err(|e| fail("Die Verbindung zum Explorer konnte nicht hergestellt werden.", e))?;
-        let watcher = start_watcher(Uploader { app, connections, connection_id, server_id: server_id.clone(), root: root.clone(), remote_root, pending: pending.clone(), rt: Handle::current() })?;
+        let watcher = start_watcher(Uploader {
+            app,
+            connections,
+            connection_id,
+            server_id: server_id.clone(),
+            root: root.clone(),
+            remote_root,
+            pending: pending.clone(),
+            rt: Handle::current(),
+        })?;
         let folder = root.to_string_lossy().to_string();
-        self.0.lock().unwrap().insert(server_id, Mount { root, id, session: Box::new(session), _watcher: watcher, pending });
+        self.0
+            .lock()
+            .unwrap()
+            .insert(server_id, Mount { root, id, session: Box::new(session), _watcher: watcher, pending });
         Ok(folder)
     }
 
@@ -169,12 +195,25 @@ impl Mounts {
     }
 }
 
-async fn connection(app: &AppHandle, connections: &Connections, connection_id: &str, server_id: &str) -> CResult<Arc<Remote>> {
+async fn connection(
+    app: &AppHandle,
+    connections: &Connections,
+    connection_id: &str,
+    server_id: &str,
+) -> CResult<Arc<Remote>> {
     let found = connections.lock().await.get(connection_id).filter(|c| !c.is_closed()).cloned();
     match found {
         Some(c) => Ok(c),
         None => {
-            let _ = app.emit("mount-event", MountEvent { server_id: server_id.to_string(), kind: "connect", name: String::new(), message: String::new() });
+            let _ = app.emit(
+                "mount-event",
+                MountEvent {
+                    server_id: server_id.to_string(),
+                    kind: "connect",
+                    name: String::new(),
+                    message: String::new(),
+                },
+            );
             Err(CloudErrorKind::NetworkUnavailable)
         }
     }
@@ -203,7 +242,15 @@ impl ServerFilter {
     }
 
     fn report(&self, name: &str, e: &AppError) {
-        let _ = self.app.emit("mount-event", MountEvent { server_id: self.server_id.clone(), kind: "error", name: name.to_string(), message: e.message.clone() });
+        let _ = self.app.emit(
+            "mount-event",
+            MountEvent {
+                server_id: self.server_id.clone(),
+                kind: "error",
+                name: name.to_string(),
+                message: e.message.clone(),
+            },
+        );
     }
 }
 
@@ -241,7 +288,12 @@ impl Filter for ServerFilter {
         Ok(())
     }
 
-    async fn fetch_placeholders(&self, request: Request, ticket: ticket::FetchPlaceholders, _info: info::FetchPlaceholders) -> CResult<()> {
+    async fn fetch_placeholders(
+        &self,
+        request: Request,
+        ticket: ticket::FetchPlaceholders,
+        _info: info::FetchPlaceholders,
+    ) -> CResult<()> {
         let dir = request.path();
         let remote_dir = self.remote_path(&dir)?;
         let conn = self.remote().await?;
@@ -256,7 +308,9 @@ impl Filter for ServerFilter {
             .map(|e| {
                 let written = file_time(e.mtime);
                 let meta = if e.kind == "dir" { Metadata::directory() } else { Metadata::file().size(e.size) };
-                PlaceholderFile::new(&e.name).metadata(meta.written(written).created(written).changed(written)).mark_in_sync()
+                PlaceholderFile::new(&e.name)
+                    .metadata(meta.written(written).created(written).changed(written))
+                    .mark_in_sync()
             })
             .collect();
         ticket.pass_with_placeholder(&mut placeholders).map_err(|_| CloudErrorKind::Unsuccessful)?;
@@ -319,7 +373,11 @@ fn needs_upload(path: &Path) -> bool {
 fn skip_name(path: &Path) -> bool {
     let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
     // Office lock files, temporary files and Explorer leftovers stay local.
-    name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "thumbs.db" || name.ends_with(".bitcrane-part")
+    name.starts_with("~$")
+        || name.ends_with(".tmp")
+        || name == "desktop.ini"
+        || name == "thumbs.db"
+        || name.ends_with(".bitcrane-part")
 }
 
 impl Uploader {
@@ -342,15 +400,30 @@ impl Uploader {
                 conn.mkdir_all(&remote_path).await.map(|_| ConvertOptions::default().mark_in_sync().has_children())
             } else {
                 let ui = path.to_string_lossy().replace('\\', "/");
-                crate::transfer::upload(&conn, &ui, &remote_path, &Default::default(), &|_, _| {}, Arc::new(AtomicU8::new(crate::transfer::RUN)))
-                    .await
-                    .map(|_| ConvertOptions::default().mark_in_sync())
+                crate::transfer::upload(
+                    &conn,
+                    &ui,
+                    &remote_path,
+                    &Default::default(),
+                    &|_, _| {},
+                    Arc::new(AtomicU8::new(crate::transfer::RUN)),
+                )
+                .await
+                .map(|_| ConvertOptions::default().mark_in_sync())
             };
             match result {
                 Ok(options) => {
                     if mark_synced(&path, options) {
                         if path.is_file() {
-                            let _ = self.app.emit("mount-event", MountEvent { server_id: self.server_id.clone(), kind: "uploaded", name: remote_name(&remote_path), message: String::new() });
+                            let _ = self.app.emit(
+                                "mount-event",
+                                MountEvent {
+                                    server_id: self.server_id.clone(),
+                                    kind: "uploaded",
+                                    name: remote_name(&remote_path),
+                                    message: String::new(),
+                                },
+                            );
                         }
                     } else {
                         // Still open in another program: try again later.
@@ -359,7 +432,15 @@ impl Uploader {
                 }
                 Err(e) => {
                     self.pending.lock().unwrap().insert(path);
-                    let _ = self.app.emit("mount-event", MountEvent { server_id: self.server_id.clone(), kind: "error", name: remote_name(&remote_path), message: e.message.clone() });
+                    let _ = self.app.emit(
+                        "mount-event",
+                        MountEvent {
+                            server_id: self.server_id.clone(),
+                            kind: "error",
+                            name: remote_name(&remote_path),
+                            message: e.message.clone(),
+                        },
+                    );
                 }
             }
         }

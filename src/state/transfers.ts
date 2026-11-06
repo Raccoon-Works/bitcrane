@@ -9,7 +9,18 @@ import type { ConflictChoice, PaneSide, Transfer } from '../backend/types';
 
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { setState, showToast, LIVE, serverById, uid, activeTab, panePath, state, listEntries, isDirEntry } from './core';
+import {
+  setState,
+  showToast,
+  LIVE,
+  serverById,
+  uid,
+  activeTab,
+  panePath,
+  state,
+  listEntries,
+  isDirEntry,
+} from './core';
 import { placeOf, selectedNames } from './fileOps';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
@@ -35,7 +46,10 @@ export function transferNames(from: string, fromDir: string, names: string[], to
     return;
   }
   // Two local halves: a plain copy on this computer (Total Commander).
-  if (!from && !to) { copyOrMoveLocal(fromDir, names, toDir, false); return; }
+  if (!from && !to) {
+    copyOrMoveLocal(fromDir, names, toDir, false);
+    return;
+  }
   if (from === to) return;
   // Rows inside opened folders carry a relative path ("routes/cart.py"); like in
   // the Finder they land directly in the target folder, grouped by their source folder.
@@ -68,8 +82,17 @@ export function transferNames(from: string, fromDir: string, names: string[], to
     for (const f of fs.walkFiles(from ? 'remote' : 'local', from || to, src)) {
       const target = paths.join(toDir, f.path.slice(fromDir.length + 1));
       items.push({
-        id: uid('t'), name: f.entry.name, direction, serverId: to || from, ...(direction === 'cross' ? { sourceServerId: from } : {}),
-        folder: relFolder(toDir, target), source: f.path, target, size: f.entry.size, done: 0, state: 'queued',
+        id: uid('t'),
+        name: f.entry.name,
+        direction,
+        serverId: to || from,
+        ...(direction === 'cross' ? { sourceServerId: from } : {}),
+        folder: relFolder(toDir, target),
+        source: f.path,
+        target,
+        size: f.entry.size,
+        done: 0,
+        state: 'queued',
       });
     }
   }
@@ -108,7 +131,10 @@ export function copyOrMoveLocal(fromDir: string, names: string[], toDir: string,
   }
   for (const [dir, list] of groups) {
     const src = dir ? paths.join(fromDir, dir) : fromDir;
-    if (src === toDir) { showToast($t('Quelle und Ziel sind derselbe Ordner.')); continue; }
+    if (src === toDir) {
+      showToast($t('Quelle und Ziel sind derselbe Ordner.'));
+      continue;
+    }
     // Folders that already exist in the target: ask "Zusammenführen" or "Beide behalten" (Transmit).
     const target = new Set((listEntries('local', '', toDir) ?? []).filter((e) => e.kind === 'dir').map((e) => e.name));
     const clashes = list.filter((n) => target.has(n) && isDirEntry('local', '', paths.join(src, n)));
@@ -117,19 +143,41 @@ export function copyOrMoveLocal(fromDir: string, names: string[], toDir: string,
       continue;
     }
     if (LIVE) {
-      if (move) void live.moveLocal(src, list, toDir).then((made) => { if (made?.length) pushUndo({ label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length), run: () => live.moveLocal(toDir, made, src) }); });
+      if (move)
+        void live.moveLocal(src, list, toDir).then((made) => {
+          if (made?.length)
+            pushUndo({
+              label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length),
+              run: () => live.moveLocal(toDir, made, src),
+            });
+        });
       else void live.copyLocal(src, list, toDir);
       continue;
     }
-    showToast(move ? $t('{0} Objekte verschoben (simuliert).', list.length) : $t('{0} Objekte kopiert (simuliert).', list.length), 'ok');
+    showToast(
+      move
+        ? $t('{0} Objekte verschoben (simuliert).', list.length)
+        : $t('{0} Objekte kopiert (simuliert).', list.length),
+      'ok',
+    );
   }
 }
 
 /** Answer of the "Ordner zusammenführen?" window: copies or moves, merging same-named folders or keeping both. */
 export function finishCopyOrMove(fromDir: string, names: string[], toDir: string, move: boolean, merge: boolean) {
   setState({ dialog: null });
-  if (LIVE) { void (move ? live.moveLocal(fromDir, names, toDir, merge) : live.copyLocal(fromDir, names, toDir, merge)); return; }
-  showToast(merge ? $t('{0} Objekte zusammengeführt (simuliert).', names.length) : move ? $t('{0} Objekte verschoben (simuliert).', names.length) : $t('{0} Objekte kopiert (simuliert).', names.length), 'ok');
+  if (LIVE) {
+    void (move ? live.moveLocal(fromDir, names, toDir, merge) : live.copyLocal(fromDir, names, toDir, merge));
+    return;
+  }
+  showToast(
+    merge
+      ? $t('{0} Objekte zusammengeführt (simuliert).', names.length)
+      : move
+        ? $t('{0} Objekte verschoben (simuliert).', names.length)
+        : $t('{0} Objekte kopiert (simuliert).', names.length),
+    'ok',
+  );
 }
 
 /** Two local halves: moves the selection of one half into the folder of the other. */
@@ -145,7 +193,13 @@ export function moveToOtherHalf(side: PaneSide) {
 export function upload(names = selectedNames('local'), targetDir?: string, sourceDir?: string) {
   const t = activeTab();
   if (!t) return;
-  transferNames(placeOf('local', t), sourceDir ?? panePath('local'), names, placeOf('remote', t), targetDir ?? panePath('remote'));
+  transferNames(
+    placeOf('local', t),
+    sourceDir ?? panePath('local'),
+    names,
+    placeOf('remote', t),
+    targetDir ?? panePath('remote'),
+  );
 }
 
 /** Files dropped in from the Finder / Explorer (native paths) go to a server folder. */
@@ -164,13 +218,23 @@ export function uploadLocalPaths(nativePaths: string[], dir: string, side: PaneS
 export function download(names = selectedNames('remote'), targetDir?: string, sourceDir?: string) {
   const t = activeTab();
   if (!t) return;
-  transferNames(placeOf('remote', t), sourceDir ?? panePath('remote'), names, placeOf('local', t), targetDir ?? panePath('local'));
+  transferNames(
+    placeOf('remote', t),
+    sourceDir ?? panePath('remote'),
+    names,
+    placeOf('local', t),
+    targetDir ?? panePath('local'),
+  );
 }
 
 export function retryTransfer(id: string) {
   const tr = state.transfers.find((x) => x.id === id);
   if (LIVE && tr) live.clearFailed(tr.serverId);
-  setState((s) => ({ transfers: s.transfers.map((x) => (x.id === id ? { ...x, state: 'queued', done: 0, error: undefined, errorDetail: undefined, hold: undefined } : x)) }));
+  setState((s) => ({
+    transfers: s.transfers.map((x) =>
+      x.id === id ? { ...x, state: 'queued', done: 0, error: undefined, errorDetail: undefined, hold: undefined } : x,
+    ),
+  }));
 }
 
 export function skipTransfer(id: string) {
@@ -182,12 +246,32 @@ export function cancelTransfer(id: string) {
 }
 
 export function toggleTransferPause(id: string) {
-  setState((s) => ({ transfers: s.transfers.map((x) => (x.id === id ? { ...x, hold: undefined, state: x.state === 'paused' ? 'queued' : x.state === 'running' || x.state === 'queued' ? 'paused' : x.state } : x)) }));
+  setState((s) => ({
+    transfers: s.transfers.map((x) =>
+      x.id === id
+        ? {
+            ...x,
+            hold: undefined,
+            state: x.state === 'paused' ? 'queued' : x.state === 'running' || x.state === 'queued' ? 'paused' : x.state,
+          }
+        : x,
+    ),
+  }));
 }
 
 export function pauseAllTransfers() {
   const anyActive = state.transfers.some((x) => x.state === 'running' || x.state === 'queued');
-  setState((s) => ({ transfers: s.transfers.map((x) => (anyActive ? (x.state === 'running' || x.state === 'queued' ? { ...x, state: 'paused', hold: undefined } : x) : x.state === 'paused' ? { ...x, state: 'queued', hold: undefined } : x)) }));
+  setState((s) => ({
+    transfers: s.transfers.map((x) =>
+      anyActive
+        ? x.state === 'running' || x.state === 'queued'
+          ? { ...x, state: 'paused', hold: undefined }
+          : x
+        : x.state === 'paused'
+          ? { ...x, state: 'queued', hold: undefined }
+          : x,
+    ),
+  }));
 }
 
 /**
@@ -198,10 +282,13 @@ export function askCancelAllTransfers() {
   const open = state.transfers.filter((x) => x.state !== 'done');
   if (!open.length) return;
   openDialog({
-    type: 'confirm', danger: true, confirm: $t('Alle abbrechen'),
+    type: 'confirm',
+    danger: true,
+    confirm: $t('Alle abbrechen'),
     title: open.length === 1 ? $t('Die Übertragung abbrechen?') : $t('Alle {0} Übertragungen abbrechen?', open.length),
     text: $t('Was schon übertragen ist, bleibt erhalten. Die übrigen Dateien werden nicht mehr übertragen.'),
-    run: () => setState((s) => ({ transfers: s.transfers.filter((x) => x.state === 'done'), dialog: { type: 'transfers' } })),
+    run: () =>
+      setState((s) => ({ transfers: s.transfers.filter((x) => x.state === 'done'), dialog: { type: 'transfers' } })),
   });
 }
 
@@ -242,17 +329,48 @@ export function resolveConflict(choice: ConflictChoice, applyToAll: boolean) {
     const pick: ConflictChoice = choice === 'download' && c.direction === 'down' ? 'replace' : choice;
     if (pick === 'keepServer') {
       // "Keep what is already at the target": the server file on uploads, the local file on downloads.
-      const note = c.direction === 'down' ? $t('Übersprungen, Datei auf diesem Rechner behalten') : $t('Übersprungen, Server-Datei behalten');
-      setState((s) => ({ transfers: s.transfers.map((x) => (x.id === tr.id ? { ...x, state: 'done', done: 0, finishedAt: Date.now(), error: note, hold: undefined } : x)) }));
+      const note =
+        c.direction === 'down'
+          ? $t('Übersprungen, Datei auf diesem Rechner behalten')
+          : $t('Übersprungen, Server-Datei behalten');
+      setState((s) => ({
+        transfers: s.transfers.map((x) =>
+          x.id === tr.id ? { ...x, state: 'done', done: 0, finishedAt: Date.now(), error: note, hold: undefined } : x,
+        ),
+      }));
     } else if (pick === 'replace') {
-      setState((s) => ({ transfers: s.transfers.map((x) => (x.id === tr.id ? { ...x, state: 'queued', error: undefined, hold: undefined } : x)) }));
+      setState((s) => ({
+        transfers: s.transfers.map((x) =>
+          x.id === tr.id ? { ...x, state: 'queued', error: undefined, hold: undefined } : x,
+        ),
+      }));
       forced.add(tr.id);
       live.forcedLive.add(tr.id);
     } else if (pick === 'keepBoth') {
       const dot = tr.name.lastIndexOf('.');
-      const tag = c.direction === 'down' ? $t('Server') : c.cross ? serverById(c.sourceServerId ?? '')?.name ?? $t('Server') : state.platform === 'mac' ? $t('Mac') : 'PC';
+      const tag =
+        c.direction === 'down'
+          ? $t('Server')
+          : c.cross
+            ? (serverById(c.sourceServerId ?? '')?.name ?? $t('Server'))
+            : state.platform === 'mac'
+              ? $t('Mac')
+              : 'PC';
       const newName = dot > 0 ? `${tr.name.slice(0, dot)} (${tag})${tr.name.slice(dot)}` : `${tr.name} (${tag})`;
-      setState((s) => ({ transfers: s.transfers.map((x) => (x.id === tr.id ? { ...x, state: 'queued', error: undefined, hold: undefined, name: newName, target: paths.join(paths.parent(x.target), newName) } : x)) }));
+      setState((s) => ({
+        transfers: s.transfers.map((x) =>
+          x.id === tr.id
+            ? {
+                ...x,
+                state: 'queued',
+                error: undefined,
+                hold: undefined,
+                name: newName,
+                target: paths.join(paths.parent(x.target), newName),
+              }
+            : x,
+        ),
+      }));
       forced.add(tr.id);
       live.forcedLive.add(tr.id);
     } else if (LIVE) {
@@ -260,7 +378,12 @@ export function resolveConflict(choice: ConflictChoice, applyToAll: boolean) {
     } else {
       const remote = fs.stat('remote', tr.serverId, tr.target);
       fs.writeFile('local', tr.serverId, tr.source, remote?.size ?? tr.size, Date.now());
-      setState((s) => ({ fsRev: s.fsRev + 1, transfers: s.transfers.map((x) => (x.id === tr.id ? { ...x, direction: 'down', state: 'done', done: x.size, finishedAt: Date.now() } : x)) }));
+      setState((s) => ({
+        fsRev: s.fsRev + 1,
+        transfers: s.transfers.map((x) =>
+          x.id === tr.id ? { ...x, direction: 'down', state: 'done', done: x.size, finishedAt: Date.now() } : x,
+        ),
+      }));
     }
   }
   const rest = state.conflicts.slice(queue.length).map((c, i, arr) => ({ ...c, more: arr.length - 1 - i }));

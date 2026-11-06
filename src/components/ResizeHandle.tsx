@@ -24,7 +24,18 @@ interface Props {
   className?: string;
 }
 
-export function ResizeHandle({ orientation, label, value, min, max, toValue, onChange, onReset, step, className = '' }: Props) {
+export function ResizeHandle({
+  orientation,
+  label,
+  value,
+  min,
+  max,
+  toValue,
+  onChange,
+  onReset,
+  step,
+  className = '',
+}: Props) {
   const drag = useRef<{ start: number; from: number } | null>(null);
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
   const pos = (e: PointerEvent | React.PointerEvent) => {
@@ -56,7 +67,10 @@ export function ResizeHandle({ orientation, label, value, min, max, toValue, onC
       e.preventDefault();
       onChange(clamp(value + (e.key === fwd ? step : -step)));
     }
-    if (e.key === 'Home' || e.key === 'Enter') { e.preventDefault(); onReset(); }
+    if (e.key === 'Home' || e.key === 'Enter') {
+      e.preventDefault();
+      onReset();
+    }
   };
   return (
     <div

@@ -106,19 +106,29 @@ struct Req {
 impl Req {
     /// Query in canonical form (sorted, encoded); used for the URL as well.
     fn canonical_query(&self) -> String {
-        let mut q: Vec<(String, String)> = self.query.iter().map(|(k, v)| (uri_encode(k, false), uri_encode(v, false))).collect();
+        let mut q: Vec<(String, String)> =
+            self.query.iter().map(|(k, v)| (uri_encode(k, false), uri_encode(v, false))).collect();
         q.sort();
         q.into_iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("&")
     }
 
     /// AWS Signature Version 4: returns the Authorization header value.
     fn authorization(&self, access_key: &str, secret: &str, region: &str, amz_date: &str, payload: &str) -> String {
-        let mut headers: Vec<(String, String)> = self.headers.iter().map(|(k, v)| (k.to_ascii_lowercase(), v.trim().to_string())).collect();
+        let mut headers: Vec<(String, String)> =
+            self.headers.iter().map(|(k, v)| (k.to_ascii_lowercase(), v.trim().to_string())).collect();
         headers.push(("host".into(), self.host.clone()));
         headers.sort();
         let signed: String = headers.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(";");
         let canonical_headers: String = headers.iter().map(|(k, v)| format!("{k}:{v}\n")).collect();
-        let canonical = format!("{}\n{}\n{}\n{}\n{}\n{}", self.method.as_str(), self.path, self.canonical_query(), canonical_headers, signed, payload);
+        let canonical = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            self.method.as_str(),
+            self.path,
+            self.canonical_query(),
+            canonical_headers,
+            signed,
+            payload
+        );
         let date = &amz_date[..8];
         let scope = format!("{date}/{region}/s3/aws4_request");
         let to_sign = format!("AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{}", hex(&Sha256::digest(canonical.as_bytes())));
@@ -134,7 +144,8 @@ impl Req {
 /// Text of an S3 error answer (<Error><Code>…</Code><Message>…</Message>).
 fn error_code(xml: &str) -> (String, String) {
     let Ok(doc) = roxmltree::Document::parse(xml) else { return (String::new(), String::new()) };
-    let get = |n: &str| doc.descendants().find(|x| x.tag_name().name() == n).and_then(|x| x.text()).unwrap_or("").to_string();
+    let get =
+        |n: &str| doc.descendants().find(|x| x.tag_name().name() == n).and_then(|x| x.text()).unwrap_or("").to_string();
     (get("Code"), get("Message"))
 }
 
@@ -142,15 +153,27 @@ fn status_err(status: StatusCode, body: &str, what: &str) -> AppError {
     let (code, message) = error_code(body);
     let detail = if code.is_empty() { status.to_string() } else { format!("{status} {code}: {message}") };
     let (kind, msg) = match (status.as_u16(), code.as_str()) {
-        (_, "InvalidAccessKeyId") => (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Diesen Zugriffsschlüssel kennt der Dienst nicht.".to_string()),
-        (_, "SignatureDoesNotMatch") => (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Der geheime Schlüssel passt nicht.".to_string()),
+        (_, "InvalidAccessKeyId") => {
+            (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Diesen Zugriffsschlüssel kennt der Dienst nicht.".to_string())
+        }
+        (_, "SignatureDoesNotMatch") => {
+            (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Der geheime Schlüssel passt nicht.".to_string())
+        }
         (_, "NoSuchBucket") => (ErrorKind::NotFound, "Diesen Bucket gibt es nicht.".to_string()),
         (_, "NoSuchKey") | (404, _) => (ErrorKind::NotFound, format!("{what}: nicht gefunden.")),
-        (301, _) | (_, "PermanentRedirect") | (_, "AuthorizationHeaderMalformed") => (ErrorKind::Other, "Der Bucket liegt in einer anderen Region. Bitte die Region in den Server-Einstellungen prüfen.".to_string()),
+        (301, _) | (_, "PermanentRedirect") | (_, "AuthorizationHeaderMalformed") => (
+            ErrorKind::Other,
+            "Der Bucket liegt in einer anderen Region. Bitte die Region in den Server-Einstellungen prüfen."
+                .to_string(),
+        ),
         (403, "AccessDenied") | (403, _) => (ErrorKind::PermissionDenied, format!("{what}: keine Berechtigung.")),
-        (409, "BucketAlreadyExists") | (409, "BucketAlreadyOwnedByYou") => (ErrorKind::AlreadyExists, "Diesen Bucket-Namen gibt es schon.".to_string()),
+        (409, "BucketAlreadyExists") | (409, "BucketAlreadyOwnedByYou") => {
+            (ErrorKind::AlreadyExists, "Diesen Bucket-Namen gibt es schon.".to_string())
+        }
         (_, "EntityTooLarge") => (ErrorKind::Other, format!("{what}: Die Datei ist für diesen Dienst zu groß.")),
-        (_, "QuotaExceeded") | (_, "StorageQuotaExceeded") => (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr.")),
+        (_, "QuotaExceeded") | (_, "StorageQuotaExceeded") => {
+            (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr."))
+        }
         _ => (ErrorKind::Other, format!("{what} fehlgeschlagen.")),
     };
     AppError::new(kind, msg).with_detail(detail)
@@ -158,7 +181,8 @@ fn status_err(status: StatusCode, body: &str, what: &str) -> AppError {
 
 fn net_err(e: reqwest::Error) -> AppError {
     if e.is_timeout() {
-        return AppError::new(ErrorKind::Unreachable, "Der Speicherdienst antwortet nicht (Zeitüberschreitung).").with_detail(e.to_string());
+        return AppError::new(ErrorKind::Unreachable, "Der Speicherdienst antwortet nicht (Zeitüberschreitung).")
+            .with_detail(e.to_string());
     }
     if e.is_connect() {
         return AppError::new(ErrorKind::Unreachable, "Speicherdienst nicht erreichbar.").with_detail(e.to_string());
@@ -168,14 +192,31 @@ fn net_err(e: reqwest::Error) -> AppError {
 
 /// Seconds of `x-amz-meta-mtime`, else Last-Modified, as milliseconds.
 fn mtime_of(headers: &reqwest::header::HeaderMap) -> i64 {
-    if let Some(s) = headers.get("x-amz-meta-mtime").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<f64>().ok()) {
+    if let Some(s) =
+        headers.get("x-amz-meta-mtime").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<f64>().ok())
+    {
         return (s * 1000.0) as i64;
     }
-    headers.get("last-modified").and_then(|v| v.to_str().ok()).and_then(|t| chrono::DateTime::parse_from_rfc2822(t.trim()).ok()).map(|d| d.timestamp_millis()).unwrap_or(0)
+    headers
+        .get("last-modified")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|t| chrono::DateTime::parse_from_rfc2822(t.trim()).ok())
+        .map(|d| d.timestamp_millis())
+        .unwrap_or(0)
 }
 
 fn entry(name: String, dir: bool, size: u64, mtime: i64) -> FileEntry {
-    FileEntry { name, kind: if dir { "dir".into() } else { "file".into() }, size: if dir { 0 } else { size }, mtime, perms: if dir { "755".into() } else { "644".into() }, owner: String::new(), group: String::new(), link: None, hidden: 0 }
+    FileEntry {
+        name,
+        kind: if dir { "dir".into() } else { "file".into() },
+        size: if dir { 0 } else { size },
+        mtime,
+        perms: if dir { "755".into() } else { "644".into() },
+        owner: String::new(),
+        group: String::new(),
+        link: None,
+        hidden: 0,
+    }
 }
 
 /// One page of ListObjectsV2: files (key, size, time) and folders (prefixes).
@@ -188,12 +229,16 @@ struct Listing {
 fn parse_listing(xml: &str) -> Listing {
     let mut out = Listing { files: Vec::new(), prefixes: Vec::new(), next: None };
     let Ok(doc) = roxmltree::Document::parse(xml) else { return out };
-    let text = |n: roxmltree::Node, tag: &str| n.children().find(|c| c.tag_name().name() == tag).and_then(|c| c.text()).unwrap_or("").to_string();
+    let text = |n: roxmltree::Node, tag: &str| {
+        n.children().find(|c| c.tag_name().name() == tag).and_then(|c| c.text()).unwrap_or("").to_string()
+    };
     let root = doc.root_element();
     for c in root.children().filter(|c| c.is_element()) {
         match c.tag_name().name() {
             "Contents" => {
-                let mtime = chrono::DateTime::parse_from_rfc3339(&text(c, "LastModified")).map(|d| d.timestamp_millis()).unwrap_or(0);
+                let mtime = chrono::DateTime::parse_from_rfc3339(&text(c, "LastModified"))
+                    .map(|d| d.timestamp_millis())
+                    .unwrap_or(0);
                 out.files.push((text(c, "Key"), text(c, "Size").parse().unwrap_or(0), mtime));
             }
             "CommonPrefixes" => out.prefixes.push(text(c, "Prefix")),
@@ -212,7 +257,13 @@ fn parse_buckets(xml: &str) -> Vec<(String, i64)> {
         .filter(|n| n.tag_name().name() == "Bucket")
         .filter_map(|b| {
             let name = b.children().find(|c| c.tag_name().name() == "Name")?.text()?.to_string();
-            let created = b.children().find(|c| c.tag_name().name() == "CreationDate").and_then(|c| c.text()).and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map(|d| d.timestamp_millis()).unwrap_or(0);
+            let created = b
+                .children()
+                .find(|c| c.tag_name().name() == "CreationDate")
+                .and_then(|c| c.text())
+                .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+                .map(|d| d.timestamp_millis())
+                .unwrap_or(0);
             Some((name, created))
         })
         .collect()
@@ -236,10 +287,13 @@ impl S3Conn {
     pub async fn connect(params: S3Params, known: Arc<KnownHosts>) -> AppResult<S3Conn> {
         let raw = params.endpoint.trim().trim_end_matches('/');
         if raw.is_empty() {
-            return Err(AppError::other("Bitte den Endpunkt des Speicherdienstes angeben (z. B. s3.eu-central-1.amazonaws.com)."));
+            return Err(AppError::other(
+                "Bitte den Endpunkt des Speicherdienstes angeben (z. B. s3.eu-central-1.amazonaws.com).",
+            ));
         }
         let with_scheme = if raw.contains("://") { raw.to_string() } else { format!("https://{raw}") };
-        let url = reqwest::Url::parse(&with_scheme).map_err(|_| AppError::other("Der Endpunkt ist ungültig (Beispiel: s3.eu-central-1.amazonaws.com)."))?;
+        let url = reqwest::Url::parse(&with_scheme)
+            .map_err(|_| AppError::other("Der Endpunkt ist ungültig (Beispiel: s3.eu-central-1.amazonaws.com)."))?;
         let scheme = url.scheme().to_string();
         let host_name = url.host_str().unwrap_or_default().to_string();
         let host = match url.port() {
@@ -259,7 +313,8 @@ impl S3Conn {
             .user_agent(concat!("Bitcrane/", env!("CARGO_PKG_VERSION")));
         if let Some(p) = &params.proxy {
             let kind = if p.kind == "http" { "http" } else { "socks5h" };
-            let mut proxy = reqwest::Proxy::all(format!("{kind}://{}:{}", p.host, p.port)).map_err(|e| AppError::other("Proxy-Adresse ungültig.").with_detail(e.to_string()))?;
+            let mut proxy = reqwest::Proxy::all(format!("{kind}://{}:{}", p.host, p.port))
+                .map_err(|e| AppError::other("Proxy-Adresse ungültig.").with_detail(e.to_string()))?;
             if let Some(u) = p.user.as_deref().filter(|u| !u.is_empty()) {
                 proxy = proxy.basic_auth(u, p.password.as_deref().unwrap_or(""));
             }
@@ -267,12 +322,25 @@ impl S3Conn {
         } else {
             builder = builder.no_proxy();
         }
-        let client = builder.build().map_err(|e| AppError::other("Der Speicherdienst konnte nicht vorbereitet werden.").with_detail(e.to_string()))?;
+        let client = builder.build().map_err(|e| {
+            AppError::other("Der Speicherdienst konnte nicht vorbereitet werden.").with_detail(e.to_string())
+        })?;
         // An IP address or "localhost" cannot carry the bucket in the host name.
         let path_style = params.path_style || host_name.parse::<std::net::IpAddr>().is_ok() || host_name == "localhost";
-        let region = if params.region.trim().is_empty() { "us-east-1".to_string() } else { params.region.trim().to_string() };
+        let region =
+            if params.region.trim().is_empty() { "us-east-1".to_string() } else { params.region.trim().to_string() };
         let bucket = Some(params.bucket.trim().trim_matches('/').to_string()).filter(|b| !b.is_empty());
-        let conn = S3Conn { client, scheme, host, region, bucket, access_key: params.access_key.trim().to_string(), secret, path_style, home: "/".into() };
+        let conn = S3Conn {
+            client,
+            scheme,
+            host,
+            region,
+            bucket,
+            access_key: params.access_key.trim().to_string(),
+            secret,
+            path_style,
+            home: "/".into(),
+        };
         // First request: checks endpoint, keys and (with a fixed bucket) the bucket.
         match &conn.bucket {
             Some(b) => {
@@ -311,12 +379,24 @@ impl S3Conn {
     /// Signs and builds the reqwest request.
     fn build(&self, r: &Req, payload: &str) -> reqwest::RequestBuilder {
         let amz_date = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-        let mut signed = Req { method: r.method.clone(), host: r.host.clone(), path: r.path.clone(), query: r.query.clone(), headers: r.headers.clone() };
+        let mut signed = Req {
+            method: r.method.clone(),
+            host: r.host.clone(),
+            path: r.path.clone(),
+            query: r.query.clone(),
+            headers: r.headers.clone(),
+        };
         signed.headers.push(("x-amz-date".into(), amz_date.clone()));
         signed.headers.push(("x-amz-content-sha256".into(), payload.into()));
         let auth = signed.authorization(&self.access_key, &self.secret, &self.region, &amz_date, payload);
         let q = r.canonical_query();
-        let url = format!("{}://{}{}{}", self.scheme, r.host, r.path, if q.is_empty() { String::new() } else { format!("?{q}") });
+        let url = format!(
+            "{}://{}{}{}",
+            self.scheme,
+            r.host,
+            r.path,
+            if q.is_empty() { String::new() } else { format!("?{q}") }
+        );
         let mut b = self.client.request(r.method.clone(), url);
         for (k, v) in &signed.headers {
             b = b.header(k.as_str(), v.as_str());
@@ -364,7 +444,14 @@ impl S3Conn {
         Ok(parse_buckets(&body))
     }
 
-    async fn list_page(&self, bucket: &str, prefix: &str, delimiter: Option<&str>, token: Option<&str>, max: Option<u32>) -> AppResult<Listing> {
+    async fn list_page(
+        &self,
+        bucket: &str,
+        prefix: &str,
+        delimiter: Option<&str>,
+        token: Option<&str>,
+        max: Option<u32>,
+    ) -> AppResult<Listing> {
         let mut r = self.req(Method::GET, Some(bucket), "");
         r.query.push(("list-type".into(), "2".into()));
         r.query.push(("prefix".into(), prefix.into()));
@@ -453,7 +540,12 @@ impl S3Conn {
         let r = self.req(Method::HEAD, Some(&bucket), &key);
         let resp = self.build(&r, EMPTY_SHA256).send().await.map_err(net_err)?;
         if resp.status().is_success() {
-            let size = resp.headers().get("content-length").and_then(|v| v.to_str().ok()).and_then(|v| v.parse().ok()).unwrap_or(0);
+            let size = resp
+                .headers()
+                .get("content-length")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
             return Ok(entry(name, false, size, mtime_of(resp.headers())));
         }
         if resp.status() != StatusCode::NOT_FOUND {
@@ -480,7 +572,11 @@ impl S3Conn {
             let mut r = self.req(Method::PUT, Some(&bucket), "");
             let region = self.region.as_str();
             // us-east-1 (and R2's "auto") take no location; elsewhere it must be named.
-            let body = if region == "us-east-1" || region == "auto" { String::new() } else { format!("<CreateBucketConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><LocationConstraint>{region}</LocationConstraint></CreateBucketConfiguration>") };
+            let body = if region == "us-east-1" || region == "auto" {
+                String::new()
+            } else {
+                format!("<CreateBucketConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><LocationConstraint>{region}</LocationConstraint></CreateBucketConfiguration>")
+            };
             r.headers.push(("content-length".into(), body.len().to_string()));
             let resp = self.build(&r, UNSIGNED).body(body).send().await.map_err(net_err)?;
             if resp.status().is_success() {
@@ -524,7 +620,8 @@ impl S3Conn {
     /// Server-side copy of one object (keeps its metadata, e.g. the mtime).
     async fn copy_key(&self, bucket: &str, from: &str, to: &str) -> AppResult<()> {
         let mut r = self.req(Method::PUT, Some(bucket), to);
-        r.headers.push(("x-amz-copy-source".into(), format!("/{}/{}", uri_encode(bucket, false), uri_encode(from, true))));
+        r.headers
+            .push(("x-amz-copy-source".into(), format!("/{}/{}", uri_encode(bucket, false), uri_encode(from, true))));
         let resp = self.build(&r, EMPTY_SHA256).header("content-length", "0").send().await.map_err(net_err)?;
         let status = resp.status();
         // A copy can fail inside a 200 answer.
@@ -532,7 +629,11 @@ impl S3Conn {
         if status.is_success() && !text.contains("<Error>") {
             Ok(())
         } else {
-            Err(status_err(if status.is_success() { StatusCode::INTERNAL_SERVER_ERROR } else { status }, &text, &format!("„{}“ kopieren", remote_name(from))))
+            Err(status_err(
+                if status.is_success() { StatusCode::INTERNAL_SERVER_ERROR } else { status },
+                &text,
+                &format!("„{}“ kopieren", remote_name(from)),
+            ))
         }
     }
 
@@ -569,7 +670,9 @@ impl S3Conn {
     async fn move_path(&self, from: &str, to: &str) -> AppResult<()> {
         let (fb, fk) = self.split(from);
         let (tb, tk) = self.split(to);
-        let (Some(fb), Some(tb)) = (fb, tb) else { return Err(AppError::other("Buckets lassen sich nicht umbenennen.")) };
+        let (Some(fb), Some(tb)) = (fb, tb) else {
+            return Err(AppError::other("Buckets lassen sich nicht umbenennen."));
+        };
         if fb != tb || fk.trim_matches('/').is_empty() || tk.trim_matches('/').is_empty() {
             return Err(AppError::other("Verschieben geht nur innerhalb eines Buckets."));
         }
@@ -598,7 +701,8 @@ impl S3Conn {
     }
 
     pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -608,7 +712,9 @@ impl S3Conn {
             let to = remote_join(dest_dir, &name);
             let (fb, fk) = self.split(from);
             let (tb, tk) = self.split(&to);
-            let (Some(fb), Some(tb)) = (fb, tb) else { return Err(AppError::other("Buckets lassen sich nicht kopieren.")) };
+            let (Some(fb), Some(tb)) = (fb, tb) else {
+                return Err(AppError::other("Buckets lassen sich nicht kopieren."));
+            };
             if fb != tb {
                 return Err(AppError::other("Kopieren auf dem Server geht nur innerhalb eines Buckets."));
             }
@@ -632,7 +738,12 @@ impl S3Conn {
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         let root = self.stat(path).await?;
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: path.to_string(),
+                relative: rel(path),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let (bucket, key) = self.split(path);
         let Some(bucket) = bucket else { return Err(AppError::other("Bitte zuerst einen Bucket öffnen.")) };
@@ -677,7 +788,12 @@ impl S3Conn {
     /// large files stay below S3's 10,000 parts). The returned task finishes
     /// the upload; if it fails, a started multipart upload is aborted so no
     /// invisible parts are left (and billed).
-    pub fn writer(self: &Arc<Self>, path: &str, size: Option<u64>, mtime: Option<u32>) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
+    pub fn writer(
+        self: &Arc<Self>,
+        path: &str,
+        size: Option<u64>,
+        mtime: Option<u32>,
+    ) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
         let (w, r) = tokio::io::duplex(1024 * 1024);
         let me = self.clone();
         let path = path.to_string();
@@ -688,21 +804,36 @@ impl S3Conn {
 
     async fn read_part(r: &mut (impl AsyncRead + Unpin), size: u64) -> AppResult<Vec<u8>> {
         let mut buf = Vec::with_capacity(size.min(64 * 1024 * 1024) as usize);
-        (&mut *r).take(size).read_to_end(&mut buf).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string()))?;
+        (&mut *r).take(size).read_to_end(&mut buf).await.map_err(|e| {
+            AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
+        })?;
         Ok(buf)
     }
 
-    async fn upload(&self, mut r: tokio::io::DuplexStream, path: &str, part_size: u64, mtime: Option<u32>) -> AppResult<()> {
+    async fn upload(
+        &self,
+        mut r: tokio::io::DuplexStream,
+        path: &str,
+        part_size: u64,
+        mtime: Option<u32>,
+    ) -> AppResult<()> {
         let (bucket, key) = self.split(path);
         let Some(bucket) = bucket else { return Err(AppError::other("Dateien gehören in einen Bucket.")) };
         let what = format!("„{}“ schreiben", remote_name(path));
-        let meta: Vec<(String, String)> = mtime.map(|m| vec![("x-amz-meta-mtime".to_string(), m.to_string())]).unwrap_or_default();
+        let meta: Vec<(String, String)> =
+            mtime.map(|m| vec![("x-amz-meta-mtime".to_string(), m.to_string())]).unwrap_or_default();
         let first = Self::read_part(&mut r, part_size).await?;
         if (first.len() as u64) < part_size {
             // Everything fits into one request.
             let mut req = self.req(Method::PUT, Some(&bucket), &key);
             req.headers.extend(meta);
-            let resp = self.build(&req, UNSIGNED).header("content-length", first.len().to_string()).body(first).send().await.map_err(net_err)?;
+            let resp = self
+                .build(&req, UNSIGNED)
+                .header("content-length", first.len().to_string())
+                .body(first)
+                .send()
+                .await
+                .map_err(net_err)?;
             if resp.status().is_success() {
                 return Ok(());
             }
@@ -715,8 +846,12 @@ impl S3Conn {
         start.query.push(("uploads".into(), String::new()));
         start.headers.extend(meta);
         let body = self.send(&start, &what).await?.text().await.map_err(net_err)?;
-        let upload_id = roxmltree::Document::parse(&body).ok().and_then(|d| d.descendants().find(|n| n.tag_name().name() == "UploadId").and_then(|n| n.text()).map(str::to_string));
-        let Some(upload_id) = upload_id else { return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(body)) };
+        let upload_id = roxmltree::Document::parse(&body).ok().and_then(|d| {
+            d.descendants().find(|n| n.tag_name().name() == "UploadId").and_then(|n| n.text()).map(str::to_string)
+        });
+        let Some(upload_id) = upload_id else {
+            return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(body));
+        };
         let result: AppResult<()> = async {
             let mut etags: Vec<String> = Vec::new();
             let mut part = first;
@@ -726,7 +861,13 @@ impl S3Conn {
                 req.query.push(("partNumber".into(), n.to_string()));
                 req.query.push(("uploadId".into(), upload_id.clone()));
                 let len = part.len();
-                let resp = self.build(&req, UNSIGNED).header("content-length", len.to_string()).body(part).send().await.map_err(net_err)?;
+                let resp = self
+                    .build(&req, UNSIGNED)
+                    .header("content-length", len.to_string())
+                    .body(part)
+                    .send()
+                    .await
+                    .map_err(net_err)?;
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let text = resp.text().await.unwrap_or_default();
@@ -741,19 +882,33 @@ impl S3Conn {
             }
             let mut xml = String::from("<CompleteMultipartUpload>");
             for (i, e) in etags.iter().enumerate() {
-                xml.push_str(&format!("<Part><PartNumber>{}</PartNumber><ETag>{}</ETag></Part>", i + 1, e.replace('&', "&amp;").replace('<', "&lt;")));
+                xml.push_str(&format!(
+                    "<Part><PartNumber>{}</PartNumber><ETag>{}</ETag></Part>",
+                    i + 1,
+                    e.replace('&', "&amp;").replace('<', "&lt;")
+                ));
             }
             xml.push_str("</CompleteMultipartUpload>");
             let mut done = self.req(Method::POST, Some(&bucket), &key);
             done.query.push(("uploadId".into(), upload_id.clone()));
-            let resp = self.build(&done, UNSIGNED).header("content-length", xml.len().to_string()).body(xml).send().await.map_err(net_err)?;
+            let resp = self
+                .build(&done, UNSIGNED)
+                .header("content-length", xml.len().to_string())
+                .body(xml)
+                .send()
+                .await
+                .map_err(net_err)?;
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
             // Completing can fail inside a 200 answer as well.
             if status.is_success() && !text.contains("<Error>") {
                 Ok(())
             } else {
-                Err(status_err(if status.is_success() { StatusCode::INTERNAL_SERVER_ERROR } else { status }, &text, &what))
+                Err(status_err(
+                    if status.is_success() { StatusCode::INTERNAL_SERVER_ERROR } else { status },
+                    &text,
+                    &what,
+                ))
             }
         }
         .await;
@@ -778,9 +933,19 @@ mod tests {
             host: "examplebucket.s3.amazonaws.com".into(),
             path: "/test.txt".into(),
             query: Vec::new(),
-            headers: vec![("range".into(), "bytes=0-9".into()), ("x-amz-content-sha256".into(), EMPTY_SHA256.into()), ("x-amz-date".into(), "20130524T000000Z".into())],
+            headers: vec![
+                ("range".into(), "bytes=0-9".into()),
+                ("x-amz-content-sha256".into(), EMPTY_SHA256.into()),
+                ("x-amz-date".into(), "20130524T000000Z".into()),
+            ],
         };
-        let auth = r.authorization("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", "20130524T000000Z", EMPTY_SHA256);
+        let auth = r.authorization(
+            "AKIAIOSFODNN7EXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "us-east-1",
+            "20130524T000000Z",
+            EMPTY_SHA256,
+        );
         assert_eq!(
             auth,
             "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41"
@@ -795,9 +960,18 @@ mod tests {
             host: "examplebucket.s3.amazonaws.com".into(),
             path: "/".into(),
             query: vec![("lifecycle".into(), String::new())],
-            headers: vec![("x-amz-content-sha256".into(), EMPTY_SHA256.into()), ("x-amz-date".into(), "20130524T000000Z".into())],
+            headers: vec![
+                ("x-amz-content-sha256".into(), EMPTY_SHA256.into()),
+                ("x-amz-date".into(), "20130524T000000Z".into()),
+            ],
         };
-        let auth = r.authorization("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", "20130524T000000Z", EMPTY_SHA256);
+        let auth = r.authorization(
+            "AKIAIOSFODNN7EXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "us-east-1",
+            "20130524T000000Z",
+            EMPTY_SHA256,
+        );
         assert!(auth.ends_with("Signature=fea454ca298b7da1c68078a5d1bdbfbbe0d65c699e0f91ac7a200a0136783543"), "{auth}");
     }
 
@@ -817,7 +991,13 @@ mod tests {
             ],
             headers: Vec::new(),
         };
-        let auth = r.authorization("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", "20130524T000000Z", UNSIGNED);
+        let auth = r.authorization(
+            "AKIAIOSFODNN7EXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "us-east-1",
+            "20130524T000000Z",
+            UNSIGNED,
+        );
         assert!(auth.ends_with("Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"), "{auth}");
     }
 
@@ -839,7 +1019,9 @@ mod tests {
         assert_eq!(l.files[1], ("docs/a.txt".to_string(), 42, 1793361600000));
         assert_eq!(l.prefixes, vec!["docs/sub/".to_string()]);
         assert_eq!(l.next.as_deref(), Some("tok"));
-        let b = parse_buckets(r#"<ListAllMyBucketsResult><Buckets><Bucket><Name>fotos</Name><CreationDate>2026-01-01T00:00:00.000Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>"#);
+        let b = parse_buckets(
+            r#"<ListAllMyBucketsResult><Buckets><Bucket><Name>fotos</Name><CreationDate>2026-01-01T00:00:00.000Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>"#,
+        );
         assert_eq!(b[0].0, "fotos");
     }
 }
@@ -856,14 +1038,28 @@ mod integration {
         let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") else { return };
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
-        let params = |bucket: &str| S3Params { timeout: None, endpoint: endpoint.clone(), region: "eu-central-1".into(), bucket: bucket.into(), access_key: "test".into(), secret: Some("geheim".into()), path_style: true, tls13_only: false, trust: None, proxy: None };
+        let params = |bucket: &str| S3Params {
+            timeout: None,
+            endpoint: endpoint.clone(),
+            region: "eu-central-1".into(),
+            bucket: bucket.into(),
+            access_key: "test".into(),
+            secret: Some("geheim".into()),
+            path_style: true,
+            tls13_only: false,
+            trust: None,
+            proxy: None,
+        };
         let bucket = format!("bitcrane-{}", uuid::Uuid::new_v4().simple());
         let root = Arc::new(S3Conn::connect(params(""), known.clone()).await.unwrap());
         root.mkdir(&format!("/{bucket}")).await.unwrap();
         assert!(root.list("/").await.unwrap().iter().any(|e| e.name == bucket));
         let conn = Arc::new(S3Conn::connect(params(&bucket), known.clone()).await.unwrap());
         conn.mkdir_all("/a b").await.unwrap();
-        assert_eq!(conn.list("/").await.unwrap().iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(), vec![("a b", "dir")]);
+        assert_eq!(
+            conn.list("/").await.unwrap().iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(),
+            vec![("a b", "dir")]
+        );
         // Small file with mtime.
         let file = "/a b/über.txt";
         let (mut w, task) = conn.writer(file, Some(11), Some(1_700_000_000));

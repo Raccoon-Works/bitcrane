@@ -10,7 +10,10 @@ import { useEffect, useState } from 'react';
 import { $t, LANG } from '../i18n';
 import { getState, LIVE, showToast } from './store';
 
-export interface Tag { name: string; color: number }
+export interface Tag {
+  name: string;
+  color: number;
+}
 
 /** Finder colours by number, with the names the Finder gives them. */
 export const TAG_COLORS: Array<{ color: number; css: string; de: string; en: string }> = [
@@ -42,12 +45,14 @@ export function useTags(dir: string, enabled: boolean): Record<string, Tag[]> | 
   useEffect(() => {
     const l = () => setTick((n) => n + 1);
     listeners.add(l);
-    return () => { listeners.delete(l); };
+    return () => {
+      listeners.delete(l);
+    };
   }, []);
   useEffect(() => {
     if (enabled && dir) void refreshTags(dir);
   }, [dir, enabled, fsRev]);
-  return enabled ? cache.get(dir) ?? null : null;
+  return enabled ? (cache.get(dir) ?? null) : null;
 }
 
 export function tagsFor(dir: string): Record<string, Tag[]> {

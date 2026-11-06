@@ -42,7 +42,8 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
   for (let d = 0; d <= max && !found; d++) {
     trace.push(v.slice());
     for (let k = -d; k <= d; k += 2) {
-      let x = k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
+      let x =
+        k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
       let y = x - k;
       while (x < n && y < m && a[x] === b[y]) {
         x++;
@@ -84,7 +85,8 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
 export function toHunks(lines: DiffLine[], context = 3): DiffHunk[] {
   const changed = lines.map((l) => l.op !== 'same');
   const keep = lines.map((_, i) => {
-    for (let j = Math.max(0, i - context); j <= Math.min(lines.length - 1, i + context); j++) if (changed[j]) return true;
+    for (let j = Math.max(0, i - context); j <= Math.min(lines.length - 1, i + context); j++)
+      if (changed[j]) return true;
     return false;
   });
   const hunks: DiffHunk[] = [];

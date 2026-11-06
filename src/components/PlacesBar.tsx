@@ -19,7 +19,12 @@ import { placeLabel } from '../util/placeLabel';
 
 /** Icon of a place, guessed from its folder (home, desktop, downloads, documents). */
 function PlaceIcon({ place }: { place: Place }) {
-  const last = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop()?.toLowerCase() ?? '';
+  const last =
+    place.path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop()
+      ?.toLowerCase() ?? '';
   const props = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
   // Cloud folders show the service's own logo (single-colour, like the Finder sidebar).
   if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={16} />;
@@ -33,16 +38,29 @@ function PlaceIcon({ place }: { place: Place }) {
 
 /** Tooltip of a place: the folder, and for cloud folders the account it belongs to. */
 function placeTitle(place: Place): string {
-  const folder = place.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+  const folder =
+    place.path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() ?? '';
   const account = place.cloud && folder.includes('-') ? folder.slice(folder.indexOf('-') + 1) : '';
-  return [placeLabel(place) + (account ? ` – ${account}` : ''), place.path, $t('Klicken zum Öffnen, ziehen zum Verschieben')].join('\n');
+  return [
+    placeLabel(place) + (account ? ` – ${account}` : ''),
+    place.path,
+    $t('Klicken zum Öffnen, ziehen zum Verschieben'),
+  ].join('\n');
 }
 
 export function PlacesBar({ side }: { side: PaneSide }) {
   // Re-render when the places, the tab or the folder shown change.
   const places = useStore((s) => placesFor(side, s, activeTab(s)));
-  const path = useStore((s) => { const t = activeTab(s); return t ? (side === 'local' ? t.localPath : t.remotePath) : ''; });
-  const hint = useStore((s) => (s.dropHint?.side === side && (s.dropHint.place || s.dropHint.addPlace) ? s.dropHint : null));
+  const path = useStore((s) => {
+    const t = activeTab(s);
+    return t ? (side === 'local' ? t.localPath : t.remotePath) : '';
+  });
+  const hint = useStore((s) =>
+    s.dropHint?.side === side && (s.dropHint.place || s.dropHint.addPlace) ? s.dropHint : null,
+  );
   const barRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ path: string; before: string | null; out: boolean } | null>(null);
   const moved = useRef(false);
@@ -65,7 +83,9 @@ export function PlacesBar({ side }: { side: PaneSide }) {
     if (last && last.offsetLeft + last.offsetWidth <= bar.clientWidth - 8) n = items.length;
     setFit((f) => (f === n ? f : n));
   };
-  useLayoutEffect(() => { setFit(places.length); }, [places]);
+  useLayoutEffect(() => {
+    setFit(places.length);
+  }, [places]);
   useLayoutEffect(measure);
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -87,7 +107,9 @@ export function PlacesBar({ side }: { side: PaneSide }) {
       const bar = barRef.current?.getBoundingClientRect();
       // Well outside the bar: letting go removes the place.
       const out = !!bar && (ev.clientY < bar.top - 24 || ev.clientY > bar.bottom + 24);
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-place-path]');
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(
+        '[data-place-path]',
+      );
       let before: string | null = null;
       if (el && barRef.current?.contains(el)) {
         const r = el.getBoundingClientRect();
@@ -117,10 +139,29 @@ export function PlacesBar({ side }: { side: PaneSide }) {
   };
 
   return (
-    <div ref={barRef} className={`places-bar${hint?.addPlace ? ' is-drop' : ''}`} data-places-bar role="toolbar" aria-label={$t('Orte')}>
+    <div
+      ref={barRef}
+      className={`places-bar${hint?.addPlace ? ' is-drop' : ''}`}
+      data-places-bar
+      role="toolbar"
+      aria-label={$t('Orte')}
+    >
       {places.map((p, i) => {
         const on = p.path === path;
-        if (i >= fit) return <button key={p.path} type="button" data-place-path={p.path} className="place is-overflow" tabIndex={-1} aria-hidden="true"><PlaceIcon place={p} /><span>{placeLabel(p)}</span></button>;
+        if (i >= fit)
+          return (
+            <button
+              key={p.path}
+              type="button"
+              data-place-path={p.path}
+              className="place is-overflow"
+              tabIndex={-1}
+              aria-hidden="true"
+            >
+              <PlaceIcon place={p} />
+              <span>{placeLabel(p)}</span>
+            </button>
+          );
         const isDrop = hint?.place === p.path;
         const isDragged = drag?.path === p.path;
         return (
@@ -132,8 +173,17 @@ export function PlacesBar({ side }: { side: PaneSide }) {
             title={placeTitle(p)}
             aria-current={on ? 'location' : undefined}
             onPointerDown={(e) => begin(e, p)}
-            onClick={() => { if (moved.current) { moved.current = false; return; } navigate(side, p.path); }}
-            onContextMenu={(e) => { e.preventDefault(); setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'place', place: p.path } }); }}
+            onClick={() => {
+              if (moved.current) {
+                moved.current = false;
+                return;
+              }
+              navigate(side, p.path);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'place', place: p.path } });
+            }}
           >
             <PlaceIcon place={p} />
             <span className="ellipsis">{placeLabel(p)}</span>
@@ -141,14 +191,29 @@ export function PlacesBar({ side }: { side: PaneSide }) {
         );
       })}
       {fit < places.length && (
-        <button type="button" className="place place-more" title={$t('Weitere Orte')} aria-label={$t('Weitere Orte')} aria-haspopup="menu"
-          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setState({ contextMenu: { x: r.left, y: r.bottom + 4, side, names: [], kind: 'placesMore', place: String(fit) } }); }}>
+        <button
+          type="button"
+          className="place place-more"
+          title={$t('Weitere Orte')}
+          aria-label={$t('Weitere Orte')}
+          aria-haspopup="menu"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setState({
+              contextMenu: { x: r.left, y: r.bottom + 4, side, names: [], kind: 'placesMore', place: String(fit) },
+            });
+          }}
+        >
           <CaretDoubleRight size={15} weight="bold" aria-hidden="true" />
         </button>
       )}
       {drag && drag.before === null && !drag.out && <span className="place-end-mark" aria-hidden="true" />}
       {!places.length && <span className="places-empty">{$t('Ordner hierher ziehen, um sie als Orte zu merken')}</span>}
-      {drag?.out && <span className="places-remove-hint" role="status">{$t('Loslassen zum Entfernen')}</span>}
+      {drag?.out && (
+        <span className="places-remove-hint" role="status">
+          {$t('Loslassen zum Entfernen')}
+        </span>
+      )}
     </div>
   );
 }

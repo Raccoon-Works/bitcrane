@@ -6,10 +6,31 @@
  * plain language plus the actions that solve it.
  */
 import { useKeyLabel } from '../state/keys';
-import { AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, Check, ChevronDown, ChevronUp, Clock, SquareTerminal } from './glyphs';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  SquareTerminal,
+} from './glyphs';
 import type { Transfer } from '../backend/types';
 import {
-  activeTab, activityExpanded, fixDemoPermissions, isOffline, retryTransfer, setActivityFilter, setState, skipTransfer, toggleActivity, updateSettings, useStore, type AfterQueue,
+  activeTab,
+  activityExpanded,
+  fixDemoPermissions,
+  isOffline,
+  retryTransfer,
+  setActivityFilter,
+  setState,
+  skipTransfer,
+  toggleActivity,
+  updateSettings,
+  useStore,
+  type AfterQueue,
 } from '../state/store';
 import { formatSpeed, formatTime } from '../util/format';
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
@@ -19,24 +40,44 @@ import { Button, IconButton, Select } from './ui';
 import { afterQueueLabel, setAfterQueue } from '../state/tools';
 import { $t } from '../i18n';
 
-
 /** Permission errors (older versions said "Keine Schreibrechte"; reading and writing now share one message). */
 const isDenied = (e?: string) => !!e && [$t('Keine Schreibrechte'), $t('Keine Berechtigung.')].includes(e);
 
 export function TransferIcon({ t }: { t: Transfer }) {
-  if (t.state === 'error') return <AlertTriangle size={14} strokeWidth={1.75} className="tone-danger" aria-label={$t('Fehler')} />;
-  if (t.direction === 'command') return <SquareTerminal size={14} strokeWidth={1.75} className={t.state === 'done' ? 'tone-ok' : 'tone-accent'} aria-hidden="true" />;
+  if (t.state === 'error')
+    return <AlertTriangle size={14} strokeWidth={1.75} className="tone-danger" aria-label={$t('Fehler')} />;
+  if (t.direction === 'command')
+    return (
+      <SquareTerminal
+        size={14}
+        strokeWidth={1.75}
+        className={t.state === 'done' ? 'tone-ok' : 'tone-accent'}
+        aria-hidden="true"
+      />
+    );
   if (t.state === 'done') return <Check size={14} strokeWidth={2} className="tone-ok" aria-label={$t('Fertig')} />;
-  if (t.state === 'queued' || t.state === 'paused') return <Clock size={14} strokeWidth={1.75} className="muted" aria-label={$t('Wartet')} />;
-  if (t.direction === 'cross') return <ArrowLeftRight size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Überträgt zwischen Servern')} />;
-  return t.direction === 'up'
-    ? <ArrowUp size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Lädt hoch')} />
-    : <ArrowDown size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Lädt herunter')} />;
+  if (t.state === 'queued' || t.state === 'paused')
+    return <Clock size={14} strokeWidth={1.75} className="muted" aria-label={$t('Wartet')} />;
+  if (t.direction === 'cross')
+    return (
+      <ArrowLeftRight size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Überträgt zwischen Servern')} />
+    );
+  return t.direction === 'up' ? (
+    <ArrowUp size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Lädt hoch')} />
+  ) : (
+    <ArrowDown size={14} strokeWidth={2} className="tone-accent" aria-label={$t('Lädt herunter')} />
+  );
 }
 
 export function Progress({ value, tone = 'accent' }: { value: number; tone?: 'accent' | 'ok' | 'danger' }) {
   return (
-    <span className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
+    <span
+      className="progress"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value * 100)}
+    >
       <span className={`progress-fill tone-bg-${tone}`} style={{ width: `${Math.round(value * 100)}%` }} />
     </span>
   );
@@ -55,20 +96,44 @@ function ActivityRow({ t }: { t: Transfer }) {
       <span className="act-name">
         <span className="strong-500">{t.name}</span>
         <span className={`small ${t.state === 'error' ? 'tone-danger' : 'muted'} ellipsis`}>
-          {t.state === 'error' ? (isDenied(t.error) ? $t('{0} im Server-Ordner {1}', t.error!.replace(/\.$/, ''), t.folder) : `${t.error} (${t.folder})`) : t.direction === 'command' ? (t.state === 'done' ? $t('Befehl ausgeführt') : $t('Befehl läuft …')) : t.folder}
+          {t.state === 'error'
+            ? isDenied(t.error)
+              ? $t('{0} im Server-Ordner {1}', t.error!.replace(/\.$/, ''), t.folder)
+              : `${t.error} (${t.folder})`
+            : t.direction === 'command'
+              ? t.state === 'done'
+                ? $t('Befehl ausgeführt')
+                : $t('Befehl läuft …')
+              : t.folder}
         </span>
       </span>
       {t.state === 'error' ? (
         <span className="act-actions">
-          <Button small onClick={() => setState({ dialog: { type: 'transfers' } })}>{isDenied(t.error) ? $t('Rechte prüfen') : $t('Details')}</Button>
-          <Button small onClick={() => skipTransfer(t.id)}>{$t('Überspringen')}</Button>
-          <Button small variant="primary" onClick={onRetry}>{$t('Wiederholen')}</Button>
+          <Button small onClick={() => setState({ dialog: { type: 'transfers' } })}>
+            {isDenied(t.error) ? $t('Rechte prüfen') : $t('Details')}
+          </Button>
+          <Button small onClick={() => skipTransfer(t.id)}>
+            {$t('Überspringen')}
+          </Button>
+          <Button small variant="primary" onClick={onRetry}>
+            {$t('Wiederholen')}
+          </Button>
         </span>
       ) : (
         <span className="act-progress">
           <Progress value={t.state === 'done' ? 1 : pct} tone={t.state === 'done' ? 'ok' : 'accent'} />
           <span className="small muted act-right">
-            {t.state === 'done' ? (t.error ? $t('Übersprungen') : $t('Fertig {0}', t.finishedAt ? formatTime(t.finishedAt) : '')) : t.state === 'queued' ? $t('Wartet') : t.state === 'paused' ? (t.error ?? $t('Pausiert')) : t.direction === 'command' ? $t('Läuft') : `${Math.round(pct * 100)} %`}
+            {t.state === 'done'
+              ? t.error
+                ? $t('Übersprungen')
+                : $t('Fertig {0}', t.finishedAt ? formatTime(t.finishedAt) : '')
+              : t.state === 'queued'
+                ? $t('Wartet')
+                : t.state === 'paused'
+                  ? (t.error ?? $t('Pausiert'))
+                  : t.direction === 'command'
+                    ? $t('Läuft')
+                    : `${Math.round(pct * 100)} %`}
           </span>
         </span>
       )}
@@ -94,14 +159,26 @@ function ActivityLog({ height }: { height: number }) {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [entries]);
   return (
-    <div ref={ref} className="act-log selectable" role="log" aria-live="polite" style={{ height }}
-      onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24; }}>
+    <div
+      ref={ref}
+      className="act-log selectable"
+      role="log"
+      aria-live="polite"
+      style={{ height }}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
+    >
       {!entries.length && <span className="small muted empty-act">{$t('Noch keine Einträge.')}</span>}
       {entries.slice(-500).map((e, i) => (
         <div key={`${e.time}-${i}`} className={`act-log-row is-${e.level}`} title={e.detail}>
           <span className="mono act-log-time">{logTime(e.time)}</span>
           <span className="act-log-source">{e.source}</span>
-          <span className="act-log-text">{e.text}{e.detail ? <span className="muted"> · {e.detail.split('\n')[0]}</span> : null}</span>
+          <span className="act-log-text">
+            {e.text}
+            {e.detail ? <span className="muted"> · {e.detail.split('\n')[0]}</span> : null}
+          </span>
         </div>
       ))}
     </div>
@@ -125,9 +202,16 @@ export function Activity() {
   const rules = useStore((s) => s.settings.rules);
   const chosenRule = useStore((s) => s.transferRule);
   const chosenName = chosenRule === 'none' ? $t('ohne Regel') : rules?.find((r) => r.id === chosenRule)?.name;
-  const ruleOptions = [{ value: '', label: $t('Regel: wie beim Server') }, { value: 'none', label: $t('Regel: keine') }, ...(rules ?? []).map((r) => ({ value: r.id, label: $t('Regel: {0}', r.name) }))];
+  const ruleOptions = [
+    { value: '', label: $t('Regel: wie beim Server') },
+    { value: 'none', label: $t('Regel: keine') },
+    ...(rules ?? []).map((r) => ({ value: r.id, label: $t('Regel: {0}', r.name) })),
+  ];
   const busy = running.length + queued.length > 0;
-  const afterOptions = (['none', 'disconnect', 'quit', 'sleep', 'shutdown'] as AfterQueue[]).map((v) => ({ value: v, label: v === 'none' ? $t('Wenn fertig: nichts tun') : $t('Wenn fertig: {0}', afterQueueLabel(v)) }));
+  const afterOptions = (['none', 'disconnect', 'quit', 'sleep', 'shutdown'] as AfterQueue[]).map((v) => ({
+    value: v,
+    label: v === 'none' ? $t('Wenn fertig: nichts tun') : $t('Wenn fertig: {0}', afterQueueLabel(v)),
+  }));
 
   if (!expanded) {
     const current = running[0] ?? queued[0];
@@ -137,7 +221,9 @@ export function Activity() {
         <>
           <Clock size={14} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
           <span className="strong tone-warn">{$t('Wartet auf Verbindung')}</span>
-          <span className="small muted">{queued.length} {queued.length === 1 ? $t('Datei') : $t('Dateien')} {$t('in der Warteschlange')}</span>
+          <span className="small muted">
+            {queued.length} {queued.length === 1 ? $t('Datei') : $t('Dateien')} {$t('in der Warteschlange')}
+          </span>
         </>
       );
     } else if (current) {
@@ -147,8 +233,12 @@ export function Activity() {
           <TransferIcon t={current} />
           <span className="strong">{current.name}</span>
           <span className="small muted ellipsis">{current.folder}</span>
-          <span className="compact-bar"><Progress value={pct} /></span>
-          <span className="small muted">{current.direction === 'command' ? $t('Befehl läuft …') : `${Math.round(pct * 100)} %`}</span>
+          <span className="compact-bar">
+            <Progress value={pct} />
+          </span>
+          <span className="small muted">
+            {current.direction === 'command' ? $t('Befehl läuft …') : `${Math.round(pct * 100)} %`}
+          </span>
         </>
       );
     } else {
@@ -157,7 +247,10 @@ export function Activity() {
         <>
           <Check size={14} strokeWidth={2} className="tone-ok" aria-hidden="true" />
           <span className="strong">{$t('Alles übertragen')}</span>
-          <span className="small muted ellipsis">{$t('zuletzt')}{' '}{last.name}{last.finishedAt ? $t(' um {0}', formatTime(last.finishedAt)) : ''}</span>
+          <span className="small muted ellipsis">
+            {$t('zuletzt')} {last.name}
+            {last.finishedAt ? $t(' um {0}', formatTime(last.finishedAt)) : ''}
+          </span>
         </>
       ) : (
         <span className="small muted">{$t('Keine Übertragungen')}</span>
@@ -165,13 +258,27 @@ export function Activity() {
     }
     const restCount = running.length + queued.length - (current ? 1 : 0);
     return (
-      <section className={`activity is-compact${!current && !done.length && !restCount ? ' is-idle' : ''}`} aria-label={$t('Aktivität')} role="status" aria-live="polite">
+      <section
+        className={`activity is-compact${!current && !done.length && !restCount ? ' is-idle' : ''}`}
+        aria-label={$t('Aktivität')}
+        role="status"
+        aria-live="polite"
+      >
         {line}
         <span className="flex-1" />
         <span className="small muted nowrap">
-          {[restCount > 0 ? $t('{0} weitere', restCount) : '', running.length && speed >= 1 ? `↑ ${formatSpeed(speed)}` : '', after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : '', chosenName ? $t('Regel: {0}', chosenName) : ''].filter(Boolean).join(' · ')}
+          {[
+            restCount > 0 ? $t('{0} weitere', restCount) : '',
+            running.length && speed >= 1 ? `↑ ${formatSpeed(speed)}` : '',
+            after !== 'none' ? $t('danach: {0}', afterQueueLabel(after)) : '',
+            chosenName ? $t('Regel: {0}', chosenName) : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </span>
-        <IconButton label={$t('Aktivität aufklappen')} shortcut={key} onClick={toggleActivity} tipBelow={false}><ChevronUp size={14} strokeWidth={2} /></IconButton>
+        <IconButton label={$t('Aktivität aufklappen')} shortcut={key} onClick={toggleActivity} tipBelow={false}>
+          <ChevronUp size={14} strokeWidth={2} />
+        </IconButton>
       </section>
     );
   }
@@ -184,31 +291,103 @@ export function Activity() {
   return (
     <section className="activity is-open" aria-label={$t('Aktivität')}>
       {/* Top edge: drag to make the activity area taller or lower (double click: default height). */}
-      <ResizeHandle orientation="horizontal" label={$t('Höhe der Aktivität (ziehen, Doppelklick: zurücksetzen)')} value={height} min={120} max={640} step={20}
-        toValue={(start, d) => start - d} onChange={(v) => updateSettings({ activityHeight: Math.round(v) })} onReset={() => updateSettings({ activityHeight: 240 })} className="activity-handle" />
+      <ResizeHandle
+        orientation="horizontal"
+        label={$t('Höhe der Aktivität (ziehen, Doppelklick: zurücksetzen)')}
+        value={height}
+        min={120}
+        max={640}
+        step={20}
+        toValue={(start, d) => start - d}
+        onChange={(v) => updateSettings({ activityHeight: Math.round(v) })}
+        onReset={() => updateSettings({ activityHeight: 240 })}
+        className="activity-handle"
+      />
       <div className="act-head">
         <span className="strong">{$t('Aktivität')}</span>
         <div role="tablist" className="segmented small-seg">
-          <button type="button" role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'is-on' : ''} onClick={() => setActivityFilter('all')}>{$t('Alle')}</button>
-          <button type="button" role="tab" aria-selected={filter === 'errors'} className={filter === 'errors' ? 'is-on' : ''} onClick={() => setActivityFilter('errors')}>
-            {$t('Fehler')}{' '}{errors.length > 0 && <span className="tone-danger strong">{errors.length}</span>}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'all'}
+            className={filter === 'all' ? 'is-on' : ''}
+            onClick={() => setActivityFilter('all')}
+          >
+            {$t('Alle')}
           </button>
-          <button type="button" role="tab" aria-selected={filter === 'history'} className={filter === 'history' ? 'is-on' : ''} onClick={() => setActivityFilter('history')}>{$t('Verlauf')}</button>
-          <button type="button" role="tab" aria-selected={filter === 'log'} className={filter === 'log' ? 'is-on' : ''} onClick={() => setActivityFilter('log')}>{$t('Protokoll')}</button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'errors'}
+            className={filter === 'errors' ? 'is-on' : ''}
+            onClick={() => setActivityFilter('errors')}
+          >
+            {$t('Fehler')} {errors.length > 0 && <span className="tone-danger strong">{errors.length}</span>}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'history'}
+            className={filter === 'history' ? 'is-on' : ''}
+            onClick={() => setActivityFilter('history')}
+          >
+            {$t('Verlauf')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'log'}
+            className={filter === 'log' ? 'is-on' : ''}
+            onClick={() => setActivityFilter('log')}
+          >
+            {$t('Protokoll')}
+          </button>
         </div>
         <span className="flex-1" />
         {running.length > 0 && speed >= 1 && <span className="small muted">↑ {formatSpeed(speed)}</span>}
         {/* WinSCP "Transfer settings": a rule for the next transfers by hand, instead of the server's. */}
-        {!!rules?.length && <Select value={chosenRule} onChange={(v) => setState({ transferRule: v })} options={ruleOptions} label={$t('Regel für Übertragungen von Hand')} />}
+        {!!rules?.length && (
+          <Select
+            value={chosenRule}
+            onChange={(v) => setState({ transferRule: v })}
+            options={ruleOptions}
+            label={$t('Regel für Übertragungen von Hand')}
+          />
+        )}
         {/* WinSCP "Once empty": what happens when everything is transferred. */}
-        {(busy || after !== 'none') && <Select value={after} onChange={setAfterQueue} options={afterOptions} label={$t('Wenn alle Übertragungen fertig sind')} />}
-        <Button small variant="ghost" onClick={() => setState({ dialog: { type: 'transfers' } })}>{$t('Alle Übertragungen')}</Button>
-        <IconButton label={errors.length ? $t('Zuklappen geht erst, wenn kein Fehler mehr offen ist') : $t('Aktivität zuklappen')} shortcut={key} disabled={errors.length > 0} onClick={toggleActivity} tipBelow={false}><ChevronDown size={14} strokeWidth={2} /></IconButton>
+        {(busy || after !== 'none') && (
+          <Select
+            value={after}
+            onChange={setAfterQueue}
+            options={afterOptions}
+            label={$t('Wenn alle Übertragungen fertig sind')}
+          />
+        )}
+        <Button small variant="ghost" onClick={() => setState({ dialog: { type: 'transfers' } })}>
+          {$t('Alle Übertragungen')}
+        </Button>
+        <IconButton
+          label={errors.length ? $t('Zuklappen geht erst, wenn kein Fehler mehr offen ist') : $t('Aktivität zuklappen')}
+          shortcut={key}
+          disabled={errors.length > 0}
+          onClick={toggleActivity}
+          tipBelow={false}
+        >
+          <ChevronDown size={14} strokeWidth={2} />
+        </IconButton>
       </div>
-      {filter === 'log' ? <ActivityLog height={height} /> : (
+      {filter === 'log' ? (
+        <ActivityLog height={height} />
+      ) : (
         <div className="act-list" role="log" aria-live="polite" style={{ height }}>
-          {list.length === 0 && <span className="small muted empty-act">{filter === 'errors' ? $t('Keine Fehler.') : $t('Noch nichts übertragen.')}</span>}
-          {list.map((t) => <ActivityRow key={t.id} t={t} />)}
+          {list.length === 0 && (
+            <span className="small muted empty-act">
+              {filter === 'errors' ? $t('Keine Fehler.') : $t('Noch nichts übertragen.')}
+            </span>
+          )}
+          {list.map((t) => (
+            <ActivityRow key={t.id} t={t} />
+          ))}
         </div>
       )}
     </section>

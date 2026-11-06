@@ -2,7 +2,7 @@
 
 use crate::error::AppResult;
 use crate::ssh::ConnectParams;
-use crate::{AppState, dav, ftp, PendingPrompts, remote, s3, smb, ssh, vault};
+use crate::{dav, ftp, remote, s3, smb, ssh, vault, AppState, PendingPrompts};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -37,7 +37,8 @@ pub(super) fn make_prompter(app: tauri::AppHandle, pending: PendingPrompts, serv
         let _ = app.emit("auth-prompt", AuthPromptEvent { id: id.clone(), server_id: server_id.clone(), request });
         let pending = pending.clone();
         Box::pin(async move {
-            let answer = tokio::time::timeout(std::time::Duration::from_secs(180), rx).await.ok().and_then(|r| r.ok()).flatten();
+            let answer =
+                tokio::time::timeout(std::time::Duration::from_secs(180), rx).await.ok().and_then(|r| r.ok()).flatten();
             pending.lock().unwrap().remove(&id);
             answer
         })
@@ -53,7 +54,12 @@ pub(crate) fn auth_prompt_answer(state: State<'_, AppState>, id: String, answers
 }
 
 #[tauri::command]
-pub(crate) async fn ssh_connect(app: tauri::AppHandle, state: State<'_, AppState>, server_id: String, params: ConnectParams) -> AppResult<ConnectResult> {
+pub(crate) async fn ssh_connect(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    server_id: String,
+    params: ConnectParams,
+) -> AppResult<ConnectResult> {
     // Take it out first: closing can take a while and must not hold the lock.
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(old) = old {
@@ -68,7 +74,11 @@ pub(crate) async fn ssh_connect(app: tauri::AppHandle, state: State<'_, AppState
 }
 
 #[tauri::command]
-pub(crate) async fn ftp_connect(state: State<'_, AppState>, server_id: String, params: ftp::FtpParams) -> AppResult<ConnectResult> {
+pub(crate) async fn ftp_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: ftp::FtpParams,
+) -> AppResult<ConnectResult> {
     // Take it out first: closing can take a while and must not hold the lock.
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(old) = old {
@@ -81,7 +91,11 @@ pub(crate) async fn ftp_connect(state: State<'_, AppState>, server_id: String, p
 }
 
 #[tauri::command]
-pub(crate) async fn dav_connect(state: State<'_, AppState>, server_id: String, params: dav::DavParams) -> AppResult<ConnectResult> {
+pub(crate) async fn dav_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: dav::DavParams,
+) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::Dav(dav::DavConn::connect(params, state.known_hosts.clone()).await?);
     let home = conn.home().to_string();
@@ -90,7 +104,11 @@ pub(crate) async fn dav_connect(state: State<'_, AppState>, server_id: String, p
 }
 
 #[tauri::command]
-pub(crate) async fn s3_connect(state: State<'_, AppState>, server_id: String, params: s3::S3Params) -> AppResult<ConnectResult> {
+pub(crate) async fn s3_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: s3::S3Params,
+) -> AppResult<ConnectResult> {
     state.connections.lock().await.remove(&server_id);
     let conn = remote::Remote::S3(Arc::new(s3::S3Conn::connect(params, state.known_hosts.clone()).await?));
     let home = conn.home().to_string();
@@ -99,7 +117,11 @@ pub(crate) async fn s3_connect(state: State<'_, AppState>, server_id: String, pa
 }
 
 #[tauri::command]
-pub(crate) async fn smb_connect(state: State<'_, AppState>, server_id: String, params: smb::SmbParams) -> AppResult<ConnectResult> {
+pub(crate) async fn smb_connect(
+    state: State<'_, AppState>,
+    server_id: String,
+    params: smb::SmbParams,
+) -> AppResult<ConnectResult> {
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(old) = old {
         old.close().await;
@@ -113,7 +135,13 @@ pub(crate) async fn smb_connect(state: State<'_, AppState>, server_id: String, p
 /// Unlocks a Cryptomator vault and keeps it under `server_id` like a server.
 /// `storage_id` is the connection of the server the vault lies on (none: this computer).
 #[tauri::command]
-pub(crate) async fn vault_open(state: State<'_, AppState>, server_id: String, location: String, storage_id: Option<String>, password: String) -> AppResult<ConnectResult> {
+pub(crate) async fn vault_open(
+    state: State<'_, AppState>,
+    server_id: String,
+    location: String,
+    storage_id: Option<String>,
+    password: String,
+) -> AppResult<ConnectResult> {
     let store = match storage_id {
         Some(id) => vault::Store::Remote { connections: state.connections.clone(), id },
         None => vault::Store::Local,
@@ -126,7 +154,12 @@ pub(crate) async fn vault_open(state: State<'_, AppState>, server_id: String, lo
 
 /// Creates a new, empty Cryptomator vault in the folder `location`.
 #[tauri::command]
-pub(crate) async fn vault_create(state: State<'_, AppState>, location: String, storage_id: Option<String>, password: String) -> AppResult<()> {
+pub(crate) async fn vault_create(
+    state: State<'_, AppState>,
+    location: String,
+    storage_id: Option<String>,
+    password: String,
+) -> AppResult<()> {
     let store = match storage_id {
         Some(id) => vault::Store::Remote { connections: state.connections.clone(), id },
         None => vault::Store::Local,

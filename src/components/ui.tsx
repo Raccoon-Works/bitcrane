@@ -12,7 +12,13 @@ import { Check, ChevronDown } from './glyphs';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'link';
 
-export function Button({ variant = 'secondary', small, className = '', children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean }) {
+export function Button({
+  variant = 'secondary',
+  small,
+  className = '',
+  children,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean }) {
   return (
     <button type="button" className={`btn btn-${variant}${small ? ' btn-small' : ''} ${className}`} {...rest}>
       {children}
@@ -21,21 +27,56 @@ export function Button({ variant = 'secondary', small, className = '', children,
 }
 
 /** Square icon button with an accessible label and an optional tooltip. */
-export function IconButton({ label, shortcut, active, className = '', children, tipBelow = true, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; shortcut?: string; active?: boolean; tipBelow?: boolean }) {
+export function IconButton({
+  label,
+  shortcut,
+  active,
+  className = '',
+  children,
+  tipBelow = true,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  shortcut?: string;
+  active?: boolean;
+  tipBelow?: boolean;
+}) {
   return (
     <Tooltip text={label} shortcut={shortcut} below={tipBelow}>
-      <button type="button" aria-label={label} aria-pressed={active} className={`icon-btn${active ? ' is-on' : ''} ${className}`} {...rest}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        className={`icon-btn${active ? ' is-on' : ''} ${className}`}
+        {...rest}
+      >
         {children}
       </button>
     </Tooltip>
   );
 }
 
-export function Checkbox({ checked, onChange, label, note, disabled, danger }: { checked: boolean; onChange: (v: boolean) => void; label?: ReactNode; note?: ReactNode; disabled?: boolean; danger?: boolean }) {
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  note,
+  disabled,
+  danger,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: ReactNode;
+  note?: ReactNode;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
   return (
     <label className={`checkbox${disabled ? ' is-disabled' : ''}${danger ? ' is-danger' : ''}`}>
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-      <span className="checkbox-box" aria-hidden="true">{checked && <Check size={11} strokeWidth={3} />}</span>
+      <span className="checkbox-box" aria-hidden="true">
+        {checked && <Check size={11} strokeWidth={3} />}
+      </span>
       {(label || note) && (
         <span className="checkbox-text">
           {label && <span className="checkbox-label">{label}</span>}
@@ -46,15 +87,59 @@ export function Checkbox({ checked, onChange, label, note, disabled, danger }: {
   );
 }
 
-export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className={`switch${checked ? ' is-on' : ''}`} onClick={() => onChange(!checked)}>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className={`switch${checked ? ' is-on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
       <span className="switch-knob" />
     </button>
   );
 }
 
-export function TextField({ value, onChange, mono, placeholder, id, invalid, autoFocus, prefix, onEnter, className = '', type = 'text', label }: { value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string; id?: string; invalid?: boolean; autoFocus?: boolean; prefix?: ReactNode; onEnter?: () => void; className?: string; type?: 'text' | 'password'; label?: string }) {
+export function TextField({
+  value,
+  onChange,
+  mono,
+  placeholder,
+  id,
+  invalid,
+  autoFocus,
+  prefix,
+  onEnter,
+  className = '',
+  type = 'text',
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  placeholder?: string;
+  id?: string;
+  invalid?: boolean;
+  autoFocus?: boolean;
+  prefix?: ReactNode;
+  onEnter?: () => void;
+  className?: string;
+  type?: 'text' | 'password';
+  label?: string;
+}) {
   return (
     <span className={`field${mono ? ' is-mono' : ''}${invalid ? ' is-invalid' : ''} ${className}`}>
       {prefix && <span className="field-prefix">{prefix}</span>}
@@ -78,12 +163,26 @@ export function TextField({ value, onChange, mono, placeholder, id, invalid, aut
 }
 
 /** Native select styled like a field; keeps keyboard and screen reader behaviour. */
-export function Select<T extends string>({ value, onChange, options, id, label }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: string }>; id?: string; label?: string }) {
+export function Select<T extends string>({
+  value,
+  onChange,
+  options,
+  id,
+  label,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ value: T; label: string }>;
+  id?: string;
+  label?: string;
+}) {
   return (
     <span className="select">
       <select id={id} aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)}>
         {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
         ))}
       </select>
       <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
@@ -91,11 +190,28 @@ export function Select<T extends string>({ value, onChange, options, id, label }
   );
 }
 
-export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: ReactNode }>; label: string }) {
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ value: T; label: ReactNode }>;
+  label: string;
+}) {
   return (
     <div role="radiogroup" aria-label={label} className="segmented">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={o.value === value} className={o.value === value ? 'is-on' : ''} onClick={() => onChange(o.value)}>
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          className={o.value === value ? 'is-on' : ''}
+          onClick={() => onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}
@@ -112,7 +228,17 @@ let lastTipClosed = 0;
  * Tooltip after a short pause; subsequent tooltips open at once
  * (design system, section "Tooltip und Klickfläche").
  */
-export function Tooltip({ text, shortcut, children, below = true }: { text: string; shortcut?: string; children: ReactNode; below?: boolean }) {
+export function Tooltip({
+  text,
+  shortcut,
+  children,
+  below = true,
+}: {
+  text: string;
+  shortcut?: string;
+  children: ReactNode;
+  below?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [instant, setInstant] = useState(false);
   const [pos, setPos] = useState<{ x: number; top: number; bottom: number; w: number; h: number } | null>(null);
@@ -124,17 +250,20 @@ export function Tooltip({ text, shortcut, children, below = true }: { text: stri
     const quick = Date.now() - lastTipClosed < 400;
     setInstant(quick);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      // Measured in stage coordinates: the tip is drawn on top of everything,
-      // so a pane or dialog edge can no longer cut it off.
-      const r = anchor.current?.getBoundingClientRect();
-      if (r) {
-        const a = stagePoint(r.left + r.width / 2, r.top);
-        const b = stagePoint(r.left, r.bottom);
-        setPos({ x: a.x, top: a.y, bottom: b.y, w: a.w, h: a.h });
-      }
-      setOpen(true);
-    }, quick ? 0 : 600);
+    timer.current = window.setTimeout(
+      () => {
+        // Measured in stage coordinates: the tip is drawn on top of everything,
+        // so a pane or dialog edge can no longer cut it off.
+        const r = anchor.current?.getBoundingClientRect();
+        if (r) {
+          const a = stagePoint(r.left + r.width / 2, r.top);
+          const b = stagePoint(r.left, r.bottom);
+          setPos({ x: a.x, top: a.y, bottom: b.y, w: a.w, h: a.h });
+        }
+        setOpen(true);
+      },
+      quick ? 0 : 600,
+    );
   };
   const hide = () => {
     window.clearTimeout(timer.current);
@@ -155,13 +284,15 @@ export function Tooltip({ text, shortcut, children, below = true }: { text: stri
   return (
     <span ref={anchor} className="tip-anchor" onMouseEnter={show} onMouseLeave={hide} onMouseDown={hide}>
       {children}
-      {open && pos && createPortal(
-        <span ref={tip} role="tooltip" className={`tooltip is-floating${instant ? ' is-instant' : ''}`}>
-          {text}
-          {shortcut && <span className="tooltip-key">{shortcut}</span>}
-        </span>,
-        host,
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <span ref={tip} role="tooltip" className={`tooltip is-floating${instant ? ' is-instant' : ''}`}>
+            {text}
+            {shortcut && <span className="tooltip-key">{shortcut}</span>}
+          </span>,
+          host,
+        )}
     </span>
   );
 }
@@ -182,11 +313,26 @@ export function Section({ title, children, aside }: { title: string; children: R
 
 /** The name as a wordmark: "Bit" bold, "crane" light (decided 31.10.2026), read as one word "Bitcrane". */
 export function Wordmark({ className = '' }: { className?: string }) {
-  return <span className={`wordmark ${className}`} aria-label="Bitcrane"><span className="wm-bit" aria-hidden="true">Bit</span><span className="wm-crane" aria-hidden="true">crane</span></span>;
+  return (
+    <span className={`wordmark ${className}`} aria-label="Bitcrane">
+      <span className="wm-bit" aria-hidden="true">
+        Bit
+      </span>
+      <span className="wm-crane" aria-hidden="true">
+        crane
+      </span>
+    </span>
+  );
 }
 
 /** A translated sentence with the wordmark where "{0}" stands ("Willkommen bei {0}"). */
 export function WithWordmark({ text }: { text: string }) {
   const [before, after = ''] = text.split('\u0000');
-  return <>{before}<Wordmark />{after}</>;
+  return (
+    <>
+      {before}
+      <Wordmark />
+      {after}
+    </>
+  );
 }

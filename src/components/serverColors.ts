@@ -16,5 +16,11 @@ export const serverColors: Record<ServerColor, Record<Theme, { bg: string; fg: s
 
 /** Swatch colours for the colour picker in the server dialog. */
 export const swatch: Record<ServerColor, string> = {
-  blue: '#2A6DE0', purple: '#AF52DE', green: '#30D158', yellow: '#FFCC00', orange: '#FF9F0A', red: '#FF453A', gray: '#8E8E93',
+  blue: '#2A6DE0',
+  purple: '#AF52DE',
+  green: '#30D158',
+  yellow: '#FFCC00',
+  orange: '#FF9F0A',
+  red: '#FF453A',
+  gray: '#8E8E93',
 };

@@ -6,46 +6,46 @@
 //! - `transfer-progress` `{ id, done, total }`
 //! - `watch-batch` `{ watchId, changed, removed }`
 
+mod archive;
+mod archive_vfs;
 pub mod cli;
 mod commands;
 mod config;
-mod error;
 mod dav;
-mod archive;
-mod archive_vfs;
-mod shell_integration;
 mod dropbox;
-mod gdrive;
-mod onedrive;
-mod oauth;
+mod error;
+mod forward;
 mod ftp;
+mod gdrive;
 mod git;
-mod tags;
-mod netshares;
+mod iconmenu;
 mod import;
 mod keys;
+#[cfg(test)]
+mod loadtest;
 mod local;
 mod model;
 #[cfg(windows)]
 mod mount_win;
+mod netshares;
+mod oauth;
+mod onedrive;
 mod paths;
 mod proxy;
 mod remote;
 mod s3;
-#[cfg(test)]
-mod loadtest;
-mod tls;
-mod ssh;
-mod smb;
 mod scp;
+mod shell_integration;
+mod smb;
+mod ssh;
 mod sshconfig;
 mod sysicons;
-mod tray;
+mod tags;
 mod terminal;
 mod thumbs;
-mod iconmenu;
-mod forward;
+mod tls;
 mod transfer;
+mod tray;
 mod vault;
 mod watcher;
 
@@ -199,7 +199,10 @@ pub fn run() {
             });
         })
         // Started at login: "--autostart" lets Bitcrane stay in the notification area if the user wants that.
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .manage(tray::TrayState::new())
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -374,4 +377,3 @@ pub fn run() {
             let _ = (app, event);
         });
 }
-

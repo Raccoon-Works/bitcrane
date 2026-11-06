@@ -1,7 +1,7 @@
 //! File contents for the text view, the built-in editor and the preview.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::{AppState, archive_vfs, local, paths};
+use crate::{archive_vfs, local, paths, AppState};
 use serde::Serialize;
 use tauri::{Manager, State};
 
@@ -9,7 +9,8 @@ use tauri::{Manager, State};
 /// <cache>/edit/<server id>/<path on the server>.
 #[tauri::command]
 pub(crate) fn edit_temp_path(app: tauri::AppHandle, server_id: String, remote_path: String) -> AppResult<String> {
-    let base = app.path().app_cache_dir().map_err(|e| AppError::other("Kein Cache-Ordner.").with_detail(e.to_string()))?;
+    let base =
+        app.path().app_cache_dir().map_err(|e| AppError::other("Kein Cache-Ordner.").with_detail(e.to_string()))?;
     let mut p = base.join("edit").join(server_id.replace(['/', '\\', ':'], "_"));
     for seg in remote_path.split('/').filter(|s| !s.is_empty() && *s != "..") {
         p.push(paths::storable_name(seg));
@@ -54,7 +55,11 @@ pub(crate) async fn local_read_text(path: String) -> AppResult<TextContent> {
 }
 
 #[tauri::command]
-pub(crate) async fn remote_read_text(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<TextContent> {
+pub(crate) async fn remote_read_text(
+    state: State<'_, AppState>,
+    server_id: String,
+    path: String,
+) -> AppResult<TextContent> {
     let bytes = remote!(state, server_id, |c| c.read_head(&path, TEXT_LIMIT + 1))?;
     bytes_to_text(bytes)
 }
@@ -98,12 +103,21 @@ fn editor_text(mut bytes: Vec<u8>, mtime: i64) -> AppResult<EditorFile> {
 
 /// Reads a file for the built-in editor: of this computer (no server) or of a server.
 #[tauri::command]
-pub(crate) async fn editor_read(state: State<'_, AppState>, server_id: Option<String>, path: String) -> AppResult<EditorFile> {
+pub(crate) async fn editor_read(
+    state: State<'_, AppState>,
+    server_id: Option<String>,
+    path: String,
+) -> AppResult<EditorFile> {
     match server_id.filter(|s| !s.is_empty()) {
         None => {
             let native = paths::to_native(&path);
             let md = tokio::fs::metadata(&native).await?;
-            let mtime = md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let mtime = md
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
             if md.len() as usize > EDITOR_LIMIT {
                 return Err(AppError::other("Die Datei ist zu groß für den eingebauten Editor (über 24 MB)."));
             }
@@ -122,11 +136,20 @@ pub(crate) async fn editor_read(state: State<'_, AppState>, server_id: Option<St
 
 /// Modification time of a file (ms), to check for changes by others before saving.
 #[tauri::command]
-pub(crate) async fn editor_mtime(state: State<'_, AppState>, server_id: Option<String>, path: String) -> AppResult<i64> {
+pub(crate) async fn editor_mtime(
+    state: State<'_, AppState>,
+    server_id: Option<String>,
+    path: String,
+) -> AppResult<i64> {
     match server_id.filter(|s| !s.is_empty()) {
         None => {
             let md = tokio::fs::metadata(paths::to_native(&path)).await?;
-            Ok(md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0))
+            Ok(md
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0))
         }
         Some(sid) => Ok(remote!(state, sid, |c| c.stat(&path))?.mtime),
     }
@@ -136,7 +159,14 @@ pub(crate) async fn editor_mtime(state: State<'_, AppState>, server_id: Option<S
 /// and returns the new modification time. Writes in place, so permissions and
 /// owner of a server file stay as they were.
 #[tauri::command]
-pub(crate) async fn editor_write(state: State<'_, AppState>, server_id: Option<String>, path: String, text: String, eol: String, bom: bool) -> AppResult<i64> {
+pub(crate) async fn editor_write(
+    state: State<'_, AppState>,
+    server_id: Option<String>,
+    path: String,
+    text: String,
+    eol: String,
+    bom: bool,
+) -> AppResult<i64> {
     use tokio::io::AsyncWriteExt;
     let body = if eol == "\r\n" { text.replace('\n', "\r\n") } else { text };
     let mut bytes = Vec::with_capacity(body.len() + 3);
@@ -149,12 +179,20 @@ pub(crate) async fn editor_write(state: State<'_, AppState>, server_id: Option<S
             let native = paths::to_native(&path);
             tokio::fs::write(&native, &bytes).await?;
             let md = tokio::fs::metadata(&native).await?;
-            Ok(md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0))
+            Ok(md
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0))
         }
         Some(sid) => {
             let len = bytes.len() as u64;
             let mut w = remote!(state, sid, |c| c.writer(&path, 0, Some(len), None))?;
-            w.write_all(&bytes).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Speichern auf dem Server fehlgeschlagen.").with_detail(e.to_string()))?;
+            w.write_all(&bytes).await.map_err(|e| {
+                AppError::new(ErrorKind::ConnectionLost, "Speichern auf dem Server fehlgeschlagen.")
+                    .with_detail(e.to_string())
+            })?;
             w.close().await?;
             Ok(remote!(state, sid, |c| c.stat(&path)).map(|st| st.mtime).unwrap_or(0))
         }
@@ -186,7 +224,12 @@ fn make_preview(path: &str, mut bytes: Vec<u8>) -> Preview {
         if truncated {
             return Preview { kind: "binary", mime: mime.into(), data: String::new(), truncated };
         }
-        return Preview { kind: "image", mime: mime.into(), data: base64::engine::general_purpose::STANDARD.encode(&bytes), truncated: false };
+        return Preview {
+            kind: "image",
+            mime: mime.into(),
+            data: base64::engine::general_purpose::STANDARD.encode(&bytes),
+            truncated: false,
+        };
     }
     let truncated = bytes.len() > PREVIEW_TEXT_LIMIT;
     bytes.truncate(PREVIEW_TEXT_LIMIT);

@@ -83,11 +83,15 @@ mod platform {
     use windows::core::{Interface, HSTRING};
     use windows::Win32::Storage::EnhancedStorage::PKEY_Title;
     use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PROPVARIANT};
-    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+    };
     use windows::Win32::System::Variant::VT_LPWSTR;
     use windows::Win32::UI::Shell::Common::{IObjectArray, IObjectCollection};
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
-    use windows::Win32::UI::Shell::{DestinationList, EnumerableObjectCollection, ICustomDestinationList, IShellLinkW, SHStrDupW, ShellLink};
+    use windows::Win32::UI::Shell::{
+        DestinationList, EnumerableObjectCollection, ICustomDestinationList, IShellLinkW, SHStrDupW, ShellLink,
+    };
 
     use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
 
@@ -121,13 +125,18 @@ mod platform {
         // Start, Sprunglisten und Datei-Explorer anzeigen" is off; tasks still show, so the servers
         // go there instead.
         let in_category = content.servers.is_empty()
-            || list.AppendCategory(&HSTRING::from(content.servers_title.as_str()), &collection(&exe, servers.clone())?).is_ok();
+            || list
+                .AppendCategory(&HSTRING::from(content.servers_title.as_str()), &collection(&exe, servers.clone())?)
+                .is_ok();
         let tasks = content.tasks.iter().chain(servers.filter(|_| !in_category));
         list.AddUserTasks(&collection(&exe, tasks)?)?;
         list.CommitList()
     }
 
-    unsafe fn collection<'a>(exe: &HSTRING, entries: impl Iterator<Item = &'a super::Entry>) -> windows::core::Result<IObjectArray> {
+    unsafe fn collection<'a>(
+        exe: &HSTRING,
+        entries: impl Iterator<Item = &'a super::Entry>,
+    ) -> windows::core::Result<IObjectArray> {
         let items: IObjectCollection = CoCreateInstance(&EnumerableObjectCollection, None, CLSCTX_INPROC_SERVER)?;
         for e in entries {
             let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)?;
@@ -187,8 +196,20 @@ mod platform {
         let class = objc2::ffi::object_getClass((&*delegate as *const _ as *const AnyObject).cast()) as *mut _;
         let dock: unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut AnyObject) -> *mut NSMenu = dock_menu;
         let click: unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut NSMenuItem) = clicked;
-        let added = objc2::ffi::class_addMethod(class, sel!(applicationDockMenu:), std::mem::transmute::<_, Imp>(dock), c"@@:@".as_ptr()).as_bool()
-            && objc2::ffi::class_addMethod(class, sel!(bitcraneDockItem:), std::mem::transmute::<_, Imp>(click), c"v@:@".as_ptr()).as_bool();
+        let added = objc2::ffi::class_addMethod(
+            class,
+            sel!(applicationDockMenu:),
+            std::mem::transmute::<_, Imp>(dock),
+            c"@@:@".as_ptr(),
+        )
+        .as_bool()
+            && objc2::ffi::class_addMethod(
+                class,
+                sel!(bitcraneDockItem:),
+                std::mem::transmute::<_, Imp>(click),
+                c"v@:@".as_ptr(),
+            )
+            .as_bool();
         if !added {
             log::warn!("dock menu: the application delegate already has these methods");
         }
@@ -198,7 +219,12 @@ mod platform {
         let menu = NSMenu::new(mtm);
         let delegate = NSApplication::sharedApplication(mtm).delegate();
         let add = |id: &str, label: &str| {
-            let item = NSMenuItem::initWithTitle_action_keyEquivalent(NSMenuItem::alloc(mtm), &NSString::from_str(label), Some(sel!(bitcraneDockItem:)), &NSString::from_str(""));
+            let item = NSMenuItem::initWithTitle_action_keyEquivalent(
+                NSMenuItem::alloc(mtm),
+                &NSString::from_str(label),
+                Some(sel!(bitcraneDockItem:)),
+                &NSString::from_str(""),
+            );
             item.setTarget(delegate.as_deref().map(|d| d.as_ref()));
             item.setRepresentedObject(Some(&NSString::from_str(id)));
             menu.addItem(&item);

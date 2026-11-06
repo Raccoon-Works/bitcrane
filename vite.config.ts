@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { viteSingleFile } from 'vite-plugin-singlefile'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 
 /**
  * Vite configuration.
@@ -17,4 +17,4 @@ export default defineConfig(({ mode }) => ({
   // Tauri expects a fixed port during development.
   server: { port: 1420, strictPort: true },
   clearScreen: false,
-}))
+}));

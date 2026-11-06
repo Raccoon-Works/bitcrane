@@ -9,7 +9,23 @@ import type { PaneSide, Tab } from '../backend/types';
 import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { state, setState, activeTab, paneLoc, showToast, panePath, LIVE, isOffline, listEntries, paneEntries, paneOnServer, type AppState, serverById, paneShowsServers, isDirEntry } from './core';
+import {
+  state,
+  setState,
+  activeTab,
+  paneLoc,
+  showToast,
+  panePath,
+  LIVE,
+  isOffline,
+  listEntries,
+  paneEntries,
+  paneOnServer,
+  type AppState,
+  serverById,
+  paneShowsServers,
+  isDirEntry,
+} from './core';
 import { openDialog } from './panels';
 import { pushUndo, renameAt } from './undo';
 import { navigate } from './tabs';
@@ -48,11 +64,17 @@ export function commitRename(side: PaneSide, oldName: string, newName: string) {
     return;
   }
   const dir = prefix ? paths.join(panePath(side), prefix.slice(0, -1)) : panePath(side);
-  const selectRenamed = () => setState((s) => ({ selection: { ...s.selection, [side]: { ...s.selection[side], names: [prefix + name] } } }));
+  const selectRenamed = () =>
+    setState((s) => ({ selection: { ...s.selection, [side]: { ...s.selection[side], names: [prefix + name] } } }));
   const loc = paneLoc(side, t);
   const undo = () => pushUndo({ label: $t('„{0}“ umbenannt', name), run: () => renameAt(...loc, dir, name, base) });
   if (LIVE) {
-    void live.renameEntry(...loc, dir, base, name).then((ok) => { if (ok) { selectRenamed(); undo(); } });
+    void live.renameEntry(...loc, dir, base, name).then((ok) => {
+      if (ok) {
+        selectRenamed();
+        undo();
+      }
+    });
     return;
   }
   const ok = fs.rename(...loc, paths.join(dir, base), name);
@@ -78,7 +100,12 @@ export function newFolder(side: PaneSide = state.focusSide) {
     const dir = panePath(side);
     void live.makeFolder(...loc, dir, name).then((ok) => {
       if (ok) pushUndo({ label: $t('Neuer Ordner „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
-      if (ok && state.activeTabId === t.id && panePath(side) === dir) setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
+      if (ok && state.activeTabId === t.id && panePath(side) === dir)
+        setState((s) => ({
+          focusSide: side,
+          selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } },
+          renaming: { side, name },
+        }));
     });
     setState({ contextMenu: null });
     return;
@@ -86,7 +113,10 @@ export function newFolder(side: PaneSide = state.focusSide) {
   fs.makeDir(...loc, paths.join(panePath(side), name));
   setState((s) => ({ fsRev: s.fsRev + 1, focusSide: side, contextMenu: null }));
   const idx = paneEntries(side).findIndex((e) => e.name === name);
-  setState((s) => ({ selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } }, renaming: { side, name } }));
+  setState((s) => ({
+    selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } },
+    renaming: { side, name },
+  }));
 }
 
 /**
@@ -121,7 +151,11 @@ export function newFile(side: PaneSide = state.focusSide) {
   const dir = panePath(side);
   const select = () => {
     const idx = paneEntries(side).findIndex((e) => e.name === name);
-    setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } }, renaming: { side, name } }));
+    setState((s) => ({
+      focusSide: side,
+      selection: { ...s.selection, [side]: { names: [name], cursor: idx, anchor: idx } },
+      renaming: { side, name },
+    }));
   };
   setState({ contextMenu: null });
   if (LIVE) {
@@ -151,7 +185,11 @@ export function deleteNames(side: PaneSide, names: string[]) {
     return;
   }
   names.forEach((n) => fs.remove(...paneLoc(side, t), paths.join(panePath(side), n)));
-  setState((s) => ({ fsRev: s.fsRev + 1, dialog: null, selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+  setState((s) => ({
+    fsRev: s.fsRev + 1,
+    dialog: null,
+    selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } },
+  }));
   showToast(names.length === 1 ? $t('„{0}“ gelöscht.', names[0]) : $t('{0} Objekte gelöscht.', names.length));
 }
 
@@ -175,7 +213,10 @@ export function webUrlFor(serverId: string, remotePath: string): string | undefi
 export function copyWebUrl(serverId: string, remotePath: string) {
   const url = webUrlFor(serverId, remotePath);
   if (!url) return;
-  void navigator.clipboard?.writeText(url).then(() => showToast($t('Kopiert: {0}', url), 'ok'), () => showToast(url));
+  void navigator.clipboard?.writeText(url).then(
+    () => showToast($t('Kopiert: {0}', url), 'ok'),
+    () => showToast(url),
+  );
 }
 
 export function openWebUrl(serverId: string, remotePath: string) {
@@ -189,7 +230,8 @@ export function openExternal(url: string) {
   else window.open(url, '_blank', 'noopener');
 }
 
-export const folderSizeKey = (side: PaneSide, serverId: string, path: string) => `${side}|${side === 'local' ? '' : serverId}|${path}`;
+export const folderSizeKey = (side: PaneSide, serverId: string, path: string) =>
+  `${side}|${side === 'local' ? '' : serverId}|${path}`;
 
 /** "Größe berechnen": adds up all files in a folder (with subfolders). */
 /** "Link kopieren": sharing link of a file or folder on a cloud service. */
@@ -198,7 +240,11 @@ export function copyShareLink(side: PaneSide, name: string) {
   if (!t) return;
   setState({ contextMenu: null });
   const [, serverId] = paneLoc(side, t);
-  if (!LIVE) { void navigator.clipboard?.writeText('https://www.dropbox.com/scl/fi/beispiel'); showToast($t('Link kopiert.'), 'ok'); return; }
+  if (!LIVE) {
+    void navigator.clipboard?.writeText('https://www.dropbox.com/scl/fi/beispiel');
+    showToast($t('Link kopiert.'), 'ok');
+    return;
+  }
   void live.copyShareLink(serverId, paths.join(panePath(side), name));
 }
 
@@ -219,19 +265,30 @@ export function openWithDefaultApp(side: PaneSide, name: string) {
 /** "Komprimieren" (this computer only): the chosen entries go into one zip next to them. */
 export function compressEntries(side: PaneSide, names: string[]) {
   setState({ contextMenu: null });
-  if (!LIVE) { showToast($t('Komprimieren geht im echten Programm.')); return; }
+  if (!LIVE) {
+    showToast($t('Komprimieren geht im echten Programm.'));
+    return;
+  }
   void live.zipLocal(panePath(side), names);
 }
 
 /** "Entpacken" (this computer only): a zip is unpacked into a new folder next to it. */
 export function extractArchive(side: PaneSide, name: string) {
   setState({ contextMenu: null });
-  if (!LIVE) { showToast($t('Entpacken geht im echten Programm.')); return; }
+  if (!LIVE) {
+    showToast($t('Entpacken geht im echten Programm.'));
+    return;
+  }
   void live.unzipLocal(panePath(side), name);
 }
 
 /** One file for "Dateien vergleichen": where it is and how it is called in the window. */
-export interface CompareRef { side: PaneSide; serverId: string; path: string; label: string }
+export interface CompareRef {
+  side: PaneSide;
+  serverId: string;
+  path: string;
+  label: string;
+}
 
 /** Opens the comparison of two files; each may be on this computer or a server. */
 export function compareFiles(a: { side: PaneSide; name: string }, b: { side: PaneSide; name: string }) {
@@ -239,8 +296,13 @@ export function compareFiles(a: { side: PaneSide; name: string }, b: { side: Pan
   if (!t) return;
   const ref = (x: { side: PaneSide; name: string }): CompareRef => {
     const [side, serverId] = paneLoc(x.side, t);
-    const where = side === 'local' ? $t('Dieser Computer') : serverById(serverId)?.name ?? '';
-    return { side, serverId, path: paths.join(panePath(x.side), x.name), label: `${paths.basename(x.name)} · ${where}` };
+    const where = side === 'local' ? $t('Dieser Computer') : (serverById(serverId)?.name ?? '');
+    return {
+      side,
+      serverId,
+      path: paths.join(panePath(x.side), x.name),
+      label: `${paths.basename(x.name)} · ${where}`,
+    };
   };
   setState({ contextMenu: null });
   openDialog({ type: 'compareFiles', a: ref(a), b: ref(b) });
@@ -262,19 +324,27 @@ export async function computeFolderSizes(side: PaneSide = state.focusSide, names
   const loc = paneLoc(side, t);
   if (loc[0] === 'remote' && isOffline(loc[1])) return;
   const dir = panePath(side);
-  const folders = names?.length ? names : (listEntries(...loc, dir) ?? []).filter((e) => e.kind === 'dir').map((e) => e.name);
+  const folders = names?.length
+    ? names
+    : (listEntries(...loc, dir) ?? []).filter((e) => e.kind === 'dir').map((e) => e.name);
   if (!folders.length) {
     showToast($t('In diesem Ordner gibt es keine Unterordner.'));
     return;
   }
-  showToast(folders.length === 1 ? $t('Größe von „{0}“ wird berechnet …', folders[0]) : $t('Größe von {0} Ordnern wird berechnet …', folders.length));
+  showToast(
+    folders.length === 1
+      ? $t('Größe von „{0}“ wird berechnet …', folders[0])
+      : $t('Größe von {0} Ordnern wird berechnet …', folders.length),
+  );
   let files = 0;
   let total = 0;
   let failed = 0;
   const one = async (name: string) => {
     const path = paths.join(dir, name);
     try {
-      const list = LIVE ? await live.walkFiles(...loc, path) : fs.walkFiles(...loc, path).map((f) => ({ size: f.entry.size }));
+      const list = LIVE
+        ? await live.walkFiles(...loc, path)
+        : fs.walkFiles(...loc, path).map((f) => ({ size: f.entry.size }));
       const size = list.reduce((a, f) => a + f.size, 0);
       files += list.length;
       total += size;
@@ -289,7 +359,11 @@ export async function computeFolderSizes(side: PaneSide = state.focusSide, names
     return;
   }
   const what = folders.length === 1 ? `„${folders[0]}“` : $t('{0} Ordner', folders.length);
-  showToast($t('{0}: {1} in {2} {3}.', what, formatSize(total), files, files === 1 ? $t('Datei') : $t('Dateien')) + (failed ? ' ' + $t('{0} nicht lesbar.', failed) : ''), 'ok');
+  showToast(
+    $t('{0}: {1} in {2} {3}.', what, formatSize(total), files, files === 1 ? $t('Datei') : $t('Dateien')) +
+      (failed ? ' ' + $t('{0} nicht lesbar.', failed) : ''),
+    'ok',
+  );
 }
 
 /**
@@ -309,8 +383,14 @@ export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, d
   if (!list.length) return;
   if (!LIVE) {
     for (const n of list) fs.move(...loc, paths.join(dir, n), toDir);
-    setState((s) => ({ fsRev: s.fsRev + 1, selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
-    showToast(list.length === 1 ? $t('„{0}“ verschoben.', paths.basename(list[0])) : $t('{0} Objekte verschoben.', list.length), 'ok');
+    setState((s) => ({
+      fsRev: s.fsRev + 1,
+      selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } },
+    }));
+    showToast(
+      list.length === 1 ? $t('„{0}“ verschoben.', paths.basename(list[0])) : $t('{0} Objekte verschoben.', list.length),
+      'ok',
+    );
     return;
   }
   if (loc[0] === 'local') {
@@ -322,7 +402,11 @@ export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, d
     }
     for (const [from, items] of groups) {
       void live.moveLocal(from, items, toDir).then((made) => {
-        if (made?.length) pushUndo({ label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length), run: () => live.moveLocal(toDir, made, from) });
+        if (made?.length)
+          pushUndo({
+            label: made.length === 1 ? $t('„{0}“ verschoben', made[0]) : $t('{0} Objekte verschoben', made.length),
+            run: () => live.moveLocal(toDir, made, from),
+          });
       });
     }
   } else void live.moveInto(...loc, dir, list, toDir);
@@ -349,13 +433,23 @@ export async function newFolderWithSelection(side: PaneSide = state.focusSide) {
   if (!LIVE) {
     fs.makeDir(...loc, target);
     for (const n of names) fs.move(...loc, paths.join(dir, n), target);
-    setState((s) => ({ fsRev: s.fsRev + 1, focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
+    setState((s) => ({
+      fsRev: s.fsRev + 1,
+      focusSide: side,
+      selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } },
+      renaming: { side, name },
+    }));
     return;
   }
   const ok = await live.makeFolder(...loc, dir, name);
   if (!ok) return;
   const moved = await live.moveInto(...loc, dir, names, target);
-  if (moved) setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } }, renaming: { side, name } }));
+  if (moved)
+    setState((s) => ({
+      focusSide: side,
+      selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } },
+      renaming: { side, name },
+    }));
 }
 
 /** ⌘L: turns the path above a file list into an input field. */
@@ -392,9 +486,13 @@ export function copySelection(side: PaneSide) {
   setState({ clipboard: { side, serverId: from, dir: panePath(side), names } });
   const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
   const other = placeOf(side === 'local' ? 'remote' : 'local', t);
-  showToast(!from ? $t('{0} kopiert. In der anderen Hälfte einfügen, um hochzuladen.', what)
-    : !other ? $t('{0} kopiert. In der anderen Hälfte einfügen, um herunterzuladen.', what)
-      : $t('{0} kopiert. In der anderen Hälfte einfügen, um es dorthin zu übertragen.', what));
+  showToast(
+    !from
+      ? $t('{0} kopiert. In der anderen Hälfte einfügen, um hochzuladen.', what)
+      : !other
+        ? $t('{0} kopiert. In der anderen Hälfte einfügen, um herunterzuladen.', what)
+        : $t('{0} kopiert. In der anderen Hälfte einfügen, um es dorthin zu übertragen.', what),
+  );
 }
 
 /** ⌘X / Strg+X on files: remembered for moving; pasting in a folder of the same computer or server moves them. */
@@ -415,7 +513,10 @@ export function pasteClipboard(side: PaneSide) {
   const toDir = panePath(side);
   if (c.cut && c.serverId === to) {
     // Moving within one computer or server; the clipboard is used up.
-    if (toDir === c.dir) { showToast($t('Die Objekte liegen schon in diesem Ordner.')); return; }
+    if (toDir === c.dir) {
+      showToast($t('Die Objekte liegen schon in diesem Ordner.'));
+      return;
+    }
     setState({ clipboard: null });
     moveIntoFolder(side, c.names, toDir, c.dir);
     return;
@@ -447,9 +548,16 @@ function askMoveAcross(from: string, fromDir: string, names: string[], to: strin
   if (!names.length) return;
   const what = names.length === 1 ? `„${paths.basename(names[0])}“` : $t('{0} Objekte', names.length);
   openDialog({
-    type: 'confirm', title: $t('{0} verschieben?', what), confirm: $t('Verschieben'),
-    text: `${$t('Bitcrane überträgt die Dateien und löscht sie danach an der alten Stelle.')} ${!from ? $t('Auf diesem Computer kommen die Originale in den Papierkorb. Gelöscht wird nur, wenn alle Dateien angekommen sind.')
-      : $t('Gelöscht wird nur, wenn alle Dateien angekommen sind.')}`,
+    type: 'confirm',
+    title: $t('{0} verschieben?', what),
+    confirm: $t('Verschieben'),
+    text: `${$t('Bitcrane überträgt die Dateien und löscht sie danach an der alten Stelle.')} ${
+      !from
+        ? $t(
+            'Auf diesem Computer kommen die Originale in den Papierkorb. Gelöscht wird nur, wenn alle Dateien angekommen sind.',
+          )
+        : $t('Gelöscht wird nur, wenn alle Dateien angekommen sind.')
+    }`,
     run: () => {
       setState({ dialog: null });
       if (LIVE) void live.moveAcross(from, fromDir, names, to, toDir);
@@ -484,7 +592,10 @@ export function goLocal(path: string) {
   if (!t) return;
   const sides: PaneSide[] = state.focusSide === 'local' ? ['local', 'remote'] : ['remote', 'local'];
   const side = sides.find((x) => !placeOf(x, t) && !paneShowsServers(x, t));
-  if (!side) { showToast($t('Keine Hälfte zeigt gerade diesen Computer.')); return; }
+  if (!side) {
+    showToast($t('Keine Hälfte zeigt gerade diesen Computer.'));
+    return;
+  }
   setState({ focusSide: side });
   navigate(side, path);
 }
@@ -505,7 +616,10 @@ export function openInOtherHalf(side: PaneSide = state.focusSide) {
 /** "Im Finder / Explorer zeigen" from the menu: the selected entry, or the folder itself. */
 export function revealSelection(side: PaneSide = state.focusSide) {
   const t = activeTab();
-  if (!t || placeOf(side, t)) { showToast($t('Das geht nur mit Ordnern dieses Computers.')); return; }
+  if (!t || placeOf(side, t)) {
+    showToast($t('Das geht nur mit Ordnern dieses Computers.'));
+    return;
+  }
   const n = selectedNames(side)[0];
   if (n) revealEntry(side, n);
   else if (LIVE) live.revealLocal(panePath(side));
@@ -516,7 +630,10 @@ export function copyToOtherHalf(side: PaneSide = state.focusSide) {
   const t = activeTab();
   if (!t) return;
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
-  if (paneShowsServers(other)) { showToast($t('Die andere Hälfte zeigt gerade die Serverliste.')); return; }
+  if (paneShowsServers(other)) {
+    showToast($t('Die andere Hälfte zeigt gerade die Serverliste.'));
+    return;
+  }
   transferNames(placeOf(side, t), panePath(side), selectedNames(side), placeOf(other, t), panePath(other));
 }
 
@@ -527,7 +644,10 @@ export function moveToOtherSide(side: PaneSide = state.focusSide) {
   const names = selectedNames(side);
   if (!names.length) return;
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
-  if (paneShowsServers(other)) { showToast($t('Die andere Hälfte zeigt gerade die Serverliste.')); return; }
+  if (paneShowsServers(other)) {
+    showToast($t('Die andere Hälfte zeigt gerade die Serverliste.'));
+    return;
+  }
   const from = placeOf(side, t);
   const to = placeOf(other, t);
   if (from === to) {
@@ -546,8 +666,14 @@ export function editWith(side: PaneSide, name: string, app: string | null) {
   const path = paths.join(panePath(side), name);
   const [ls, sid] = paneLoc(side, t);
   // null: the built-in editor of Bitcrane.
-  if (app === null) { void import('./editor').then((m) => m.openFile(ls === 'local' ? '' : sid, path)); return; }
-  if (!LIVE) { showToast($t('„{0}“ wird mit {1} geöffnet.', name, app || $t('dem Standardprogramm'))); return; }
+  if (app === null) {
+    void import('./editor').then((m) => m.openFile(ls === 'local' ? '' : sid, path));
+    return;
+  }
+  if (!LIVE) {
+    showToast($t('„{0}“ wird mit {1} geöffnet.', name, app || $t('dem Standardprogramm')));
+    return;
+  }
   if (ls === 'local') live.openLocal(path, app);
   else void live.editRemote(sid, path, app);
 }
@@ -559,7 +685,14 @@ export function copyPath(side: PaneSide, name?: string) {
   showToast($t('Pfad kopiert: {0}', p));
 }
 
-export function savePerms(side: PaneSide, path: string, perms: string, owner: string, group: string, recursive: boolean) {
+export function savePerms(
+  side: PaneSide,
+  path: string,
+  perms: string,
+  owner: string,
+  group: string,
+  recursive: boolean,
+) {
   const t = activeTab();
   if (!t) return;
   if (LIVE) {

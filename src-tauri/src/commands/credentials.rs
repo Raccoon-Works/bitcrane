@@ -1,9 +1,9 @@
 //! SSH keys, known hosts and secrets kept in the system keychain.
 
+use super::connect::make_prompter;
 use crate::error::{AppResult, ErrorKind};
 use crate::ssh::ConnectParams;
-use crate::{AppState, config, keys, paths, remote};
-use super::connect::make_prompter;
+use crate::{config, keys, paths, remote, AppState};
 use serde::Serialize;
 use tauri::State;
 
@@ -46,7 +46,9 @@ pub(crate) fn key_info(path: String) -> KeyInfo {
         // Older PEM keys ("BEGIN RSA PRIVATE KEY") are still usable for login.
         None => match russh::keys::load_secret_key(&native, None) {
             Ok(_) => KeyInfo { exists: true, algorithm: "RSA".into(), encrypted: false, invalid: false },
-            Err(russh::keys::Error::KeyIsEncrypted) => KeyInfo { exists: true, algorithm: String::new(), encrypted: true, invalid: false },
+            Err(russh::keys::Error::KeyIsEncrypted) => {
+                KeyInfo { exists: true, algorithm: String::new(), encrypted: true, invalid: false }
+            }
             Err(_) => KeyInfo { exists: true, algorithm: String::new(), encrypted: false, invalid: true },
         },
     }
@@ -68,7 +70,11 @@ pub(crate) fn key_public(path: String) -> AppResult<String> {
 /// An unknown host key counts as reachable; the fingerprint is confirmed on
 /// the real connection.
 #[tauri::command]
-pub(crate) async fn ssh_test(app: tauri::AppHandle, state: State<'_, AppState>, params: ConnectParams) -> AppResult<String> {
+pub(crate) async fn ssh_test(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    params: ConnectParams,
+) -> AppResult<String> {
     let prompter = make_prompter(app, state.prompts.clone(), String::new());
     match remote::connect_ssh(&params, state.known_hosts.clone(), Some(prompter)).await {
         Ok(c) => {

@@ -35,34 +35,59 @@ export function WatchPopover() {
     <div ref={ref} role="dialog" aria-label={$t('Überwachungen')} className="popover watch-popover">
       <div className="popover-head">
         <span className="title-text">{$t('Überwachungen')}</span>
-        <Button variant="primary" small onClick={() => openDialog({ type: 'watchSetup' })}>{$t('Neue Überwachung')}</Button>
+        <Button variant="primary" small onClick={() => openDialog({ type: 'watchSetup' })}>
+          {$t('Neue Überwachung')}
+        </Button>
       </div>
-      {watches.length === 0 && <p className="empty-note">{$t('Noch keine Überwachung. Mit einer Überwachung lädt Bitcrane jede Änderung in einem Ordner automatisch hoch.')}</p>}
+      {watches.length === 0 && (
+        <p className="empty-note">
+          {$t(
+            'Noch keine Überwachung. Mit einer Überwachung lädt Bitcrane jede Änderung in einem Ordner automatisch hoch.',
+          )}
+        </p>
+      )}
       {watches.map((w) => {
         const srv = servers.find((x) => x.id === w.serverId);
-        const stateText = w.state === 'active' ? 'aktiv' : w.state === 'waiting' ? $t('wartet auf Verbindung') : 'pausiert';
+        const stateText =
+          w.state === 'active' ? 'aktiv' : w.state === 'waiting' ? $t('wartet auf Verbindung') : 'pausiert';
         const tone = w.state === 'active' ? 'accent' : w.state === 'waiting' ? 'warn' : 'muted';
         return (
           <div key={w.id} className="watch-card">
             <div className="watch-card-head">
               <span className={`pill-dot tone-${tone}`} />
-              <button type="button" className="watch-name" onClick={() => openWatchFolders(w.id)}>{w.name}</button>
+              <button type="button" className="watch-name" onClick={() => openWatchFolders(w.id)}>
+                {w.name}
+              </button>
               <span className={`small tone-${tone}`}>{stateText}</span>
             </div>
-            <span className="watch-path mono">{w.localPath} → {srv?.name ?? $t('Server')}</span>
+            <span className="watch-path mono">
+              {w.localPath} → {srv?.name ?? $t('Server')}
+            </span>
             <div className="watch-card-foot">
               <span className="small muted flex-1">
-                {w.state === 'paused' ? 'pausiert' : w.lastFile ? `${w.lastFile} · ${formatAgo(w.lastTime, now)}` : $t('noch nichts hochgeladen')}
+                {w.state === 'paused'
+                  ? 'pausiert'
+                  : w.lastFile
+                    ? `${w.lastFile} · ${formatAgo(w.lastTime, now)}`
+                    : $t('noch nichts hochgeladen')}
               </span>
-              <Button small onClick={() => toggleWatch(w.id)}>{w.state === 'paused' ? $t('Fortsetzen') : $t('Pausieren')}</Button>
-              <Button small onClick={() => openDialog({ type: 'watchSetup', editId: w.id })}>{$t('Bearbeiten')}</Button>
+              <Button small onClick={() => toggleWatch(w.id)}>
+                {w.state === 'paused' ? $t('Fortsetzen') : $t('Pausieren')}
+              </Button>
+              <Button small onClick={() => openDialog({ type: 'watchSetup', editId: w.id })}>
+                {$t('Bearbeiten')}
+              </Button>
             </div>
           </div>
         );
       })}
       <div className="popover-foot">
         <span className="small muted flex-1">{$t('Läuft auch bei geschlossenem Fenster weiter')}</span>
-        <Switch checked={background} onChange={(v) => updateSettings({ runInBackground: v })} label={$t('Im Hintergrund weiterlaufen')} />
+        <Switch
+          checked={background}
+          onChange={(v) => updateSettings({ runInBackground: v })}
+          label={$t('Im Hintergrund weiterlaufen')}
+        />
       </div>
     </div>
   );

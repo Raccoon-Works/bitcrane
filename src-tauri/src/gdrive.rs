@@ -54,11 +54,17 @@ pub fn export_as(mime: &str, pdf: bool) -> Option<(&'static str, &'static str)> 
     const PDF: (&str, &str) = ("pdf", "application/pdf");
     match mime {
         "application/vnd.google-apps.document" if pdf => Some(PDF),
-        "application/vnd.google-apps.document" => Some(("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+        "application/vnd.google-apps.document" => {
+            Some(("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        }
         "application/vnd.google-apps.spreadsheet" if pdf => Some(PDF),
-        "application/vnd.google-apps.spreadsheet" => Some(("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+        "application/vnd.google-apps.spreadsheet" => {
+            Some(("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        }
         "application/vnd.google-apps.presentation" if pdf => Some(PDF),
-        "application/vnd.google-apps.presentation" => Some(("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")),
+        "application/vnd.google-apps.presentation" => {
+            Some(("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"))
+        }
         "application/vnd.google-apps.drawing" if pdf => Some(PDF),
         "application/vnd.google-apps.drawing" => Some(("png", "image/png")),
         _ => None,
@@ -66,7 +72,9 @@ pub fn export_as(mime: &str, pdf: bool) -> Option<(&'static str, &'static str)> 
 }
 
 fn is_google_doc(v: &Value) -> bool {
-    v.get("mimeType").and_then(|m| m.as_str()).is_some_and(|m| m.starts_with("application/vnd.google-apps.") && m != FOLDER)
+    v.get("mimeType")
+        .and_then(|m| m.as_str())
+        .is_some_and(|m| m.starts_with("application/vnd.google-apps.") && m != FOLDER)
 }
 
 struct Token {
@@ -90,7 +98,13 @@ pub struct GDriveConn {
 /// Normalised path: "/" for the top, else "/a/b" without a trailing slash.
 fn norm(path: &str) -> String {
     let p = path.trim_end_matches('/');
-    if p.is_empty() { "/".into() } else if p.starts_with('/') { p.to_string() } else { format!("/{p}") }
+    if p.is_empty() {
+        "/".into()
+    } else if p.starts_with('/') {
+        p.to_string()
+    } else {
+        format!("/{p}")
+    }
 }
 
 /// A name inside a Drive search query ('…' with \ and ' escaped).
@@ -174,7 +188,11 @@ fn not_set_up() -> AppError {
 }
 
 /// Signs in in the browser with the user's own app key; returns the refresh token and the account.
-pub async fn sign_in(client_id: &str, client_secret: &str, open: impl FnOnce(&str) -> AppResult<()>) -> AppResult<oauth::SignedIn> {
+pub async fn sign_in(
+    client_id: &str,
+    client_secret: &str,
+    open: impl FnOnce(&str) -> AppResult<()>,
+) -> AppResult<oauth::SignedIn> {
     if client_id.trim().is_empty() || client_secret.trim().is_empty() {
         return Err(not_set_up());
     }
@@ -208,15 +226,25 @@ pub async fn sign_in(client_id: &str, client_secret: &str, open: impl FnOnce(&st
         ],
     )
     .await?;
-    let refresh = answer.refresh_token.ok_or_else(|| AppError::other("Google hat keine dauerhafte Anmeldung geschickt."))?;
+    let refresh =
+        answer.refresh_token.ok_or_else(|| AppError::other("Google hat keine dauerhafte Anmeldung geschickt."))?;
     let conn = GDriveConn::new(client, client_id.trim().into(), client_secret.trim().into(), refresh.clone(), false);
-    *conn.token.lock().await = Token { access: answer.access_token, valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)) };
+    *conn.token.lock().await = Token {
+        access: answer.access_token,
+        valid_until: Instant::now() + Duration::from_secs(answer.expires_in.unwrap_or(3600).saturating_sub(60)),
+    };
     let account = conn.account().await.unwrap_or_else(|_| "Google Drive".into());
     Ok(oauth::SignedIn { refresh_token: refresh, account })
 }
 
 impl GDriveConn {
-    fn new(client: reqwest::Client, client_id: String, client_secret: String, refresh: String, pdf: bool) -> GDriveConn {
+    fn new(
+        client: reqwest::Client,
+        client_id: String,
+        client_secret: String,
+        refresh: String,
+        pdf: bool,
+    ) -> GDriveConn {
         let mut ids = HashMap::new();
         ids.insert("/".to_string(), "root".to_string());
         GDriveConn {
@@ -235,7 +263,13 @@ impl GDriveConn {
         if params.client_id.trim().is_empty() || params.client_secret.trim().is_empty() {
             return Err(not_set_up());
         }
-        let conn = GDriveConn::new(oauth::http_client()?, params.client_id.trim().into(), params.client_secret.trim().into(), params.refresh_token, params.pdf_export);
+        let conn = GDriveConn::new(
+            oauth::http_client()?,
+            params.client_id.trim().into(),
+            params.client_secret.trim().into(),
+            params.refresh_token,
+            params.pdf_export,
+        );
         // Renews the access token and checks the account at once.
         conn.account().await?;
         Ok(conn)
@@ -248,7 +282,12 @@ impl GDriveConn {
             let a = oauth::token_request(
                 &self.client,
                 TOKEN_URL,
-                &[("grant_type", "refresh_token"), ("refresh_token", &self.refresh), ("client_id", &self.client_id), ("client_secret", &self.client_secret)],
+                &[
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", &self.refresh),
+                    ("client_id", &self.client_id),
+                    ("client_secret", &self.client_secret),
+                ],
             )
             .await?;
             t.access = a.access_token;
@@ -258,7 +297,14 @@ impl GDriveConn {
     }
 
     /// A JSON call; `body` None means no request body.
-    async fn call(&self, method: reqwest::Method, url: &str, query: &[(&str, &str)], body: Option<Value>, what: &str) -> AppResult<Value> {
+    async fn call(
+        &self,
+        method: reqwest::Method,
+        url: &str,
+        query: &[(&str, &str)],
+        body: Option<Value>,
+        what: &str,
+    ) -> AppResult<Value> {
         let token = self.access().await?;
         let mut req = self.client.request(method, url).bearer_auth(token).query(query);
         if let Some(b) = body {
@@ -275,8 +321,20 @@ impl GDriveConn {
 
     /// E-mail address of the signed-in account.
     pub async fn account(&self) -> AppResult<String> {
-        let v = self.call(reqwest::Method::GET, &format!("{API}/about"), &[("fields", "user(emailAddress,displayName)")], None, "Konto lesen").await?;
-        Ok(v.pointer("/user/emailAddress").or_else(|| v.pointer("/user/displayName")).and_then(|e| e.as_str()).unwrap_or("Google Drive").to_string())
+        let v = self
+            .call(
+                reqwest::Method::GET,
+                &format!("{API}/about"),
+                &[("fields", "user(emailAddress,displayName)")],
+                None,
+                "Konto lesen",
+            )
+            .await?;
+        Ok(v.pointer("/user/emailAddress")
+            .or_else(|| v.pointer("/user/displayName"))
+            .and_then(|e| e.as_str())
+            .unwrap_or("Google Drive")
+            .to_string())
     }
 
     /// All children of a folder id (every page).
@@ -286,7 +344,8 @@ impl GDriveConn {
         let mut out = Vec::new();
         let mut page = String::new();
         loop {
-            let mut query = vec![("q", q.as_str()), ("fields", fields.as_str()), ("pageSize", "1000"), ("spaces", "drive")];
+            let mut query =
+                vec![("q", q.as_str()), ("fields", fields.as_str()), ("pageSize", "1000"), ("spaces", "drive")];
             if !page.is_empty() {
                 query.push(("pageToken", page.as_str()));
             }
@@ -304,7 +363,15 @@ impl GDriveConn {
     async fn child(&self, parent: &str, name: &str, what: &str) -> AppResult<Option<Value>> {
         let q = format!("{} in parents and name = {} and trashed = false", quoted(parent), quoted(name));
         let fields = format!("files({FIELDS})");
-        let v = self.call(reqwest::Method::GET, &format!("{API}/files"), &[("q", q.as_str()), ("fields", fields.as_str()), ("pageSize", "10"), ("spaces", "drive")], None, what).await?;
+        let v = self
+            .call(
+                reqwest::Method::GET,
+                &format!("{API}/files"),
+                &[("q", q.as_str()), ("fields", fields.as_str()), ("pageSize", "10"), ("spaces", "drive")],
+                None,
+                what,
+            )
+            .await?;
         Ok(v.pointer("/files/0").cloned())
     }
 
@@ -318,7 +385,10 @@ impl GDriveConn {
         let cached = self.ids.lock().unwrap().get(&path).cloned();
         if let Some(id) = cached {
             let fields = FIELDS.to_string();
-            match self.call(reqwest::Method::GET, &format!("{API}/files/{id}"), &[("fields", fields.as_str())], None, &what).await {
+            match self
+                .call(reqwest::Method::GET, &format!("{API}/files/{id}"), &[("fields", fields.as_str())], None, &what)
+                .await
+            {
                 Ok(v) if v.get("trashed").and_then(|t| t.as_bool()) != Some(true) => return Ok(v),
                 _ => self.forget(&path),
             }
@@ -384,10 +454,21 @@ impl GDriveConn {
 
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
         if norm(path) == "/" {
-            return Ok(FileEntry { name: "/".into(), kind: "dir".into(), size: 0, mtime: 0, perms: "755".into(), owner: String::new(), group: String::new(), link: None, hidden: 0 });
+            return Ok(FileEntry {
+                name: "/".into(),
+                kind: "dir".into(),
+                size: 0,
+                mtime: 0,
+                perms: "755".into(),
+                owner: String::new(),
+                group: String::new(),
+                link: None,
+                hidden: 0,
+            });
         }
         let v = self.lookup(path).await?;
-        entry_of(&v, self.pdf).ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v, self.pdf)
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -401,7 +482,13 @@ impl GDriveConn {
         }
         let parent = self.id_of(&remote_parent(&norm(path))).await?;
         let v = self
-            .call(reqwest::Method::POST, &format!("{API}/files"), &[("fields", "id")], Some(json!({ "name": remote_name(path), "mimeType": FOLDER, "parents": [parent] })), &what)
+            .call(
+                reqwest::Method::POST,
+                &format!("{API}/files"),
+                &[("fields", "id")],
+                Some(json!({ "name": remote_name(path), "mimeType": FOLDER, "parents": [parent] })),
+                &what,
+            )
             .await?;
         if let Some(id) = v.get("id").and_then(|i| i.as_str()) {
             self.ids.lock().unwrap().insert(norm(path), id.to_string());
@@ -445,7 +532,14 @@ impl GDriveConn {
             query.push(("addParents", &new_parent));
             query.push(("removeParents", &old_parent));
         }
-        self.call(reqwest::Method::PATCH, &format!("{API}/files/{id}"), &query, Some(json!({ "name": new_name })), &what).await?;
+        self.call(
+            reqwest::Method::PATCH,
+            &format!("{API}/files/{id}"),
+            &query,
+            Some(json!({ "name": new_name })),
+            &what,
+        )
+        .await?;
         self.forget(&from);
         self.ids.lock().unwrap().insert(to, id);
         Ok(())
@@ -455,7 +549,14 @@ impl GDriveConn {
     /// The replaced old copy is deleted for good, like an overwrite.
     pub async fn replace(&self, from: &str, to: &str) -> AppResult<()> {
         if let Ok(old) = self.id_of(to).await {
-            self.call(reqwest::Method::DELETE, &format!("{API}/files/{old}"), &[], None, &format!("„{}“ ersetzen", remote_name(to))).await?;
+            self.call(
+                reqwest::Method::DELETE,
+                &format!("{API}/files/{old}"),
+                &[],
+                None,
+                &format!("„{}“ ersetzen", remote_name(to)),
+            )
+            .await?;
             self.forget(to);
         }
         self.rename(from, to).await
@@ -468,14 +569,22 @@ impl GDriveConn {
             Err(e) if e.kind == ErrorKind::NotFound => return Ok(()),
             Err(e) => return Err(e),
         };
-        self.call(reqwest::Method::PATCH, &format!("{API}/files/{id}"), &[("fields", "id")], Some(json!({ "trashed": true })), &format!("„{}“ löschen", remote_name(path))).await?;
+        self.call(
+            reqwest::Method::PATCH,
+            &format!("{API}/files/{id}"),
+            &[("fields", "id")],
+            Some(json!({ "trashed": true })),
+            &format!("„{}“ löschen", remote_name(path)),
+        )
+        .await?;
         self.forget(path);
         Ok(())
     }
 
     /// Copy inside the Drive, with "Kopie" names on clashes; folders are copied with their content.
     pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
@@ -501,7 +610,14 @@ impl GDriveConn {
         }
         let id = src.get("id").and_then(|i| i.as_str()).unwrap_or_default();
         let parent = self.id_of(&remote_parent(&norm(to))).await?;
-        self.call(reqwest::Method::POST, &format!("{API}/files/{id}/copy"), &[("fields", "id")], Some(json!({ "name": remote_name(to), "parents": [parent] })), &what).await?;
+        self.call(
+            reqwest::Method::POST,
+            &format!("{API}/files/{id}/copy"),
+            &[("fields", "id")],
+            Some(json!({ "name": remote_name(to), "parents": [parent] })),
+            &what,
+        )
+        .await?;
         Ok(())
     }
 
@@ -511,7 +627,12 @@ impl GDriveConn {
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         let root = self.stat(path).await?;
         if root.kind != "dir" {
-            return Ok(vec![WalkItem { path: norm(path), relative: rel(&norm(path)), size: root.size, mtime: root.mtime }]);
+            return Ok(vec![WalkItem {
+                path: norm(path),
+                relative: rel(&norm(path)),
+                size: root.size,
+                mtime: root.mtime,
+            }]);
         }
         let mut out = Vec::new();
         let mut todo = vec![norm(path)];
@@ -531,8 +652,19 @@ impl GDriveConn {
     /// Link to the file in Google Drive (who may open it is set in Drive itself).
     pub async fn share_link(&self, path: &str) -> AppResult<String> {
         let id = self.id_of(path).await?;
-        let v = self.call(reqwest::Method::GET, &format!("{API}/files/{id}"), &[("fields", "webViewLink")], None, &format!("Link für „{}“", remote_name(path))).await?;
-        v.get("webViewLink").and_then(|u| u.as_str()).map(String::from).ok_or_else(|| AppError::other("Google Drive hat keinen Link geliefert."))
+        let v = self
+            .call(
+                reqwest::Method::GET,
+                &format!("{API}/files/{id}"),
+                &[("fields", "webViewLink")],
+                None,
+                &format!("Link für „{}“", remote_name(path)),
+            )
+            .await?;
+        v.get("webViewLink")
+            .and_then(|u| u.as_str())
+            .map(String::from)
+            .ok_or_else(|| AppError::other("Google Drive hat keinen Link geliefert."))
     }
 
     /// Reads a file from `offset` (HTTP Range).
@@ -545,7 +677,8 @@ impl GDriveConn {
         let mut req = if let Some((_, export_mime)) = export_as(mime, self.pdf) {
             // Converted by Google on the fly; such a download always starts from the beginning.
             if offset > 0 {
-                return Err(AppError::other("Google Drive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range"));
+                return Err(AppError::other("Google Drive kann hier nicht an einer Stelle weiterlesen.")
+                    .with_detail("no-range"));
             }
             self.client.get(format!("{API}/files/{id}/export")).query(&[("mimeType", export_mime)]).bearer_auth(token)
         } else if mime.starts_with("application/vnd.google-apps.") {
@@ -563,7 +696,9 @@ impl GDriveConn {
             return Err(api_err(status, &text, &what));
         }
         if offset > 0 && status != reqwest::StatusCode::PARTIAL_CONTENT {
-            return Err(AppError::other("Google Drive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range"));
+            return Err(
+                AppError::other("Google Drive kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range")
+            );
         }
         let stream = resp.bytes_stream().map_err(|e| std::io::Error::other(e.to_string()));
         Ok(Box::new(tokio_util::io::StreamReader::new(stream)))
@@ -607,7 +742,14 @@ impl GDriveConn {
     }
 
     /// Sends one piece; `total` is known only with the last one.
-    async fn send_piece(&self, session: &str, start: u64, piece: Vec<u8>, total: Option<u64>, what: &str) -> AppResult<Option<Value>> {
+    async fn send_piece(
+        &self,
+        session: &str,
+        start: u64,
+        piece: Vec<u8>,
+        total: Option<u64>,
+        what: &str,
+    ) -> AppResult<Option<Value>> {
         let range = match (piece.is_empty(), total) {
             (true, Some(t)) => format!("bytes */{t}"),
             (_, Some(t)) => format!("bytes {start}-{}/{t}", start + piece.len() as u64 - 1),
@@ -628,7 +770,11 @@ impl GDriveConn {
 
     /// Writes a file. Bitcrane writes into the returned stream; the task sends
     /// it to Drive in pieces (resumable upload) and finishes the upload.
-    pub fn writer(self: &std::sync::Arc<Self>, path: &str, mtime: Option<u32>) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
+    pub fn writer(
+        self: &std::sync::Arc<Self>,
+        path: &str,
+        mtime: Option<u32>,
+    ) -> (Box<dyn AsyncWrite + Unpin + Send>, tokio::task::JoinHandle<AppResult<()>>) {
         let (w, mut r) = tokio::io::duplex(1024 * 1024);
         let conn = self.clone();
         let path = norm(path);
@@ -640,7 +786,9 @@ impl GDriveConn {
                 let mut buf = Vec::with_capacity(CHUNK);
                 while buf.len() < CHUNK {
                     let mut part = vec![0u8; (CHUNK - buf.len()).min(256 * 1024)];
-                    let n = r.read(&mut part).await.map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string()))?;
+                    let n = r.read(&mut part).await.map_err(|e| {
+                        AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
+                    })?;
                     if n == 0 {
                         break;
                     }
@@ -676,11 +824,20 @@ mod tests {
         assert_eq!((f.kind.as_str(), f.size, f.mtime), ("file", 42, 1793260800000));
         let d = entry_of(&json!({ "id": "2", "name": "Fotos", "mimeType": FOLDER }), false).unwrap();
         assert_eq!(d.kind, "dir");
-        assert!(entry_of(&json!({ "id": "3", "name": "x", "mimeType": "application/vnd.google-apps.shortcut" }), false).is_none());
+        assert!(entry_of(
+            &json!({ "id": "3", "name": "x", "mimeType": "application/vnd.google-apps.shortcut" }),
+            false
+        )
+        .is_none());
         let doc = json!({ "id": "4", "name": "Bericht", "mimeType": "application/vnd.google-apps.document" });
         assert_eq!(entry_of(&doc, false).unwrap().name, "Bericht.docx");
         assert_eq!(entry_of(&doc, true).unwrap().name, "Bericht.pdf");
-        assert_eq!(entry_of(&json!({ "id": "5", "name": "Umfrage", "mimeType": "application/vnd.google-apps.form" }), false).unwrap().name, "Umfrage");
+        assert_eq!(
+            entry_of(&json!({ "id": "5", "name": "Umfrage", "mimeType": "application/vnd.google-apps.form" }), false)
+                .unwrap()
+                .name,
+            "Umfrage"
+        );
         assert_eq!(rfc3339(1793260800).as_deref(), Some("2026-10-29T08:00:00Z"));
     }
 }

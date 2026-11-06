@@ -11,7 +11,11 @@
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow, ProgressBarStatus } from '@tauri-apps/api/window';
-import { disable as disableAutostart, enable as enableAutostart, isEnabled as autostartEnabled } from '@tauri-apps/plugin-autostart';
+import {
+  disable as disableAutostart,
+  enable as enableAutostart,
+  isEnabled as autostartEnabled,
+} from '@tauri-apps/plugin-autostart';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Transfer } from '../backend/types';
@@ -19,7 +23,19 @@ import { menuDefs } from './menus';
 import { playDoneSound, playErrorSound } from '../util/sounds';
 import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';
-import { getState, newTab, openDialog, openServerInNewTab, openSftpLink, pauseAllWatches, subscribeStore, toggleWatch, undoLast, updateSettings, type AppState } from './store';
+import {
+  getState,
+  newTab,
+  openDialog,
+  openServerInNewTab,
+  openSftpLink,
+  pauseAllWatches,
+  subscribeStore,
+  toggleWatch,
+  undoLast,
+  updateSettings,
+  type AppState,
+} from './store';
 import { checkForUpdates } from './updates';
 import { editorMenuKey } from './editor';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
@@ -30,7 +46,18 @@ import { $t, menuText } from '../i18n';
 /* macOS menu bar                                                           */
 /* ------------------------------------------------------------------------ */
 
-const KEY_NAMES: Record<string, string> = { '↑': 'Up', '↓': 'Down', '←': 'Left', '→': 'Right', '⌫': 'Backspace', '⌦': 'Delete', '↩': 'Enter', esc: 'Escape', '⇥': 'Tab', Leertaste: 'Space' };
+const KEY_NAMES: Record<string, string> = {
+  '↑': 'Up',
+  '↓': 'Down',
+  '←': 'Left',
+  '→': 'Right',
+  '⌫': 'Backspace',
+  '⌦': 'Delete',
+  '↩': 'Enter',
+  esc: 'Escape',
+  '⇥': 'Tab',
+  Leertaste: 'Space',
+};
 
 /**
  * Converts a shortcut as shown in the menus ("⇧⌘N", "⌥⌘↓") into a Tauri
@@ -58,7 +85,8 @@ const TEXT_KEYS = new Set(['⌘⌫', '⌘↑', '⌘A', '⌘↓']);
 
 async function installMacMenu() {
   const defs = menuDefs();
-  const sub = async (id: string, text: string, items: Array<MenuItem | PredefinedMenuItem | Submenu>) => Submenu.new({ id, text: menuText(text), items });
+  const sub = async (id: string, text: string, items: Array<MenuItem | PredefinedMenuItem | Submenu>) =>
+    Submenu.new({ id, text: menuText(text), items });
   const custom = async (defId: string, skip: string[] = []) => {
     const def = defs.find((d) => d.id === defId)!;
     const out: Array<MenuItem | PredefinedMenuItem> = [];
@@ -68,16 +96,18 @@ async function installMacMenu() {
         out.push(await PredefinedMenuItem.new({ item: 'Separator' }));
         continue;
       }
-      out.push(await MenuItem.new({
-        text: menuText(it.label),
-        enabled: !!it.run,
-        accelerator: it.mac && !TEXT_KEYS.has(it.mac) ? toAccelerator(it.mac) : undefined,
-        action: () => {
-          // While the code editor has the keyboard, its own ⌘ shortcuts win (⌘W, ⌘F, ⌘D …).
-          if (it.mac && editorMenuKey(it.mac)) return;
-          it.run?.();
-        },
-      }));
+      out.push(
+        await MenuItem.new({
+          text: menuText(it.label),
+          enabled: !!it.run,
+          accelerator: it.mac && !TEXT_KEYS.has(it.mac) ? toAccelerator(it.mac) : undefined,
+          action: () => {
+            // While the code editor has the keyboard, its own ⌘ shortcuts win (⌘W, ⌘F, ⌘D …).
+            if (it.mac && editorMenuKey(it.mac)) return;
+            it.run?.();
+          },
+        }),
+      );
     }
     return out;
   };
@@ -88,10 +118,20 @@ async function installMacMenu() {
   const appMenu = await sub('app', 'Bitcrane', [
     await MenuItem.new({ text: menuText($t('Über Bitcrane')), action: () => item($t('Über Bitcrane')).run?.() }),
     // Like other Mac apps: "Nach Updates suchen …" right below "Über Bitcrane".
-    await MenuItem.new({ text: menuText($t('Nach Updates suchen …')), action: () => item($t('Nach Updates suchen …')).run?.() }),
+    await MenuItem.new({
+      text: menuText($t('Nach Updates suchen …')),
+      action: () => item($t('Nach Updates suchen …')).run?.(),
+    }),
     await sep(),
-    await MenuItem.new({ text: menuText($t('Einstellungen …')), accelerator: item($t('Einstellungen …')).mac ? toAccelerator(item($t('Einstellungen …')).mac!) : undefined, action: () => item($t('Einstellungen …')).run?.() }),
-    await MenuItem.new({ text: menuText($t('Werkzeugleiste anpassen …')), action: () => item($t('Werkzeugleiste anpassen …')).run?.() }),
+    await MenuItem.new({
+      text: menuText($t('Einstellungen …')),
+      accelerator: item($t('Einstellungen …')).mac ? toAccelerator(item($t('Einstellungen …')).mac!) : undefined,
+      action: () => item($t('Einstellungen …')).run?.(),
+    }),
+    await MenuItem.new({
+      text: menuText($t('Werkzeugleiste anpassen …')),
+      action: () => item($t('Werkzeugleiste anpassen …')).run?.(),
+    }),
     await sep(),
     await PredefinedMenuItem.new({ item: 'Hide', text: menuText($t('Bitcrane ausblenden')) }),
     await PredefinedMenuItem.new({ item: 'HideOthers', text: menuText($t('Andere ausblenden')) }),
@@ -102,11 +142,16 @@ async function installMacMenu() {
   // "Bearbeiten" needs the standard text commands, otherwise ⌘C / ⌘V do not work in text fields.
   const editMenu = await sub('edit', $t('Bearbeiten'), [
     // ⌘Z: in a text field the text's undo, otherwise the last file action (rename, move, new file).
-    await MenuItem.new({ text: menuText($t('Widerrufen')), accelerator: 'Cmd+Z', action: () => {
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) document.execCommand('undo');
-      else undoLast();
-    } }),
+    await MenuItem.new({
+      text: menuText($t('Widerrufen')),
+      accelerator: 'Cmd+Z',
+      action: () => {
+        const el = document.activeElement as HTMLElement | null;
+        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable))
+          document.execCommand('undo');
+        else undoLast();
+      },
+    }),
     await PredefinedMenuItem.new({ item: 'Redo', text: menuText($t('Wiederholen')) }),
     await sep(),
     await PredefinedMenuItem.new({ item: 'Cut', text: menuText($t('Ausschneiden')) }),
@@ -115,7 +160,13 @@ async function installMacMenu() {
     await PredefinedMenuItem.new({ item: 'SelectAll', text: menuText($t('Alles auswählen')) }),
     await sep(),
     // "Alles auswählen" is the standard entry above; it also selects all files in a list.
-    ...(await custom('edit', [$t('Widerrufen'), $t('Alles auswählen'), $t('Ausschneiden'), $t('Kopieren'), $t('Einfügen')])),
+    ...(await custom('edit', [
+      $t('Widerrufen'),
+      $t('Alles auswählen'),
+      $t('Ausschneiden'),
+      $t('Kopieren'),
+      $t('Einfügen'),
+    ])),
   ]);
   const windowMenu = await sub('window', $t('Fenster'), [
     await PredefinedMenuItem.new({ item: 'Minimize', text: menuText($t('Im Dock ablegen')) }),
@@ -149,15 +200,23 @@ function trayStatus(s: AppState): { text: string; paused: boolean } {
   const errors = s.transfers.filter((t) => t.state === 'error').length;
   const watching = s.watches.filter((w) => w.state !== 'paused').length;
   const paused = s.watches.length > 0 && watching === 0;
-  if (errors) return { text: errors === 1 ? $t('1 Fehler, bitte ansehen') : $t('{0} Fehler, bitte ansehen', errors), paused };
+  if (errors)
+    return { text: errors === 1 ? $t('1 Fehler, bitte ansehen') : $t('{0} Fehler, bitte ansehen', errors), paused };
   if (active) return { text: active === 1 ? $t('Überträgt 1 Datei') : $t('Überträgt {0} Dateien', active), paused };
   if (paused) return { text: menuText($t('Alle Überwachungen pausiert')), paused };
-  if (watching) return { text: watching === 1 ? $t('1 Überwachung aktiv') : $t('{0} Überwachungen aktiv', watching), paused };
+  if (watching)
+    return { text: watching === 1 ? $t('1 Überwachung aktiv') : $t('{0} Überwachungen aktiv', watching), paused };
   return { text: menuText($t('Keine Überwachung aktiv')), paused };
 }
 
 /** One entry of the status icon's menu (see tray.rs); no id and no label = separator. */
-interface TrayItem { id?: string; label?: string; enabled?: boolean; checked?: boolean; items?: TrayItem[] }
+interface TrayItem {
+  id?: string;
+  label?: string;
+  enabled?: boolean;
+  checked?: boolean;
+  items?: TrayItem[];
+}
 const SEP: TrayItem = {};
 
 /**
@@ -175,7 +234,12 @@ function trayMenu(s: AppState, st: { text: string; paused: boolean }): TrayItem[
     { id: 'newTab', label: menuText($t('Neuer Tab')) },
     { id: 'quick', label: menuText($t('Schnell verbinden …')) },
   ];
-  if (servers.length) items.push({ id: 'servers', label: menuText($t('Server öffnen')), items: servers.map((x) => ({ id: `server:${x.id}`, label: x.name })) });
+  if (servers.length)
+    items.push({
+      id: 'servers',
+      label: menuText($t('Server öffnen')),
+      items: servers.map((x) => ({ id: `server:${x.id}`, label: x.name })),
+    });
   if (s.watches.length) {
     items.push({
       id: 'watches',
@@ -183,7 +247,10 @@ function trayMenu(s: AppState, st: { text: string; paused: boolean }): TrayItem[
       items: [
         ...s.watches.map((w) => ({ id: `watch:${w.id}`, label: w.name, checked: w.state !== 'paused' })),
         SEP,
-        { id: 'pauseAll', label: menuText(st.paused ? $t('Alle Überwachungen fortsetzen') : $t('Alle Überwachungen pausieren')) },
+        {
+          id: 'pauseAll',
+          label: menuText(st.paused ? $t('Alle Überwachungen fortsetzen') : $t('Alle Überwachungen pausieren')),
+        },
       ],
     });
   }
@@ -192,7 +259,10 @@ function trayMenu(s: AppState, st: { text: string; paused: boolean }): TrayItem[
     SEP,
     { id: 'updates', label: menuText($t('Nach Updates suchen …')) },
     { id: 'settings', label: menuText($t('Einstellungen …')) },
-    { id: 'hideIcon', label: menuText(mac ? $t('Symbol in der Menüleiste ausblenden') : $t('Symbol im Infobereich ausblenden')) },
+    {
+      id: 'hideIcon',
+      label: menuText(mac ? $t('Symbol in der Menüleiste ausblenden') : $t('Symbol im Infobereich ausblenden')),
+    },
     SEP,
     { id: 'quit', label: menuText($t('Bitcrane beenden')) },
   );
@@ -222,9 +292,12 @@ function onTrayAction(id: string) {
   else if (id === 'settings') openDialog({ type: 'settings', tab: 'general' });
   else if (id === 'hideIcon') {
     updateSettings({ showMenuBarIcon: false });
-    void notify('Bitcrane', getState().platform === 'mac'
-      ? $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol in der Menüleiste.')
-      : $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol im Infobereich.'));
+    void notify(
+      'Bitcrane',
+      getState().platform === 'mac'
+        ? $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol in der Menüleiste.')
+        : $t('Das Symbol ist ausgeblendet. Wieder einschalten: Einstellungen › Allgemein › Symbol im Infobereich.'),
+    );
   } else if (id.startsWith('server:')) openServerInNewTab(id.slice(7));
   else if (id.startsWith('watch:')) toggleWatch(id.slice(6));
 }
@@ -260,7 +333,10 @@ function onTransfers(s: AppState, focused: boolean) {
       if (s.settings.soundOnError) playErrorSound();
       if (s.settings.notify !== 'none') {
         const server = s.servers.find((x) => x.id === t.serverId)?.name ?? $t('Server');
-        notify(`${t.name}: ${t.error ?? $t('Fehler')}`, $t('{0}, {1}. Bitcrane öffnen, um es zu beheben.', server, t.folder));
+        notify(
+          `${t.name}: ${t.error ?? $t('Fehler')}`,
+          $t('{0}, {1}. Bitcrane öffnen, um es zu beheben.', server, t.folder),
+        );
       }
     }
     if (t.state === 'done' && before && before !== 'done' && t.direction !== 'command') batchDone++;
@@ -270,7 +346,11 @@ function onTransfers(s: AppState, focused: boolean) {
   if (!busy && batchDone > 0) {
     if (!batchHadError) {
       if (s.settings.soundOnDone) playDoneSound();
-      if (s.settings.notify === 'all' && !focused) notify($t('Alles übertragen'), batchDone === 1 ? $t('1 Datei übertragen.') : $t('{0} Dateien übertragen.', batchDone));
+      if (s.settings.notify === 'all' && !focused)
+        notify(
+          $t('Alles übertragen'),
+          batchDone === 1 ? $t('1 Datei übertragen.') : $t('{0} Dateien übertragen.', batchDone),
+        );
     }
     batchDone = 0;
     batchHadError = false;
@@ -288,7 +368,9 @@ function syncProgress(s: AppState) {
   const key = `${show}|${pct}|${active.length}`;
   if (key === lastProgress) return;
   lastProgress = key;
-  win.setProgressBar(show ? { status: ProgressBarStatus.Normal, progress: pct } : { status: ProgressBarStatus.None }).catch(() => undefined);
+  win
+    .setProgressBar(show ? { status: ProgressBarStatus.Normal, progress: pct } : { status: ProgressBarStatus.None })
+    .catch(() => undefined);
   // The count badge exists on macOS (and some Linux docks), not on Windows.
   win.setBadgeCount(show ? active.length : undefined).catch(() => undefined);
 }
@@ -305,7 +387,11 @@ export async function startShell() {
   started = true;
   const win = getCurrentWindow();
   let focused = true;
-  win.onFocusChanged(({ payload }) => { focused = payload; }).catch(() => undefined);
+  win
+    .onFocusChanged(({ payload }) => {
+      focused = payload;
+    })
+    .catch(() => undefined);
 
   if (getState().platform === 'mac') {
     await installMacMenu().catch(() => undefined);
@@ -350,9 +436,28 @@ export async function startShell() {
         else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u));
       }
     };
-    const waitConfig = () => (isConfigLoaded() ? Promise.resolve() : new Promise<void>((r) => { const t = window.setInterval(() => { if (isConfigLoaded()) { window.clearInterval(t); r(); } }, 100); }));
-    void waitConfig().then(() => deepLink.getCurrent().then(open).catch(() => undefined));
-    await deepLink.onOpenUrl((urls) => { void waitConfig().then(() => open(urls)); }).catch(() => undefined);
+    const waitConfig = () =>
+      isConfigLoaded()
+        ? Promise.resolve()
+        : new Promise<void>((r) => {
+            const t = window.setInterval(() => {
+              if (isConfigLoaded()) {
+                window.clearInterval(t);
+                r();
+              }
+            }, 100);
+          });
+    void waitConfig().then(() =>
+      deepLink
+        .getCurrent()
+        .then(open)
+        .catch(() => undefined),
+    );
+    await deepLink
+      .onOpenUrl((urls) => {
+        void waitConfig().then(() => open(urls));
+      })
+      .catch(() => undefined);
     // Windows registers the link type when the setting is on (the Mac declares it in the app bundle).
     if (getState().platform === 'win') {
       let linksOn: boolean | null = null;
@@ -372,7 +477,17 @@ export async function startShell() {
 
   // "Mit Bitcrane hochladen" from the Explorer: paths of a second start, and the ones Bitcrane was started with.
   await listen<string[]>('upload-files', (e) => receiveUploadPaths(e.payload));
-  const whenLoaded = () => (isConfigLoaded() ? Promise.resolve() : new Promise<void>((r) => { const t = window.setInterval(() => { if (isConfigLoaded()) { window.clearInterval(t); r(); } }, 100); }));
+  const whenLoaded = () =>
+    isConfigLoaded()
+      ? Promise.resolve()
+      : new Promise<void>((r) => {
+          const t = window.setInterval(() => {
+            if (isConfigLoaded()) {
+              window.clearInterval(t);
+              r();
+            }
+          }, 100);
+        });
   void whenLoaded().then(async () => {
     const first = await backend.takePendingUploads().catch(() => [] as string[]);
     if (first.length) receiveUploadPaths(first);
@@ -405,7 +520,14 @@ export async function startShell() {
       onTransfers(s, focused);
       syncProgress(s);
     }
-    if (!prev || prev.transfers !== s.transfers || prev.watches !== s.watches || prev.settings !== s.settings || prev.servers !== s.servers) syncTray(s);
+    if (
+      !prev ||
+      prev.transfers !== s.transfers ||
+      prev.watches !== s.watches ||
+      prev.settings !== s.settings ||
+      prev.servers !== s.servers
+    )
+      syncTray(s);
     // Only after the saved settings are loaded, otherwise the defaults would switch it off.
     if (isConfigLoaded() && (!prev || prev.settings.startAtLogin !== s.settings.startAtLogin || !autostartSynced)) {
       autostartSynced = true;

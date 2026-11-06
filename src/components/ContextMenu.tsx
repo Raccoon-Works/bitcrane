@@ -9,7 +9,76 @@ import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
-  activeTab, LIVE, localPlaces, editLocalPlaces, SIDEBAR_SECTIONS, toggleSidebarHidden, type SidebarSection, isPackage, showPackageContents, paneLoc, compareFiles, copyShareLink, openWithDefaultApp, compressEntries, extractArchive, placesFor, setLeftServer, setRightLocal, openPlace, openServerIn, setPaneServerList, closePaneServer, removePlace, navigate, removeServerGroup, pickLocalFolder, editPath, askDelete, askRemoveServer, computeFolderSizes, newFolderWithSelection, closeTab, closeOtherTabs, closeTabsRight, duplicateTab, copyPath, copyWebUrl, openWebUrl, webUrlFor, copySelection, cutSelection, revealEntry, removeRecent, clearRecent, addLocalPlace, addPlace, moveToOtherSide, paneShowsServers, disconnect, download, duplicateServer, getState, keepServer, openServerInNewTab, isDirEntry, pasteClipboard, togglePermsColumn, updateSettings, newFile, newFolder, openInEditor, openTerminal, newTab, openDialog, openEntry, panePath, setState, startRename, upload, useStore,
+  activeTab,
+  LIVE,
+  localPlaces,
+  editLocalPlaces,
+  SIDEBAR_SECTIONS,
+  toggleSidebarHidden,
+  type SidebarSection,
+  isPackage,
+  showPackageContents,
+  paneLoc,
+  compareFiles,
+  copyShareLink,
+  openWithDefaultApp,
+  compressEntries,
+  extractArchive,
+  placesFor,
+  setLeftServer,
+  setRightLocal,
+  openPlace,
+  openServerIn,
+  setPaneServerList,
+  closePaneServer,
+  removePlace,
+  navigate,
+  removeServerGroup,
+  pickLocalFolder,
+  editPath,
+  askDelete,
+  askRemoveServer,
+  computeFolderSizes,
+  newFolderWithSelection,
+  closeTab,
+  closeOtherTabs,
+  closeTabsRight,
+  duplicateTab,
+  copyPath,
+  copyWebUrl,
+  openWebUrl,
+  webUrlFor,
+  copySelection,
+  cutSelection,
+  revealEntry,
+  removeRecent,
+  clearRecent,
+  addLocalPlace,
+  addPlace,
+  moveToOtherSide,
+  paneShowsServers,
+  disconnect,
+  download,
+  duplicateServer,
+  getState,
+  keepServer,
+  openServerInNewTab,
+  isDirEntry,
+  pasteClipboard,
+  togglePermsColumn,
+  updateSettings,
+  newFile,
+  newFolder,
+  openInEditor,
+  openTerminal,
+  newTab,
+  openDialog,
+  openEntry,
+  panePath,
+  setState,
+  startRename,
+  upload,
+  useStore,
 } from '../state/store';
 import { $t, menuText } from '../i18n';
 import { isCloudProtocol } from '../backend/types';
@@ -19,7 +88,14 @@ import { TAG_COLORS, tagName, tagsFor, toggleTag } from '../state/tags';
 import { openExplorerFolder, setExplorerFolder } from '../state/mount';
 import { runCustomCommand } from '../state/tools';
 
-interface Item { label: string; key?: string; run: () => void; danger?: boolean; checked?: boolean; /** Colour dot before the label (Finder tags). */ dot?: string }
+interface Item {
+  label: string;
+  key?: string;
+  run: () => void;
+  danger?: boolean;
+  checked?: boolean;
+  /** Colour dot before the label (Finder tags). */ dot?: string;
+}
 
 export function ContextMenu() {
   const menu = useStore((s) => s.contextMenu);
@@ -32,12 +108,17 @@ export function ContextMenu() {
     const el = ref.current;
     if (!menu || !el) return;
     const p = stagePoint(menu.x, menu.y);
-    setPos({ left: Math.max(8, Math.min(p.x, p.w - el.offsetWidth - 8)), top: Math.max(8, Math.min(p.y, p.h - el.offsetHeight - 8)) });
+    setPos({
+      left: Math.max(8, Math.min(p.x, p.w - el.offsetWidth - 8)),
+      top: Math.max(8, Math.min(p.y, p.h - el.offsetHeight - 8)),
+    });
   }, [menu]);
 
   useEffect(() => {
     if (!menu) return;
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setState({ contextMenu: null }); };
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setState({ contextMenu: null });
+    };
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setState({ contextMenu: null });
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -50,7 +131,10 @@ export function ContextMenu() {
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', key);
     ref.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key); };
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', key);
+    };
   }, [menu]);
 
   if (!menu) return null;
@@ -70,7 +154,8 @@ export function ContextMenu() {
   const pkg = !!one && folder && isPackage(menu.side, { name: one, kind: 'dir' });
   const isDir = folder && !pkg;
   const leftServer = tab?.leftServerId ? getState().servers.find((x) => x.id === tab.leftServerId) : undefined;
-  const otherName = (side: 'local' | 'remote') => (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
+  const otherName = (side: 'local' | 'remote') =>
+    (side === 'local' ? getState().servers.find((x) => x.id === tab?.serverId)?.name : leftServer?.name) ?? '';
   /** The other half for "verschieben": its server, or its folder on this computer. */
   const otherPlace = (side: 'local' | 'remote') => {
     const o = side === 'local' ? 'remote' : 'local';
@@ -83,7 +168,10 @@ export function ContextMenu() {
   };
   const groups: Item[][] = [];
   // Own commands (Einstellungen › Erweitert) run on SFTP servers only (they need SSH).
-  const commands = onServer && sftpTab && !!paneServer ? (getState().settings.customCommands ?? []).filter((c) => c.name.trim() && c.command.trim()) : [];
+  const commands =
+    onServer && sftpTab && !!paneServer
+      ? (getState().settings.customCommands ?? []).filter((c) => c.name.trim() && c.command.trim())
+      : [];
 
   if (menu.kind === 'server' && menu.serverId) {
     const id = menu.serverId;
@@ -93,37 +181,89 @@ export function ContextMenu() {
     const termFirst = ssh && srv?.openAs === 'terminal';
     const openTerm = () => void import('../state/terminal').then((m) => m.openServerTerminal(id));
     groups.push([
-      ...(termFirst ? [{ label: $t('Terminal öffnen'), run: openTerm }, { label: $t('Dateien öffnen'), run: () => openServerIn(menu.side, id) }] : [{ label: $t('Verbinden'), run: () => openServerIn(menu.side, id) }, { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) }]),
-      ...(tab && tab.serverId !== id && tab.leftServerId !== id ? [{ label: other === 'local' ? $t('In der linken Hälfte öffnen') : $t('In der rechten Hälfte öffnen'), run: () => openServerIn(other, id) }] : []),
+      ...(termFirst
+        ? [
+            { label: $t('Terminal öffnen'), run: openTerm },
+            { label: $t('Dateien öffnen'), run: () => openServerIn(menu.side, id) },
+          ]
+        : [
+            { label: $t('Verbinden'), run: () => openServerIn(menu.side, id) },
+            { label: $t('In neuem Tab öffnen'), run: () => openServerInNewTab(id) },
+          ]),
+      ...(tab && tab.serverId !== id && tab.leftServerId !== id
+        ? [
+            {
+              label: other === 'local' ? $t('In der linken Hälfte öffnen') : $t('In der rechten Hälfte öffnen'),
+              run: () => openServerIn(other, id),
+            },
+          ]
+        : []),
       ...(srv?.online ? [{ label: $t('Verbindung trennen'), run: () => disconnect(id) }] : []),
       ...(ssh && !termFirst ? [{ label: $t('Terminal öffnen'), run: openTerm }] : []),
     ]);
     groups.push([
-      ...(srv?.temporary ? [{ label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'), run: () => keepServer(id) }] : srv?.protocol === 'vault' ? [] : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
+      ...(srv?.temporary
+        ? [
+            {
+              label: srv.protocol === 'vault' ? $t('Tresor merken') : $t('Als Server speichern'),
+              run: () => keepServer(id),
+            },
+          ]
+        : srv?.protocol === 'vault'
+          ? []
+          : [{ label: $t('Bearbeiten …'), run: () => openDialog({ type: 'serverEdit', serverId: id }) }]),
       { label: $t('Duplizieren'), run: () => duplicateServer(id) },
-      { label: $t('Adresse kopieren'), run: () => { if (srv) void navigator.clipboard?.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`); } },
+      {
+        label: $t('Adresse kopieren'),
+        run: () => {
+          if (srv) void navigator.clipboard?.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`);
+        },
+      },
     ]);
     // Windows: the server as a folder in the Explorer (like OneDrive).
     if (srv && !srv.temporary && getState().platform === 'win' && !isCloudProtocol(srv.protocol)) {
-      groups.push(srv.mountExplorer
-        ? [
-            ...(getState().explorerFolders[id] ? [{ label: $t('Ordner im Explorer öffnen'), run: () => openExplorerFolder(id) }] : []),
-            { label: $t('Nicht mehr im Explorer zeigen'), run: () => setExplorerFolder(id, false) },
-          ]
-        : [{ label: $t('Im Explorer als Ordner zeigen'), run: () => setExplorerFolder(id, true) }]);
+      groups.push(
+        srv.mountExplorer
+          ? [
+              ...(getState().explorerFolders[id]
+                ? [{ label: $t('Ordner im Explorer öffnen'), run: () => openExplorerFolder(id) }]
+                : []),
+              { label: $t('Nicht mehr im Explorer zeigen'), run: () => setExplorerFolder(id, false) },
+            ]
+          : [{ label: $t('Im Explorer als Ordner zeigen'), run: () => setExplorerFolder(id, true) }],
+      );
     }
-    if (srv && !srv.temporary) groups.push([{ label: $t('Entfernen …'), danger: true, run: () => askRemoveServer(id) }]);
+    if (srv && !srv.temporary)
+      groups.push([{ label: $t('Entfernen …'), danger: true, run: () => askRemoveServer(id) }]);
   } else if (menu.kind === 'git') {
     // The branch chip of a half: the everyday git commands of its working copy.
     const st = gitFor(panePath(menu.side));
     if (st) {
       groups.push([
         { label: $t('Commit …'), run: () => openDialog({ type: 'gitCommit', root: st.root }) },
-        { label: $t('Alles hinzufügen'), run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'addAll'); } },
+        {
+          label: $t('Alles hinzufügen'),
+          run: () => {
+            setState({ contextMenu: null });
+            void gitRun(st.root, 'addAll');
+          },
+        },
       ]);
       groups.push([
-        { label: st.behind ? $t('Pull ({0} neue)', st.behind) : 'Pull', run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'pull'); } },
-        { label: st.ahead ? $t('Push ({0} Commits)', st.ahead) : 'Push', run: () => { setState({ contextMenu: null }); void gitRun(st.root, 'push'); } },
+        {
+          label: st.behind ? $t('Pull ({0} neue)', st.behind) : 'Pull',
+          run: () => {
+            setState({ contextMenu: null });
+            void gitRun(st.root, 'pull');
+          },
+        },
+        {
+          label: st.ahead ? $t('Push ({0} Commits)', st.ahead) : 'Push',
+          run: () => {
+            setState({ contextMenu: null });
+            void gitRun(st.root, 'push');
+          },
+        },
       ]);
     }
   } else if (menu.kind === 'serverGroup' && menu.group) {
@@ -135,11 +275,20 @@ export function ContextMenu() {
     const all = crumbs(panePath(menu.side), getState().homeName);
     // From the "…" button: the folders not shown; from the folder name: all folders above it.
     const hidden = menu.place?.startsWith('h:') ? Number(menu.place.slice(2)) : all.length - 3;
-    groups.push(all.slice(0, menu.place === 'all' ? -1 : hidden).reverse().map((c) => ({ label: c.name, run: () => navigate(menu.side, c.path) })));
+    groups.push(
+      all
+        .slice(0, menu.place === 'all' ? -1 : hidden)
+        .reverse()
+        .map((c) => ({ label: c.name, run: () => navigate(menu.side, c.path) })),
+    );
   } else if (menu.kind === 'placesMore') {
     // Places that do not fit into the places bar ("»" at its end); place = number shown.
     const shown = Number(menu.place ?? 0);
-    groups.push(placesFor(menu.side).slice(shown).map((p) => ({ label: placeLabel(p), run: () => navigate(menu.side, p.path) })));
+    groups.push(
+      placesFor(menu.side)
+        .slice(shown)
+        .map((p) => ({ label: placeLabel(p), run: () => navigate(menu.side, p.path) })),
+    );
   } else if (menu.kind === 'place' && menu.place) {
     const path = menu.place;
     groups.push([
@@ -151,9 +300,20 @@ export function ContextMenu() {
     // Which sections the sidebar shows (Finder: Settings > Sidebar), and the default order.
     const st = getState().settings;
     const hiddenNow = st.sidebarHidden ?? [];
-    const names: Record<SidebarSection, string> = { favorites: $t('Favoriten'), recent: $t('Zuletzt verwendet'), devices: $t('Geräte'), shares: $t('Freigaben'), tags: $t('Tags') };
-    groups.push(SIDEBAR_SECTIONS.filter((id) => id !== 'tags' || platform === 'mac')
-      .map((id) => ({ label: names[id], checked: !hiddenNow.includes(id), run: () => toggleSidebarHidden(id) })));
+    const names: Record<SidebarSection, string> = {
+      favorites: $t('Favoriten'),
+      recent: $t('Zuletzt verwendet'),
+      devices: $t('Geräte'),
+      shares: $t('Freigaben'),
+      tags: $t('Tags'),
+    };
+    groups.push(
+      SIDEBAR_SECTIONS.filter((id) => id !== 'tags' || platform === 'mac').map((id) => ({
+        label: names[id],
+        checked: !hiddenNow.includes(id),
+        run: () => toggleSidebarHidden(id),
+      })),
+    );
     groups.push([
       { label: $t('Alle Bereiche aufklappen'), run: () => updateSettings({ sidebarCollapsed: [] }) },
       { label: $t('Reihenfolge zurücksetzen'), run: () => updateSettings({ sidebarOrder: [] }) },
@@ -164,7 +324,13 @@ export function ContextMenu() {
     groups.push([
       { label: $t('Öffnen'), run: () => openPlace(path) },
       { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
-      { label: $t('Zu den Favoriten hinzufügen'), run: () => { addLocalPlace(path); setState({ contextMenu: null }); } },
+      {
+        label: $t('Zu den Favoriten hinzufügen'),
+        run: () => {
+          addLocalPlace(path);
+          setState({ contextMenu: null });
+        },
+      },
     ]);
     groups.push([
       { label: $t('Aus „Zuletzt verwendet“ entfernen'), run: () => removeRecent(path) },
@@ -181,19 +347,38 @@ export function ContextMenu() {
     ]);
     groups.push([
       ...(i > 0 ? [{ label: $t('Nach oben'), run: () => editLocalPlaces(path, { before: list[i - 1].path }) }] : []),
-      ...(i >= 0 && i < list.length - 1 ? [{ label: $t('Nach unten'), run: () => editLocalPlaces(path, { before: list[i + 2]?.path ?? null }) }] : []),
+      ...(i >= 0 && i < list.length - 1
+        ? [{ label: $t('Nach unten'), run: () => editLocalPlaces(path, { before: list[i + 2]?.path ?? null }) }]
+        : []),
     ]);
-    groups.push([{ label: $t('Aus den Favoriten entfernen'), danger: true, run: () => editLocalPlaces(path, { remove: true }) }]);
+    groups.push([
+      { label: $t('Aus den Favoriten entfernen'), danger: true, run: () => editLocalPlaces(path, { remove: true }) },
+    ]);
   } else if (menu.kind === 'paneSource') {
     // The location button of a half: this computer and its drives, or which server it shows.
     const servers = getState().servers.filter((x) => !x.temporary || x.online);
     if (menu.side === 'local') {
-      groups.push([{ label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'), checked: !tab?.leftServerId, run: () => setLeftServer('') }]);
+      groups.push([
+        {
+          label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'),
+          checked: !tab?.leftServerId,
+          run: () => setLeftServer(''),
+        },
+      ]);
       // Drives of this computer: switches back from a server if needed and opens the drive.
       // The browser prototype has no real drives; it shows typical ones.
-      const drives = LIVE ? getState().drives : platform === 'mac'
-        ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }]
-        : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads' }, { name: 'F: (Google Drive)', path: '~/Projekte' }];
+      const drives = LIVE
+        ? getState().drives
+        : platform === 'mac'
+          ? [
+              { name: 'Macintosh HD', path: '~' },
+              { name: 'USB-Stick', path: '~/Downloads' },
+            ]
+          : [
+              { name: 'C:', path: '~' },
+              { name: 'D:', path: '~/Downloads' },
+              { name: 'F: (Google Drive)', path: '~/Projekte' },
+            ];
       if (drives.length) groups.push(drives.map((d) => ({ label: d.name, run: () => openPlace(d.path) })));
       // Any other folder: the system's folder dialog, or typing the path.
       groups.push([
@@ -201,14 +386,36 @@ export function ContextMenu() {
         { label: $t('Pfad eingeben …'), key: sk('editPath'), run: () => editPath('local') },
       ]);
       const others = servers.filter((x) => x.id !== tab?.serverId);
-      if (others.length) groups.push(others.map((x) => ({ label: x.name, checked: tab?.leftServerId === x.id, run: () => openServerIn('local', x.id) })));
+      if (others.length)
+        groups.push(
+          others.map((x) => ({
+            label: x.name,
+            checked: tab?.leftServerId === x.id,
+            run: () => openServerIn('local', x.id),
+          })),
+        );
     } else {
       // The right half: this computer (two local halves, Total Commander) or a server.
-      groups.push([{ label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'), checked: !!tab?.rightLocal && !tab.serverId, run: () => setRightLocal() }]);
+      groups.push([
+        {
+          label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'),
+          checked: !!tab?.rightLocal && !tab.serverId,
+          run: () => setRightLocal(),
+        },
+      ]);
       if (tab?.rightLocal && !tab.serverId) {
-        const drives = LIVE ? getState().drives : platform === 'mac'
-          ? [{ name: 'Macintosh HD', path: '~' }, { name: 'USB-Stick', path: '~/Downloads' }]
-          : [{ name: 'C:', path: '~' }, { name: 'D:', path: '~/Downloads' }, { name: 'F: (Google Drive)', path: '~/Projekte' }];
+        const drives = LIVE
+          ? getState().drives
+          : platform === 'mac'
+            ? [
+                { name: 'Macintosh HD', path: '~' },
+                { name: 'USB-Stick', path: '~/Downloads' },
+              ]
+            : [
+                { name: 'C:', path: '~' },
+                { name: 'D:', path: '~/Downloads' },
+                { name: 'F: (Google Drive)', path: '~/Projekte' },
+              ];
         if (drives.length) groups.push(drives.map((d) => ({ label: d.name, run: () => setRightLocal(d.path) })));
         groups.push([
           { label: $t('Anderer Ordner …'), run: () => void pickLocalFolder('remote') },
@@ -216,7 +423,14 @@ export function ContextMenu() {
         ]);
       }
       const others = servers.filter((x) => x.id !== tab?.leftServerId);
-      if (others.length) groups.push(others.map((x) => ({ label: x.name, checked: tab?.serverId === x.id, run: () => openServerIn('remote', x.id) })));
+      if (others.length)
+        groups.push(
+          others.map((x) => ({
+            label: x.name,
+            checked: tab?.serverId === x.id,
+            run: () => openServerIn('remote', x.id),
+          })),
+        );
     }
     groups.push([
       { label: $t('Serverliste zeigen'), run: () => setPaneServerList(menu.side, true) },
@@ -237,7 +451,8 @@ export function ContextMenu() {
     ]);
   } else if (menu.kind === 'columns') {
     const st = getState().settings;
-    const col = (c: 'mtime' | 'size' | 'kind' | 'owner') => () => updateSettings({ columns: { ...st.columns, [c]: !st.columns[c] } });
+    const col = (c: 'mtime' | 'size' | 'kind' | 'owner') => () =>
+      updateSettings({ columns: { ...st.columns, [c]: !st.columns[c] } });
     // Same order as the columns. A creation date is missing on purpose: SFTP and FTP servers do not report one.
     groups.push([
       { label: $t('Geändert'), checked: st.columns.mtime, run: col('mtime') },
@@ -248,106 +463,304 @@ export function ContextMenu() {
     ]);
   } else if (menu.names.length) {
     const first: Item[] = [];
-    if (one) first.push({ label: isDir ? $t('Öffnen') : onServer ? $t('Im Editor öffnen') : $t('Öffnen'), key: k('⌘↓', 'Enter'), run: () => (pkg ? openWithDefaultApp(menu.side, one) : openEntry(menu.side, one)) });
+    if (one)
+      first.push({
+        label: isDir ? $t('Öffnen') : onServer ? $t('Im Editor öffnen') : $t('Öffnen'),
+        key: k('⌘↓', 'Enter'),
+        run: () => (pkg ? openWithDefaultApp(menu.side, one) : openEntry(menu.side, one)),
+      });
     if (pkg && one) first.push({ label: $t('Paketinhalt zeigen'), run: () => showPackageContents(menu.side, one) });
-    if (one && !isDir && !pkg && !onServer) first.push({ label: $t('Im Editor öffnen'), run: () => openInEditor(menu.side, one) });
-    if (one && !isDir && !pkg) first.push({ label: $t('Bearbeiten mit …'), run: () => { setState({ contextMenu: null }); openDialog({ type: 'editWith', side: menu.side, name: one }); } });
-    if (one && !isDir && !pkg) first.push({ label: $t('Vorschau'), key: k($t('Leertaste'), $t('Leertaste')), run: () => { setState({ contextMenu: null }); openDialog({ type: 'preview', side: menu.side }); } });
-    if (leftServer) first.push({ label: $t('Zu „{0}“ übertragen', otherName(menu.side)), key: sk(menu.side === 'remote' ? 'download' : 'upload'), run: () => (menu.side === 'remote' ? download(menu.names) : upload(menu.names)) });
-    else if (menu.side === 'remote') first.push({ label: $t('Herunterladen'), key: sk('download'), run: () => download(menu.names) });
+    if (one && !isDir && !pkg && !onServer)
+      first.push({ label: $t('Im Editor öffnen'), run: () => openInEditor(menu.side, one) });
+    if (one && !isDir && !pkg)
+      first.push({
+        label: $t('Bearbeiten mit …'),
+        run: () => {
+          setState({ contextMenu: null });
+          openDialog({ type: 'editWith', side: menu.side, name: one });
+        },
+      });
+    if (one && !isDir && !pkg)
+      first.push({
+        label: $t('Vorschau'),
+        key: k($t('Leertaste'), $t('Leertaste')),
+        run: () => {
+          setState({ contextMenu: null });
+          openDialog({ type: 'preview', side: menu.side });
+        },
+      });
+    if (leftServer)
+      first.push({
+        label: $t('Zu „{0}“ übertragen', otherName(menu.side)),
+        key: sk(menu.side === 'remote' ? 'download' : 'upload'),
+        run: () => (menu.side === 'remote' ? download(menu.names) : upload(menu.names)),
+      });
+    else if (menu.side === 'remote')
+      first.push({ label: $t('Herunterladen'), key: sk('download'), run: () => download(menu.names) });
     // Upload only when the other half shows a server (not with the server list or two local halves).
     else if (tab?.serverId) first.push({ label: $t('Hochladen'), key: sk('upload'), run: () => upload(menu.names) });
     // Moving into the other half: on one computer or server a plain move, between them transfer and remove (after a question).
-    if (!paneShowsServers(menu.side === 'local' ? 'remote' : 'local')) first.push({ label: $t('Nach „{0}“ verschieben …', otherPlace(menu.side)), key: sk('moveToOther'), run: () => { setState({ contextMenu: null }); moveToOtherSide(menu.side); } });
+    if (!paneShowsServers(menu.side === 'local' ? 'remote' : 'local'))
+      first.push({
+        label: $t('Nach „{0}“ verschieben …', otherPlace(menu.side)),
+        key: sk('moveToOther'),
+        run: () => {
+          setState({ contextMenu: null });
+          moveToOtherSide(menu.side);
+        },
+      });
     groups.push(first);
     const second: Item[] = [
       { label: $t('Kopieren'), key: sk('copy'), run: () => copySelection(menu.side) },
-      { label: $t('Ausschneiden'), key: sk('cut'), run: () => { setState({ contextMenu: null }); cutSelection(menu.side); } },
-      { label: $t('Kopieren nach …'), key: sk('copyTo'), run: () => openDialog({ type: 'copyTo', side: menu.side, names: menu.names }) },
+      {
+        label: $t('Ausschneiden'),
+        key: sk('cut'),
+        run: () => {
+          setState({ contextMenu: null });
+          cutSelection(menu.side);
+        },
+      },
+      {
+        label: $t('Kopieren nach …'),
+        key: sk('copyTo'),
+        run: () => openDialog({ type: 'copyTo', side: menu.side, names: menu.names }),
+      },
       { label: $t('Pfad kopieren'), key: sk('copyPath'), run: () => copyPath(menu.side, one) },
     ];
-    if (one && !onServer) second.push({ label: platform === 'mac' ? $t('Im Finder zeigen') : $t('Im Explorer zeigen'), run: () => revealEntry(menu.side, one) });
+    if (one && !onServer)
+      second.push({
+        label: platform === 'mac' ? $t('Im Finder zeigen') : $t('Im Explorer zeigen'),
+        run: () => revealEntry(menu.side, one),
+      });
     const web = one && tab && onServer ? webUrlFor(sid, join(panePath(menu.side), one)) : undefined;
     if (web && tab && one) {
       second.push({ label: $t('Web-Adresse kopieren'), run: () => copyWebUrl(sid, join(panePath(menu.side), one)) });
       second.push({ label: $t('Im Browser öffnen'), run: () => openWebUrl(sid, join(panePath(menu.side), one)) });
     }
     // Cloud services: a sharing link (Transmit "Copy Link").
-    if (one && paneServer && isCloudProtocol(paneServer.protocol)) second.push({ label: $t('Link zum Teilen kopieren'), run: () => copyShareLink(menu.side, one) });
-    if (one && !folder && paneServer?.protocol === 's3') second.push({ label: $t('Link mit Ablaufdatum …'), run: () => openDialog({ type: 'presign', side: menu.side, name: one }) });
+    if (one && paneServer && isCloudProtocol(paneServer.protocol))
+      second.push({ label: $t('Link zum Teilen kopieren'), run: () => copyShareLink(menu.side, one) });
+    if (one && !folder && paneServer?.protocol === 's3')
+      second.push({
+        label: $t('Link mit Ablaufdatum …'),
+        run: () => openDialog({ type: 'presign', side: menu.side, name: one }),
+      });
     if (one) second.push({ label: $t('Umbenennen'), key: k('↩', 'F2'), run: () => startRename(menu.side, one) });
-    else second.push({ label: $t('{0} Objekte umbenennen …', menu.names.length), run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }) });
-    if (one && !folder) second.push({ label: $t('Prüfsumme …'), run: () => openDialog({ type: 'checksum', side: menu.side, name: one }) });
-    const chosenDirs = tab ? menu.names.filter((n) => isDirEntry(...paneLoc(menu.side, tab), join(panePath(menu.side), n))) : [];
-    if (chosenDirs.length) second.push({ label: chosenDirs.length === 1 ? $t('Größe berechnen') : $t('Größe von {0} Ordnern berechnen', chosenDirs.length), run: () => void computeFolderSizes(menu.side, chosenDirs) });
+    else
+      second.push({
+        label: $t('{0} Objekte umbenennen …', menu.names.length),
+        run: () => openDialog({ type: 'batchRename', side: menu.side, names: menu.names }),
+      });
+    if (one && !folder)
+      second.push({
+        label: $t('Prüfsumme …'),
+        run: () => openDialog({ type: 'checksum', side: menu.side, name: one }),
+      });
+    const chosenDirs = tab
+      ? menu.names.filter((n) => isDirEntry(...paneLoc(menu.side, tab), join(panePath(menu.side), n)))
+      : [];
+    if (chosenDirs.length)
+      second.push({
+        label:
+          chosenDirs.length === 1 ? $t('Größe berechnen') : $t('Größe von {0} Ordnern berechnen', chosenDirs.length),
+        run: () => void computeFolderSizes(menu.side, chosenDirs),
+      });
     // "Dateien vergleichen" (after ForkLift): two files of this half, or this file and the one picked in the other half.
     const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
     const otherPick = getState().selection[other].names;
-    const isFile = (side: 'local' | 'remote', name: string) => !!tab && !isDirEntry(...paneLoc(side, tab), join(panePath(side), name));
+    const isFile = (side: 'local' | 'remote', name: string) =>
+      !!tab && !isDirEntry(...paneLoc(side, tab), join(panePath(side), name));
     if (menu.names.length === 2 && menu.names.every((n) => isFile(menu.side, n))) {
-      second.push({ label: $t('Dateien vergleichen'), run: () => compareFiles({ side: menu.side, name: menu.names[0] }, { side: menu.side, name: menu.names[1] }) });
+      second.push({
+        label: $t('Dateien vergleichen'),
+        run: () => compareFiles({ side: menu.side, name: menu.names[0] }, { side: menu.side, name: menu.names[1] }),
+      });
     } else if (one && !folder && otherPick.length === 1 && isFile(other, otherPick[0])) {
-      const [a, b] = menu.side === 'local' ? [{ side: menu.side, name: one }, { side: other, name: otherPick[0] }] : [{ side: other, name: otherPick[0] }, { side: menu.side, name: one }];
+      const [a, b] =
+        menu.side === 'local'
+          ? [
+              { side: menu.side, name: one },
+              { side: other, name: otherPick[0] },
+            ]
+          : [
+              { side: other, name: otherPick[0] },
+              { side: menu.side, name: one },
+            ];
       second.push({ label: $t('Mit „{0}“ vergleichen', otherPick[0]), run: () => compareFiles(a, b) });
     }
     // Zip archives on this computer (after ForkLift).
     // Inside an opened archive nothing can be added, so no "komprimieren" there.
     if (!onServer && !archiveFolder(panePath(menu.side))) {
-      second.push({ label: one ? $t('„{0}“ komprimieren', one) : $t('{0} Objekte komprimieren', menu.names.length), run: () => compressEntries(menu.side, menu.names) });
+      second.push({
+        label: one ? $t('„{0}“ komprimieren', one) : $t('{0} Objekte komprimieren', menu.names.length),
+        run: () => compressEntries(menu.side, menu.names),
+      });
       if (one && !folder && isArchiveName(one)) {
         second.push({ label: $t('Entpacken'), run: () => extractArchive(menu.side, one) });
         second.push({ label: $t('Mit Standardprogramm öffnen'), run: () => openWithDefaultApp(menu.side, one) });
       }
     }
-    if (one && menu.side === 'remote' && sftpTab) second.push({ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: join(panePath('remote'), one) }) });
-    if (one) second.push({ label: $t('Informationen und Rechte …'), key: k('⌘I', 'Strg+I'), run: () => openDialog({ type: 'perms', side: menu.side, path: join(panePath(menu.side), one) }) });
+    if (one && menu.side === 'remote' && sftpTab)
+      second.push({
+        label: $t('Symbolischen Link erstellen …'),
+        run: () => openDialog({ type: 'symlink', target: join(panePath('remote'), one) }),
+      });
+    if (one)
+      second.push({
+        label: $t('Informationen und Rechte …'),
+        key: k('⌘I', 'Strg+I'),
+        run: () => openDialog({ type: 'perms', side: menu.side, path: join(panePath(menu.side), one) }),
+      });
     groups.push(second);
     // Finder tags (Mac, this computer): the seven colours, ticked when every chosen file has it.
     if (!onServer && platform === 'mac') {
       const dir = panePath(menu.side);
       const have = tagsFor(dir);
-      groups.push(TAG_COLORS.map((c) => ({
-        label: tagName(c), dot: c.css,
-        checked: menu.names.every((n) => (have[n] ?? []).some((t) => t.color === c.color)),
-        run: () => { setState({ contextMenu: null }); void toggleTag(dir, menu.names, c); },
-      })));
+      groups.push(
+        TAG_COLORS.map((c) => ({
+          label: tagName(c),
+          dot: c.css,
+          checked: menu.names.every((n) => (have[n] ?? []).some((t) => t.color === c.color)),
+          run: () => {
+            setState({ contextMenu: null });
+            void toggleTag(dir, menu.names, c);
+          },
+        })),
+      );
     }
     // In a git working copy on this computer: add the chosen files for the next commit.
     const gst = !onServer ? gitFor(panePath(menu.side)) : null;
     if (gst) {
       const rel = menu.names.map((n) => join(panePath(menu.side), n).slice(gst.root.length + 1));
       groups.push([
-        { label: $t('Git: Für Commit hinzufügen'), run: () => { setState({ contextMenu: null }); void gitRun(gst.root, 'add', { paths: rel }); } },
+        {
+          label: $t('Git: Für Commit hinzufügen'),
+          run: () => {
+            setState({ contextMenu: null });
+            void gitRun(gst.root, 'add', { paths: rel });
+          },
+        },
         { label: $t('Git: Commit …'), run: () => openDialog({ type: 'gitCommit', root: gst.root }) },
       ]);
     }
-    const third: Item[] = [{ label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neuer Ordner mit Auswahl'), key: sk('newFolderWithSelection'), run: () => void newFolderWithSelection(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) }];
-    if (isDir && one) third.push({ label: $t('In neuem Tab öffnen'), run: () => { newTab(); setState({ contextMenu: null }); window.setTimeout(() => openEntry(menu.side, one), 0); } });
+    const third: Item[] = [
+      { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) },
+      {
+        label: $t('Neuer Ordner mit Auswahl'),
+        key: sk('newFolderWithSelection'),
+        run: () => void newFolderWithSelection(menu.side),
+      },
+      { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) },
+    ];
+    if (isDir && one)
+      third.push({
+        label: $t('In neuem Tab öffnen'),
+        run: () => {
+          newTab();
+          setState({ contextMenu: null });
+          window.setTimeout(() => openEntry(menu.side, one), 0);
+        },
+      });
     // Explorer "An Schnellzugriff anheften", Finder "Zur Seitenleiste hinzufügen".
     if (isDir && one) {
       const target = join(panePath(menu.side), one);
-      third.push(onServer
-        ? { label: $t('Zu den Orten hinzufügen'), run: () => { setState({ contextMenu: null }); addPlace(menu.side, target); } }
-        : { label: $t('Zu den Favoriten hinzufügen'), run: () => { setState({ contextMenu: null }); addLocalPlace(target); } });
+      third.push(
+        onServer
+          ? {
+              label: $t('Zu den Orten hinzufügen'),
+              run: () => {
+                setState({ contextMenu: null });
+                addPlace(menu.side, target);
+              },
+            }
+          : {
+              label: $t('Zu den Favoriten hinzufügen'),
+              run: () => {
+                setState({ contextMenu: null });
+                addLocalPlace(target);
+              },
+            },
+      );
     }
     groups.push(third);
-    if (commands.length) groups.push(commands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, menu.names) })));
-    groups.push([{ label: onServer ? $t('Vom Server löschen …') : $t('In den Papierkorb …'), key: k('⌘⌫', $t('Entf')), run: () => askDelete(menu.side, menu.names), danger: true }]);
+    if (commands.length)
+      groups.push(
+        commands.map((c) => ({
+          label: c.name || c.command,
+          run: () => void runCustomCommand(c, menu.side, menu.names),
+        })),
+      );
+    groups.push([
+      {
+        label: onServer ? $t('Vom Server löschen …') : $t('In den Papierkorb …'),
+        key: k('⌘⌫', $t('Entf')),
+        run: () => askDelete(menu.side, menu.names),
+        danger: true,
+      },
+    ]);
   } else {
     groups.push([
-      ...(clip ? [{ label: clip.serverId === (onServer ? sid : '') ? $t('Hier einfügen (Kopie)') : !clip.serverId ? $t('Hier einfügen (hochladen)') : !onServer ? $t('Hier einfügen (herunterladen)') : $t('Hier einfügen (übertragen)'), key: sk('paste'), run: () => pasteClipboard(menu.side) }] : []),
-      { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) }, { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) },
+      ...(clip
+        ? [
+            {
+              label:
+                clip.serverId === (onServer ? sid : '')
+                  ? $t('Hier einfügen (Kopie)')
+                  : !clip.serverId
+                    ? $t('Hier einfügen (hochladen)')
+                    : !onServer
+                      ? $t('Hier einfügen (herunterladen)')
+                      : $t('Hier einfügen (übertragen)'),
+              key: sk('paste'),
+              run: () => pasteClipboard(menu.side),
+            },
+          ]
+        : []),
+      { label: $t('Neuer Ordner'), key: sk('newFolder'), run: () => newFolder(menu.side) },
+      { label: $t('Neue Datei'), key: sk('newFile'), run: () => newFile(menu.side) },
       { label: $t('Pfad dieses Ordners kopieren'), run: () => copyPath(menu.side) },
-      { label: $t('Alle Ordnergrößen berechnen'), key: sk('folderSizes'), run: () => void computeFolderSizes(menu.side) },
-      ...(paneServer?.protocol !== 'vault' ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }] : []),
-      { label: $t('Auswählen nach Muster …'), key: sk('selectMask'), run: () => openDialog({ type: 'selectMask', side: menu.side }) },
-      ...(menu.side === 'remote' && sftpTab ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }] : []),
-      ...(!onServer || sftpTab ? [{ label: $t('Terminal hier öffnen'), run: () => void import('../state/terminal').then((m) => m.newTerminal(onServer ? 'server' : 'local')) }] : []),
-      ...(remoteTerminal ? [{ label: onServer ? $t('Im System-Terminal öffnen (SSH)') : $t('Im System-Terminal öffnen'), run: () => openTerminal(menu.side) }] : []),
+      {
+        label: $t('Alle Ordnergrößen berechnen'),
+        key: sk('folderSizes'),
+        run: () => void computeFolderSizes(menu.side),
+      },
+      ...(paneServer?.protocol !== 'vault'
+        ? [{ label: $t('Neuer Cryptomator-Tresor …'), run: () => openDialog({ type: 'vaultCreate', side: menu.side }) }]
+        : []),
+      {
+        label: $t('Auswählen nach Muster …'),
+        key: sk('selectMask'),
+        run: () => openDialog({ type: 'selectMask', side: menu.side }),
+      },
+      ...(menu.side === 'remote' && sftpTab
+        ? [{ label: $t('Symbolischen Link erstellen …'), run: () => openDialog({ type: 'symlink', target: '' }) }]
+        : []),
+      ...(!onServer || sftpTab
+        ? [
+            {
+              label: $t('Terminal hier öffnen'),
+              run: () => void import('../state/terminal').then((m) => m.newTerminal(onServer ? 'server' : 'local')),
+            },
+          ]
+        : []),
+      ...(remoteTerminal
+        ? [
+            {
+              label: onServer ? $t('Im System-Terminal öffnen (SSH)') : $t('Im System-Terminal öffnen'),
+              run: () => openTerminal(menu.side),
+            },
+          ]
+        : []),
     ]);
     const folderCommands = commands.filter((c) => !/\{(file|files|name)\}/.test(c.command));
-    if (folderCommands.length) groups.push(folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })));
-    if (!onServer) groups.push([{ label: $t('Diesen Ordner überwachen …'), key: sk('newWatch'), run: () => openDialog({ type: 'watchSetup' }) }]);
+    if (folderCommands.length)
+      groups.push(
+        folderCommands.map((c) => ({ label: c.name || c.command, run: () => void runCustomCommand(c, menu.side, []) })),
+      );
+    if (!onServer)
+      groups.push([
+        { label: $t('Diesen Ordner überwachen …'), key: sk('newWatch'), run: () => openDialog({ type: 'watchSetup' }) },
+      ]);
   }
   // Groups left empty by conditions are dropped, so no double separators appear.
   for (let i = groups.length - 1; i >= 0; i--) if (!groups[i].length) groups.splice(i, 1);
@@ -360,14 +773,34 @@ export function ContextMenu() {
   const pt = stagePoint(menu.x, menu.y);
 
   return (
-    <div ref={ref} role="menu" aria-label={$t('Kontextmenü')} className="menu context-menu" style={{ left: pos?.left ?? pt.x, top: pos?.top ?? pt.y, visibility: pos ? undefined : 'hidden' }}>
+    <div
+      ref={ref}
+      role="menu"
+      aria-label={$t('Kontextmenü')}
+      className="menu context-menu"
+      style={{ left: pos?.left ?? pt.x, top: pos?.top ?? pt.y, visibility: pos ? undefined : 'hidden' }}
+    >
       {groups.map((g, gi) => (
         <div key={gi}>
           {gi > 0 && <div className="menu-sep" role="separator" />}
           {g.map((it) => (
-            <button key={it.label} type="button" role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={it.checked} className={`menu-item${it.danger ? ' is-danger' : ''}`} onClick={() => { setState({ contextMenu: null }); it.run(); }}>
+            <button
+              key={it.label}
+              type="button"
+              role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+              aria-checked={it.checked}
+              className={`menu-item${it.danger ? ' is-danger' : ''}`}
+              onClick={() => {
+                setState({ contextMenu: null });
+                it.run();
+              }}
+            >
               {/* As in the system menus: once any item can carry a tick, all texts start at the same edge. */}
-              {(it.checked !== undefined || anyCheck) && <span className="menu-check" aria-hidden="true">{it.checked ? <Check size={13} strokeWidth={2.2} /> : null}</span>}
+              {(it.checked !== undefined || anyCheck) && (
+                <span className="menu-check" aria-hidden="true">
+                  {it.checked ? <Check size={13} strokeWidth={2.2} /> : null}
+                </span>
+              )}
               {it.dot && <span className="tag-dot menu-tag-dot" style={{ background: it.dot }} aria-hidden="true" />}
               <span className="flex-1">{menuText(it.label)}</span>
               {it.key && <span className="menu-key">{it.key}</span>}

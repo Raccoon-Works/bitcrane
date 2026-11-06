@@ -159,7 +159,12 @@ pub fn parse_transmit(text: &str) -> Vec<ImportedServer> {
             c if c.contains("DAV") => ("webdav", false, if c.ends_with('S') { 443 } else { 80 }),
             _ => continue,
         };
-        let port = v.get("port").and_then(|x| x.as_u64()).filter(|p| *p > 0 && *p <= 65535).map(|p| p as u16).unwrap_or(default_port);
+        let port = v
+            .get("port")
+            .and_then(|x| x.as_u64())
+            .filter(|p| *p > 0 && *p <= 65535)
+            .map(|p| p as u16)
+            .unwrap_or(default_port);
         let name = get("name");
         out.push(ImportedServer {
             source: "Transmit".into(),
@@ -211,7 +216,14 @@ fn cyberduck_dirs() -> Vec<PathBuf> {
         v.push(Path::new(&appdata).join("Cyberduck").join("Bookmarks"));
     }
     let lib = home().join("Library");
-    v.push(lib.join("Group Containers").join("G69SCX94XU.duck").join("Library").join("Application Support").join("duck").join("Bookmarks"));
+    v.push(
+        lib.join("Group Containers")
+            .join("G69SCX94XU.duck")
+            .join("Library")
+            .join("Application Support")
+            .join("duck")
+            .join("Bookmarks"),
+    );
     v.push(lib.join("Application Support").join("Cyberduck").join("Bookmarks"));
     v
 }
@@ -237,7 +249,12 @@ pub fn parse_cyberduck(text: &str) -> Vec<ImportedServer> {
         let key = k.text().unwrap_or("").to_string();
         if v.has_tag_name("array") {
             if key == "Labels" {
-                labels = v.children().filter(|c| c.has_tag_name("string")).filter_map(|c| c.text()).map(|t| t.trim().to_string()).collect();
+                labels = v
+                    .children()
+                    .filter(|c| c.has_tag_name("string"))
+                    .filter_map(|c| c.text())
+                    .map(|t| t.trim().to_string())
+                    .collect();
             }
         } else {
             string.insert(key, v.text().unwrap_or("").trim().to_string());
@@ -265,7 +282,13 @@ pub fn parse_cyberduck(text: &str) -> Vec<ImportedServer> {
         user: get("Username"),
         protocol: protocol.into(),
         implicit_tls,
-        auth: if protocol != "sftp" { "password".into() } else if key.is_empty() { "agent".into() } else { "key".into() },
+        auth: if protocol != "sftp" {
+            "password".into()
+        } else if key.is_empty() {
+            "agent".into()
+        } else {
+            "key".into()
+        },
         key_path: (!key.is_empty()).then(|| to_ui(Path::new(&key))),
         remote_dir: Some(get("Path")).filter(|p| !p.is_empty()),
         local_dir: None,
@@ -288,7 +311,9 @@ fn read_putty() -> Option<Vec<ImportedServer>> {
         let Ok(key) = sessions.open_subkey(&raw) else { continue };
         let s = |v: &str| key.get_value::<String, _>(v).unwrap_or_default();
         let port = key.get_value::<u32, _>("PortNumber").unwrap_or(22);
-        if let Some(server) = putty_session(&raw, &s("Protocol"), &s("HostName"), port, &s("UserName"), &s("PublicKeyFile")) {
+        if let Some(server) =
+            putty_session(&raw, &s("Protocol"), &s("HostName"), port, &s("UserName"), &s("PublicKeyFile"))
+        {
             out.push(server);
         }
     }
@@ -302,7 +327,14 @@ fn read_putty() -> Option<Vec<ImportedServer>> {
 
 /// One PuTTY session; the registry key name is percent-encoded ("My%20Server").
 #[cfg_attr(not(windows), allow(dead_code))]
-pub fn putty_session(raw_name: &str, protocol: &str, host: &str, port: u32, user: &str, key_file: &str) -> Option<ImportedServer> {
+pub fn putty_session(
+    raw_name: &str,
+    protocol: &str,
+    host: &str,
+    port: u32,
+    user: &str,
+    key_file: &str,
+) -> Option<ImportedServer> {
     let name = percent_decode(raw_name);
     if name == "Default Settings" || !protocol.eq_ignore_ascii_case("ssh") {
         return None;
@@ -411,7 +443,9 @@ pub fn parse_filezilla(text: &str) -> Vec<ImportedServer> {
     let Ok(doc) = roxmltree::Document::parse(text) else { return Vec::new() };
     let mut out = Vec::new();
     for server in doc.descendants().filter(|n| n.has_tag_name("Server")) {
-        let child = |name: &str| server.children().find(|c| c.has_tag_name(name)).and_then(|c| c.text()).unwrap_or("").trim().to_string();
+        let child = |name: &str| {
+            server.children().find(|c| c.has_tag_name(name)).and_then(|c| c.text()).unwrap_or("").trim().to_string()
+        };
         let host = child("Host");
         if host.is_empty() {
             continue;
@@ -430,7 +464,11 @@ pub fn parse_filezilla(text: &str) -> Vec<ImportedServer> {
             .filter_map(|f| f.children().find(|c| c.is_text()).and_then(|t| t.text()).map(|t| t.trim().to_string()))
             .filter(|t| !t.is_empty())
             .collect();
-        let name = server.children().find(|c| c.has_tag_name("Name")).and_then(|c| c.text()).map(str::to_string)
+        let name = server
+            .children()
+            .find(|c| c.has_tag_name("Name"))
+            .and_then(|c| c.text())
+            .map(str::to_string)
             .or_else(|| server.children().find(|c| c.is_text()).and_then(|c| c.text()).map(|t| t.trim().to_string()))
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| host.clone());
@@ -438,12 +476,24 @@ pub fn parse_filezilla(text: &str) -> Vec<ImportedServer> {
             source: "FileZilla".into(),
             name,
             group: groups.into_iter().rev().collect::<Vec<_>>().join(" / "),
-            port: child("Port").parse().unwrap_or(if protocol == "sftp" { 22 } else if implicit_tls { 990 } else { 21 }),
+            port: child("Port").parse().unwrap_or(if protocol == "sftp" {
+                22
+            } else if implicit_tls {
+                990
+            } else {
+                21
+            }),
             host,
             user: child("User"),
             protocol: protocol.into(),
             implicit_tls,
-            auth: if !key.is_empty() { "key".into() } else if child("Logontype") == "5" { "agent".into() } else { "password".into() },
+            auth: if !key.is_empty() {
+                "key".into()
+            } else if child("Logontype") == "5" {
+                "agent".into()
+            } else {
+                "password".into()
+            },
             key_path: (!key.is_empty()).then(|| to_ui(Path::new(&key))),
             remote_dir: decode_filezilla_dir(&child("RemoteDir")).filter(|d| d != "/"),
             local_dir: Some(child("LocalDir")).filter(|d| !d.is_empty()).map(|d| to_ui(Path::new(&d))),
@@ -462,7 +512,8 @@ fn unescape(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Some(v) = std::str::from_utf8(&bytes[i + 1..i + 3]).ok().and_then(|h| u8::from_str_radix(h, 16).ok()) {
+            if let Some(v) = std::str::from_utf8(&bytes[i + 1..i + 3]).ok().and_then(|h| u8::from_str_radix(h, 16).ok())
+            {
                 out.push(v);
                 i += 3;
                 continue;
@@ -496,7 +547,23 @@ fn winscp_session(key: &str, get: &dyn Fn(&str) -> Option<String>) -> Option<Imp
         _ => ("sftp", false),
     };
     let key_file = get("PublicKeyFile").map(|v| unescape(&v)).filter(|v| !v.is_empty());
-    let default_port = match protocol { "sftp" => 22, "webdav" => if ftps > 0 { 443 } else { 80 }, _ => if implicit_tls { 990 } else { 21 } };
+    let default_port = match protocol {
+        "sftp" => 22,
+        "webdav" => {
+            if ftps > 0 {
+                443
+            } else {
+                80
+            }
+        }
+        _ => {
+            if implicit_tls {
+                990
+            } else {
+                21
+            }
+        }
+    };
     Some(ImportedServer {
         source: "WinSCP".into(),
         name,
@@ -506,7 +573,13 @@ fn winscp_session(key: &str, get: &dyn Fn(&str) -> Option<String>) -> Option<Imp
         user: get("UserName").map(|v| unescape(&v)).unwrap_or_default(),
         protocol: protocol.into(),
         implicit_tls,
-        auth: if key_file.is_some() { "key".into() } else if protocol == "sftp" { "agent".into() } else { "password".into() },
+        auth: if key_file.is_some() {
+            "key".into()
+        } else if protocol == "sftp" {
+            "agent".into()
+        } else {
+            "password".into()
+        },
         key_path: key_file.map(|k| to_ui(Path::new(&k))),
         remote_dir: get("RemoteDirectory").map(|v| unescape(&v)).filter(|v| !v.is_empty()),
         local_dir: get("LocalDirectory").map(|v| to_ui(Path::new(&unescape(&v)))).filter(|v| !v.is_empty()),
@@ -544,12 +617,16 @@ fn read_winscp() -> Option<Vec<ImportedServer>> {
     {
         use winreg::enums::HKEY_CURRENT_USER;
         use winreg::RegKey;
-        if let Ok(sessions) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Martin Prikryl\WinSCP 2\Sessions") {
+        if let Ok(sessions) =
+            RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Martin Prikryl\WinSCP 2\Sessions")
+        {
             let mut out = Vec::new();
             for name in sessions.enum_keys().flatten() {
                 let Ok(key) = sessions.open_subkey(&name) else { continue };
                 let get = |v: &str| -> Option<String> {
-                    key.get_value::<String, _>(v).ok().or_else(|| key.get_value::<u32, _>(v).ok().map(|n| n.to_string()))
+                    key.get_value::<String, _>(v)
+                        .ok()
+                        .or_else(|| key.get_value::<u32, _>(v).ok().map(|n| n.to_string()))
                 };
                 if let Some(s) = winscp_session(&name, &get) {
                     out.push(s);
@@ -586,7 +663,10 @@ mod tests {
         let s = parse_transmit(json);
         assert_eq!(s.len(), 3);
         assert_eq!((s[0].name.as_str(), s[0].protocol.as_str(), s[0].port), ("Plain", "ftp", 2121));
-        assert_eq!((s[1].protocol.as_str(), s[1].port, s[1].local_dir.as_deref()), ("ftps", 21, Some("/Users/x/Downloads")));
+        assert_eq!(
+            (s[1].protocol.as_str(), s[1].port, s[1].local_dir.as_deref()),
+            ("ftps", 21, Some("/Users/x/Downloads"))
+        );
         assert_eq!((s[2].name.as_str(), s[2].protocol.as_str(), s[2].port), ("sftp.example", "sftp", 22));
         assert!(s.iter().all(|x| x.source == "Transmit"));
     }
@@ -606,13 +686,18 @@ mod tests {
 </dict></plist>"#;
         let s = parse_cyberduck(xml);
         assert_eq!(s.len(), 1);
-        assert_eq!((s[0].name.as_str(), s[0].host.as_str(), s[0].port, s[0].user.as_str()), ("Web", "web.example", 2222, "deploy"));
+        assert_eq!(
+            (s[0].name.as_str(), s[0].host.as_str(), s[0].port, s[0].user.as_str()),
+            ("Web", "web.example", 2222, "deploy")
+        );
         assert_eq!(s[0].group, "Kunden");
         assert_eq!(s[0].remote_dir.as_deref(), Some("/var/www"));
         assert_eq!(s[0].auth, "agent");
         let s3 = xml.replace("<string>sftp</string>", "<string>s3</string>");
         assert!(parse_cyberduck(&s3).is_empty());
-        let dav = xml.replace("<string>sftp</string>", "<string>davs</string>").replace("<key>Port</key><string>2222</string>", "");
+        let dav = xml
+            .replace("<string>sftp</string>", "<string>davs</string>")
+            .replace("<key>Port</key><string>2222</string>", "");
         let d = parse_cyberduck(&dav);
         assert_eq!((d[0].protocol.as_str(), d[0].port), ("webdav", 443));
     }
@@ -620,7 +705,10 @@ mod tests {
     #[test]
     fn putty_sessions() {
         let s = putty_session("My%20Bot", "ssh", "admin@bot.example", 2200, "", "").unwrap();
-        assert_eq!((s.name.as_str(), s.host.as_str(), s.user.as_str(), s.port), ("My Bot", "bot.example", "admin", 2200));
+        assert_eq!(
+            (s.name.as_str(), s.host.as_str(), s.user.as_str(), s.port),
+            ("My Bot", "bot.example", "admin", 2200)
+        );
         assert!(putty_session("Default%20Settings", "ssh", "x", 22, "", "").is_none());
         assert!(putty_session("Telnet", "telnet", "x", 23, "", "").is_none());
         let u = putty_session("Web", "ssh", "web.example", 22, "deploy", "C:\\k.ppk").unwrap();

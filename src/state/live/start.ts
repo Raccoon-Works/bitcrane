@@ -23,8 +23,19 @@ export function startLive() {
   if (started) return;
   started = true;
   // Questions of a server during login (one-time code etc.) open a dialog.
-  void listen<{ id: string; serverId: string; host: string; name: string; instructions: string; prompts: Array<{ text: string; echo: boolean }> }>('auth-prompt', (e) => {
-    addLog('info', $t('Der Server fragt: {0}', e.payload.prompts.map((p) => p.text.trim()).join(' / ')), e.payload.serverId || undefined);
+  void listen<{
+    id: string;
+    serverId: string;
+    host: string;
+    name: string;
+    instructions: string;
+    prompts: Array<{ text: string; echo: boolean }>;
+  }>('auth-prompt', (e) => {
+    addLog(
+      'info',
+      $t('Der Server fragt: {0}', e.payload.prompts.map((p) => p.text.trim()).join(' / ')),
+      e.payload.serverId || undefined,
+    );
     openDialog({ type: 'authPrompt', ...e.payload });
   });
   subscribeStore(() => {
@@ -36,8 +47,18 @@ export function startLive() {
     if (p && p.transfers !== s.transfers) discardRemoved(p.transfers, s.transfers);
     if (!p || p.transfers !== s.transfers || p.settings.parallel !== s.settings.parallel) pump();
     if (!p || p.watches !== s.watches) reconcileWatches(s);
-    if (!p || p.servers !== s.servers || p.watches !== s.watches || p.settings !== s.settings || p.toolbar !== s.toolbar
-      || p.toolbarLabels !== s.toolbarLabels || p.tabs !== s.tabs || p.activeTabId !== s.activeTabId || p.transfers !== s.transfers) scheduleSave(s);
+    if (
+      !p ||
+      p.servers !== s.servers ||
+      p.watches !== s.watches ||
+      p.settings !== s.settings ||
+      p.toolbar !== s.toolbar ||
+      p.toolbarLabels !== s.toolbarLabels ||
+      p.tabs !== s.tabs ||
+      p.activeTabId !== s.activeTabId ||
+      p.transfers !== s.transfers
+    )
+      scheduleSave(s);
   });
   window.setInterval(() => {
     const now = Date.now();
@@ -52,7 +73,8 @@ export function startLive() {
     let awake = false;
     subscribeStore(() => {
       const s = getState();
-      const busy = s.settings.keepAwake !== false && s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
+      const busy =
+        s.settings.keepAwake !== false && s.transfers.some((t) => t.state === 'running' || t.state === 'queued');
       if (busy !== awake) {
         awake = busy;
         void invoke('keep_awake', { on: busy }).catch(() => undefined);
