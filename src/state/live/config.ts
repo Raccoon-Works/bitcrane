@@ -8,6 +8,7 @@ import type { AppState, SavedTab } from '../appState';
 import { oldDefaultToolbars } from '../defaults';
 import { savedTabs, tabsFromSaved } from '../tools';
 import { $t, LANG, rememberLanguage } from '../../i18n';
+import { parseQuickAddress } from '../../util/serverAddress';
 import { updateSettings } from '../settings';
 import { openDialog } from '../panels';
 import { toBackendError } from '../../backend/api';
@@ -294,55 +295,22 @@ export async function quickConnect(
   save: boolean,
   auth: 'auto' | 'key' | 'password',
 ): Promise<Server | null> {
-  // Optional scheme: sftp:// (default), ftp://, ftps://, ftpes:// (explicit TLS), webdav:// / davs://, smb://.
-  const scheme =
-    address
-      .trim()
-      .match(/^([a-z]+):\/\//i)?.[1]
-      ?.toLowerCase() ?? 'sftp';
-  const protocol: Server['protocol'] =
-    scheme === 'ftp'
-      ? 'ftp'
-      : scheme === 'ftps' || scheme === 'ftpes'
-        ? 'ftps'
-        : scheme === 'webdav' || scheme === 'davs' || scheme === 'dav'
-          ? 'webdav'
-          : scheme === 'smb'
-            ? 'smb'
-            : 'sftp';
-  const m = address
-    .trim()
-    .replace(/^[a-z]+:\/\//i, '')
-    .match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
-  if (!m) {
+  const a = parseQuickAddress(address);
+  if (!a) {
     showToast($t('Adresse nicht erkannt. Beispiele: ubuntu@server.example:22, ftp://web@host.example'), 'error');
     return null;
   }
-  const [, userPart, hostPart, portPart, path] = m;
-  let host = hostPart;
-  let user = userPart ?? '';
-  const defaultPort =
-    protocol === 'ftp'
-      ? 21
-      : protocol === 'ftps'
-        ? scheme === 'ftps'
-          ? 990
-          : 21
-        : protocol === 'webdav'
-          ? scheme === 'dav'
-            ? 80
-            : 443
-          : protocol === 'smb'
-            ? 445
-            : 22;
-  let port = portPart ? Number(portPart) : defaultPort;
+  const { scheme, protocol, path } = a;
+  let host = a.host;
+  let user = a.user ?? '';
+  let port = a.port ?? a.defaultPort;
   let keyPath = '~/.ssh/id_ed25519';
   let method: Server['auth'] = auth === 'password' ? 'password' : auth === 'key' ? 'key' : 'auto';
   if (protocol !== 'sftp') {
     return {
       id: uid('srv'),
-      name: hostPart,
-      mono: hostPart.slice(0, 2).toUpperCase(),
+      name: a.host,
+      mono: a.host.slice(0, 2).toUpperCase(),
       color: 'gray',
       host,
       port,
@@ -362,11 +330,11 @@ export async function quickConnect(
     };
   }
   if (getState().settings.readSshConfig) {
-    const alias = (await backend.sshConfigHosts()).find((h) => h.alias === hostPart);
+    const alias = (await backend.sshConfigHosts()).find((h) => h.alias === a.host);
     if (alias) {
       host = alias.host;
-      user = userPart ?? alias.user;
-      port = portPart ? port : alias.port;
+      user = a.user ?? alias.user;
+      port = a.port ?? alias.port;
       if (alias.identityFile) {
         keyPath = alias.identityFile;
         if (auth === 'auto') method = 'key';
@@ -379,8 +347,8 @@ export async function quickConnect(
   }
   return {
     id: uid('srv'),
-    name: hostPart,
-    mono: hostPart.slice(0, 2).toUpperCase(),
+    name: a.host,
+    mono: a.host.slice(0, 2).toUpperCase(),
     color: 'gray',
     host,
     port,

@@ -146,7 +146,7 @@ function uploadEdited(localPath: string) {
         },
       ]);
     })
-    .catch(() => undefined);
+    .catch((e) => showError(e, { serverId: s.serverId }));
 }
 
 /** After an edited file went up: remember the new server time for the next save. */

@@ -335,7 +335,7 @@ pub fn putty_session(
     user: &str,
     key_file: &str,
 ) -> Option<ImportedServer> {
-    let name = percent_decode(raw_name);
+    let name = percent_encoding::percent_decode_str(raw_name).decode_utf8_lossy().into_owned();
     if name == "Default Settings" || !protocol.eq_ignore_ascii_case("ssh") {
         return None;
     }
@@ -363,25 +363,6 @@ pub fn putty_session(
         local_dir: None,
         jump: None,
     })
-}
-
-#[cfg(any(windows, test))]
-fn percent_decode(s: &str) -> String {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        if b[i] == b'%' && i + 2 < b.len() {
-            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(v);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(b[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /* ---------------------------------------------------------------------- Tabby */
@@ -713,6 +694,15 @@ mod tests {
         assert!(putty_session("Telnet", "telnet", "x", 23, "", "").is_none());
         let u = putty_session("Web", "ssh", "web.example", 22, "deploy", "C:\\k.ppk").unwrap();
         assert_eq!((u.user.as_str(), u.auth.as_str()), ("deploy", "key"));
+    }
+
+    #[test]
+    fn putty_session_names_are_percent_decoded() {
+        let name = |raw: &str| putty_session(raw, "ssh", "x", 22, "", "").unwrap().name;
+        // UTF-8 sequences, an escape at the very end and malformed escapes (kept as they are).
+        assert_eq!(name("B%C3%BCro%20Server"), "Büro Server");
+        assert_eq!(name("Web%2F1%20"), "Web/1 ");
+        assert_eq!(name("100%25%zz%"), "100%%zz%");
     }
 
     #[test]

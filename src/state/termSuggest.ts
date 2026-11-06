@@ -56,7 +56,7 @@ function persist() {
 const keyFor = (serverId: string) => serverId || 'local';
 
 /** Remembers a command as the newest of its server (an older copy moves up). */
-function rememberCommand(serverId: string, line: string) {
+export function rememberCommand(serverId: string, line: string) {
   if (!line.trim() || line.startsWith(' ')) return;
   const h = load();
   const k = keyFor(serverId);
@@ -99,7 +99,7 @@ function lastToken(input: string): { token: string; start: number } {
 }
 
 /** Whether the word being typed is probably a file or folder. */
-function wantsPath(input: string): boolean {
+export function wantsPath(input: string): boolean {
   const { token, start } = lastToken(input);
   if (/^(~|\.{1,2}|\/)/.test(token) || token.includes('/')) return true;
   if (start === 0) return false;
@@ -109,7 +109,12 @@ function wantsPath(input: string): boolean {
 }
 
 /** Candidates for the typed line, best first. `names` lists the folder of the word being typed. */
-function candidatesFor(serverId: string, input: string, snippets: Snippet[], names: string[] | null): Candidate[] {
+export function candidatesFor(
+  serverId: string,
+  input: string,
+  snippets: Snippet[],
+  names: string[] | null,
+): Candidate[] {
   if (!input.trim()) return [];
   const out: Candidate[] = [];
   const seen = new Set<string>([input]);

@@ -23,6 +23,7 @@ import { openServer } from './tabs';
 import { openDialog } from './panels';
 import { updateSettings } from './settings';
 import { closePaneServer, simulateLocalChange } from './watches';
+import { normalizeSshAddress, splitAddress } from '../util/serverAddress';
 
 export function saveServer(server: Server, connect: boolean) {
   const exists = getState().servers.some((x) => x.id === server.id);
@@ -212,29 +213,6 @@ function fakeFingerprint(host: string): string {
 }
 
 /**
- * Accepts what people type in a terminal as well: "ssh user@host",
- * "ssh -p 2222 user@host" and ssh:// become the usual user@host:port.
- */
-function normalizeSshAddress(address: string): string {
-  let a = address.trim().replace(/^ssh:\/\//i, '');
-  const cmd = a.match(/^ssh\s+(.*)$/i);
-  if (!cmd) return a;
-  let port = '';
-  const words: string[] = [];
-  const parts = cmd[1].trim().split(/\s+/);
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === '-p' && parts[i + 1]) port = parts[++i];
-    else if (/^-p\d+$/.test(parts[i])) port = parts[i].slice(2);
-    else if (parts[i] === '-l' && parts[i + 1]) words.unshift(`${parts[++i]}@`);
-    // Options with a value (key file, jump host, -o …): skipped together with it.
-    else if (/^-[bcDEeFIiJLlmOoQRSWw]$/.test(parts[i])) i++;
-    else if (!parts[i].startsWith('-')) words.push(parts[i]);
-  }
-  a = words.join('');
-  return port && !/:\d+(\/|$)/.test(a) ? `${a}:${port}` : a;
-}
-
-/**
  * "Schnell verbinden" with "sftp://user@host:port" from the quick-connect field. A password typed
  * into the form is used for this connection; it is kept in the system keychain only when the
  * server is saved ("Zu Servern hinzufügen").
@@ -268,22 +246,19 @@ export function quickConnect(
     });
     return;
   }
-  const m = address
-    .trim()
-    .replace(/^sftp:\/\//, '')
-    .match(/^(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/);
-  if (!m) {
+  const parts = splitAddress(address.trim().replace(/^sftp:\/\//, ''));
+  if (!parts) {
     showToast($t('Adresse nicht erkannt. Beispiel: ubuntu@server.example:22'), 'error');
     return;
   }
-  const [, user = 'ubuntu', host, port = '22', path] = m;
+  const { user = 'ubuntu', host, port = 22, path } = parts;
   const server: Server = {
     ...newServerTemplate(),
     name: host,
     mono: host.slice(0, 2).toUpperCase(),
     host,
     user,
-    port: Number(port),
+    port,
     color: 'gray',
     remoteStart: path || `/home/${user}`,
     temporary: !save,
