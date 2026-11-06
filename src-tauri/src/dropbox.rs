@@ -76,17 +76,7 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
     let mtime = parse_time(
         v.get("client_modified").and_then(|t| t.as_str()).or_else(|| v.get("server_modified").and_then(|t| t.as_str())),
     );
-    Some(FileEntry {
-        name,
-        kind: if dir { "dir".into() } else { "file".into() },
-        size: if dir { 0 } else { v.get("size").and_then(|s| s.as_u64()).unwrap_or(0) },
-        mtime,
-        perms: if dir { "755".into() } else { "644".into() },
-        owner: String::new(),
-        group: String::new(),
-        link: None,
-        hidden: 0,
-    })
+    Some(FileEntry::plain(name, dir, v.get("size").and_then(|s| s.as_u64()).unwrap_or(0), mtime))
 }
 
 /// Turns an API error answer into a clear message.

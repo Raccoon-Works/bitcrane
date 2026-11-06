@@ -26,6 +26,24 @@ pub struct FileEntry {
     pub hidden: u8,
 }
 
+impl FileEntry {
+    /// An entry of a service without owners and permission bits (cloud storage, S3):
+    /// folders show as 755 and without a size, files as 644.
+    pub fn plain(name: String, dir: bool, size: u64, mtime: i64) -> Self {
+        FileEntry {
+            name,
+            kind: if dir { "dir".into() } else { "file".into() },
+            size: if dir { 0 } else { size },
+            mtime,
+            perms: if dir { "755".into() } else { "644".into() },
+            owner: String::new(),
+            group: String::new(),
+            link: None,
+            hidden: 0,
+        }
+    }
+}
+
 fn is_zero(v: &u8) -> bool {
     *v == 0
 }
