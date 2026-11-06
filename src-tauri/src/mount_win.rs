@@ -14,7 +14,7 @@
 //! `mount:<server id>`, opened by the interface (which has the passwords).
 //! When it is missing, the interface is asked to connect again.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult};
 use crate::paths::{remote_name, sync_root_to_remote as to_remote};
 use crate::remote::Remote;
 use cloud_filter::error::{CResult, CloudErrorKind};

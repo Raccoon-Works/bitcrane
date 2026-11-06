@@ -593,12 +593,12 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
 
 impl Session {
     /// Starts SFTP on the session. Without SFTP on the server, the session
-    /// comes back with the error, so it can still be used another way.
-    pub async fn into_sftp(self) -> Result<Connection, (Session, AppError)> {
+    /// comes back with the error (boxed: a session is large), so it can still be used another way.
+    pub async fn into_sftp(self) -> Result<Connection, (Box<Session>, AppError)> {
         let no_sftp = |e: String| AppError::other("Der Server bietet kein SFTP an.").with_detail(e);
         let channel = match self.handle.channel_open_session().await {
             Ok(c) => c,
-            Err(e) => return Err((self, AppError::from(e))),
+            Err(e) => return Err((Box::new(self), AppError::from(e))),
         };
         // An own SFTP command (sudo) runs as a command; otherwise the server's "sftp" subsystem.
         let custom = self.sftp_command.clone();
@@ -607,7 +607,7 @@ impl Session {
             None => channel.request_subsystem(true, "sftp").await,
         };
         if let Err(e) = started {
-            return Err((self, no_sftp(e.to_string())));
+            return Err((Box::new(self), no_sftp(e.to_string())));
         }
         let sftp = match SftpSession::new(channel.into_stream()).await {
             Ok(s) => s,
@@ -617,7 +617,7 @@ impl Session {
                     Some(cmd) => AppError::other("Der eigene SFTP-Befehl hat nicht als SFTP-Server geantwortet. Bei sudo muss der Benutzer ihn ohne Passwort ausführen dürfen (NOPASSWD in sudoers).").with_detail(format!("{cmd}: {e}")),
                     None => no_sftp(e.to_string()),
                 };
-                return Err((self, err));
+                return Err((Box::new(self), err));
             }
         };
         sftp.set_timeout(30);

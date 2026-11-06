@@ -278,24 +278,25 @@ pub fn parse_cyberduck(text: &str) -> Vec<ImportedServer> {
 
 /// PuTTY's saved sessions (Windows registry): SSH sessions only, with their
 /// .ppk key file (Bitcrane reads PuTTY keys, see keys.rs).
+#[cfg(windows)]
 fn read_putty() -> Option<Vec<ImportedServer>> {
-    #[cfg(windows)]
-    {
-        use winreg::enums::HKEY_CURRENT_USER;
-        use winreg::RegKey;
-        let sessions = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\SimonTatham\PuTTY\Sessions").ok()?;
-        let mut out = Vec::new();
-        for raw in sessions.enum_keys().flatten() {
-            let Ok(key) = sessions.open_subkey(&raw) else { continue };
-            let s = |v: &str| key.get_value::<String, _>(v).unwrap_or_default();
-            let port = key.get_value::<u32, _>("PortNumber").unwrap_or(22);
-            if let Some(server) = putty_session(&raw, &s("Protocol"), &s("HostName"), port, &s("UserName"), &s("PublicKeyFile")) {
-                out.push(server);
-            }
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let sessions = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\SimonTatham\PuTTY\Sessions").ok()?;
+    let mut out = Vec::new();
+    for raw in sessions.enum_keys().flatten() {
+        let Ok(key) = sessions.open_subkey(&raw) else { continue };
+        let s = |v: &str| key.get_value::<String, _>(v).unwrap_or_default();
+        let port = key.get_value::<u32, _>("PortNumber").unwrap_or(22);
+        if let Some(server) = putty_session(&raw, &s("Protocol"), &s("HostName"), port, &s("UserName"), &s("PublicKeyFile")) {
+            out.push(server);
         }
-        return Some(out);
     }
-    #[cfg(not(windows))]
+    Some(out)
+}
+
+#[cfg(not(windows))]
+fn read_putty() -> Option<Vec<ImportedServer>> {
     None
 }
 
