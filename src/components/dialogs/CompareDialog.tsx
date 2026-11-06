@@ -33,7 +33,7 @@ import {
   LIVE,
   paneLoc,
   ruleFor,
-  runSync,
+  applySyncActions,
   serverById,
   showToast,
   uid,
@@ -207,7 +207,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
       else n.add(rel);
       return n;
     });
-  const run = () => runSync(actionsOf(chosen));
+  const run = () => applySyncActions(actionsOf(chosen));
 
   const saveFavorite = () => {
     if (!tab || !favName?.trim()) return;

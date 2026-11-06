@@ -11,7 +11,7 @@ import { addLog } from './log';
 import { getState, LIVE, serverById, setState, showToast } from './store';
 
 /** Short description, e.g. "localhost:5433 → db:5432" or "SOCKS localhost:1080". */
-export function describeForward(f: PortForward): string {
+function describeForward(f: PortForward): string {
   const bind = `${f.bindHost === '127.0.0.1' ? 'localhost' : f.bindHost}:${f.bindPort}`;
   if (f.kind === 'dynamic') return `SOCKS ${bind}`;
   const dest = `${f.destHost}:${f.destPort}`;
@@ -20,7 +20,7 @@ export function describeForward(f: PortForward): string {
 
 export async function refreshForwards() {
   if (!LIVE) return;
-  const ids = await backend.forwardActive().catch(() => []);
+  const ids = await backend.forwardActive();
   setState({ tunnels: ids });
 }
 
@@ -52,7 +52,7 @@ export async function startForward(serverId: string, f: PortForward): Promise<bo
 }
 
 export async function stopForward(f: PortForward) {
-  if (LIVE) await backend.forwardStop(f.id).catch(() => undefined);
+  if (LIVE) await backend.forwardStop(f.id);
   setState((s) => ({ tunnels: s.tunnels.filter((x) => x !== f.id) }));
   await refreshForwards();
 }

@@ -97,6 +97,7 @@ export function serverTrash(serverId: string): string | undefined {
 
 /** Moves entries into the server's recycle bin; a name already there gets the date and time added. */
 async function trashOnServer(serverId: string, dir: string, names: string[], trash: string) {
+  // Usually the bin exists already; any real problem shows in the moves that follow.
   await backend.remoteMkdir(serverId, trash).catch(() => undefined);
   const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-');
   for (const n of names) {
@@ -211,7 +212,6 @@ export async function moveInto(
   return ok;
 }
 
-/** Copies on this computer. */
 /** Moves files or folders between two folders of this computer (two local halves). */
 export async function moveLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
@@ -237,6 +237,7 @@ export async function moveLocal(fromDir: string, names: string[], toDir: string,
   return ok ? made : null;
 }
 
+/** Copies on this computer. */
 export async function copyLocal(fromDir: string, names: string[], toDir: string, merge = false) {
   let made: string[] = [];
   const ok = await run(

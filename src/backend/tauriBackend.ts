@@ -52,7 +52,7 @@ export const tauriBackend: Backend = {
   forwardStop: (id) => invoke('forward_stop', { id }),
   authPromptAnswer: (id, answers) => invoke('auth_prompt_answer', { id, answers }),
 
-  appInfo: () => invoke('app_info'),
+  appVersion: () => invoke('app_version'),
   cliPath: () => invoke('cli_path'),
   startInfo: () => invoke('start_info'),
   startDecided: () => invoke('start_decided'),
@@ -62,7 +62,6 @@ export const tauriBackend: Backend = {
   shellIntegrationSet: (enable, label) => invoke('shell_integration_set', { enable, label }),
   macFullDiskAccess: () => invoke('mac_full_disk_access'),
   openMacSettings: (page) => invoke('open_mac_settings', { page }),
-  openFullDiskAccess: () => invoke('open_full_disk_access'),
 
   localList: (path) => invoke<FileEntry[]>('local_list', { path }),
   localStat: (path) => invoke<FileEntry>('local_stat', { path }),

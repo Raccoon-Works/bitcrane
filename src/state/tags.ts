@@ -27,9 +27,9 @@ export const tagCss = (color: number) => TAG_COLORS.find((c) => c.color === colo
 const cache = new Map<string, Record<string, Tag[]>>();
 const listeners = new Set<() => void>();
 
-export async function refreshTags(dir: string) {
+async function refreshTags(dir: string) {
   if (!LIVE || !dir) return;
-  const t = await backend.localTags(dir).catch(() => ({}));
+  const t = await backend.localTags(dir);
   cache.set(dir, t);
   listeners.forEach((l) => l());
 }

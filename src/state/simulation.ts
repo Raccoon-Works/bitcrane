@@ -16,20 +16,20 @@ import {
   emptyTab,
   setState,
   initialState,
-  state,
   subscribeStore,
   showToast,
   uid,
   activeTab,
   openServerIn,
   LIVE,
+  getState,
 } from './core';
 import { detectTheme } from './defaults';
 import { sampleServers } from './demoData';
 import { openDialog } from './panels';
 import { offerCloudPlaces } from './places';
 import { forced } from './transfers';
-import { pendingCommand, simulateLocalChange } from './watches';
+import { pendingDemoCommand, simulateLocalChange } from './watches';
 
 /** Version shown by the prototype (About, Settings): the one the screenshots stand for. */
 export const PROTOTYPE_VERSION = '0.3.0';
@@ -40,8 +40,8 @@ export function showFirstRun() {
   const tab = emptyTab('~');
   setState({
     ...initialState(),
-    platform: state.platform,
-    theme: state.theme,
+    platform: getState().platform,
+    theme: getState().theme,
     servers: [],
     tabs: [tab],
     watches: [],
@@ -52,7 +52,7 @@ export function showFirstRun() {
   window.setTimeout(() => {
     openDialog({ type: 'import', firstStart: true });
     const stop = subscribeStore(() => {
-      if (state.dialog?.type !== 'import') {
+      if (getState().dialog?.type !== 'import') {
         stop();
         void offerCloudPlaces(false);
       }
@@ -65,8 +65,8 @@ export function showFirstRun() {
 export function resetPrototype() {
   fs.resetAll();
   forced.clear();
-  pendingCommand.clear();
-  setState({ ...initialState(), platform: state.platform, theme: state.theme });
+  pendingDemoCommand.clear();
+  setState({ ...initialState(), platform: getState().platform, theme: getState().theme });
   showToast($t('Beispieldaten wiederhergestellt.'));
 }
 
@@ -86,7 +86,11 @@ export function importServers(list: ImportedServer[]) {
   // Same server = same protocol, user, host, port and key file (two entries with different keys are kept).
   const keyOf = (x: { host: string; port: number; user: string; protocol?: string; keyPath?: string; auth?: string }) =>
     `${x.protocol ?? 'sftp'}|${x.user.toLowerCase()}@${x.host.toLowerCase()}:${x.port}|${x.auth === 'key' ? (x.keyPath ?? '') : ''}`;
-  const seen = new Set(state.servers.filter((x) => !x.temporary).map(keyOf));
+  const seen = new Set(
+    getState()
+      .servers.filter((x) => !x.temporary)
+      .map(keyOf),
+  );
   list = list.filter((s) => {
     const k = keyOf(s);
     if (seen.has(k)) return false;
@@ -118,14 +122,15 @@ export function importServers(list: ImportedServer[]) {
     ...(s.protocol === 'webdav' ? { davHttps: s.port !== 80 } : {}),
   }));
   // ProxyJump names refer to other entries of the SSH configuration.
-  const all = [...state.servers, ...created];
+  const all = [...getState().servers, ...created];
   list.forEach((s, i) => {
     if (!s.jump) return;
     const j = all.find((x) => x.name === s.jump || x.host === s.jump);
     if (j && j.id !== created[i].id) created[i].jumpServerId = j.id;
   });
   // Offered on the first start: the servers only go into the list; connecting stays the user's choice.
-  const firstStart = state.dialog?.type === 'import' && !!state.dialog.firstStart;
+  const dialog = getState().dialog;
+  const firstStart = dialog?.type === 'import' && !!dialog.firstStart;
   setState((st) => ({ servers: [...st.servers, ...created], dialog: null, firstRun: false }));
   showToast(
     created.length === 1 ? $t('„{0}“ übernommen.', created[0].name) : $t('{0} Server übernommen.', created.length),
@@ -173,7 +178,7 @@ function writeError(tr: Transfer): { error: string; detail: string } | null {
 }
 
 function tick() {
-  const s = state;
+  const s = getState();
   const now = Date.now();
   let changed = false;
   let fsChanged = false;
@@ -286,8 +291,8 @@ function tick() {
       );
       changed = true;
     }
-    if (!busy && pendingCommand.has(w.id)) {
-      pendingCommand.delete(w.id);
+    if (!busy && pendingDemoCommand.has(w.id)) {
+      pendingDemoCommand.delete(w.id);
       const hadError = batch.some((x) => x.state === 'error');
       if (w.options.commandEnabled && w.options.command && !hadError) {
         transfers = [
@@ -341,20 +346,23 @@ function tick() {
   }
 }
 
-let started = false;
-/** Starts the simulation timer once. */
 /** Prototype: a believable connection log, and one line per finished transfer. */
 function simulateLog(addLog: typeof import('./log').addLog) {
   addLog(
     'info',
-    $t('Bitcrane gestartet, {0} {1}, {2} Überwachungen', state.servers.length, $t('Server'), state.watches.length),
+    $t(
+      'Bitcrane gestartet, {0} {1}, {2} Überwachungen',
+      getState().servers.length,
+      $t('Server'),
+      getState().watches.length,
+    ),
   );
   addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', 'deploy', 'shop.example', 22, $t('SSH-Schlüssel')), 'ob');
   addLog('ok', $t('Verbunden, Startordner {0}', '/home/deploy'), 'ob');
   addLog('info', $t('Überwachung „{0}“ gestartet', 'webshop live'), 'ob');
   const seen = new Map<string, string>();
   subscribeStore(() => {
-    for (const t of state.transfers) {
+    for (const t of getState().transfers) {
       const before = seen.get(t.id);
       if (before === t.state) continue;
       seen.set(t.id, t.state);
@@ -378,6 +386,9 @@ function simulateLog(addLog: typeof import('./log').addLog) {
   });
 }
 
+let started = false;
+
+/** Starts the simulation timer once; in the app, the live backend instead. */
 export function startSimulation() {
   if (started) return;
   started = true;
@@ -387,7 +398,7 @@ export function startSimulation() {
     void import('./log').then((m) => simulateLog(m.addLog));
   }
   window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change', () => {
-    if (state.settings.themeSetting === 'system' && !DEMO_THEME) setState({ theme: detectTheme() });
+    if (getState().settings.themeSetting === 'system' && !DEMO_THEME) setState({ theme: detectTheme() });
   });
   listenForDemoMessages((patch) => setState(patch));
 }

@@ -59,7 +59,7 @@ import {
 import { $t, LANG } from '../i18n';
 import { join as joinPath } from '../util/paths';
 
-export interface ShortcutAction {
+interface ShortcutAction {
   id: string;
   label: string;
   group: string;
@@ -783,7 +783,7 @@ function modsOf(e: KeyboardEvent, platform: Platform, withShift: boolean) {
 }
 
 /** All spellings of a key press; punctuation also matches without Shift (layouts differ). */
-export function combosOf(e: KeyboardEvent, platform: Platform): string[] {
+function combosOf(e: KeyboardEvent, platform: Platform): string[] {
   if (isModifierKey(e.key)) return [];
   const out: string[] = [];
   for (const k of keyCandidates(e)) {

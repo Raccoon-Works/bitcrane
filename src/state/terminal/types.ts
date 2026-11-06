@@ -1,6 +1,7 @@
 /**
  * Data of the built-in terminal kept in the store and the settings: sessions,
- * snippets, the terminal settings and the terminal state of a tab.
+ * snippets and the terminal settings. The terminal state of a tab is saved with
+ * the tab and lives with it in backend/types.ts.
  */
 
 export interface TermSession {
@@ -50,11 +51,4 @@ export interface TerminalSettings {
   localShell: string;
   /** Open the terminals of the tabs again at the next start (with "Tabs vom letzten Mal"). */
   restore: boolean;
-}
-
-/** Tab state of the terminal: panel shown, session in front, whole tab. */
-export interface TabTerminal {
-  open: boolean;
-  active?: string;
-  full?: boolean;
 }

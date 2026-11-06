@@ -116,7 +116,7 @@ export function selectDifferences(side: PaneSide) {
 /* ------------------------------------------------------------------------ */
 
 /** Turns "*.jpg; foto-??.png" into one case-insensitive regular expression per pattern. */
-export function maskToRegexps(mask: string): RegExp[] {
+function maskToRegexps(mask: string): RegExp[] {
   // "*.*" means every entry, as in Windows and WinSCP (also names without a dot).
   return mask
     .split(/[;,]/)
@@ -179,22 +179,13 @@ export function invertSelection(side: PaneSide) {
 const shellQuote = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 
 /** The command with its placeholders filled in for these files. */
-export function expandCommand(cmd: CustomCommand, dir: string, names: string[]): string {
+function expandCommand(cmd: CustomCommand, dir: string, names: string[]): string {
   const full = names.map((n) => paths.join(dir, n));
   return cmd.command
     .replace(/\{files\}/g, full.map(shellQuote).join(' '))
     .replace(/\{file\}/g, full[0] ? shellQuote(full[0]) : "''")
     .replace(/\{name\}/g, names[0] ? shellQuote(names[0]) : "''")
     .replace(/\{dir\}/g, shellQuote(dir));
-}
-
-/** True when the half shows an SFTP server, where commands can run (SSH). */
-export function canRunCommands(side: PaneSide): boolean {
-  const t = activeTab();
-  if (!t) return false;
-  const [ls, sid] = paneLoc(side, t);
-  const srv = ls === 'remote' ? serverById(sid) : undefined;
-  return !!srv && live.isSftp(srv);
 }
 
 /**
@@ -473,5 +464,5 @@ export async function uploadToServer(paths: string[], serverId: string, dir: str
 export async function applyShellIntegration() {
   if (!LIVE) return;
   const on = getState().settings.shellIntegration !== false;
-  await backend.shellIntegrationSet(on, $t('Mit Bitcrane hochladen')).catch(() => undefined);
+  await backend.shellIntegrationSet(on, $t('Mit Bitcrane hochladen')).catch((e) => showError(e));
 }

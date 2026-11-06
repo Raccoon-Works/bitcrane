@@ -17,9 +17,9 @@ const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
 /** Reads the state of a folder again (after file actions, a commit, a pull …). */
-export async function refreshGit(dir: string) {
+async function refreshGit(dir: string) {
   if (!LIVE || !dir) return;
-  const st = await backend.gitStatus(dir).catch(() => null);
+  const st = await backend.gitStatus(dir);
   const before = JSON.stringify(cache.get(dir) ?? null);
   cache.set(dir, st);
   if (JSON.stringify(st) !== before) notify();

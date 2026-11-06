@@ -40,11 +40,7 @@ export function TerminalSettingsPage() {
           ],
   );
   useEffect(() => {
-    if (LIVE)
-      backend
-        .termShells()
-        .then(setShells)
-        .catch(() => undefined);
+    if (LIVE) void backend.termShells().then(setShells);
   }, []);
   return (
     <>

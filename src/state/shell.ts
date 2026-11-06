@@ -37,6 +37,7 @@ import {
   type AppState,
 } from './store';
 import { checkForUpdates } from './updates';
+import { showError } from './errors';
 import { editorMenuKey } from './editor';
 import { applyShellIntegration, receiveUploadPaths, uploadPathsFromLink } from './tools';
 import { initMounts } from './mount';
@@ -63,7 +64,7 @@ const KEY_NAMES: Record<string, string> = {
  * Converts a shortcut as shown in the menus ("⇧⌘N", "⌥⌘↓") into a Tauri
  * accelerator ("Shift+Cmd+N", "Alt+Cmd+Down").
  */
-export function toAccelerator(mac: string): string {
+function toAccelerator(mac: string): string {
   const parts: string[] = [];
   let key = '';
   for (const ch of mac) {
@@ -278,7 +279,7 @@ function syncTray(s: AppState) {
   const key = `${visible}|${JSON.stringify(items)}`;
   if (key === lastTray) return;
   lastTray = key;
-  backend.trayUpdate(visible, st.text, items).catch(() => undefined);
+  backend.trayUpdate(visible, st.text, items).catch((e) => showError(e));
 }
 
 /** Actions from the status icon's menu. */
@@ -368,6 +369,7 @@ function syncProgress(s: AppState) {
   const key = `${show}|${pct}|${active.length}`;
   if (key === lastProgress) return;
   lastProgress = key;
+  // Progress and badge are decoration the system may not offer; there is nothing to tell the user.
   win
     .setProgressBar(show ? { status: ProgressBarStatus.Normal, progress: pct } : { status: ProgressBarStatus.None })
     .catch(() => undefined);
@@ -386,6 +388,7 @@ export async function startShell() {
   if (started) return;
   started = true;
   const win = getCurrentWindow();
+  // Without focus events Bitcrane counts as being in front and leaves out system notifications.
   let focused = true;
   win
     .onFocusChanged(({ payload }) => {
@@ -394,6 +397,7 @@ export async function startShell() {
     .catch(() => undefined);
 
   if (getState().platform === 'mac') {
+    // A menu that cannot be built must not stop the rest of the start; the system's default menu stays.
     await installMacMenu().catch(() => undefined);
     // Own shortcuts: rebuild the menu so it shows and uses the new keys.
     let keys = getState().settings.shortcuts;
@@ -426,7 +430,7 @@ export async function startShell() {
     }
   });
 
-  // sftp:// links: the first one may have started the app.
+  // sftp:// links: the first one may have started the app. Without the plugin, links are simply not handled.
   const deepLink = await import('@tauri-apps/plugin-deep-link').catch(() => null);
   if (deepLink) {
     const open = (urls: string[] | null) => {
@@ -447,6 +451,7 @@ export async function startShell() {
               }
             }, 100);
           });
+    // No start link and no link listener both just mean no link to open.
     void waitConfig().then(() =>
       deepLink
         .getCurrent()
@@ -465,7 +470,7 @@ export async function startShell() {
         const on = getState().settings.sftpLinks;
         if (!isConfigLoaded() || on === linksOn) return;
         linksOn = on;
-        void (on ? deepLink.register('sftp') : deepLink.unregister('sftp')).catch(() => undefined);
+        void (on ? deepLink.register('sftp') : deepLink.unregister('sftp')).catch((e) => showError(e));
       };
       subscribeStore(syncLinks);
       syncLinks();
@@ -489,9 +494,9 @@ export async function startShell() {
           }, 100);
         });
   void whenLoaded().then(async () => {
-    const first = await backend.takePendingUploads().catch(() => [] as string[]);
+    const first = await backend.takePendingUploads();
     if (first.length) receiveUploadPaths(first);
-    const startAction = await backend.takeStartAction().catch(() => null);
+    const startAction = await backend.takeStartAction();
     if (startAction) onTrayAction(startAction);
     // The context-menu entry follows the setting.
     let shellOn: boolean | undefined;
@@ -508,7 +513,7 @@ export async function startShell() {
     void import('./terminal').then((m) => m.initTerminals());
   });
 
-  // Start at login follows the setting.
+  // Start at login follows the setting. An unreadable state counts as off, so the setting registers it again.
   let autostart = await autostartEnabled().catch(() => false);
   let autostartSynced = false;
 
@@ -535,7 +540,7 @@ export async function startShell() {
       // First sync after the start: register again, so an older entry gets the "--autostart" argument.
       if (want !== autostart || (want && !prev)) {
         autostart = want;
-        (want ? enableAutostart() : disableAutostart()).catch(() => undefined);
+        (want ? enableAutostart() : disableAutostart()).catch((e) => showError(e));
       }
     }
     prev = s;

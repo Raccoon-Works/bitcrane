@@ -21,14 +21,9 @@ export function useFreeSpace(path: string, enabled: boolean, rev: number): numbe
     }
     let live = true;
     const t = window.setTimeout(() => {
-      void backend
-        .localFreeSpace(path)
-        .then((v) => {
-          if (live) setFree(v ?? null);
-        })
-        .catch(() => {
-          if (live) setFree(null);
-        });
+      void backend.localFreeSpace(path).then((v) => {
+        if (live) setFree(v ?? null);
+      });
     }, 300);
     return () => {
       live = false;

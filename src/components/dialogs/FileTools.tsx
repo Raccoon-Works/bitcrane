@@ -74,7 +74,7 @@ function SumLine({ label, path, sum }: { label: string; path: string; sum: Sum }
             className="icon-btn"
             aria-label={$t('Prüfsumme kopieren')}
             onClick={() =>
-              void navigator.clipboard?.writeText(sum.hex).then(() => showToast($t('Prüfsumme kopiert.'), 'ok'))
+              void navigator.clipboard.writeText(sum.hex).then(() => showToast($t('Prüfsumme kopiert.'), 'ok'))
             }
           >
             <Copy size={13} strokeWidth={1.75} />
@@ -250,7 +250,7 @@ export function PresignDialog({ side, name }: { side: PaneSide; name: string }) 
     timeStyle: 'short',
   });
   const copy = () =>
-    void navigator.clipboard?.writeText(link).then(() => {
+    void navigator.clipboard.writeText(link).then(() => {
       showToast($t('Link kopiert.'), 'ok');
       closeDialog();
     });

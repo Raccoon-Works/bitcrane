@@ -5,7 +5,7 @@
 import type { Platform, Theme } from '../backend/types';
 
 import { $t, rememberLanguage } from '../i18n';
-import { state, LIVE, showToast, setState } from './core';
+import { LIVE, showToast, setState, getState } from './core';
 import type { Settings, TransferRule, ToolId } from './appState';
 import { detectTheme } from './defaults';
 
@@ -13,7 +13,7 @@ import { detectTheme } from './defaults';
 export const NO_RULES: TransferRule[] = [];
 
 export function updateSettings(patch: Partial<Settings>) {
-  if (patch.language && patch.language !== state.settings.language) {
+  if (patch.language && patch.language !== getState().settings.language) {
     rememberLanguage(patch.language);
     if (!LIVE) {
       // The prototype simply reloads in the new language.

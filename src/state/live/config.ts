@@ -81,6 +81,12 @@ function snapshot(s: AppState): string {
   return JSON.stringify(cfg);
 }
 
+function writeConfig(snap: string): Promise<void> {
+  return backend
+    .configSave(JSON.parse(snap))
+    .catch(() => showToast($t('Einstellungen konnten nicht gespeichert werden.'), 'error'));
+}
+
 export function scheduleSave(s: AppState) {
   if (!loaded) return;
   const snap = snapshot(s);
@@ -89,50 +95,39 @@ export function scheduleSave(s: AppState) {
   if (snap === lastSaved) return;
   saveTimer = window.setTimeout(() => {
     lastSaved = snap;
-    backend
-      .configSave(JSON.parse(snap))
-      .catch(() => showToast($t('Einstellungen konnten nicht gespeichert werden.'), 'error'));
+    void writeConfig(snap);
   }, 400);
 }
 
 /** Reads the drives and volumes of this computer for the sidebar. */
 async function loadDrives() {
-  const drives = await backend.localDrives().catch(() => []);
+  const drives = await backend.localDrives();
   const cur = getState().drives;
   if (drives.length !== cur.length || drives.some((d, i) => d.path !== cur[i].path || d.name !== cur[i].name))
     setState({ drives });
 }
 
-/** Writes pending changes at once (before quitting). */
 /** After an update (installed on quit or with a restart) a short message names the new version once. */
 export async function announceUpdate() {
-  try {
-    const { getVersion } = await import('@tauri-apps/api/app');
-    const now = await getVersion();
-    const before = getState().settings.lastVersion;
-    if (before === now) return;
-    updateSettings({ lastVersion: now });
-    if (before) showToast($t('Bitcrane wurde auf {0} aktualisiert.', now), 'update');
-  } catch {
-    // Unknown version: no message.
-  }
+  const now = await backend.appVersion();
+  const before = getState().settings.lastVersion;
+  if (before === now) return;
+  updateSettings({ lastVersion: now });
+  if (before) showToast($t('Bitcrane wurde auf {0} aktualisiert.', now), 'update');
 }
 
+/** Writes pending changes at once (before quitting). */
 export async function saveNow() {
   if (!loaded) return;
   window.clearTimeout(saveTimer);
   const snap = snapshot(getState());
   if (snap === lastSaved) return;
   lastSaved = snap;
-  await backend.configSave(JSON.parse(snap)).catch(() => undefined);
+  await writeConfig(snap);
 }
 
-/**
- * Start at login ("--autostart"): with "Beim Start nur im Infobereich" the window stays hidden and
- * only the status icon is there; otherwise it opens now. A normal start already showed it (Rust).
- */
 /** Mac: one-time hint about "Festplattenvollzugriff" (Full Disk Access). */
-export function showDiskAccessHint() {
+function showDiskAccessHint() {
   setState((st) => ({ settings: { ...st.settings, diskAccessHinted: true } }));
   openDialog({
     type: 'confirm',
@@ -142,11 +137,15 @@ export function showDiskAccessHint() {
     ),
     confirm: $t('Systemeinstellungen öffnen'),
     run: () => {
-      void backend.openFullDiskAccess().catch(() => undefined);
+      void backend.openMacSettings('fullDisk').catch((e) => showError(e));
     },
   });
 }
 
+/**
+ * Start at login ("--autostart"): with "Beim Start nur im Infobereich" the window stays hidden and
+ * only the status icon is there; otherwise it opens now. A normal start already showed it (Rust).
+ */
 async function decideStartWindow() {
   try {
     const atLogin = await backend.startInfo();
@@ -283,7 +282,7 @@ export async function loadConfig() {
 
 /** Cloud storage folders of this computer (empty when the lookup fails). */
 export async function cloudPlaces() {
-  return backend.localCloudPlaces().catch(() => []);
+  return backend.localCloudPlaces();
 }
 
 /**
@@ -363,7 +362,7 @@ export async function quickConnect(
     };
   }
   if (getState().settings.readSshConfig) {
-    const alias = (await backend.sshConfigHosts().catch(() => [])).find((h) => h.alias === hostPart);
+    const alias = (await backend.sshConfigHosts()).find((h) => h.alias === hostPart);
     if (alias) {
       host = alias.host;
       user = userPart ?? alias.user;

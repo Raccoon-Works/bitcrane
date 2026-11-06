@@ -79,7 +79,6 @@ export interface FtpConnectParams {
   timeout?: number;
 }
 
-/** WebDAV connection (see `dav.rs`). */
 /** Amazon S3 or a compatible service (s3.rs). */
 export interface S3ConnectParams {
   endpoint: string;
@@ -94,6 +93,7 @@ export interface S3ConnectParams {
   timeout?: number;
 }
 
+/** WebDAV connection (see `dav.rs`). */
 export interface DavConnectParams {
   url: string;
   user: string;
@@ -204,13 +204,6 @@ export interface SshConfigHost {
   port: number;
   user: string;
   identityFile?: string;
-}
-
-/** Version and platform of the running app (see `app_info` in commands/app.rs). */
-export interface AppInfo {
-  version: string;
-  platform: string;
-  knownHosts: number;
 }
 
 /** A Finder tag (Mac) of a file; `color` is the Finder colour number 0 to 7. */
@@ -329,7 +322,8 @@ export interface Backend {
   /** Answers a keyboard-interactive login prompt; null cancels it. */
   authPromptAnswer(id: string, answers: string[] | null): Promise<void>;
 
-  appInfo(): Promise<AppInfo>;
+  /** Version of the running app. */
+  appVersion(): Promise<string>;
   /** Path of the program for `bitcrane …` on the command line. */
   cliPath(): Promise<string>;
   /** True after a start at login (the window may stay hidden). */
@@ -348,8 +342,6 @@ export interface Backend {
   macFullDiskAccess(): Promise<boolean>;
   /** Mac: opens a page of the System Settings: "fullDisk", "localNetwork", "notifications" or "loginItems". */
   openMacSettings(page: string): Promise<void>;
-  /** Mac: opens the Full Disk Access page of the system settings. */
-  openFullDiskAccess(): Promise<void>;
 
   localList(path: string): Promise<FileEntry[]>;
   localStat(path: string): Promise<FileEntry>;
@@ -363,8 +355,10 @@ export interface Backend {
   remoteSymlink(serverId: string, link: string, target: string): Promise<void>;
   /** Opens an http(s) address in the default browser. */
   openUrl(url: string): Promise<void>;
-  /** Copies into a folder on this computer; returns the new names ("x Kopie" on a clash). */
-  /** With `merge`, a folder whose name exists in the target is merged into it ("Zusammenführen"). */
+  /**
+   * Copies into a folder on this computer; returns the new names ("x Kopie" on a clash). With
+   * `merge`, a folder whose name exists in the target is merged into it ("Zusammenführen").
+   */
   localCopy(paths: string[], destDir: string, merge?: boolean): Promise<string[]>;
   localMove(paths: string[], destDir: string, merge?: boolean): Promise<string[]>;
   /** Copies files to exact targets, replacing existing ones (comparing two local folders). */
@@ -429,8 +423,10 @@ export interface Backend {
   ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Which cloud services this build has app keys for. */
   cloudServices(): Promise<{ dropbox: boolean; onedrive: boolean }>;
-  /** Sign-in in the browser; resolves with the refresh token and the account name. */
-  /** Google Drive needs the user's own app key (client id and secret). */
+  /**
+   * Sign-in in the browser; resolves with the refresh token and the account name. Google Drive
+   * needs the user's own app key (client id and secret).
+   */
   cloudSignIn(
     service: string,
     clientId?: string,

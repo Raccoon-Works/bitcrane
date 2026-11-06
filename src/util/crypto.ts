@@ -2,7 +2,7 @@
  * Password encryption for export files: PBKDF2-SHA256 derives an AES-256-GCM
  * key from the password. Uses the browser's Web Crypto, nothing custom.
  */
-import { fromBase64 } from './base64';
+import { fromBase64, toBase64 } from './base64';
 
 export interface Sealed {
   kdf: 'PBKDF2-SHA256';
@@ -13,7 +13,6 @@ export interface Sealed {
 }
 
 const ITERATIONS = 310_000;
-const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 
 async function keyFor(password: string, salt: Uint8Array, iterations: number) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
@@ -33,10 +32,7 @@ export async function seal(text: string, password: string): Promise<Sealed> {
   const data = new Uint8Array(
     await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)),
   );
-  // Chunked base64 for large files (spread arguments have a limit).
-  let out = '';
-  for (let i = 0; i < data.length; i += 0x8000) out += String.fromCharCode(...data.subarray(i, i + 0x8000));
-  return { kdf: 'PBKDF2-SHA256', iterations: ITERATIONS, salt: b64(salt), iv: b64(iv), data: btoa(out) };
+  return { kdf: 'PBKDF2-SHA256', iterations: ITERATIONS, salt: toBase64(salt), iv: toBase64(iv), data: toBase64(data) };
 }
 
 /** Throws when the password is wrong (AES-GCM checks integrity). */

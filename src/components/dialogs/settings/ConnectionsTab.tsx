@@ -21,11 +21,7 @@ function KnownHostsList() {
         ],
   );
   const load = () => {
-    if (LIVE)
-      backend
-        .knownHostsList()
-        .then(setHosts)
-        .catch(() => setHosts([]));
+    if (LIVE) void backend.knownHostsList().then(setHosts);
   };
   useEffect(load, []);
   const forget = (host: string) => {

@@ -48,7 +48,7 @@ export async function stopEditing(localPath: string) {
   const e = editSessions.get(localPath);
   if (!e) return;
   editSessions.delete(localPath);
-  await backend.watchStop(e.watchId).catch(() => undefined);
+  await backend.watchStop(e.watchId);
   publishEdits();
 }
 

@@ -11,7 +11,6 @@ import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
   setState,
-  state,
   LIVE,
   serverById,
   uid,
@@ -27,6 +26,7 @@ import {
   panePath,
   paneEntries,
   isDirEntry,
+  getState,
 } from './core';
 import type { PaneSelection, AppState, TransferRule } from './appState';
 import { openDialog } from './panels';
@@ -49,7 +49,7 @@ export function selectTab(id: string) {
     popoverOpen: false,
     expanded: { local: [], remote: [] },
   });
-  const t = state.tabs.find((x) => x.id === id);
+  const t = getState().tabs.find((x) => x.id === id);
   if (LIVE && t) {
     if (t.leftServerId && t.serverId) live.autoConnectPair(t.serverId, t.leftServerId);
     else if (t.leftServerId) live.autoConnect(t.leftServerId);
@@ -57,7 +57,6 @@ export function selectTab(id: string) {
   }
 }
 
-/** Opens a server in a new tab, or switches to its existing tab. */
 /** Opens another tab for a server, even when one is already open. */
 export function openServerInNewTab(serverId: string) {
   const srv = serverById(serverId);
@@ -89,7 +88,7 @@ export function openServerInNewTab(serverId: string) {
 export function askRemoveServer(id: string) {
   const srv = serverById(id);
   if (!srv) return;
-  const watches = state.watches.filter((w) => w.serverId === id);
+  const watches = getState().watches.filter((w) => w.serverId === id);
   openDialog({
     type: 'confirm',
     danger: true,
@@ -115,6 +114,7 @@ export function askRemoveServer(id: string) {
   });
 }
 
+/** Opens a server in a new tab, or switches to its existing tab. */
 export function openServer(serverId: string, files = false) {
   // Servers set to open as a terminal (SSH only): a terminal tab instead of the files.
   const target = serverById(serverId);
@@ -123,7 +123,7 @@ export function openServer(serverId: string, files = false) {
     return;
   }
   setState((st) => ({ servers: st.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)) }));
-  const s = state;
+  const s = getState();
   const existing = s.tabs.find((t) => t.serverId === serverId);
   if (existing) {
     selectTab(existing.id);
@@ -182,7 +182,7 @@ export function newTab() {
 
 /** Closes a tab; the last one becomes a new, empty tab (like WinSCP). */
 export function closeTab(id: string) {
-  const s = state;
+  const s = getState();
   const idx = s.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
   let tabs = s.tabs.filter((t) => t.id !== id);
@@ -199,9 +199,9 @@ export function closeTab(id: string) {
 
 /** "Andere Tabs schließen" (ForkLift): keeps only the given tab. */
 export function closeOtherTabs(id: string) {
-  const keep = state.tabs.find((t) => t.id === id);
+  const keep = getState().tabs.find((t) => t.id === id);
   if (!keep) return;
-  const closed = state.tabs.filter((t) => t.id !== id);
+  const closed = getState().tabs.filter((t) => t.id !== id);
   setState((s) => ({
     tabs: [keep],
     activeTabId: id,
@@ -213,11 +213,11 @@ export function closeOtherTabs(id: string) {
 
 /** Closes the tabs to the right of the given one. */
 export function closeTabsRight(id: string) {
-  const idx = state.tabs.findIndex((t) => t.id === id);
+  const idx = getState().tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
-  const tabs = state.tabs.slice(0, idx + 1);
-  const closed = state.tabs.slice(idx + 1);
-  const activeTabId = tabs.some((t) => t.id === state.activeTabId) ? state.activeTabId : id;
+  const tabs = getState().tabs.slice(0, idx + 1);
+  const closed = getState().tabs.slice(idx + 1);
+  const activeTabId = tabs.some((t) => t.id === getState().activeTabId) ? getState().activeTabId : id;
   setState((s) => ({
     tabs,
     activeTabId,
@@ -229,8 +229,8 @@ export function closeTabsRight(id: string) {
 
 /** "Tab duplizieren": the same folders (and server) in a new tab next to it. */
 export function duplicateTab(id: string) {
-  const idx = state.tabs.findIndex((t) => t.id === id);
-  const t = state.tabs[idx];
+  const idx = getState().tabs.findIndex((t) => t.id === id);
+  const t = getState().tabs[idx];
   if (!t || t.settings) return;
   const copy: Tab = { ...t, id: uid('tab'), back: [], forward: [] };
   setState((s) => ({
@@ -293,7 +293,7 @@ export function navigate(side: PaneSide, path: string, record = true) {
 
 /** Folders of this computer opened last, newest first (sidebar "Zuletzt verwendet"). */
 function rememberRecentDir(path: string) {
-  const cur = state.settings.recentDirs ?? [];
+  const cur = getState().settings.recentDirs ?? [];
   if (cur[0] === path) return;
   updateSettings({ recentDirs: [path, ...cur.filter((p) => p !== path)].slice(0, 12) });
 }
@@ -340,7 +340,7 @@ export function goForward() {
 }
 
 /** Entries of the folder shown that are hidden by the settings (status line "2 versteckt", like WinSCP). */
-export function hiddenCount(side: PaneSide, s: AppState = state): number {
+export function hiddenCount(side: PaneSide, s: AppState = getState()): number {
   const t = activeTab(s);
   if (!t || paneShowsServers(side, t)) return 0;
   const list = listEntries(...paneLoc(side, t), panePath(side, s)) ?? [];
@@ -358,7 +358,7 @@ export function hiddenCount(side: PaneSide, s: AppState = state): number {
 export function ruleFor(
   serverId: string,
   watchId?: string,
-  s: AppState = state,
+  s: AppState = getState(),
   useChoice = true,
 ): TransferRule | undefined {
   const rules = s.settings.rules ?? [];
@@ -372,7 +372,7 @@ export function ruleFor(
 }
 
 /** Excludes of a watch together with those of its rule. */
-export function watchExcludes(w: Watch, s: AppState = state): string[] {
+export function watchExcludes(w: Watch, s: AppState = getState()): string[] {
   const r = ruleFor(w.serverId, w.id, s);
   return r?.excludes.length ? [...new Set([...w.excludes, ...r.excludes])] : w.excludes;
 }
@@ -444,16 +444,12 @@ export function openEntry(side: PaneSide, name: string) {
     );
 }
 
-/**
- * Double click, Enter (Windows) or ⌘↓ on a row. Folders open; files do what
- * "Doppelklick auf eine Datei" says (Transmit: open, edit or transfer).
- */
 /** Folders the Finder shows as one item (apps, bundles, Photos libraries …). */
 const PACKAGE_EXT =
   /\.(app|bundle|framework|plugin|kext|prefPane|saver|appex|xpc|pkg|mpkg|photoslibrary|musiclibrary|tvlibrary|imovielibrary|fcpbundle|rtfd|pages|numbers|key|playground|xcodeproj|xcworkspace|scptd|workflow)$/i;
 
 /** True for a package folder on the Mac's own disk (shown and opened like a file, "Paketinhalt zeigen" goes in). */
-export function isPackage(side: PaneSide, entry: { name: string; kind: string }, s: AppState = state): boolean {
+export function isPackage(side: PaneSide, entry: { name: string; kind: string }, s: AppState = getState()): boolean {
   if (s.platform !== 'mac' || entry.kind !== 'dir') return false;
   const t = activeTab(s);
   if (!t || paneLoc(side, t)[0] !== 'local') return false;
@@ -466,6 +462,10 @@ export function showPackageContents(side: PaneSide, name: string) {
   navigate(side, paths.join(panePath(side), name));
 }
 
+/**
+ * Double click, Enter (Windows) or ⌘↓ on a row. Folders open; files do what
+ * "Doppelklick auf eine Datei" says (Transmit: open, edit or transfer).
+ */
 export function activateEntry(side: PaneSide, name: string) {
   const t = activeTab();
   if (!t) return;
@@ -475,7 +475,7 @@ export function activateEntry(side: PaneSide, name: string) {
     return;
   }
   const path = paths.join(panePath(side), name);
-  const mode = state.settings.fileDoubleClick;
+  const mode = getState().settings.fileDoubleClick;
   if (isDirEntry(...paneLoc(side, t), path) || mode === 'open') {
     openEntry(side, name);
     return;
@@ -503,7 +503,7 @@ export function openInEditor(side: PaneSide, name: string) {
   const [ls, sid] = paneLoc(side, t);
   // The built-in editor, unless a program of the system is chosen (in general or for this kind of file).
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-  if (state.settings.editorMode !== 'external' && !(ext && state.settings.editorByExt[ext])) {
+  if (getState().settings.editorMode !== 'external' && !(ext && getState().settings.editorByExt[ext])) {
     void import('./editor').then((m) => m.openFile(ls === 'local' ? '' : sid, path));
     return;
   }
@@ -520,7 +520,7 @@ export function openInEditor(side: PaneSide, name: string) {
 }
 
 /** "Terminal öffnen": an SSH session in the server folder, or a local terminal in the local folder. */
-export function openTerminal(side: PaneSide = state.focusSide) {
+export function openTerminal(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   const [ls, sid] = paneLoc(side, t);
   const onServer = ls === 'remote';
@@ -548,8 +548,8 @@ export function openTerminal(side: PaneSide = state.focusSide) {
           keyPath: srv.auth === 'key' ? srv.keyPath : undefined,
           remotePath: panePath(side),
           localPath: home,
-          app: state.settings.externalTerminal,
+          app: getState().settings.externalTerminal,
         }
-      : { localPath: home, app: state.settings.externalTerminal };
+      : { localPath: home, app: getState().settings.externalTerminal };
   void backend.openTerminal(target).catch((e) => showError(e));
 }

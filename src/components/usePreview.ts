@@ -15,7 +15,7 @@ const DEMO_TEXT =
   'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
 
 /** MIME type of PDF, audio and video files (the same list as local::media_mime). */
-export function mediaMime(name: string): string | null {
+function mediaMime(name: string): string | null {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   const map: Record<string, string> = {
     pdf: 'application/pdf',
@@ -34,8 +34,10 @@ export function mediaMime(name: string): string | null {
   return map[ext] ?? null;
 }
 
-/** `media`: also load PDFs, audio and video (the preview window; the info column does not). */
-/** Loads a preview; `null` while loading. */
+/**
+ * Loads a preview; `null` while loading. `media`: also load PDFs, audio and video
+ * (the preview window; the info column does not).
+ */
 export function usePreview(
   side: PaneSide,
   serverId: string,

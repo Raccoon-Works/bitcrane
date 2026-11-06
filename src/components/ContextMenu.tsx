@@ -216,7 +216,7 @@ export function ContextMenu() {
       {
         label: $t('Adresse kopieren'),
         run: () => {
-          if (srv) void navigator.clipboard?.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`);
+          if (srv) void navigator.clipboard.writeText(`${srv.protocol ?? 'sftp'}://${addressOf(srv)}`);
         },
       },
     ]);
@@ -293,7 +293,7 @@ export function ContextMenu() {
     const path = menu.place;
     groups.push([
       { label: $t('Öffnen'), run: () => navigate(menu.side, path) },
-      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
+      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard.writeText(path) },
     ]);
     groups.push([{ label: $t('Aus der Ortsleiste entfernen'), danger: true, run: () => removePlace(menu.side, path) }]);
   } else if (menu.kind === 'sidebarSection') {
@@ -323,7 +323,7 @@ export function ContextMenu() {
     const path = menu.place;
     groups.push([
       { label: $t('Öffnen'), run: () => openPlace(path) },
-      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
+      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard.writeText(path) },
       {
         label: $t('Zu den Favoriten hinzufügen'),
         run: () => {
@@ -343,7 +343,7 @@ export function ContextMenu() {
     const i = list.findIndex((p) => p.path === path);
     groups.push([
       { label: $t('Öffnen'), run: () => openPlace(path) },
-      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard?.writeText(path) },
+      { label: $t('Pfad kopieren'), run: () => void navigator.clipboard.writeText(path) },
     ]);
     groups.push([
       ...(i > 0 ? [{ label: $t('Nach oben'), run: () => editLocalPlaces(path, { before: list[i - 1].path }) }] : []),

@@ -551,11 +551,7 @@ function ServerFoot() {
 function Welcome({ onQuick }: { onQuick: () => void }) {
   const [found, setFound] = useState(LIVE ? 0 : 3);
   useEffect(() => {
-    if (LIVE)
-      backend
-        .importFind()
-        .then((r) => setFound(r.servers.length))
-        .catch(() => undefined);
+    if (LIVE) void backend.importFind().then((r) => setFound(r.servers.length));
   }, []);
   return (
     <div className="server-welcome">

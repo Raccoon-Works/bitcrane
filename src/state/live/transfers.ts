@@ -326,7 +326,7 @@ function openAfterDownload(path: string) {
   while (openedRecently.length && now - openedRecently[0] > 10000) openedRecently.shift();
   if (openedRecently.length >= 5) return;
   openedRecently.push(now);
-  backend.localOpen(path).catch(() => undefined);
+  backend.localOpen(path).catch((e) => showError(e));
 }
 
 /** "Im Inhalt suchen": files below `base` containing `query` (this computer or an SSH server). */
@@ -340,7 +340,7 @@ function limitFor(total: number, share: number): number {
 }
 
 /** Number of older versions kept per file ("Ältere Version auf dem Server behalten"). */
-export const KEEP_VERSIONS = 5;
+const KEEP_VERSIONS = 5;
 
 let pumpScheduled = false;
 /** Starts queued transfers and stops ones the user paused or removed. */
@@ -355,7 +355,7 @@ export function pump() {
       if ((!tr || tr.state !== 'running') && !cancelling.has(id)) {
         cancelling.add(id);
         // Removed: throw the partial file away. Paused: keep it to continue later.
-        backend.cancel(id, !tr).catch(() => undefined);
+        void backend.cancel(id, !tr);
       }
     }
     let slots = Math.max(0, s.settings.parallel - active.size);
@@ -400,16 +400,14 @@ export function discardRemoved(prev: Transfer[], next: Transfer[]) {
       continue;
     if ((t.direction === 'up' || t.direction === 'cross') && !connected.has(t.serverId)) continue;
     // Server to server keeps its partial file on the target server, like an upload.
-    if (t.direction === 'cross') backend.discardPartial(t.serverId, 'up', '', t.target).catch(() => undefined);
+    if (t.direction === 'cross') void backend.discardPartial(t.serverId, 'up', '', t.target);
     else
-      backend
-        .discardPartial(
-          t.serverId,
-          t.direction,
-          t.direction === 'up' ? t.source : t.target,
-          t.direction === 'up' ? t.target : t.source,
-        )
-        .catch(() => undefined);
+      void backend.discardPartial(
+        t.serverId,
+        t.direction,
+        t.direction === 'up' ? t.source : t.target,
+        t.direction === 'up' ? t.target : t.source,
+      );
   }
 }
 
@@ -482,7 +480,7 @@ async function start(tr: Transfer) {
       if (tr.sourceServerId) {
         // Server to server: find out which of the two connections broke.
         for (const id of [tr.sourceServerId, tr.serverId]) {
-          if (!(await backend.isConnected(id).catch(() => false))) markOffline(id);
+          if (!(await backend.isConnected(id))) markOffline(id);
         }
       } else markOffline(tr.serverId);
     } else if (cur && s0AutoRetry(tr, err)) {

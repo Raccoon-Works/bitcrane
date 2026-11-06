@@ -20,7 +20,10 @@ pub const ACTION_FLAG: &str = "--tray-action";
 
 /// One entry: the action id of the status menu and its text.
 #[derive(Clone, PartialEq)]
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+#[cfg_attr(
+    not(any(windows, target_os = "macos")),
+    allow(dead_code, reason = "only the jump list (Windows) and the Dock menu (Mac) read the fields")
+)]
 struct Entry {
     id: String,
     label: String,
@@ -28,7 +31,10 @@ struct Entry {
 
 /// Tasks first, then the servers (with the heading of their submenu).
 #[derive(Clone, PartialEq, Default)]
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+#[cfg_attr(
+    not(any(windows, target_os = "macos")),
+    allow(dead_code, reason = "only the jump list (Windows) and the Dock menu (Mac) read the fields")
+)]
 struct Content {
     tasks: Vec<Entry>,
     servers_title: String,

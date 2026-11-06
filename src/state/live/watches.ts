@@ -32,7 +32,7 @@ export function reconcileWatches(s: AppState) {
     const w = wanted.get(id);
     if (!w || signature(w) !== runningWatches.get(id)) {
       runningWatches.delete(id);
-      backend.watchStop(id).catch(() => undefined);
+      void backend.watchStop(id);
     }
   }
   for (const [id, w] of wanted) {
@@ -196,6 +196,8 @@ export async function initialSync(w: Watch, manual = false) {
   try {
     const [local, remote] = await Promise.all([
       backend.localWalk(w.localPath),
+      // A server folder that is missing or unreadable counts as empty: the local files go up, and a lost
+      // connection shows in those transfers.
       backend.remoteWalk(w.serverId, w.remotePath).catch(() => [] as WalkItem[]),
     ]);
     // Compared in NFC form, so a name decomposed on one side still meets its counterpart.
@@ -259,7 +261,6 @@ export function runCommandNow(watchId: string) {
   ]);
 }
 
-/** Deletes chosen in "Ordner abgleichen" (server files removed, local ones to the trash). */
 /** Comparing two local folders: copies files to their exact targets, replacing older ones. */
 export async function copyLocalFiles(pairs: Array<[string, string]>) {
   if (!pairs.length) return;
@@ -276,6 +277,7 @@ export async function copyLocalFiles(pairs: Array<[string, string]>) {
   }
 }
 
+/** Deletes chosen in "Ordner abgleichen" (server files removed, local ones to the trash). */
 export async function syncDeletes(serverId: string, remote: string[], local: string[]) {
   try {
     if (remote.length) {

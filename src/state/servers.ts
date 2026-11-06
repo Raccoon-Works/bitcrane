@@ -7,7 +7,6 @@ import type { PaneSide, Server } from '../backend/types';
 import { isCloudProtocol } from '../backend/types';
 import { $t } from '../i18n';
 import {
-  state,
   setState,
   LIVE,
   showToast,
@@ -17,6 +16,7 @@ import {
   activeTab,
   watchForLocal,
   panePath,
+  getState,
 } from './core';
 import type { AppState } from './appState';
 import { openServer } from './tabs';
@@ -25,7 +25,7 @@ import { updateSettings } from './settings';
 import { closePaneServer, simulateLocalChange } from './watches';
 
 export function saveServer(server: Server, connect: boolean) {
-  const exists = state.servers.some((x) => x.id === server.id);
+  const exists = getState().servers.some((x) => x.id === server.id);
   setState((s) => ({
     servers: exists ? s.servers.map((x) => (x.id === server.id ? server : x)) : [...s.servers, server],
     dialog: null,
@@ -70,7 +70,7 @@ export function moveServer(id: string, beforeId: string | null, group: string) {
 /* Server groups (the folder button at the bottom of the server list, after Transmit). */
 
 /** All group names: those of saved servers plus empty ones created by the user. */
-export function serverGroupNames(s: AppState = state): string[] {
+export function serverGroupNames(s: AppState = getState()): string[] {
   const names = new Set([
     ...s.servers.filter((x) => !x.temporary).map((x) => x.group.trim()),
     ...(s.settings.serverGroups ?? []),
@@ -84,7 +84,7 @@ export function addServerGroup() {
   const taken = new Set(serverGroupNames());
   let name = $t('Neue Gruppe');
   for (let i = 2; taken.has(name); i++) name = $t('Neue Gruppe {0}', i);
-  updateSettings({ serverGroups: [...(state.settings.serverGroups ?? []), name] });
+  updateSettings({ serverGroups: [...(getState().settings.serverGroups ?? []), name] });
   setState({ renamingGroup: name, contextMenu: null });
 }
 
@@ -149,7 +149,7 @@ export function deleteServer(id: string) {
     if (removed)
       void live.forgetSecrets(
         removed,
-        state.servers.filter((x) => x.id !== id),
+        getState().servers.filter((x) => x.id !== id),
       );
   }
   setState((s) => {
@@ -178,7 +178,7 @@ export function deleteServer(id: string) {
 }
 
 export function newServerTemplate(): Server {
-  const d = state.settings.serverDefaults;
+  const d = getState().settings.serverDefaults;
   return {
     id: uid('srv'),
     name: '',
@@ -199,7 +199,7 @@ export function newServerTemplate(): Server {
 }
 
 /** Builds a deterministic, realistic-looking SHA256 host key fingerprint. */
-export function fakeFingerprint(host: string): string {
+function fakeFingerprint(host: string): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   let h = 2166136261;
   let out = '';
@@ -211,16 +211,11 @@ export function fakeFingerprint(host: string): string {
   return 'SHA256:' + out;
 }
 
-/** "sftp://user@host:port" from the quick-connect field. */
-/**
- * "Schnell verbinden". A password typed into the form is used for this connection;
- * it is kept in the system keychain only when the server is saved ("Zu Servern hinzufügen").
- */
 /**
  * Accepts what people type in a terminal as well: "ssh user@host",
  * "ssh -p 2222 user@host" and ssh:// become the usual user@host:port.
  */
-export function normalizeSshAddress(address: string): string {
+function normalizeSshAddress(address: string): string {
   let a = address.trim().replace(/^ssh:\/\//i, '');
   const cmd = a.match(/^ssh\s+(.*)$/i);
   if (!cmd) return a;
@@ -239,6 +234,11 @@ export function normalizeSshAddress(address: string): string {
   return port && !/:\d+(\/|$)/.test(a) ? `${a}:${port}` : a;
 }
 
+/**
+ * "Schnell verbinden" with "sftp://user@host:port" from the quick-connect field. A password typed
+ * into the form is used for this connection; it is kept in the system keychain only when the
+ * server is saved ("Zu Servern hinzufügen").
+ */
 export function quickConnect(
   address: string,
   save: boolean,
@@ -303,7 +303,6 @@ export function quickConnect(
   });
 }
 
-/** Passphrase or password typed by the user in the login prompt. */
 /**
  * "Abbrechen" in the password prompt: when the server was just being opened
  * and never connected, its half goes back to the server list instead of
@@ -318,6 +317,7 @@ export function cancelSecret(serverId: string) {
   else if (t.leftServerId === serverId) closePaneServer('local');
 }
 
+/** Passphrase or password typed by the user in the login prompt. */
 export function submitSecret(serverId: string, secret: string, save: boolean, kind: 'passphrase' | 'password') {
   setState({ dialog: null });
   live.submitSecret(serverId, secret, save, kind);
@@ -325,7 +325,7 @@ export function submitSecret(serverId: string, secret: string, save: boolean, ki
 
 /** "Befehl nach dem Hochladen jetzt ausführen" for the watch of the current folder. */
 export function runWatchCommand() {
-  const w = watchForLocal(panePath('local')) ?? state.watches[0];
+  const w = watchForLocal(panePath('local')) ?? getState().watches[0];
   if (!w) {
     showToast($t('Für diesen Ordner gibt es keine Überwachung.'));
     return;
@@ -335,7 +335,7 @@ export function runWatchCommand() {
 }
 
 export function trustHostKey(serverId: string) {
-  const d = state.dialog;
+  const d = getState().dialog;
   setState({ dialog: null });
   if (LIVE) {
     if (d?.type === 'fingerprint') live.trustAndConnect(serverId, d.key.fingerprint);

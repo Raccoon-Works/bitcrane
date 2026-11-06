@@ -250,7 +250,6 @@ pub fn run() {
             commands::local::local_copy,
             commands::local::local_move,
             commands::local::local_copy_files,
-            commands::app::open_full_disk_access,
             commands::app::mac_full_disk_access,
             commands::app::open_mac_settings,
             commands::local::git_status,
@@ -364,7 +363,7 @@ pub fn run() {
             commands::credentials::known_hosts_remove,
             commands::app::log_write,
             commands::app::log_path,
-            commands::app::app_info,
+            commands::app::app_version,
         ])
         .build(context)
         .expect("error while building Bitcrane")

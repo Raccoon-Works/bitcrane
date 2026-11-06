@@ -13,7 +13,7 @@ import { $t } from '../i18n';
 import { addLog } from './log';
 import { showToast } from './store';
 
-export interface ErrorText {
+interface ErrorText {
   /** What happened. */
   text: string;
   /** What the user can do (may be empty). */

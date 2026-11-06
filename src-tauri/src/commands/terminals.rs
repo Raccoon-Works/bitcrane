@@ -19,7 +19,10 @@ pub(crate) struct TerminalTarget {
     /// Terminal program: Mac "terminal" (default), "iterm", "ghostty"; Windows
     /// "wt" (default, Windows Terminal), "powershell", "cmd".
     #[serde(default)]
-    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
+    #[cfg_attr(
+        not(any(target_os = "macos", windows)),
+        allow(dead_code, reason = "only the macOS and Windows terminal launchers read it")
+    )]
     app: Option<String>,
 }
 

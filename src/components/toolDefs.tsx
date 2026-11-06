@@ -55,7 +55,7 @@ import {
 import { toggleTerminal } from '../state/terminal';
 
 /** Platform-specific shortcut label. */
-export function useKey() {
+function useKey() {
   const platform = useStore((s) => s.platform);
   return (mac: string, win: string) => (platform === 'mac' ? mac : win);
 }

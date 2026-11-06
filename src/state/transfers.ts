@@ -17,9 +17,9 @@ import {
   uid,
   activeTab,
   panePath,
-  state,
   listEntries,
   isDirEntry,
+  getState,
 } from './core';
 import { placeOf, selectedNames } from './fileOps';
 import { updateSettings } from './settings';
@@ -100,7 +100,6 @@ export function transferNames(from: string, fromDir: string, names: string[], to
   if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
 }
 
-/** Copies or moves between two folders of this computer; names may carry a relative path. */
 /**
  * "Kopieren nach …" (ForkLift): the chosen entries of a half into a folder of
  * this computer, without opening it in the other half first. From a server
@@ -118,10 +117,11 @@ export function copyTo(side: PaneSide, names: string[], toDir: string, move = fa
   }
   if (!from) copyOrMoveLocal(fromDir, names, toDir, move);
   else transferNames(from, fromDir, names, '', toDir);
-  const recent = [toDir, ...(state.settings.copyToRecent ?? []).filter((p) => p !== toDir)].slice(0, 6);
+  const recent = [toDir, ...(getState().settings.copyToRecent ?? []).filter((p) => p !== toDir)].slice(0, 6);
   updateSettings({ copyToRecent: recent });
 }
 
+/** Copies or moves between two folders of this computer; names may carry a relative path. */
 export function copyOrMoveLocal(fromDir: string, names: string[], toDir: string, move: boolean) {
   setState({ contextMenu: null });
   const groups = new Map<string, string[]>();
@@ -228,7 +228,7 @@ export function download(names = selectedNames('remote'), targetDir?: string, so
 }
 
 export function retryTransfer(id: string) {
-  const tr = state.transfers.find((x) => x.id === id);
+  const tr = getState().transfers.find((x) => x.id === id);
   if (LIVE && tr) live.clearFailed(tr.serverId);
   setState((s) => ({
     transfers: s.transfers.map((x) =>
@@ -260,7 +260,7 @@ export function toggleTransferPause(id: string) {
 }
 
 export function pauseAllTransfers() {
-  const anyActive = state.transfers.some((x) => x.state === 'running' || x.state === 'queued');
+  const anyActive = getState().transfers.some((x) => x.state === 'running' || x.state === 'queued');
   setState((s) => ({
     transfers: s.transfers.map((x) =>
       anyActive
@@ -279,7 +279,7 @@ export function pauseAllTransfers() {
  * finished is removed, after asking. Files already transferred stay where they are.
  */
 export function askCancelAllTransfers() {
-  const open = state.transfers.filter((x) => x.state !== 'done');
+  const open = getState().transfers.filter((x) => x.state !== 'done');
   if (!open.length) return;
   openDialog({
     type: 'confirm',
@@ -321,9 +321,9 @@ export function fixDemoPermissions() {
 /* ------------------------------------------------------------------------ */
 
 export function resolveConflict(choice: ConflictChoice, applyToAll: boolean) {
-  const queue = applyToAll ? state.conflicts : state.conflicts.slice(0, 1);
+  const queue = applyToAll ? getState().conflicts : getState().conflicts.slice(0, 1);
   for (const c of queue) {
-    const tr = state.transfers.find((x) => x.id === c.transferId);
+    const tr = getState().transfers.find((x) => x.id === c.transferId);
     if (!tr) continue;
     // "Take the server version" on a download conflict means: download and replace.
     const pick: ConflictChoice = choice === 'download' && c.direction === 'down' ? 'replace' : choice;
@@ -353,7 +353,7 @@ export function resolveConflict(choice: ConflictChoice, applyToAll: boolean) {
           ? $t('Server')
           : c.cross
             ? (serverById(c.sourceServerId ?? '')?.name ?? $t('Server'))
-            : state.platform === 'mac'
+            : getState().platform === 'mac'
               ? $t('Mac')
               : 'PC';
       const newName = dot > 0 ? `${tr.name.slice(0, dot)} (${tag})${tr.name.slice(dot)}` : `${tr.name} (${tag})`;
@@ -386,7 +386,9 @@ export function resolveConflict(choice: ConflictChoice, applyToAll: boolean) {
       }));
     }
   }
-  const rest = state.conflicts.slice(queue.length).map((c, i, arr) => ({ ...c, more: arr.length - 1 - i }));
+  const rest = getState()
+    .conflicts.slice(queue.length)
+    .map((c, i, arr) => ({ ...c, more: arr.length - 1 - i }));
   setState({ conflicts: rest, dialog: rest.length ? { type: 'conflict' } : null });
 }
 

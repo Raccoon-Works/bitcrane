@@ -11,7 +11,6 @@ import { $t } from '../i18n';
 import {
   setState,
   activityExpanded,
-  state,
   activeTab,
   emptyTab,
   paneShowsServers,
@@ -22,9 +21,10 @@ import {
   panePath,
   LIVE,
   uid,
+  getState,
 } from './core';
-import type { DialogState, SettingsTab, AppState } from './appState';
-import { SIDEBAR_MAX, SIDEBAR_MIN } from './defaults';
+import type { SettingsTab } from '../backend/types';
+import type { DialogState, AppState } from './appState';
 import { clearSelection, navigate, openServerInNewTab } from './tabs';
 import { quickConnect } from './servers';
 
@@ -32,16 +32,6 @@ export const toggleInspector = () => setState((s) => ({ inspectorOpen: !s.inspec
 export const toggleActivity = () => setState((s) => ({ activityOpen: !activityExpanded(s) }));
 export const togglePopover = () => setState((s) => ({ popoverOpen: !s.popoverOpen, appMenu: null }));
 
-/** Sets the sidebar width within its limits and remembers it. */
-export function setSidebarWidth(width: number) {
-  const w = Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width)));
-  setState({ sidebarWidth: w });
-  try {
-    window.localStorage.setItem('bitcrane.sidebarWidth', String(w));
-  } catch {
-    // Not critical: the width simply is not remembered.
-  }
-}
 export const openDialog = (dialog: DialogState) => {
   // The settings are a tab of their own, not a dialog.
   if (dialog?.type === 'settings') return openSettingsTab(dialog.tab);
@@ -49,8 +39,8 @@ export const openDialog = (dialog: DialogState) => {
 };
 
 /** Opens the settings tab (or brings it to the front) on the given area. */
-export function openSettingsTab(section: SettingsTab = 'general') {
-  const s = state;
+function openSettingsTab(section: SettingsTab = 'general') {
+  const s = getState();
   const close = { dialog: null, popoverOpen: false, contextMenu: null, appMenu: null, menuBarWindowOpen: false };
   const existing = s.tabs.find((t) => t.settings);
   if (existing) {
@@ -82,7 +72,7 @@ export function setSettingsSection(section: SettingsTab) {
 }
 export const closeDialog = () => setState({ dialog: null });
 /** What the search field searches: this computer, a server's files, or the server list. */
-export function searchTarget(s: AppState = state): {
+export function searchTarget(s: AppState = getState()): {
   side: PaneSide;
   kind: 'local' | 'server' | 'servers';
   name: string;
@@ -100,12 +90,12 @@ export const setSearch = (search: string) => {
   // A new search starts in the focused half; while text is in the field it stays there.
   setState((s) => ({ search, searchSide: s.search.trim() ? s.searchSide : s.focusSide }));
   pruneSelection();
-  if (state.deepSearchOn) scheduleDeepSearch();
+  if (getState().deepSearchOn) scheduleDeepSearch();
 };
 
 /** Drops selected names that a filter just hid, so actions never touch files the user cannot see. */
 function pruneSelection() {
-  const next = { ...state.selection };
+  const next = { ...getState().selection };
   let changed = false;
   for (const side of ['local', 'remote'] as PaneSide[]) {
     const visible = new Set(paneEntries(side).map((e) => e.name));
@@ -129,45 +119,45 @@ let deepRun = 0;
 export function setDeepSearch(on: boolean) {
   setState({ deepSearchOn: on, ...(on ? {} : { deepSearch: null, searchContent: false }) });
   if (on) {
-    if (!state.search.trim()) showToast($t('Suche in Unterordnern an: einen Namen ins Suchfeld tippen.'));
+    if (!getState().search.trim()) showToast($t('Suche in Unterordnern an: einen Namen ins Suchfeld tippen.'));
     scheduleDeepSearch();
   }
 }
+
+/** The subfolder setting before the content search turned it on. */
+let deepBeforeContent = false;
 
 /**
  * "Im Inhalt suchen" (ForkLift, Commander One, WinSCP "grep"): finds text inside
  * files below the folder, on this computer and on SSH servers. Turns on the
  * search in subfolders as well.
  */
-/** The subfolder setting before the content search turned it on. */
-let deepBeforeContent = false;
-
 export function setSearchContent(on: boolean) {
   // Content search turns on the subfolders; turning it off restores what was set before.
-  if (on && !state.searchContent) deepBeforeContent = state.deepSearchOn;
+  if (on && !getState().searchContent) deepBeforeContent = getState().deepSearchOn;
   setState({ searchContent: on, deepSearchOn: on ? true : deepBeforeContent, deepSearch: null });
-  if (on && !state.search.trim()) showToast($t('Suche im Inhalt an: einen Text ins Suchfeld tippen.'));
+  if (on && !getState().search.trim()) showToast($t('Suche im Inhalt an: einen Text ins Suchfeld tippen.'));
   scheduleDeepSearch();
 }
 
 function scheduleDeepSearch() {
   window.clearTimeout(deepTimer);
-  const q = state.search.trim();
-  if (!q || (state.searchContent && q.length < 2)) {
+  const q = getState().search.trim();
+  if (!q || (getState().searchContent && q.length < 2)) {
     setState({ deepSearch: null });
     return;
   }
   // Searching in content reads files, so it waits a little longer for the typing to stop.
   deepTimer = window.setTimeout(
-    () => void (state.searchContent ? runContentSearch(q) : runDeepSearch(q)),
-    state.searchContent ? 600 : 300,
+    () => void (getState().searchContent ? runContentSearch(q) : runDeepSearch(q)),
+    getState().searchContent ? 600 : 300,
   );
 }
 
 async function runContentSearch(query: string) {
   const t = activeTab();
   if (!t) return;
-  const side = state.searchSide;
+  const side = getState().searchSide;
   if (paneShowsServers(side, t)) return;
   const base = panePath(side);
   const run = ++deepRun;
@@ -191,7 +181,7 @@ async function runContentSearch(query: string) {
       : await live.grep(...loc, base, query, max + 1);
     if (run !== deepRun) return;
     const visible = hits.filter(
-      (h) => state.settings.showHidden || !h.rel.split('/').some((seg) => seg.startsWith('.')),
+      (h) => getState().settings.showHidden || !h.rel.split('/').some((seg) => seg.startsWith('.')),
     );
     setState({
       deepSearch: {
@@ -224,7 +214,7 @@ async function runContentSearch(query: string) {
 async function runDeepSearch(query: string) {
   const t = activeTab();
   if (!t) return;
-  const side = state.searchSide;
+  const side = getState().searchSide;
   if (paneShowsServers(side, t)) return;
   const base = panePath(side);
   const run = ++deepRun;
@@ -261,7 +251,7 @@ async function runDeepSearch(query: string) {
       .map((i) => ({ path: i.path, rel: i.relative.split('/').slice(1).join('/'), size: i.size, mtime: i.mtime }))
       .filter(
         (i) =>
-          (state.settings.showHidden || !i.rel.split('/').some((seg) => seg.startsWith('.'))) &&
+          (getState().settings.showHidden || !i.rel.split('/').some((seg) => seg.startsWith('.'))) &&
           words.every((w) => i.rel.toLowerCase().includes(w)),
       )
       // Matches in the file name first, then by path.
@@ -314,7 +304,7 @@ export function toggleHidden() {
   setState((s) => ({ settings: { ...s.settings, showHidden: !s.settings.showHidden } }));
   pruneSelection();
   showToast(
-    state.settings.showHidden
+    getState().settings.showHidden
       ? $t('Versteckte Dateien werden gezeigt.')
       : $t('Versteckte Dateien werden ausgeblendet.'),
   );
@@ -326,7 +316,7 @@ export function toggleHidden() {
  * opens its folder with the file selected.
  */
 export function openSftpLink(url: string) {
-  if (!state.settings.sftpLinks) {
+  if (!getState().settings.sftpLinks) {
     showToast(
       $t('Bitcrane öffnet sftp-Links erst, wenn das in den Einstellungen unter „Erweitert“ eingeschaltet ist.'),
     );
@@ -344,7 +334,7 @@ export function openSftpLink(url: string) {
   const port = Number(u.port) || 22;
   const user = decodeURIComponent(u.username);
   const path = decodeURIComponent(u.pathname || '');
-  const srv = state.servers.find((x) => x.host === host && x.port === port && (!user || x.user === user));
+  const srv = getState().servers.find((x) => x.host === host && x.port === port && (!user || x.user === user));
   if (!srv) {
     quickConnect(
       `${user ? `${user}@` : ''}${host}${port !== 22 ? `:${port}` : ''}${path && path !== '/' ? path : ''}`,
@@ -363,7 +353,7 @@ export function openSftpLink(url: string) {
 
 /** Opens the folders of a saved comparison and shows the comparison. */
 export function openSyncFavorite(id: string) {
-  const f = state.settings.syncFavorites.find((x) => x.id === id);
+  const f = getState().settings.syncFavorites.find((x) => x.id === id);
   if (!f || (!f.rightLocal && !serverById(f.serverId)) || (f.leftServerId && !serverById(f.leftServerId))) return;
   const tab: Tab = {
     id: uid('tab'),

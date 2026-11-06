@@ -65,7 +65,7 @@ function saveResult(id: string, result: string) {
 }
 
 /** Runs one saved comparison without the window. */
-export async function runScheduled(f: SyncFavorite): Promise<void> {
+async function runScheduled(f: SyncFavorite): Promise<void> {
   if (running.has(f.id)) return;
   running.add(f.id);
   const leftServer = f.leftServerId ?? '';

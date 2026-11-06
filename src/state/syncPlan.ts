@@ -35,7 +35,7 @@ export interface Place {
   name: string;
 }
 
-export interface PlanOptions {
+interface PlanOptions {
   direction: Direction;
   bySize: boolean;
   deletes: boolean;
@@ -67,7 +67,7 @@ export function baseKey(left: Place, right: Place): string {
   return `${BASE_PREFIX}${left.serverId}|${left.dir}||${right.serverId}|${right.dir}`;
 }
 
-export function loadBase(key: string): Base {
+function loadBase(key: string): Base {
   try {
     const raw = localStorage.getItem(key);
     return raw ? new Map(Object.entries(JSON.parse(raw) as Record<string, [number, number]>)) : new Map();

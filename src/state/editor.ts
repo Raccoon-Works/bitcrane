@@ -23,14 +23,14 @@ import { LIVE, getState, serverById, setState, showToast, updateSettings } from 
 import { isConnected, refreshVisible } from './live';
 
 /** Editor settings with their standard values (CodeEditor.tsx and Settings › Allgemein). */
-export interface EditorPrefs {
+interface EditorPrefs {
   fontSize: number;
   wrap: boolean;
   tabSize: number;
 }
 export const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
 
-export interface EditorDoc {
+interface EditorDoc {
   id: string;
   /** Server of the file; '' for a file of this computer, null for a new, unsaved document. */
   serverId: string | null;
@@ -76,7 +76,6 @@ export function useEditor(): EditorState {
     () => st,
   );
 }
-export const editorState = () => st;
 
 /** Text getters of the documents, registered by the component (the live CodeMirror text). */
 const textOf = new Map<string, () => string>();
@@ -89,7 +88,7 @@ let counter = 0;
 const newId = () => `doc-${Date.now().toString(36)}-${++counter}`;
 
 /** Shows the editor (over the file halves); with no document a new, empty one is made. */
-export function showEditor() {
+function showEditor() {
   if (!st.docs.length && !restoreDocs()) newDocument();
   set({ open: true });
 }
@@ -345,7 +344,7 @@ export function cancelClose() {
 }
 
 /** Unsaved documents (asked about before quitting). */
-export function unsavedDocs(): EditorDoc[] {
+function unsavedDocs(): EditorDoc[] {
   return st.docs.filter((d) => d.dirty);
 }
 

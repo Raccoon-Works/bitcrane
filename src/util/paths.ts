@@ -6,7 +6,7 @@
  */
 
 /** Splits "~/Projekte/a" or "/home/ubuntu" into segments. */
-export function segments(path: string): string[] {
+function segments(path: string): string[] {
   return path.replace(/^~\/?/, '').split('/').filter(Boolean);
 }
 
@@ -29,6 +29,11 @@ export function parent(path: string): string {
 }
 
 /** Last path segment. */
+export function basename(path: string): string {
+  const s = segments(path);
+  return s.length ? s[s.length - 1] : path;
+}
+
 /** True when a local path lies inside a zip or tar archive opened like a folder (archive_vfs.rs). */
 export function insideArchive(path: string): boolean {
   const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
@@ -45,15 +50,6 @@ export function isArchiveName(name: string): boolean {
   return /\.(zip|tar|tgz|tar\.gz)$/i.test(name);
 }
 
-export function basename(path: string): string {
-  const s = segments(path);
-  return s.length ? s[s.length - 1] : path;
-}
-
-/**
- * Breadcrumb parts of a path, e.g. "~/Projekte/a" -> [home, Projekte, a].
- * Handles the home folder ("~"), POSIX roots ("/") and Windows drives ("D:/").
- */
 /** Folder of `path` as shown in a transfer list: relative to `root`, or the root's own name. */
 export function relFolder(root: string, path: string): string {
   const p = parent(path);
@@ -61,6 +57,10 @@ export function relFolder(root: string, path: string): string {
   return p.startsWith(root + '/') ? p.slice(root.length + 1) : p;
 }
 
+/**
+ * Breadcrumb parts of a path, e.g. "~/Projekte/a" -> [home, Projekte, a].
+ * Handles the home folder ("~"), POSIX roots ("/") and Windows drives ("D:/").
+ */
 export function crumbs(path: string, homeName: string): Array<{ name: string; path: string }> {
   const out: Array<{ name: string; path: string }> = [];
   let acc: string;
@@ -99,7 +99,7 @@ const pct = (c: string) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padS
  * space at the end and the first letter of reserved names ("CON" → "%43ON").
  * `winNameFromSafe` turns it back on upload.
  */
-export function winSafeName(name: string): string {
+function winSafeName(name: string): string {
   let out = [...name].map((c) => (WIN_BAD.has(c) || c.charCodeAt(0) < 32 ? pct(c) : c)).join('');
   if (/[. ]$/.test(out)) out = out.slice(0, -1) + pct(out.slice(-1));
   if (WIN_RESERVED.test(out)) out = pct(out[0]) + out.slice(1);

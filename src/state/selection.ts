@@ -4,21 +4,21 @@
 
 import type { PaneSide } from '../backend/types';
 
-import { state, setState, paneEntries } from './core';
+import { setState, paneEntries, getState } from './core';
 import { updateSettings } from './settings';
 
 export function setFocusSide(side: PaneSide) {
-  if (state.focusSide !== side) setState({ focusSide: side });
+  if (getState().focusSide !== side) setState({ focusSide: side });
 }
 
 /** Makes the other half the active one; with "Nur eine Hälfte" that also shows it. */
 export function focusOtherHalf() {
-  setFocusSide(state.focusSide === 'local' ? 'remote' : 'local');
+  setFocusSide(getState().focusSide === 'local' ? 'remote' : 'local');
 }
 
 /** "Nur eine Hälfte": shows only the active half, or both again. */
 export function toggleSingleHalf() {
-  updateSettings({ singleHalf: !state.settings.singleHalf });
+  updateSettings({ singleHalf: !getState().settings.singleHalf });
 }
 
 /** Mouse click on a row with optional modifier keys. */
@@ -26,7 +26,7 @@ export function clickRow(side: PaneSide, index: number, mod: { shift?: boolean; 
   const entries = paneEntries(side);
   const entry = entries[index];
   if (!entry) return;
-  const sel = state.selection[side];
+  const sel = getState().selection[side];
   let names: string[];
   let anchor = sel.anchor;
   if (mod.shift && sel.anchor >= 0) {
@@ -54,7 +54,7 @@ export function clearPaneSelection(side: PaneSide) {
 export function moveCursor(side: PaneSide, delta: number, extend: boolean) {
   const entries = paneEntries(side);
   if (!entries.length) return;
-  const sel = state.selection[side];
+  const sel = getState().selection[side];
   const cursor = Math.max(
     0,
     Math.min(entries.length - 1, (sel.cursor < 0 ? (delta > 0 ? -1 : entries.length) : sel.cursor) + delta),
@@ -75,9 +75,9 @@ export function moveCursor(side: PaneSide, delta: number, extend: boolean) {
 }
 
 /** Einfg (Commander keys): selects or deselects the entry under the cursor and moves on to the next. */
-export function toggleAtCursor(side: PaneSide = state.focusSide) {
+export function toggleAtCursor(side: PaneSide = getState().focusSide) {
   const entries = paneEntries(side);
-  const sel = state.selection[side];
+  const sel = getState().selection[side];
   const entry = entries[sel.cursor];
   if (!entry) return;
   const names = sel.names.includes(entry.name) ? sel.names.filter((n) => n !== entry.name) : [...sel.names, entry.name];

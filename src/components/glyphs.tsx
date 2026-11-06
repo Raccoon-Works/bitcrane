@@ -27,7 +27,6 @@ import {
   Copy as PCopy,
   Dot as PDot,
   DotsSixVertical,
-  DotsThree,
   DownloadSimple,
   Eye as PEye,
   EyeSlash,
@@ -115,7 +114,6 @@ export const Keyboard = wrap(PKeyboard);
 export const Link2 = wrap(LinkSimple);
 export const Loader2 = wrap(CircleNotch);
 export const Lock = wrap(PLock);
-export const MoreHorizontal = wrap(DotsThree);
 export const Pause = wrap(PPause);
 export const Play = wrap(PPlay);
 export const PlugZap = wrap(Plug);

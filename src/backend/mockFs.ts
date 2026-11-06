@@ -239,18 +239,18 @@ function rootFor(side: 'local' | 'remote', serverId: string): DirNode {
 }
 
 /** Splits a path like "~/Projekte/a" or "/home/deploy" into segments. */
-export function segments(path: string): string[] {
+function segments(path: string): string[] {
   return path.replace(/^~\/?/, '').split('/').filter(Boolean);
 }
 
 /** Joins a parent path and a child name. */
-export function join(parent: string, name: string): string {
+function join(parent: string, name: string): string {
   if (parent === '/') return '/' + name;
   return parent.replace(/\/$/, '') + '/' + name;
 }
 
 /** Returns the parent path, or the same path when already at the root. */
-export function parent(path: string): string {
+function parent(path: string): string {
   if (path === '~' || path === '/') return path;
   const i = path.lastIndexOf('/');
   if (i <= 0) return path.startsWith('~') ? '~' : '/';
@@ -258,7 +258,7 @@ export function parent(path: string): string {
 }
 
 /** Returns the last path segment. */
-export function basename(path: string): string {
+function basename(path: string): string {
   const s = segments(path);
   return s.length ? s[s.length - 1] : path;
 }

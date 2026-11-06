@@ -10,7 +10,7 @@
  * Ideas taken from Tabby (MIT): snippets, colour schemes, per-server profile
  * settings.
  */
-export type { Snippet, TabTerminal, TermSession, TerminalSettings } from './terminal/types';
+export type { Snippet, TermSession, TerminalSettings } from './terminal/types';
 export { SCHEMES } from './terminal/schemes';
 export { terminalSettings, themeFor } from './terminal/settings';
 export { clearTerminal, findInTerminal, fitTerminal } from './terminal/instances';

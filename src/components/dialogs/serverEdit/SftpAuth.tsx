@@ -27,17 +27,12 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
     if (!LIVE || (draft.auth !== 'key' && draft.auth !== 'auto')) return;
     let cancelled = false;
     const t = window.setTimeout(() => {
-      backend
-        .keyInfo(draft.keyPath)
-        .then((k) => {
-          if (!cancelled) setKeyInfo(k);
-        })
-        .catch(() => undefined);
-      hasStoredSecret(draft)
-        .then((v) => {
-          if (!cancelled) setSecretStored(v);
-        })
-        .catch(() => undefined);
+      void backend.keyInfo(draft.keyPath).then((k) => {
+        if (!cancelled) setKeyInfo(k);
+      });
+      void hasStoredSecret(draft).then((v) => {
+        if (!cancelled) setSecretStored(v);
+      });
     }, 250);
     return () => {
       cancelled = true;

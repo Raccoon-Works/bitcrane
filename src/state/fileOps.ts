@@ -10,7 +10,6 @@ import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
-  state,
   setState,
   activeTab,
   paneLoc,
@@ -24,6 +23,7 @@ import {
   serverById,
   paneShowsServers,
   isDirEntry,
+  getState,
 } from './core';
 import type { AppState } from './appState';
 import { openDialog } from './panels';
@@ -34,7 +34,7 @@ import { updateSettings } from './settings';
 
 /** Names selected in a pane, or the entry under the cursor. */
 export function selectedNames(side: PaneSide): string[] {
-  return state.selection[side].names;
+  return getState().selection[side].names;
 }
 
 export function startRename(side: PaneSide, name?: string) {
@@ -58,7 +58,7 @@ export function commitRename(side: PaneSide, oldName: string, newName: string) {
   const name = newName.trim();
   if (!t || !name || name === base) return;
   // Windows forbids more characters in local names than servers do.
-  const winLocal = state.platform === 'win' && paneLoc(side, t)[0] === 'local';
+  const winLocal = getState().platform === 'win' && paneLoc(side, t)[0] === 'local';
   if (name.includes('/') || (winLocal && /[\\:*?"<>|]/.test(name))) {
     showToast($t('Ein Name darf diese Zeichen nicht enthalten: {0}', winLocal ? '/ \\ : * ? " < > |' : '/'), 'error');
     return;
@@ -87,7 +87,7 @@ export function commitRename(side: PaneSide, oldName: string, newName: string) {
   selectRenamed();
 }
 
-export function newFolder(side: PaneSide = state.focusSide) {
+export function newFolder(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t) return;
   const loc = paneLoc(side, t);
@@ -100,7 +100,7 @@ export function newFolder(side: PaneSide = state.focusSide) {
     const dir = panePath(side);
     void live.makeFolder(...loc, dir, name).then((ok) => {
       if (ok) pushUndo({ label: $t('Neuer Ordner „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
-      if (ok && state.activeTabId === t.id && panePath(side) === dir)
+      if (ok && getState().activeTabId === t.id && panePath(side) === dir)
         setState((s) => ({
           focusSide: side,
           selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } },
@@ -139,7 +139,7 @@ export function createMissingFolder(side: PaneSide) {
 }
 
 /** "Neue Datei" (ForkLift): an empty text file, named right away. */
-export function newFile(side: PaneSide = state.focusSide) {
+export function newFile(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t) return;
   const loc = paneLoc(side, t);
@@ -161,7 +161,7 @@ export function newFile(side: PaneSide = state.focusSide) {
   if (LIVE) {
     void live.makeFile(...loc, dir, name).then((ok) => {
       if (ok) pushUndo({ label: $t('Neue Datei „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
-      if (ok && state.activeTabId === t.id && panePath(side) === dir) select();
+      if (ok && getState().activeTabId === t.id && panePath(side) === dir) select();
     });
     return;
   }
@@ -172,7 +172,7 @@ export function newFile(side: PaneSide = state.focusSide) {
 
 export function askDelete(side: PaneSide, names = selectedNames(side)) {
   if (!names.length) return;
-  if (state.settings.confirmDelete || paneOnServer(side)) openDialog({ type: 'confirmDelete', side, names });
+  if (getState().settings.confirmDelete || paneOnServer(side)) openDialog({ type: 'confirmDelete', side, names });
   else deleteNames(side, names);
 }
 
@@ -194,7 +194,7 @@ export function deleteNames(side: PaneSide, names: string[]) {
 }
 
 /** Editor program for a file name ('' = the system's default program). */
-export function editorFor(name: string, s: AppState = state): string {
+export function editorFor(name: string, s: AppState = getState()): string {
   const dot = name.lastIndexOf('.');
   const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';
   return (ext && s.settings.editorByExt[ext]) || s.settings.editorApp;
@@ -213,7 +213,7 @@ export function webUrlFor(serverId: string, remotePath: string): string | undefi
 export function copyWebUrl(serverId: string, remotePath: string) {
   const url = webUrlFor(serverId, remotePath);
   if (!url) return;
-  void navigator.clipboard?.writeText(url).then(
+  void navigator.clipboard.writeText(url).then(
     () => showToast($t('Kopiert: {0}', url), 'ok'),
     () => showToast(url),
   );
@@ -233,7 +233,6 @@ export function openExternal(url: string) {
 export const folderSizeKey = (side: PaneSide, serverId: string, path: string) =>
   `${side}|${side === 'local' ? '' : serverId}|${path}`;
 
-/** "Größe berechnen": adds up all files in a folder (with subfolders). */
 /** "Link kopieren": sharing link of a file or folder on a cloud service. */
 export function copyShareLink(side: PaneSide, name: string) {
   const t = activeTab();
@@ -241,14 +240,13 @@ export function copyShareLink(side: PaneSide, name: string) {
   setState({ contextMenu: null });
   const [, serverId] = paneLoc(side, t);
   if (!LIVE) {
-    void navigator.clipboard?.writeText('https://www.dropbox.com/scl/fi/beispiel');
+    void navigator.clipboard.writeText('https://www.dropbox.com/scl/fi/beispiel');
     showToast($t('Link kopiert.'), 'ok');
     return;
   }
   void live.copyShareLink(serverId, paths.join(panePath(side), name));
 }
 
-/** Opens a local file with its default program (archives otherwise open like a folder). */
 /** "Im Finder/Explorer zeigen" (this computer only). */
 export function revealEntry(side: PaneSide, name: string) {
   setState({ contextMenu: null });
@@ -256,6 +254,7 @@ export function revealEntry(side: PaneSide, name: string) {
   else showToast($t('„{0}“ wird im Finder bzw. Explorer gezeigt.', name));
 }
 
+/** Opens a local file with its default program (archives otherwise open like a folder). */
 export function openWithDefaultApp(side: PaneSide, name: string) {
   setState({ contextMenu: null });
   if (LIVE) live.openLocal(paths.join(panePath(side), name));
@@ -308,16 +307,12 @@ export function compareFiles(a: { side: PaneSide; name: string }, b: { side: Pan
   openDialog({ type: 'compareFiles', a: ref(a), b: ref(b) });
 }
 
-export async function computeFolderSize(side: PaneSide, name: string) {
-  await computeFolderSizes(side, [name]);
-}
-
 /**
  * "Ordnergrößen berechnen" (ForkLift, WinSCP): the given folders, or every
  * folder of the half when none are given. Sizes appear in the list as they
  * come in; three folders are read at a time.
  */
-export async function computeFolderSizes(side: PaneSide = state.focusSide, names?: string[]) {
+export async function computeFolderSizes(side: PaneSide = getState().focusSide, names?: string[]) {
   const t = activeTab();
   if (!t) return;
   setState({ contextMenu: null });
@@ -417,7 +412,7 @@ export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, d
  * "Neuer Ordner mit Auswahl" (ForkLift): moves the chosen entries into a new
  * folder of the same half and starts renaming it.
  */
-export async function newFolderWithSelection(side: PaneSide = state.focusSide) {
+export async function newFolderWithSelection(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   const names = selectedNames(side).filter((n) => !n.includes('/'));
   if (!t || !names.length) return;
@@ -506,7 +501,7 @@ export function cutSelection(side: PaneSide) {
 }
 
 export function pasteClipboard(side: PaneSide) {
-  const c = state.clipboard;
+  const c = getState().clipboard;
   const t = activeTab();
   if (!c || !t) return;
   const to = placeOf(side, t);
@@ -568,7 +563,7 @@ function askMoveAcross(from: string, fromDir: string, names: string[], to: strin
 
 /** Takes a folder off "Zuletzt verwendet" (the folder itself stays). */
 export function removeRecent(path: string) {
-  updateSettings({ recentDirs: (state.settings.recentDirs ?? []).filter((p) => p !== path) });
+  updateSettings({ recentDirs: (getState().settings.recentDirs ?? []).filter((p) => p !== path) });
   setState({ contextMenu: null });
 }
 
@@ -579,8 +574,8 @@ export function clearRecent() {
 }
 
 /** ⌥⌘V (Finder "Objekt hierher bewegen"): what ⌘C remembered is moved here instead of copied. */
-export function pasteMove(side: PaneSide = state.focusSide) {
-  const c = state.clipboard;
+export function pasteMove(side: PaneSide = getState().focusSide) {
+  const c = getState().clipboard;
   if (!c) return;
   setState({ clipboard: { ...c, cut: true } });
   pasteClipboard(side);
@@ -590,7 +585,7 @@ export function pasteMove(side: PaneSide = state.focusSide) {
 export function goLocal(path: string) {
   const t = activeTab();
   if (!t) return;
-  const sides: PaneSide[] = state.focusSide === 'local' ? ['local', 'remote'] : ['remote', 'local'];
+  const sides: PaneSide[] = getState().focusSide === 'local' ? ['local', 'remote'] : ['remote', 'local'];
   const side = sides.find((x) => !placeOf(x, t) && !paneShowsServers(x, t));
   if (!side) {
     showToast($t('Keine Hälfte zeigt gerade diesen Computer.'));
@@ -601,7 +596,7 @@ export function goLocal(path: string) {
 }
 
 /** "In der anderen Hälfte öffnen" (ForkLift): the selected folder, or this folder, in the other half of the same place. */
-export function openInOtherHalf(side: PaneSide = state.focusSide) {
+export function openInOtherHalf(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t) return;
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
@@ -614,7 +609,7 @@ export function openInOtherHalf(side: PaneSide = state.focusSide) {
 }
 
 /** "Im Finder / Explorer zeigen" from the menu: the selected entry, or the folder itself. */
-export function revealSelection(side: PaneSide = state.focusSide) {
+export function revealSelection(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t || placeOf(side, t)) {
     showToast($t('Das geht nur mit Ordnern dieses Computers.'));
@@ -626,7 +621,7 @@ export function revealSelection(side: PaneSide = state.focusSide) {
 }
 
 /** F5 in the Commander keys: the selection goes into the folder of the other half (copy, upload or download). */
-export function copyToOtherHalf(side: PaneSide = state.focusSide) {
+export function copyToOtherHalf(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t) return;
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
@@ -638,7 +633,7 @@ export function copyToOtherHalf(side: PaneSide = state.focusSide) {
 }
 
 /** "Verschieben in die andere Hälfte" (F6 in the Commander keys). */
-export function moveToOtherSide(side: PaneSide = state.focusSide) {
+export function moveToOtherSide(side: PaneSide = getState().focusSide) {
   const t = activeTab();
   if (!t) return;
   const names = selectedNames(side);
@@ -680,9 +675,11 @@ export function editWith(side: PaneSide, name: string, app: string | null) {
 
 export function copyPath(side: PaneSide, name?: string) {
   const p = name ? paths.join(panePath(side), name) : panePath(side);
-  navigator.clipboard?.writeText(p).catch(() => undefined);
   setState({ contextMenu: null });
-  showToast($t('Pfad kopiert: {0}', p));
+  void navigator.clipboard.writeText(p).then(
+    () => showToast($t('Pfad kopiert: {0}', p)),
+    () => showToast($t('Kopieren nicht möglich.'), 'error'),
+  );
 }
 
 export function savePerms(

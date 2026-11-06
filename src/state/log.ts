@@ -51,6 +51,7 @@ export function addLog(level: LogLevel, text: string, serverId?: string, detail?
     flushTimer = window.setTimeout(() => {
       const lines = pending;
       pending = [];
+      // Reporting a failed write of the log as a new entry would feed the log it failed to write.
       backend.logWrite(lines).catch(() => undefined);
     }, 500);
   }

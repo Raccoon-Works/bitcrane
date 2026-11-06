@@ -56,7 +56,7 @@ function persist() {
 const keyFor = (serverId: string) => serverId || 'local';
 
 /** Remembers a command as the newest of its server (an older copy moves up). */
-export function rememberCommand(serverId: string, line: string) {
+function rememberCommand(serverId: string, line: string) {
   if (!line.trim() || line.startsWith(' ')) return;
   const h = load();
   const k = keyFor(serverId);
@@ -77,10 +77,10 @@ export function clearHistory() {
   persist();
 }
 
-export type CandidateKind = 'history' | 'snippet' | 'command' | 'folder' | 'file';
+type CandidateKind = 'history' | 'snippet' | 'command' | 'folder' | 'file';
 
 /** A suggestion: the whole input line it leads to. */
-export interface Candidate {
+interface Candidate {
   text: string;
   kind: CandidateKind;
   /** Shown instead of the text (snippet name, file name). */
@@ -109,12 +109,7 @@ function wantsPath(input: string): boolean {
 }
 
 /** Candidates for the typed line, best first. `names` lists the folder of the word being typed. */
-export function candidatesFor(
-  serverId: string,
-  input: string,
-  snippets: Snippet[],
-  names: string[] | null,
-): Candidate[] {
+function candidatesFor(serverId: string, input: string, snippets: Snippet[], names: string[] | null): Candidate[] {
   if (!input.trim()) return [];
   const out: Candidate[] = [];
   const seen = new Set<string>([input]);
@@ -137,12 +132,6 @@ export function candidatesFor(
   return out;
 }
 
-/** Kept for the ghost-only mode: the rest of the best candidate. */
-export function suggestionFor(serverId: string, input: string, snippets: Snippet[]): string {
-  const best = candidatesFor(serverId, input, snippets, null)[0];
-  return best ? best.text.slice(input.length) : '';
-}
-
 const KIND_LABEL: Record<CandidateKind, () => string> = {
   history: () => $t('Verlauf'),
   snippet: () => $t('Snippet'),
@@ -157,7 +146,7 @@ interface Pos {
   col: number;
 }
 
-export interface SuggesterOptions {
+interface SuggesterOptions {
   /** 'off', 'ghost' (only the dimmed rest) or 'list' (dimmed rest and the list). */
   mode: () => 'off' | 'ghost' | 'list';
   snippets: () => Snippet[];

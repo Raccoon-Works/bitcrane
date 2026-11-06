@@ -4,6 +4,25 @@
 //! The commands in `lib.rs` and the transfers in `transfer.rs` only talk to
 //! `Remote`; what a protocol cannot do (commands on the server over FTP,
 //! permissions over WebDAV, ...) comes back as a clear error.
+
+use crate::dav::DavConn;
+use crate::dropbox::DropboxConn;
+use crate::error::{AppError, AppResult, ErrorKind};
+use crate::ftp::{FtpConn, FtpFinish, Io};
+use crate::gdrive::GDriveConn;
+use crate::model::{FileEntry, WalkItem};
+use crate::onedrive::OneDriveConn;
+use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::scp::ScpConn;
+use crate::smb::SmbConn;
+use crate::ssh::Connection;
+use crate::vault::VaultConn;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
+
 /// Files below `path` (or `path` itself when it is a file), found by listing folder after
 /// folder, for protocols without a recursive listing of their own. Linked folders are not
 /// entered: a link back up would never end.
@@ -36,24 +55,6 @@ where
     }
     Ok(out)
 }
-
-use crate::dav::DavConn;
-use crate::dropbox::DropboxConn;
-use crate::error::{AppError, AppResult, ErrorKind};
-use crate::ftp::{FtpConn, FtpFinish, Io};
-use crate::gdrive::GDriveConn;
-use crate::model::{FileEntry, WalkItem};
-use crate::onedrive::OneDriveConn;
-use crate::paths::{remote_join, remote_name, remote_parent};
-use crate::scp::ScpConn;
-use crate::smb::SmbConn;
-use crate::ssh::Connection;
-use crate::vault::VaultConn;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 pub enum Remote {
     Sftp(Box<Connection>),
