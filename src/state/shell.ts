@@ -15,7 +15,7 @@ import { disable as disableAutostart, enable as enableAutostart, isEnabled as au
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Transfer } from '../backend/types';
-import { menuDefs } from '../components/AppMenu';
+import { menuDefs } from './menus';
 import { playDoneSound, playErrorSound } from '../util/sounds';
 import { quitApp } from '../util/appWindow';
 import { isConfigLoaded } from './live';

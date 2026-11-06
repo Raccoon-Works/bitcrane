@@ -2,7 +2,7 @@
  * Smaller dialogs: quick connect, host key (fingerprint) checks, conflict,
  * permissions, delete confirmation, about and the shortcut overview.
  */
-import { addressOf } from '../ServerList';
+import { addressOf } from '../../util/serverAddress';
 import { serverTrash } from '../../state/live';
 import { AlertTriangle, Cloud, Download, Info, KeyRound, ShieldAlert, ShieldCheck, Trash2, Zap } from '../glyphs';
 import { invoke } from '@tauri-apps/api/core';

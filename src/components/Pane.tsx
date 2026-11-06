@@ -21,10 +21,12 @@ import { ServerList } from './ServerList';
 import { formatDate, formatSize, permsToText } from '../util/format';
 import { beginRowDrag } from '../util/dragDrop';
 import { crumbs as crumbsFor } from '../util/paths';
-import { FileGlyph, FolderGlyph, PackageGlyph, typeIconFor } from './icons';
+import { FileGlyph, FolderGlyph, PackageGlyph } from './icons';
+import { typeIconFor } from './fileTypes';
 import { Thumb } from './Thumb';
 import * as paths from '../util/paths';
-import { LocalTile, ServerTile, swatch } from './ServerTile';
+import { LocalTile, ServerTile } from './ServerTile';
+import { swatch } from './serverColors';
 import { Button, IconButton } from './ui';
 import { $t, LOCALE } from '../i18n';
 import { invoke } from '@tauri-apps/api/core';
@@ -237,10 +239,10 @@ export function Pane({ side }: { side: PaneSide }) {
     // Stop when only the current folder is left (plus the "…").
     const visible = el ? el.querySelectorAll('.crumb-wrap').length - (crumbsHidden > 0 ? 1 : 0) : 0;
     if (el && visible > 1 && el.scrollWidth > el.clientWidth + 1) setCrumbsHidden((h) => h + 1);
-  });
+  }, [crumbsHidden, crumbPath, homeName]);
   useEffect(() => {
     const el = crumbsRef.current?.parentElement;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    if (!el) return;
     let w = el.clientWidth;
     const ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; setCrumbsHidden(0); } });
     ro.observe(el);
@@ -266,7 +268,6 @@ export function Pane({ side }: { side: PaneSide }) {
     const first = rowsRef.current?.querySelector<HTMLElement>('.row');
     if (first && first.offsetHeight) setRowH(first.offsetHeight);
     measureView();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [virtual, entries.length, density]);
   useEffect(() => {
     const el = listRef.current;
@@ -274,10 +275,9 @@ export function Pane({ side }: { side: PaneSide }) {
     let frame = 0;
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; measureView(); }); };
     el.addEventListener('scroll', onScroll, { passive: true });
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onScroll) : null;
-    ro?.observe(el);
-    return () => { el.removeEventListener('scroll', onScroll); ro?.disconnect(); if (frame) cancelAnimationFrame(frame); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const ro = new ResizeObserver(onScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', onScroll); ro.disconnect(); if (frame) cancelAnimationFrame(frame); };
   }, [virtual]);
   const firstRow = virtual ? Math.max(0, Math.floor(view.top / rowH) - VIRTUAL_MARGIN) : 0;
   const lastRow = virtual ? Math.min(entries.length, Math.ceil((view.top + view.height) / rowH) + VIRTUAL_MARGIN) : entries.length;

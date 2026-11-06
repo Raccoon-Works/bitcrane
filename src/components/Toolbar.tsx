@@ -3,32 +3,18 @@
  * button in the middle, the customisable tool group and the search field.
  * On Windows the tabs live in the title bar instead (MainWindow.tsx).
  */
-import { toggleTerminal } from '../state/terminal';
-import {
-  ArrowClockwise, ArrowsClockwise, CaretDoubleRight, Check, SidebarSimple, Code, Checks, Columns, Broadcast, CaretLeft, CaretRight, Command, Copy, DownloadSimple, EyeSlash, FolderSimplePlus, Info, LinkSimple, LockSimple, MagnifyingGlass, NotePencil, PencilSimple, Plugs, SquareHalfBottom, TerminalWindow, Trash, TreeStructure, TextAa, UploadSimple,
-} from '@phosphor-icons/react';
+import { CaretDoubleRight, Check, SidebarSimple, Broadcast, CaretLeft, CaretRight, MagnifyingGlass, TreeStructure, TextAa } from '@phosphor-icons/react';
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { TermNewMenu } from './TermNewMenu';
-import { toggleEditor, useEditor } from '../state/editor';
-import {
-  activeTab, activityExpanded, askDelete, copyPath, disconnect, download, goBack, goForward, newFolder, openDialog,
-  refresh, setSearch, startRename, toggleActivity, toggleHidden, toggleInspector, togglePopover,
-  upload, useStore, type ToolId,
-  getState, openInEditor, searchTarget, setDeepSearch, setSearchContent, toggleSyncBrowse, updateSettings,
-} from '../state/store';
+import { activeTab, goBack, goForward, openDialog, setSearch, togglePopover, useStore, type ToolId, searchTarget, setDeepSearch, setSearchContent, updateSettings } from '../state/store';
 import { formatAgo } from '../util/format';
 import { useKeyLabel } from '../state/keys';
 import { IconButton, Tooltip } from './ui';
 import { WatchPopover } from './WatchPopover';
-import { WinMoreMenu, useCloseOnOutside } from './AppMenu';
-import { toggleCompareDirs } from '../state/tools';
+import { WinMoreMenu } from './AppMenu';
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { $t } from '../i18n';
-
-/** Platform-specific shortcut label. */
-export function useKey() {
-  const platform = useStore((s) => s.platform);
-  return (mac: string, win: string) => (platform === 'mac' ? mac : win);
-}
+import { useToolDefs } from './toolDefs';
 
 /**
  * Folder watches as a toolbar symbol with a small lamp (replaces the wide
@@ -108,47 +94,6 @@ function toolRuns(tools: ToolId[]): ToolId[][] {
     else runs.push([t]);
   }
   return runs;
-}
-
-/** Icon and action for each customisable tool. */
-export function useToolDefs(): Record<ToolId, { label: string; short?: string; key?: string; icon: ReactNode; run: () => void; active?: boolean; disabled?: boolean }> {
-  const sk = useKeyLabel();
-  const key = useKey();
-  const inspector = useStore((s) => s.inspectorOpen);
-  const terminalOpen = useStore((s) => !!s.tabs.find((t) => t.id === s.activeTabId)?.terminal?.open);
-  const activity = useStore((s) => activityExpanded(s));
-  const focus = useStore((s) => s.focusSide);
-  const showHidden = useStore((s) => s.settings.showHidden);
-  const tab = useStore((s) => activeTab(s));
-  const selLocal = useStore((s) => s.selection.local.names.length);
-  const selRemote = useStore((s) => s.selection.remote.names.length);
-  const sel = focus === 'local' ? selLocal : selRemote;
-  const compareOn = useStore((s) => s.compareDirs);
-  const editorOpen = useEditor().open;
-  const ic = (n: ReactNode) => n;
-  return {
-    nav: { label: $t('Zurück'), key: sk('back'), icon: ic(<CaretLeft size={19} />), run: goBack, disabled: !tab?.back.length },
-    newFolder: { label: $t('Neuer Ordner'), key: sk('newFolder'), icon: ic(<FolderSimplePlus size={19} />), run: () => newFolder() },
-    refresh: { label: $t('Aktualisieren'), key: sk('refresh'), icon: ic(<ArrowClockwise size={19} />), run: refresh },
-    info: { label: $t('Informationen'), short: $t('Info'), key: sk('inspector'), icon: ic(<Info size={19} />), run: toggleInspector, active: inspector },
-    activity: { label: $t('Aktivität'), key: sk('activity'), icon: ic(<SquareHalfBottom size={19} />), run: toggleActivity, active: activity },
-    upload: { label: $t('Hochladen'), icon: ic(<UploadSimple size={19} />), run: () => upload(), disabled: !selLocal },
-    download: { label: $t('Herunterladen'), key: sk('download'), icon: ic(<DownloadSimple size={19} />), run: () => download(), disabled: !selRemote },
-    delete: { label: $t('Löschen'), key: key('⌘⌫', $t('Entf')), icon: ic(<Trash size={19} />), run: () => askDelete(focus), disabled: !sel },
-    rename: { label: $t('Umbenennen'), key: key('↩', 'F2'), icon: ic(<PencilSimple size={19} />), run: () => startRename(focus), disabled: !sel },
-    perms: { label: $t('Rechte'), icon: ic(<LockSimple size={19} />), run: () => toggleInspector(), disabled: false },
-    hidden: { label: showHidden ? $t('Versteckte Dateien ausblenden') : $t('Versteckte Dateien zeigen'), short: $t('Versteckte'), key: sk('hidden'), icon: ic(<EyeSlash size={19} />), run: toggleHidden, active: !showHidden },
-    terminal: { label: $t('Terminal'), key: sk('terminal'), icon: ic(<TerminalWindow size={19} />), run: () => toggleTerminal(), active: terminalOpen },
-    disconnect: { label: $t('Trennen'), icon: ic(<Plugs size={19} />), run: () => disconnect() },
-    copyPath: { label: $t('Pfad kopieren'), short: $t('Pfad'), key: sk('copyPath'), icon: ic(<Copy size={19} />), run: () => copyPath(focus) },
-    editor: { label: $t('Im Editor öffnen'), short: $t('Bearbeiten'), icon: ic(<NotePencil size={19} />), run: () => { const n = getState().selection[focus].names[0]; if (n) openInEditor(focus, n); }, disabled: !sel },
-    codeEditor: { label: $t('Editor'), key: sk('codeEditor'), icon: ic(<Code size={19} />), run: toggleEditor, active: editorOpen },
-    sync: { label: $t('Ordner abgleichen'), short: $t('Abgleichen'), icon: ic(<ArrowsClockwise size={19} />), run: () => openDialog({ type: 'compare' }) },
-    syncBrowse: { label: $t('Synchron blättern'), short: $t('Synchron'), key: sk('syncBrowse'), icon: ic(<LinkSimple size={19} />), run: toggleSyncBrowse, active: !!tab?.syncBrowse },
-    palette: { label: $t('Befehle'), key: sk('palette'), icon: ic(<Command size={19} />), run: () => openDialog({ type: 'palette' }) },
-    compareDirs: { label: $t('Verzeichnisse vergleichen'), short: $t('Vergleichen'), key: sk('compareDirs'), icon: ic(<Columns size={19} />), run: toggleCompareDirs, active: compareOn },
-    selectMask: { label: $t('Auswählen nach Muster'), short: $t('Auswählen'), key: sk('selectMask'), icon: ic(<Checks size={19} />), run: () => openDialog({ type: 'selectMask', side: focus }) },
-  };
 }
 
 /** Room the "»" button takes when tools overflow: its width plus the gap before it. */

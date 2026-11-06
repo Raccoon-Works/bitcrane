@@ -605,7 +605,7 @@ function detectPlatform(): Platform {
  * Read once at load: the app itself writes data-theme on the root later, and
  * reading it then would turn "Wie das System" into the last chosen theme.
  */
-const HOST_THEME = typeof document !== 'undefined' ? document.documentElement.dataset.theme : undefined;
+const HOST_THEME = document.documentElement.dataset.theme;
 
 function detectTheme(): Theme {
   if (DEMO_THEME) return DEMO_THEME;

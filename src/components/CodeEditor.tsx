@@ -32,7 +32,7 @@ import { Button, IconButton } from './ui';
 
 /** Editor settings with their standard values. */
 export interface EditorPrefs { fontSize: number; wrap: boolean; tabSize: number }
-export const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
+const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
 
 /** Syntax colours as CSS variables, so the light and the dark theme each set their own. */
 const highlight = HighlightStyle.define([
@@ -179,11 +179,13 @@ export function CodeEditor() {
   };
 
   // Closing the editor keeps what was typed: the texts go into the documents and come back when it opens again.
-  useEffect(() => () => {
-    const texts = new Map<string, string>();
-    for (const [id, st] of states.current) texts.set(id, st.doc.toString());
-    keepTexts(texts);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const saved = states.current;
+    return () => {
+      const texts = new Map<string, string>();
+      for (const [id, st] of saved) texts.set(id, st.doc.toString());
+      keepTexts(texts);
+    };
   }, []);
 
   // One EditorView; documents swap their states in and out of it.
@@ -191,10 +193,11 @@ export function CodeEditor() {
     if (!host.current) return;
     const v = new EditorView({ parent: host.current });
     view.current = v;
+    const saved = states.current;
     return () => {
       // The shown document's latest state is kept before the view goes (closing the editor).
       const a = activeRef.current;
-      if (a && states.current.has(a)) states.current.set(a, v.state);
+      if (a && saved.has(a)) saved.set(a, v.state);
       v.destroy();
       view.current = null;
     };
@@ -240,9 +243,10 @@ export function CodeEditor() {
     const line = s.doc.lineAt(r.head);
     setCursor({ line: line.number, col: r.head - line.from + 1, sel: 0 });
     v.focus();
+    const saved = states.current;
     return () => {
       // Keep the state (text, history, cursor) for when the document is shown again.
-      if (view.current && states.current.has(doc.id)) states.current.set(doc.id, view.current.state);
+      if (view.current && saved.has(doc.id)) saved.set(doc.id, view.current.state);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.id, doc?.loading, doc?.error]);

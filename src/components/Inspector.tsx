@@ -5,7 +5,8 @@
  */
 import type { PaneSide } from '../backend/types';
 import { activeTab, copyPath, openDialog, openInEditor, panePath, savePerms, statEntry, useStore, watchForLocal, paneLoc } from '../state/store';
-import { PreviewView, usePreview } from './preview';
+import { PreviewView } from './preview';
+import { usePreview } from './usePreview';
 import { join } from '../util/paths';
 import { describeFile, extLabel, formatDate, formatSize } from '../util/format';
 import { FolderGlyph } from './icons';

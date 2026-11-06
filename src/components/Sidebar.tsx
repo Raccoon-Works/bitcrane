@@ -20,8 +20,9 @@ import type { Place } from '../backend/types';
 import { $t, LOCALE } from '../i18n';
 import { LIVE, removeRecent, activeTab, editLocalPlaces, getState, localPlaces, moveSidebarSection, navigate, openDialog, openPlace, setRightLocal, setState, sidebarOrder, toggleSidebarCollapsed, useStore, type SidebarSection } from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
-import { BrandLogo, isBrandService } from './BrandLogo';
-import { placeLabel } from './PlacesBar';
+import { BrandLogo } from './BrandLogo';
+import { isBrandService } from './brands';
+import { placeLabel } from '../util/placeLabel';
 import * as paths from '../util/paths';
 
 const ICON = { size: 16, weight: 'regular', 'aria-hidden': true } as const;
