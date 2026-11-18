@@ -97,17 +97,13 @@ struct Ctx {
 async fn run(mut args: Vec<String>) -> i32 {
     let quiet = take_flag(&mut args, "--quiet");
     let dir = config_dir();
-    let config = match crate::config::load(&dir) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("bitcrane: {}", e.message.english());
-            return 1;
-        }
-    };
-    let config = match Config::from_value(config) {
+    let config = match Config::read(&dir) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("bitcrane: the saved servers are not readable ({e})");
+            match &e.detail {
+                Some(d) => eprintln!("bitcrane: {} ({d})", e.message.english()),
+                None => eprintln!("bitcrane: {}", e.message.english()),
+            }
             return 1;
         }
     };
@@ -159,42 +155,65 @@ fn take_option(args: &mut Vec<String>, name: &str) -> AppResult<Option<String>> 
     Ok(Some(v))
 }
 
+/// The readable servers on standard output; entries the core cannot read are named on standard
+/// error, so scripts that read the list are not disturbed.
 fn servers(ctx: &Ctx) {
     for s in &ctx.config.servers {
         println!("{}\t{}\t{}@{}:{}", s.name, s.protocol.name(), s.user, s.host, s.port);
     }
+    for u in &ctx.config.unreadable {
+        eprintln!("skipped {}: the saved entry is not readable ({})", u.name, u.reason);
+    }
 }
 
-/// "name:path" -> (server, path). A Windows drive ("C:\x") is not a server.
-fn find_target<'a>(servers: &'a [Server], spec: &str) -> AppResult<(&'a Server, Option<String>)> {
+/// "name:path" -> (server, path). A Windows drive ("C:\x") is not a server. A saved entry the core
+/// cannot read fails here with its name, while all other servers stay usable.
+fn find_target<'a>(config: &'a Config, spec: &str) -> AppResult<(&'a Server, Option<String>)> {
     let (name, path) = match spec.split_once(':') {
         Some((n, p)) => (n, Some(p.to_string()).filter(|p| !p.is_empty())),
         None => (spec, None),
     };
+    let servers = &config.servers;
     let found =
         servers.iter().find(|s| s.id == name).or_else(|| servers.iter().find(|s| s.name.eq_ignore_ascii_case(name)));
-    found.map(|s| (s, path)).ok_or_else(|| {
-        AppError::new(ErrorKind::NotFound, "No saved server called \"{0}\" (see: bitcrane servers).").param(name)
+    if let Some(s) = found {
+        return Ok((s, path));
+    }
+    let unreadable = config.unreadable.iter().find(|u| u.id == name || u.name.eq_ignore_ascii_case(name));
+    Err(match unreadable {
+        Some(u) => AppError::other("The saved server \"{0}\" is not readable.").param(&u.name).with_detail(&u.reason),
+        None => {
+            AppError::new(ErrorKind::NotFound, "No saved server called \"{0}\" (see: bitcrane servers).").param(name)
+        }
     })
 }
 
 /// Connects to a saved server with any protocol, logging in like the app does (`login.rs`) with
-/// what the keychain holds.
+/// what the keychain holds. Like the app, it follows one jump server.
 async fn connect(ctx: &Ctx, s: &Server) -> AppResult<Remote> {
     if !ctx.quiet {
         eprintln!("Connecting to {} ...", s.name);
     }
-    let jump = s.jump_id().and_then(|id| ctx.config.servers.iter().find(|x| x.id == id));
-    let login =
-        Login { keepalive: true, google_client_id: ctx.config.settings.google_client_id.clone(), ..Login::default() };
+    let jump = s.jump_id().and_then(|id| ctx.config.server(id)).cloned();
+    // The servers come straight from the saved configuration, so their stored secrets apply.
+    let login = Login {
+        keepalive: true,
+        google_client_id: ctx.config.settings.google_client_id.clone(),
+        stored_secrets: true,
+        ..Login::default()
+    };
     // No other connections exist here, so a vault on a server reports that it is not connected.
     let env = Env { known: ctx.known.clone(), prompter: None, secrets: &Keychain, connections: Default::default() };
-    crate::login::open(s, jump, &login, &env).await.map_err(|e| match e.kind {
+    let opened = crate::login::open(s.clone(), jump, login, &env).await.map_err(|e| match e.kind {
         ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => {
             AppError::new(e.kind, "The host key of {0} is not confirmed. Connect once in Bitcrane.").param(&s.name)
         }
         _ => e,
-    })
+    })?;
+    if let Some(w) = opened.warning {
+        eprintln!("warning: {}", w.message.english());
+    }
+    Ok(opened.remote)
 }
 
 /// The folder a command works in: the given path, else the server's start folder.
@@ -209,7 +228,7 @@ fn start_dir(home: &str, s: &Server, path: Option<String>) -> String {
 
 async fn ls(ctx: &Ctx, args: &[String]) -> AppResult<()> {
     let [spec] = args else { return Err(usage("ls needs exactly one <server>[:<path>]")) };
-    let (s, path) = find_target(&ctx.config.servers, spec)?;
+    let (s, path) = find_target(&ctx.config, spec)?;
     let conn = connect(ctx, s).await?;
     let dir = start_dir(conn.home(), s, path);
     let list = conn.list(&dir).await;
@@ -238,7 +257,7 @@ async fn upload(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
     if args.is_empty() {
         return Err(usage("upload needs at least one local file or folder"));
     }
-    let (s, path) = find_target(&ctx.config.servers, &to)?;
+    let (s, path) = find_target(&ctx.config, &to)?;
     let conn = connect(ctx, s).await?;
     let dest = start_dir(conn.home(), s, path);
     let opts = options(ctx);
@@ -285,7 +304,7 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
     // One connection per server, even when several paths name the same one.
     let mut open: Vec<(String, Remote)> = Vec::new();
     for spec in &args {
-        let (s, path) = find_target(&ctx.config.servers, spec)?;
+        let (s, path) = find_target(&ctx.config, spec)?;
         let Some(path) = path else { return Err(usage("download needs <server>:<path>")) };
         let id = s.id.clone();
         if !open.iter().any(|(i, _)| *i == id) {
@@ -335,13 +354,15 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Invented servers as the app stores them in its settings file.
-    fn servers() -> Vec<Server> {
-        serde_json::from_value(json!([
+    /// Invented servers as the app stores them in its settings file, one of them edited by hand
+    /// into an entry the core cannot read.
+    fn config() -> Config {
+        Config::from_value(json!({ "servers": [
             { "id": "s1", "name": "Webserver", "host": "web.example", "port": 2222, "user": "anna" },
             { "id": "f1", "name": "Shop FTP", "protocol": "ftps", "host": "ftp.example", "port": 21, "user": "shop" },
+            { "id": "b1", "name": "Kaputt", "host": "bad.example", "port": 70000 },
             { "id": "n1", "name": "NAS", "protocol": "smb", "host": "nas.example", "port": 445, "user": "ben" },
-        ]))
+        ]}))
         .unwrap()
     }
 
@@ -364,7 +385,9 @@ mod tests {
 
     #[test]
     fn servers_are_found_by_id_or_name_with_an_optional_path() {
-        let all = servers();
+        let all = config();
+        let listed: Vec<&str> = all.servers.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(listed, ["Webserver", "Shop FTP", "NAS"]);
         let (s, path) = find_target(&all, "webserver:/var/www").unwrap();
         assert_eq!((s.id.as_str(), path.as_deref()), ("s1", Some("/var/www")));
         let (s, path) = find_target(&all, "f1").unwrap();
@@ -374,6 +397,10 @@ mod tests {
         let unknown = find_target(&all, "C:\\Users").unwrap_err();
         assert_eq!(unknown.kind, ErrorKind::NotFound);
         assert_eq!(unknown.message.english(), "No saved server called \"C\" (see: bitcrane servers).");
+        // Only the unreadable entry fails, by its name.
+        let bad = find_target(&all, "kaputt:/srv").unwrap_err();
+        assert_eq!(bad.message.english(), "The saved server \"Kaputt\" is not readable.");
+        assert!(bad.detail.is_some_and(|d| d.contains("70000")));
     }
 
     #[test]
@@ -382,6 +409,6 @@ mod tests {
         assert_eq!(start_dir("/home/anna", &s, Some("/tmp".into())), "/tmp");
         assert_eq!(start_dir("/home/anna", &s, Some("logs".into())), "/home/anna/logs");
         assert_eq!(start_dir("/home/anna", &s, None), "/srv/www");
-        assert_eq!(start_dir("/home/anna", &servers()[0], None), "/home/anna");
+        assert_eq!(start_dir("/home/anna", &config().servers[0], None), "/home/anna");
     }
 }

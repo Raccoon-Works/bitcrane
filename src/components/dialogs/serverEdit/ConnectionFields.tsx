@@ -5,7 +5,7 @@
  */
 import type { Dispatch, SetStateAction } from 'react';
 import type { Server } from '../../../backend/types';
-import { davUrl } from '../../../util/serverAddress';
+import { davUrl, portInput } from '../../../util/serverAddress';
 import { useStore } from '../../../state/store';
 import { Segmented, Select, Switch, TextField } from '../../ui';
 import { $t } from '../../../i18n';
@@ -130,11 +130,7 @@ export function ConnectionFields({
           invalid={!draft.host && testFailed}
           mono={family === 's3'}
         />
-        <TextField
-          value={String(draft.port)}
-          onChange={(v) => set('port', Number(v.replace(/\D/g, '')) || 22)}
-          className="port-field"
-        />
+        <TextField value={String(draft.port)} onChange={(v) => set('port', portInput(v, 22))} className="port-field" />
       </div>
 
       {family === 's3' && (

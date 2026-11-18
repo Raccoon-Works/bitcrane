@@ -26,8 +26,9 @@ import { updateSettings } from './settings';
 
 /**
  * True inside the desktop app: real files and real servers instead of the demo data. Fixed when
- * building (vite.config.ts), so the app's bundle leaves out the demo and the demo's the app; only
- * the development server, which serves both, asks at run time whether Tauri is there.
+ * building (vite.config.ts), so the app's bundle leaves out the demo; the demo's bundle still
+ * contains the app's code but never calls it. Only the development server, which serves both,
+ * asks at run time whether Tauri is there.
  */
 export const LIVE: boolean = __BITCRANE_LIVE__ ?? '__TAURI_INTERNALS__' in window;
 

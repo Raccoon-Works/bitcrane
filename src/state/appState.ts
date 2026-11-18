@@ -59,7 +59,8 @@ export type DialogState =
   | { type: 'gitCommit'; root: string }
   | { type: 'tagFiles'; name: string; color: number }
   | { type: 'shortcuts' }
-  | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
+  /** `jump`: the password of `serverId`'s jump server, asked while connecting to `serverId`. */
+  | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean; jump?: boolean }
   | { type: 'diff'; transferId: string }
   | { type: 'compareFiles'; a: CompareRef; b: CompareRef }
   | { type: 'uploadTo'; paths: string[]; external: boolean }

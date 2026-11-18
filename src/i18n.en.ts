@@ -1233,6 +1233,10 @@ export const EN: Record<string, string> = {
   'Dieser Server ist noch nicht bekannt.': 'This server is not known yet.',
   'Verbindung zum Server fehlgeschlagen.': 'Connection to the server failed.',
   'Sprungserver {0}: {1}': 'Jump server {0}: {1}',
+  '{0} ist der Sprungserver für {1}.': '{0} is the jump server for {1}.',
+  'Das Passwort des Sprungservers {0} fragt Bitcrane beim Verbinden ab.':
+    'Bitcrane asks for the password of the jump server {0} when connecting.',
+  'Die Einstellungen sind nicht lesbar.': 'The settings cannot be read.',
   'Der Sprungserver erreicht das Ziel nicht.': 'The jump server cannot reach the target server.',
   'Der Server bietet kein SFTP an.': 'The server does not offer SFTP.',
   'Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?':

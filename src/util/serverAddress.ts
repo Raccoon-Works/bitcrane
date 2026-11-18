@@ -4,6 +4,14 @@
  */
 import { isCloudProtocol, type Protocol, type Server } from '../backend/types';
 
+/**
+ * A port number as typed into a field: digits only, at most 65535 (the core reads ports as 16-bit
+ * numbers, src-tauri/src/serverconfig.rs); empty or 0 gives `fallback`.
+ */
+export function portInput(text: string, fallback: number): number {
+  return Math.min(65535, Number(text.replace(/\D/g, '')) || fallback);
+}
+
 /** Address of a WebDAV server, shown in the server dialog; the core logs in with the same one (login.rs). */
 export function davUrl(srv: Server): string {
   const https = srv.davHttps !== false;

@@ -292,10 +292,16 @@ export function cancelSecret(serverId: string) {
   else if (t.leftServerId === serverId) closePaneServer('local');
 }
 
-/** Passphrase or password typed by the user in the login prompt. */
-export function submitSecret(serverId: string, secret: string, save: boolean, kind: 'passphrase' | 'password') {
+/** Passphrase or password typed by the user in the login prompt (`jump`: for the jump server). */
+export function submitSecret(
+  serverId: string,
+  secret: string,
+  save: boolean,
+  kind: 'passphrase' | 'password',
+  jump?: boolean,
+) {
   setState({ dialog: null });
-  live.submitSecret(serverId, secret, save, kind);
+  live.submitSecret(serverId, secret, save, kind, jump);
 }
 
 /** "Befehl nach dem Hochladen jetzt ausführen" for the watch of the current folder. */

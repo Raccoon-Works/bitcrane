@@ -41,8 +41,10 @@ export interface GrepHit {
 export type ChecksumAlgo = 'md5' | 'sha1' | 'sha256' | 'sha512';
 
 /**
- * Where a secret is kept in the system keychain (src-tauri/src/secrets.rs). The interface names
- * secrets but never reads them: the core uses them where they are needed.
+ * Where a secret is kept in the system keychain (src-tauri/src/secrets.rs). The interface names a
+ * secret to store or forget it or to ask whether it is stored; no call reads one back. The core
+ * uses stored secrets only for the server they were saved for, and export and sync files carry
+ * them encrypted with a password the user types (see secrets.rs for the exact limits).
  */
 export type SecretRef =
   | { kind: 'password'; user: string; host: string; port: number }
@@ -52,14 +54,17 @@ export type SecretRef =
   | { kind: 'googleClient' }
   | { kind: 'syncPassword' };
 
-/** One login (see `ConnectRequest` in src-tauri/src/commands/connect.rs). */
+/**
+ * One login (see `ConnectRequest` in src-tauri/src/commands/connect.rs). The core takes the jump
+ * server from the saved servers and uses stored secrets only when `server` matches its saved entry.
+ */
 export interface ConnectRequest {
   server: Server;
-  /** Its jump server (SFTP only). */
-  jump?: Server;
   /** Typed into the prompt just now; otherwise the stored one is used. */
   password?: string;
   passphrase?: string;
+  /** Typed into the prompt for the jump server's password just now. */
+  jumpPassword?: string;
   /** Fingerprint or certificate the user confirmed in the host key dialog. */
   trust?: string;
   /** Send keepalive messages (setting "Verbindung offen halten"). */
@@ -117,6 +122,7 @@ export type ErrorKind =
   | 'authFailed'
   | 'passphraseRequired'
   | 'passwordRequired'
+  | 'jumpPasswordRequired'
   | 'unreachable'
   | 'notConnected'
   | 'connectionLost'
@@ -389,8 +395,14 @@ export interface Backend {
   /** Folder of a server shown in the Explorer right now. */
   mountFolder(serverId: string): Promise<string | null>;
 
-  /** Logs into a server and keeps the connection under `serverId`; resolves to the start folder. */
-  serverConnect(serverId: string, request: ConnectRequest): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /**
+   * Logs into a server and keeps the connection under `serverId`; resolves to the start folder and
+   * a problem that did not stop the login (an error to report).
+   */
+  serverConnect(
+    serverId: string,
+    request: ConnectRequest,
+  ): Promise<{ home: string; clockOffsetMs?: number | null; warning?: unknown }>;
   /** "Verbindung testen": logs in once and closes again; resolves to the start folder. */
   serverTest(request: ConnectRequest): Promise<string>;
   disconnect(serverId: string): Promise<void>;

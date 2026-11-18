@@ -141,6 +141,9 @@ pub enum ErrorKind {
     PassphraseRequired,
     /// The server wants a password and none was given ("Automatisch").
     PasswordRequired,
+    /// The jump server in front of an SSH server wants a password: none is stored or typed, or it
+    /// refused the one given. Kept apart from `PasswordRequired`, whose prompt is for the target.
+    JumpPasswordRequired,
     /// The server could not be reached (DNS, refused, timeout).
     Unreachable,
     /// There is no open session for the requested server.
@@ -278,6 +281,14 @@ impl From<russh_sftp::client::error::Error> for AppError {
 impl From<russh::Error> for AppError {
     fn from(e: russh::Error) -> Self {
         AppError::new(ErrorKind::ConnectionLost, "SSH-Verbindung fehlgeschlagen.").with_detail(e.to_string())
+    }
+}
+
+/// A task on a worker thread (`spawn_blocking`) that panicked or was cancelled: a bug, not
+/// something the user can act on.
+impl From<tokio::task::JoinError> for AppError {
+    fn from(e: tokio::task::JoinError) -> Self {
+        AppError::other("Unerwarteter Fehler.").with_detail(e.to_string())
     }
 }
 

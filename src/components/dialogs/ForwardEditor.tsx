@@ -9,8 +9,7 @@ import { startForward, stopForward } from '../../state/forward';
 import { uid, useStore } from '../../state/store';
 import { Plus, X } from '../glyphs';
 import { Button, Checkbox, IconButton, Select, Switch, TextField } from '../ui';
-
-const port = (v: string, fallback: number) => Math.min(65535, Number(v.replace(/\D/g, '')) || fallback);
+import { portInput } from '../../util/serverAddress';
 
 export function ForwardEditor({
   serverId,
@@ -100,7 +99,7 @@ export function ForwardEditor({
               <TextField
                 label={$t('Port, der geöffnet wird')}
                 value={String(f.bindPort)}
-                onChange={(v) => set(f.id, { bindPort: port(v, 0) })}
+                onChange={(v) => set(f.id, { bindPort: portInput(v, 0) })}
                 mono
                 className="fw-port"
               />
@@ -120,7 +119,7 @@ export function ForwardEditor({
                   <TextField
                     label={$t('Ziel-Port')}
                     value={String(f.destPort)}
-                    onChange={(v) => set(f.id, { destPort: port(v, 1) })}
+                    onChange={(v) => set(f.id, { destPort: portInput(v, 1) })}
                     mono
                     className="fw-port"
                   />

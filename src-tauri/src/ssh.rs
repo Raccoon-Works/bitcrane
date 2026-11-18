@@ -695,7 +695,23 @@ pub struct Session {
     pub(crate) sftp_command: Option<String>,
 }
 
-/// Opens the session: host key check and login (through the jump server if set).
+/// An error of the jump server's login, named as such. The interface answers `PasswordRequired`,
+/// `PassphraseRequired` and `AuthFailed` with a prompt for the target server; for the jump server
+/// that prompt would never help, so its password questions become `JumpPasswordRequired` and the
+/// other login failures a plain error naming the jump server.
+fn jump_error(e: AppError, jump: &ConnectParams) -> AppError {
+    let sent_password = matches!(jump.auth, AuthParams::Password { .. } | AuthParams::Auto { password: Some(_), .. });
+    let kind = match e.kind {
+        ErrorKind::PasswordRequired => ErrorKind::JumpPasswordRequired,
+        ErrorKind::AuthFailed if sent_password => ErrorKind::JumpPasswordRequired,
+        ErrorKind::AuthFailed | ErrorKind::PassphraseRequired => ErrorKind::Other,
+        other => other,
+    };
+    AppError { kind, message: Message::new("Sprungserver {0}: {1}").param(&jump.host).param(e.message), ..e }
+}
+
+/// Opens the session: host key check and login (through the jump server if set). Only one jump
+/// server is followed: a jump server's own `jump` is not used.
 pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Option<Prompter>) -> AppResult<Session> {
     let forwards = RemoteForwards::default();
     let (handle, jump) = match &params.jump {
@@ -711,10 +727,7 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
                 RemoteForwards::default(),
             )
             .await
-            .map_err(|e| AppError {
-                message: Message::new("Sprungserver {0}: {1}").param(&jump_params.host).param(e.message),
-                ..e
-            })?;
+            .map_err(|e| jump_error(e, jump_params))?;
             let channel = jump
                 .channel_open_direct_tcpip(params.host.clone(), params.port as u32, "127.0.0.1", 0)
                 .await
@@ -1776,6 +1789,35 @@ mod params_tests {
         let path = dir.path().join("known_hosts.json");
         std::fs::create_dir(&path).unwrap();
         assert!(KnownHosts::load(path).set("shop.example:22", "SHA256:eins").is_err());
+    }
+
+    #[test]
+    fn login_failures_of_the_jump_server_do_not_ask_for_the_targets_secrets() {
+        let jump = |auth| ConnectParams {
+            host: "jump.example".into(),
+            port: 22,
+            user: "ops".into(),
+            auth,
+            trust: None,
+            keepalive: false,
+            scp: false,
+            jump: None,
+            proxy: None,
+            forward_agent: false,
+            timeout: None,
+            sftp_command: None,
+        };
+        let password = jump(AuthParams::Password { password: "pw".into() });
+        let key = jump(AuthParams::Key { path: "~/.ssh/id_ed25519".into(), passphrase: None });
+        let rejected = "Anmeldung abgelehnt. Benutzer, Schlüssel oder Passwort prüfen.";
+        let kind = |e: ErrorKind, p: &ConnectParams| jump_error(AppError::new(e, rejected), p).kind;
+        assert_eq!(kind(ErrorKind::PasswordRequired, &key), ErrorKind::JumpPasswordRequired);
+        assert_eq!(kind(ErrorKind::AuthFailed, &password), ErrorKind::JumpPasswordRequired);
+        assert_eq!(kind(ErrorKind::AuthFailed, &key), ErrorKind::Other);
+        assert_eq!(kind(ErrorKind::PassphraseRequired, &key), ErrorKind::Other);
+        assert_eq!(kind(ErrorKind::HostKeyUnknown, &key), ErrorKind::HostKeyUnknown);
+        let e = jump_error(AppError::new(ErrorKind::AuthFailed, rejected), &key);
+        assert!(e.message.english().starts_with("Jump server jump.example: "), "{}", e.message.english());
     }
 }
 

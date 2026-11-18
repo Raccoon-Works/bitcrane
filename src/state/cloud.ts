@@ -41,7 +41,7 @@ export function googleSecretStored(): Promise<boolean> {
 
 /** Whether the user's own Google app key is complete: the id in the settings, the secret in the keychain. */
 async function hasGoogleKey(): Promise<boolean> {
-  return !!getState().settings.googleClientId?.trim() && (await googleSecretStored());
+  return !!getState().settings.googleClientId && (await googleSecretStored());
 }
 
 /** Keeps the Google app key: the id in the settings, the secret in the keychain (only when entered). */
@@ -100,7 +100,7 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
     const existing = serverId ? serverById(serverId) : undefined;
     // The id comes first: the core keeps the sign-in for this server entry.
     const template = existing ?? newServerTemplate();
-    const account = await backend.cloudSignIn(service, template.id, getState().settings.googleClientId?.trim() ?? '');
+    const account = await backend.cloudSignIn(service, template.id, getState().settings.googleClientId ?? '');
     const srv: Server = existing
       ? { ...existing, user: account || existing.user }
       : {

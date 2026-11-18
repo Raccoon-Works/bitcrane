@@ -4,11 +4,16 @@
 //! The interface owns the configuration file (`config.json`, see `config.rs`) and writes servers
 //! in the shape of its `Server` type (`src/backend/types.ts`). This model reads the part the core
 //! needs and ignores the rest (colours, places, tunnels …). Every field has the default the
-//! interface assumes when it is missing, so every file an earlier version wrote still loads.
+//! interface assumes when it is missing, so every file an earlier version wrote still loads. A
+//! server entry that still does not fit (a hand-edited port above 65535, an FTP encoding no version
+//! writes) is set aside on its own (see [`read_servers`]), so it cannot break the others.
 
+use crate::error::AppResult;
 use crate::ftp::{FtpEncoding, TransferMode};
 use crate::secrets::SecretRef;
 use serde::Deserialize;
+use serde_json::Value;
+use std::path::Path;
 
 /// A saved server (or a temporary one from "Schnell verbinden", or a draft being tested).
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -132,7 +137,7 @@ impl Auth {
 }
 
 /// SOCKS5 or HTTP proxy in front of a server.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerProxy {
     /// "socks5" or "http".
@@ -188,6 +193,20 @@ impl Server {
         SecretRef::Cloud { server_id: self.id.clone() }
     }
 
+    /// Whether `other` logs into the same account the same way: protocol, address, user,
+    /// encryption and proxy are equal. A login may use this server's stored secrets only then, so
+    /// a request that changes any of them (plain FTP or HTTP instead of TLS, another proxy) cannot
+    /// make the core send a stored password somewhere it was not saved for.
+    pub fn same_login(&self, other: &Server) -> bool {
+        fn route(s: &Server) -> (Protocol, &str, u16, &str, Option<&ServerProxy>) {
+            (s.protocol, &s.host, s.port, &s.user, s.proxy())
+        }
+        fn encryption(s: &Server) -> [bool; 5] {
+            [s.implicit_tls, s.tls13_only, s.dav_https, s.s3_http, s.smb_encrypt]
+        }
+        route(self) == route(other) && encryption(self) == encryption(other)
+    }
+
     /// The stored password a login uses: only for the methods that send one.
     pub fn uses_password(&self) -> bool {
         self.auth.uses_password()
@@ -224,12 +243,49 @@ impl Server {
     }
 }
 
-/// The parts of the configuration file the command line reads.
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
+/// A saved server entry this model cannot read, kept by name for messages.
+#[derive(Debug)]
+pub struct Unreadable {
+    pub id: String,
+    pub name: String,
+    /// What did not fit, for the log.
+    pub reason: String,
+}
+
+/// Reads server entries one by one: an entry that does not fit is logged and set aside, and the
+/// others are still read.
+pub fn read_servers(entries: Vec<Value>) -> (Vec<Server>, Vec<Unreadable>) {
+    let mut servers = Vec::new();
+    let mut unreadable = Vec::new();
+    for entry in entries {
+        let text = |key: &str| entry.get(key).and_then(Value::as_str).unwrap_or_default().to_string();
+        let (id, name) = (text("id"), text("name"));
+        match serde_json::from_value::<Server>(entry) {
+            Ok(server) => servers.push(server),
+            Err(e) => {
+                log::warn!("skipped the saved server {name} ({id}), it is not readable: {e}");
+                unreadable.push(Unreadable { id, name, reason: e.to_string() });
+            }
+        }
+    }
+    (servers, unreadable)
+}
+
+/// The parts of the configuration file the core reads.
+#[derive(Debug, Default)]
 pub struct Config {
     pub servers: Vec<Server>,
+    /// Entries left out of `servers` (see [`read_servers`]).
+    pub unreadable: Vec<Unreadable>,
     pub settings: Settings,
+}
+
+/// The file's shape before the servers are read one by one.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct RawConfig {
+    servers: Vec<Value>,
+    settings: Settings,
 }
 
 /// Settings the command line follows (the interface writes many more).
@@ -250,11 +306,24 @@ impl Default for Settings {
 
 impl Config {
     /// Reads the configuration the interface stored; `null` (first start) is an empty one.
-    pub fn from_value(value: serde_json::Value) -> serde_json::Result<Config> {
+    pub fn from_value(value: Value) -> serde_json::Result<Config> {
         if value.is_null() {
             return Ok(Config::default());
         }
-        serde_json::from_value(value)
+        let raw: RawConfig = serde_json::from_value(value)?;
+        let (servers, unreadable) = read_servers(raw.servers);
+        Ok(Config { servers, unreadable, settings: raw.settings })
+    }
+
+    /// Reads the configuration file in `dir` as it is now.
+    pub fn read(dir: &Path) -> AppResult<Config> {
+        Config::from_value(crate::config::load(dir)?).map_err(|e| {
+            crate::error::AppError::other("Die Einstellungen sind nicht lesbar.").with_detail(e.to_string())
+        })
+    }
+
+    pub fn server(&self, id: &str) -> Option<&Server> {
+        self.servers.iter().find(|s| s.id == id)
     }
 }
 
@@ -361,6 +430,50 @@ mod tests {
             let entry = json!({ "id": "f", "protocol": "ftp", key: value });
             assert!(serde_json::from_value::<Server>(entry).is_err(), "{key}={value} must be refused");
         }
+    }
+
+    #[test]
+    fn an_entry_that_does_not_fit_is_set_aside_and_the_others_load() {
+        let mut stored = stored_config();
+        stored["servers"][1]["port"] = json!(70000);
+        stored["servers"][4]["ftpEncoding"] = json!("utf-16");
+        let config = Config::from_value(stored).unwrap();
+        assert_eq!(config.servers.len(), 11);
+        let skipped: Vec<(&str, &str)> = config.unreadable.iter().map(|u| (u.id.as_str(), u.name.as_str())).collect();
+        assert_eq!(skipped, [("nas", "Backup NAS"), ("f1", "Shop FTP")]);
+        assert!(config.server("ob").is_some() && config.server("nas").is_none());
+    }
+
+    #[test]
+    fn the_same_login_needs_the_same_address_encryption_and_proxy() {
+        let config = Config::from_value(stored_config()).unwrap();
+        for saved in &config.servers {
+            assert!(saved.same_login(&saved.clone()), "{}", saved.id);
+            // Name, colour, start folder and the like do not matter.
+            let renamed = Server { name: "x".into(), remote_start: "/tmp".into(), ..saved.clone() };
+            assert!(saved.same_login(&renamed));
+        }
+        let ftp = config.server("f1").unwrap();
+        let changed = [
+            Server { protocol: Protocol::Ftp, ..ftp.clone() },
+            Server { host: "other.example".into(), ..ftp.clone() },
+            Server { port: 21, ..ftp.clone() },
+            Server { user: "other".into(), ..ftp.clone() },
+            Server { implicit_tls: false, ..ftp.clone() },
+            Server { tls13_only: false, ..ftp.clone() },
+            Server { dav_https: false, ..ftp.clone() },
+            Server { s3_http: true, ..ftp.clone() },
+            Server { smb_encrypt: true, ..ftp.clone() },
+            Server {
+                proxy: Some(ServerProxy { kind: "http".into(), host: "proxy.example".into(), port: 8080, user: None }),
+                ..ftp.clone()
+            },
+        ];
+        for other in &changed {
+            assert!(!ftp.same_login(other), "{other:?}");
+        }
+        let shop = config.server("ob").unwrap();
+        assert!(!shop.same_login(&Server { proxy: None, ..shop.clone() }));
     }
 
     #[test]

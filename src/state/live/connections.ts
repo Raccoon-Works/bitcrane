@@ -18,6 +18,7 @@ import { synced, initialSync } from './watches';
 import { showError } from '../errors';
 import { updateSettings } from '../settings';
 import { offerCloudPlaces } from '../places';
+import { saveNow } from './config';
 
 export const connected = new Set<string>();
 /** Server clock minus local clock (ms), measured when connecting. */
@@ -88,7 +89,10 @@ export function withTerminalButton(
   return at < 0 ? [...toolbar, 'terminal'] : [...toolbar.slice(0, at), 'terminal', ...toolbar.slice(at)];
 }
 
-/** The jump server of an SFTP server, if one is set. */
+/**
+ * The jump server of an SFTP server, if one is set, for the log and the password prompt. The core
+ * finds it by the same rule (`Server::jump_id`, src-tauri/src/serverconfig.rs).
+ */
 function jumpOf(srv: Server): Server | undefined {
   const j = isSftp(srv) && srv.jumpServerId ? serverById(srv.jumpServerId) : undefined;
   return j && j.id !== srv.id ? j : undefined;
@@ -103,46 +107,66 @@ function typedSecret(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secret
   };
 }
 
-/** A login for the core: the server, its jump server and what the user typed or confirmed. */
+/** A login for the core: the server and what the user typed or confirmed. */
 function loginRequest(
   srv: Server,
-  typed: Pick<ConnectOptions, 'secret' | 'secretKind' | 'trust'> = {},
+  typed: Pick<ConnectOptions, 'secret' | 'secretKind' | 'trust' | 'jumpPassword'> = {},
 ): ConnectRequest {
   return {
     server: srv,
-    jump: jumpOf(srv),
     ...typedSecret(srv, typed),
+    jumpPassword: typed.jumpPassword,
     trust: typed.trust,
     keepalive: getState().settings.keepAlive,
-    googleClientId: getState().settings.googleClientId?.trim() ?? '',
+    googleClientId: getState().settings.googleClientId ?? '',
   };
 }
 
-/** Connects with the server's protocol; resolves to the start folder (and SSH clock offset). */
-async function openConnection(id: string, srv: Server, request: ConnectRequest) {
-  // The vault's files lie on another server, which has to be connected first.
+/** A vault whose files lie on another server needs that server connected first. */
+function checkVaultStorage(srv: Server) {
   if (srv.protocol === 'vault' && srv.vaultStorageId && !connected.has(srv.vaultStorageId)) {
     throw {
       kind: 'notConnected',
       message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', serverById(srv.vaultStorageId)?.name ?? '?'),
     };
   }
+}
+
+/** Connects with the server's protocol; resolves to the start folder (and SSH clock offset). */
+async function openConnection(id: string, srv: Server, request: ConnectRequest) {
+  checkVaultStorage(srv);
+  // The core uses stored secrets only for a server that matches its saved entry, so a change made
+  // just now (saving waits a moment to collect changes) has to be in the file first.
+  await saveNow();
   return backend.serverConnect(id, request);
 }
 
 /**
- * Whether the login has a password: typed just now, or stored for a method that sends one
- * (the same rule the core follows, src-tauri/src/login.rs).
+ * Whether the login has a password: typed just now, or stored for a method that sends one (the
+ * same rule the core follows, `Server::uses_password` in src-tauri/src/serverconfig.rs). Asking
+ * before connecting avoids a failed attempt: an SMB or FTP login would otherwise first try without
+ * a password and report a wrong one.
  */
 async function hasPassword(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secretKind'> = {}) {
   if (typedSecret(srv, typed).password !== undefined) return true;
   return (srv.auth === 'password' || srv.auth === 'auto') && hasSecret(passwordRef(srv));
 }
 
-/** Whether the login has a key passphrase: typed just now, or stored for a method that reads a key. */
+/** Whether the login has a key passphrase: typed just now, or stored for a method that reads a key (`Server::uses_passphrase`). */
 async function hasPassphrase(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secretKind'> = {}) {
   if (typedSecret(srv, typed).passphrase !== undefined) return true;
   return (srv.auth === 'key' || srv.auth === 'auto') && hasSecret(passphraseRef(srv.keyPath));
+}
+
+/** Stores a secret typed into a prompt after the login with it worked. */
+function keepSecret(secret: SecretRef, value: string) {
+  backend.secretStore(secret, value).catch(() => {
+    showToast(
+      $t('Konnte das Kennwort nicht im Schlüsselbund sichern.'),
+      'error',
+      $t('Beim nächsten Verbinden fragt Bitcrane wieder danach.'),
+    );
+  });
 }
 
 /**
@@ -170,6 +194,10 @@ interface ConnectOptions {
   secretKind?: 'passphrase' | 'password';
   /** Store the typed secret in the system keychain after a successful login. */
   saveSecret?: boolean;
+  /** Password of the jump server, typed by the user in its prompt. */
+  jumpPassword?: string;
+  /** Store `jumpPassword` for the jump server after a successful login. */
+  saveJumpPassword?: boolean;
   /** Background reconnect: no dialogs, no toasts on failure. */
   silent?: boolean;
 }
@@ -236,7 +264,12 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
       ? true
       : srv.auth === 'password' && !!srv.user;
   if (needsPassword && !(await hasPassword(srv, opts))) {
-    if (opts.trust) pendingLogin.set(serverId, { trust: opts.trust });
+    if (opts.trust || opts.jumpPassword !== undefined)
+      pendingLogin.set(serverId, {
+        trust: opts.trust,
+        jumpPassword: opts.jumpPassword,
+        saveJumpPassword: opts.saveJumpPassword,
+      });
     if (!opts.silent) openDialog({ type: 'secret', serverId, kind: 'password' });
     return false;
   }
@@ -244,7 +277,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     if (!opts.silent)
       addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', srv.user, srv.host, srv.port, authLabel(srv)), serverId);
     const request = loginRequest(srv, opts);
-    const jump = request.jump;
+    const jump = jumpOf(srv);
     if (jump && !opts.silent)
       addLog('info', $t('Über den Sprungserver {0}@{1}:{2}', jump.user, jump.host, jump.port), serverId);
     // Through a jump server its own proxy is used (see login.rs).
@@ -255,7 +288,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
         $t('Über {0}-Proxy {1}:{2}', proxy.kind === 'http' ? 'HTTP' : 'SOCKS5', proxy.host, proxy.port),
         serverId,
       );
-    const { home, clockOffsetMs } = await openConnection(serverId, srv, request);
+    const { home, clockOffsetMs, warning } = await openConnection(serverId, srv, request);
     connected.add(serverId);
     homes.set(serverId, home);
     pendingLogin.delete(serverId);
@@ -278,18 +311,13 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
       }
     }
     failed.delete(serverId);
+    if (warning) showError(warning, { prefix: srv.name, serverId });
     if (opts.saveSecret && opts.secret !== undefined) {
       const kind = opts.secretKind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
-      backend
-        .secretStore(kind === 'passphrase' ? passphraseRef(srv.keyPath) : passwordRef(srv), opts.secret)
-        .catch(() => {
-          showToast(
-            $t('Konnte das Kennwort nicht im Schlüsselbund sichern.'),
-            'error',
-            $t('Beim nächsten Verbinden fragt Bitcrane wieder danach.'),
-          );
-        });
+      keepSecret(kind === 'passphrase' ? passphraseRef(srv.keyPath) : passwordRef(srv), opts.secret);
     }
+    if (jump && opts.saveJumpPassword && opts.jumpPassword !== undefined)
+      keepSecret(passwordRef(jump), opts.jumpPassword);
     setState((s) => {
       const offline = { ...s.offline };
       delete offline[serverId];
@@ -336,12 +364,14 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     if (opts.silent) return false;
     failed.add(serverId);
     // Keep what was answered so far for the next question of this login.
-    if (opts.secret !== undefined || opts.trust)
+    if (opts.secret !== undefined || opts.trust || opts.jumpPassword !== undefined)
       pendingLogin.set(serverId, {
         secret: opts.secret,
         secretKind: opts.secretKind,
         saveSecret: opts.saveSecret,
         trust: opts.trust,
+        jumpPassword: opts.jumpPassword,
+        saveJumpPassword: opts.saveJumpPassword,
       });
     switch (err.kind) {
       case 'hostKeyUnknown':
@@ -355,6 +385,10 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
         break;
       case 'passwordRequired':
         openDialog({ type: 'secret', serverId, kind: 'password' });
+        break;
+      case 'jumpPasswordRequired':
+        // The jump server's own password; shown as wrong when the one typed for it was refused.
+        openDialog({ type: 'secret', serverId, kind: 'password', jump: true, wrong: opts.jumpPassword !== undefined });
         break;
       case 'authFailed':
         // A cloud service's sign-in was revoked or is missing: sign in again in the browser.
@@ -423,6 +457,7 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
   if (srv.auth === 'password' && !(await hasPassword(srv)))
     return { ok: true, text: $t('Das Passwort fragt Bitcrane beim Verbinden ab.') };
   try {
+    checkVaultStorage(srv);
     const home = await backend.serverTest(loginRequest(srv));
     return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
   } catch (e) {
@@ -431,6 +466,11 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
       return { ok: true, text: $t('Erreichbar. Die Passphrase des Schlüssels fragt Bitcrane beim Verbinden ab.') };
     if (err.kind === 'passwordRequired')
       return { ok: true, text: $t('Erreichbar. Das Passwort fragt Bitcrane beim Verbinden ab.') };
+    if (err.kind === 'jumpPasswordRequired')
+      return {
+        ok: true,
+        text: $t('Das Passwort des Sprungservers {0} fragt Bitcrane beim Verbinden ab.', jumpOf(srv)?.name ?? '?'),
+      };
     if (err.kind === 'hostKeyUnknown')
       return {
         ok: true,
@@ -488,7 +528,10 @@ export function clearFailed(serverId: string) {
  * What the user already answered during one login (typed password, trusted
  * fingerprint), so a second question does not lose the first answer.
  */
-const pendingLogin = new Map<string, Pick<ConnectOptions, 'secret' | 'secretKind' | 'saveSecret' | 'trust'>>();
+const pendingLogin = new Map<
+  string,
+  Pick<ConnectOptions, 'secret' | 'secretKind' | 'saveSecret' | 'trust' | 'jumpPassword' | 'saveJumpPassword'>
+>();
 
 /** Answer from the host key dialog. */
 export function trustAndConnect(serverId: string, fingerprint: string) {
@@ -496,15 +539,32 @@ export function trustAndConnect(serverId: string, fingerprint: string) {
   void connectServer(serverId, { ...pendingLogin.get(serverId), trust: fingerprint });
 }
 
-/** Answer from the passphrase / password prompt. */
-export function submitSecret(serverId: string, secret: string, save: boolean, kind: 'passphrase' | 'password') {
+/**
+ * Answer from the passphrase / password prompt. `jump`: it was the jump server's password; what
+ * was answered for the server itself so far is kept.
+ */
+export function submitSecret(
+  serverId: string,
+  secret: string,
+  save: boolean,
+  kind: 'passphrase' | 'password',
+  jump = false,
+) {
   failed.delete(serverId);
-  void connectServer(serverId, {
-    trust: pendingLogin.get(serverId)?.trust,
-    secret,
-    secretKind: kind,
-    saveSecret: save,
-  });
+  const pending = pendingLogin.get(serverId);
+  void connectServer(
+    serverId,
+    jump
+      ? { ...pending, jumpPassword: secret, saveJumpPassword: save }
+      : {
+          trust: pending?.trust,
+          jumpPassword: pending?.jumpPassword,
+          saveJumpPassword: pending?.saveJumpPassword,
+          secret,
+          secretKind: kind,
+          saveSecret: save,
+        },
+  );
 }
 
 /** Marks a server as dropped; a timer tries to reconnect in the background. */

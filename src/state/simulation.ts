@@ -386,9 +386,6 @@ function simulateLog(addLog: typeof import('./log').addLog) {
   });
 }
 
-let started = false;
-
-/** Starts the simulation timer once; in the app, the live backend instead. */
 /**
  * Prototype: all files below a folder, shaped like the core's walk (relative paths start with
  * the walked folder's own name), so comparing folders reads both the same way.
@@ -401,6 +398,9 @@ export function demoWalk(side: 'local' | 'remote', serverId: string, dir: string
   });
 }
 
+let started = false;
+
+/** Starts the simulation timer once; in the app, the live backend instead. */
 export function startSimulation() {
   if (started) return;
   started = true;

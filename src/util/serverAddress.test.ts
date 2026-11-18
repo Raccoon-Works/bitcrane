@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Server } from '../backend/types';
-import { addressOf, hostOf, normalizeSshAddress, parseQuickAddress, splitAddress } from './serverAddress';
+import { addressOf, hostOf, normalizeSshAddress, parseQuickAddress, portInput, splitAddress } from './serverAddress';
 
 function server(patch: Partial<Server>): Server {
   return {
@@ -167,5 +167,15 @@ describe('parseQuickAddress', () => {
   it('rejects an address without a host', () => {
     expect(parseQuickAddress('ftp://')).toBeNull();
     expect(parseQuickAddress('')).toBeNull();
+  });
+});
+
+describe('portInput', () => {
+  it('keeps a typed port within what the core reads', () => {
+    expect(portInput('2222', 22)).toBe(2222);
+    expect(portInput('22a2', 22)).toBe(222);
+    expect(portInput('70000', 22)).toBe(65535);
+    expect(portInput('', 22)).toBe(22);
+    expect(portInput('0', 1080)).toBe(1080);
   });
 });

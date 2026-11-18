@@ -10,23 +10,30 @@ import { Button, Checkbox, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
+/**
+ * Asks for a password or passphrase while connecting to `serverId`. `jump`: the password belongs to
+ * its jump server, which the prompt then shows.
+ */
 export function SecretPrompt({
   serverId,
   kind,
   wrong,
+  jump,
 }: {
   serverId: string;
   kind: 'passphrase' | 'password';
   wrong?: boolean;
+  jump?: boolean;
 }) {
-  const srv = useStore((s) => serverById(serverId, s));
+  const target = useStore((s) => serverById(serverId, s));
+  const srv = useStore((s) => (jump && target?.jumpServerId ? serverById(target.jumpServerId, s) : target));
   const platform = useStore((s) => s.platform);
   const [value, setValue] = useState('');
   const [save, setSave] = useState(true);
-  if (!srv) return null;
+  if (!srv || !target) return null;
   const store = platform === 'mac' ? $t('im Schlüsselbund') : $t('in der Windows-Anmeldeinformationsverwaltung');
   const submit = () => {
-    if (value) submitSecret(serverId, value, save, kind);
+    if (value) submitSecret(serverId, value, save, kind, jump);
   };
   return (
     <Dialog
@@ -43,7 +50,9 @@ export function SecretPrompt({
           ? $t('Der Schlüssel {0} ist mit einer Passphrase geschützt.', srv.keyPath)
           : srv.protocol === 'vault'
             ? $t('Cryptomator-Tresor in {0}', srv.host)
-            : $t('{0} meldet sich mit Passwort an.', srv.name)
+            : jump
+              ? $t('{0} ist der Sprungserver für {1}.', srv.name, target.name)
+              : $t('{0} meldet sich mit Passwort an.', srv.name)
       }
       icon={
         <span className="icon-tile tone-accent">

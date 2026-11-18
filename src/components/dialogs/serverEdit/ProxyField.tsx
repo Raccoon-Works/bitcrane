@@ -9,6 +9,7 @@ import { LIVE, useStore } from '../../../state/store';
 import { Select, TextField } from '../../ui';
 import { $t } from '../../../i18n';
 import { keychainShort, type SetField } from './model';
+import { portInput } from '../../../util/serverAddress';
 
 export function ProxyField({
   draft,
@@ -72,7 +73,7 @@ export function ProxyField({
               <TextField
                 label={$t('Proxy-Port')}
                 value={String(draft.proxy.port)}
-                onChange={(v) => set('proxy', { ...draft.proxy!, port: Number(v.replace(/\D/g, '')) || 1080 })}
+                onChange={(v) => set('proxy', { ...draft.proxy!, port: portInput(v, 1080) })}
                 className="port-field"
               />
             </>

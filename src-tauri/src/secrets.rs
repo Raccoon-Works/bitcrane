@@ -1,7 +1,16 @@
 //! Secrets: passwords, key passphrases, proxy passwords, cloud sign-ins, the Google app secret and
 //! the sync password. They live in the system keychain (macOS Keychain, Windows Credential
-//! Manager) and never pass through the interface: it names a secret with a [`SecretRef`], and the
-//! core reads it where it is used (logging in, export, sync).
+//! Manager). The interface names a secret with a [`SecretRef`] to store or forget it or to ask
+//! whether it is stored; only the core reads it, where it is used. What that gives:
+//!
+//! - In normal operation a stored secret never reaches the interface.
+//! - A stored secret is only sent to the server it was saved for: a login request that reaches
+//!   the same account another way gets only the secrets typed into it (`commands/connect.rs`).
+//!   The configuration file that names the saved servers is written by the interface, though, so
+//!   this protects against a request built by hand, not against an interface that rewrites it.
+//! - Export and sync files carry secrets encrypted with a password the user types into the
+//!   interface. Whoever controls the interface also knows that password, so these files are
+//!   protected against everyone who reads them later, not against the interface itself.
 //!
 //! Export files and the sync file carry secrets encrypted with a password the user chooses
 //! ([`seal`], [`unseal`]). The format was written by the interface's Web Crypto code before it
@@ -180,9 +189,9 @@ pub struct Sealed {
 const KDF: &str = "PBKDF2-SHA256";
 /// PBKDF2 rounds for new files (OWASP's recommendation for PBKDF2-HMAC-SHA256 when it was chosen).
 const ITERATIONS: u32 = 310_000;
-/// Files name their own number of rounds; far more than any version writes would only make
-/// opening a manipulated file hang.
-const MAX_ITERATIONS: u32 = 10_000_000;
+/// Files name their own number of rounds. Every version has written [`ITERATIONS`]; this leaves
+/// room for a later increase while a manipulated file cannot keep the core busy for minutes.
+const MAX_ITERATIONS: u32 = 1_000_000;
 
 fn key_for(password: &str, salt: &[u8], iterations: u32) -> Aes256Gcm {
     let mut key = [0u8; 32];
@@ -273,7 +282,8 @@ pub mod tests {
         // The names the interface formed before (connections.ts, cloud.ts, sync.ts, KeyPanel.tsx).
         let cases = [
             (password("anna", "web.example", 2222), "password:anna@web.example:2222"),
-            (password("", "/Users/x/Tresor", 0), "password:@/Users/x/Tresor:0"),
+            // A vault on this computer (src/state/vault.ts names its user "local").
+            (password("local", "/Users/x/Tresor", 0), "password:local@/Users/x/Tresor:0"),
             (SecretRef::Passphrase { key_path: "~/.ssh/id_ed25519".into() }, "passphrase:~/.ssh/id_ed25519"),
             (SecretRef::Passphrase { key_path: String::new() }, "passphrase:"),
             (
@@ -294,8 +304,9 @@ pub mod tests {
         for secret in [
             password("anna@example.com", "ftp.example", 21),
             password("ops", "::1", 22),
-            password("", "/Users/x/Tresor", 0),
+            password("local", "/Users/x/Tresor", 0),
             password("local", "C:/Users/x/Tresor", 0),
+            password("n1", "/Tresore/privat", 0),
             SecretRef::Passphrase { key_path: "C:\\Users\\x\\.ssh\\id_rsa".into() },
             SecretRef::Proxy { user: "p@q".into(), host: "proxy.example".into(), port: 8080 },
             SecretRef::Cloud { server_id: "s1".into() },

@@ -204,10 +204,11 @@ function Dialogs() {
     case 'secret':
       return (
         <SecretPrompt
-          key={dialog.serverId + dialog.kind}
+          key={dialog.serverId + dialog.kind + String(!!dialog.jump)}
           serverId={dialog.serverId}
           kind={dialog.kind}
           wrong={dialog.wrong}
+          jump={dialog.jump}
         />
       );
   }
