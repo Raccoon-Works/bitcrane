@@ -12,6 +12,7 @@
 //! protects the exchange instead of a secret.
 
 use crate::error::{AppError, AppResult, ErrorKind};
+use crate::LockExt;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -77,7 +78,7 @@ pub fn pkce() -> (String, String) {
 static CANCEL: Mutex<Option<tokio::sync::oneshot::Sender<()>>> = Mutex::new(None);
 
 pub fn cancel() {
-    if let Some(tx) = CANCEL.lock().unwrap().take() {
+    if let Some(tx) = CANCEL.locked().take() {
         let _ = tx.send(());
     }
 }
@@ -92,7 +93,7 @@ pub async fn wait_for_code(auth_url: &str, state: &str, open: impl FnOnce(&str) 
         AppError::other("Die Anmeldung konnte nicht starten: ein anderes Programm benutzt gerade den Anschluss für die Rückmeldung (Port 53682).").with_detail(e.to_string())
     })?;
     let (tx, mut rx) = tokio::sync::oneshot::channel();
-    *CANCEL.lock().unwrap() = Some(tx);
+    *CANCEL.locked() = Some(tx);
     open(auth_url)?;
     let deadline = tokio::time::sleep(Duration::from_secs(300));
     tokio::pin!(deadline);
@@ -127,7 +128,7 @@ pub async fn wait_for_code(auth_url: &str, state: &str, open: impl FnOnce(&str) 
                 let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}", page.len());
                 let _ = sock.write_all(reply.as_bytes()).await;
                 let _ = sock.shutdown().await;
-                CANCEL.lock().unwrap().take();
+                CANCEL.locked().take();
                 return result;
             }
         }

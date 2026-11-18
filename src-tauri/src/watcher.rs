@@ -8,6 +8,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::paths::{real_rel, to_native, to_ui};
+use crate::LockExt;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::event::{ModifyKind, RenameMode};
 use notify::{EventKind, RecursiveMode};
@@ -60,7 +61,7 @@ pub fn build_excludes(patterns: &[String]) -> AppResult<GlobSet> {
         );
     }
     // Bitcrane's own temporary upload/download files are never relevant.
-    b.add(Glob::new("*.bitcrane-part").unwrap());
+    b.add(Glob::new("*.bitcrane-part").expect("the pattern of the temporary files is valid"));
     b.build().map_err(|e| AppError::other("Ausschlüsse ungültig.").with_detail(e.to_string()))
 }
 
@@ -165,12 +166,12 @@ impl Watches {
         debouncer
             .watch(&root, if recursive { RecursiveMode::Recursive } else { RecursiveMode::NonRecursive })
             .map_err(|e| AppError::other("Ordner kann nicht überwacht werden.").with_detail(e.to_string()))?;
-        self.running.lock().unwrap().insert(watch_id, debouncer);
+        self.running.locked().insert(watch_id, debouncer);
         Ok(())
     }
 
     pub fn stop(&self, watch_id: &str) {
-        if let Some(d) = self.running.lock().unwrap().remove(watch_id) {
+        if let Some(d) = self.running.locked().remove(watch_id) {
             d.stop_nonblocking();
         }
     }

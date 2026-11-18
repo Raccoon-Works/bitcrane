@@ -7,6 +7,7 @@ use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
+use crate::LockExt;
 use futures_util::TryStreamExt;
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use reqwest::{Method, StatusCode};
@@ -74,7 +75,7 @@ fn net_err(
         src = s.source();
     }
     if text.to_lowercase().contains("certificate") {
-        if let Some(cert) = seen.and_then(|s| s.lock().unwrap().clone()) {
+        if let Some(cert) = seen.and_then(|s| s.locked().clone()) {
             let stored = known.get(host_id);
             if stored.as_deref() != Some(cert.fingerprint.as_str()) {
                 return crate::ftp::cert_error(host, cert.fingerprint, stored);
@@ -89,6 +90,11 @@ fn net_err(
         return AppError::new(ErrorKind::Unreachable, "Server nicht erreichbar.").with_detail(text);
     }
     AppError::new(ErrorKind::ConnectionLost, "Verbindung zum WebDAV-Server unterbrochen.").with_detail(text)
+}
+
+/// The WebDAV methods `reqwest` has no constant for; only literal method names are passed.
+fn dav_method(name: &'static [u8]) -> Method {
+    Method::from_bytes(name).expect("WebDAV method names are valid HTTP tokens")
 }
 
 fn status_err(status: StatusCode, what: &Message) -> AppError {
@@ -219,7 +225,7 @@ impl DavConn {
         };
         // First request: checks address, certificate and login.
         let resp = conn
-            .request(Method::from_bytes(b"PROPFIND").unwrap(), "/")
+            .request(dav_method(b"PROPFIND"), "/")
             .header("Depth", "0")
             .body(PROPFIND_BODY)
             .send()
@@ -273,7 +279,7 @@ impl DavConn {
         let dir_path = if depth == "1" && !path.ends_with('/') { format!("{path}/") } else { path.to_string() };
         let resp = self
             .send(
-                self.request(Method::from_bytes(b"PROPFIND").unwrap(), &dir_path)
+                self.request(dav_method(b"PROPFIND"), &dir_path)
                     .header("Depth", depth)
                     .header("Content-Type", "application/xml")
                     .body(PROPFIND_BODY),
@@ -312,7 +318,7 @@ impl DavConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        let resp = self.send(self.request(Method::from_bytes(b"MKCOL").unwrap(), path)).await?;
+        let resp = self.send(self.request(dav_method(b"MKCOL"), path)).await?;
         if resp.status().is_success() {
             Ok(())
         } else {
@@ -338,7 +344,7 @@ impl DavConn {
 
     async fn move_or_copy(
         &self,
-        method: &[u8],
+        method: &'static [u8],
         from: &str,
         to: &str,
         overwrite: bool,
@@ -346,7 +352,7 @@ impl DavConn {
     ) -> AppResult<()> {
         let resp = self
             .send(
-                self.request(Method::from_bytes(method).unwrap(), from)
+                self.request(dav_method(method), from)
                     .header("Destination", self.url(to))
                     .header("Overwrite", if overwrite { "T" } else { "F" }),
             )

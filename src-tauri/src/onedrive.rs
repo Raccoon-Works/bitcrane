@@ -165,7 +165,7 @@ pub async fn sign_in(open: impl FnOnce(&str) -> AppResult<()>) -> AppResult<oaut
     let (verifier, challenge) = oauth::pkce();
     let state = oauth::state_token();
     let redirect = oauth::redirect_uri();
-    let mut url = reqwest::Url::parse(AUTH_URL).unwrap();
+    let mut url = reqwest::Url::parse(AUTH_URL).expect("AUTH_URL is a valid URL");
     url.query_pairs_mut()
         .append_pair("client_id", key)
         .append_pair("response_type", "code")

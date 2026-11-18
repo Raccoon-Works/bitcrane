@@ -75,7 +75,7 @@ fn uri_encode(s: &str, keep_slash: bool) -> String {
 }
 
 fn hmac(key: &[u8], data: &str) -> Vec<u8> {
-    let mut m = Hmac::<Sha256>::new_from_slice(key).expect("any key length");
+    let mut m = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts keys of any length");
     m.update(data.as_bytes());
     m.finalize().into_bytes().to_vec()
 }

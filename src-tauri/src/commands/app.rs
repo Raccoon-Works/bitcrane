@@ -2,7 +2,7 @@
 //! system settings.
 
 use crate::error::{AppError, AppResult};
-use crate::{iconmenu, links, paths, shell_integration, tray, AppState};
+use crate::{iconmenu, links, paths, shell_integration, tray, AppState, LockExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -249,7 +249,7 @@ static KEEP_AWAKE: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 /// thread that took it.
 #[tauri::command]
 pub(crate) fn keep_awake(on: bool) {
-    let mut slot = KEEP_AWAKE.lock().unwrap();
+    let mut slot = KEEP_AWAKE.locked();
     if on && slot.is_none() {
         let (tx, rx) = mpsc::channel::<()>();
         std::thread::spawn(move || {

@@ -11,6 +11,7 @@ use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem,
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
+use crate::LockExt;
 use std::sync::Mutex;
 
 const TRAY_ID: &str = "bitcrane-tray";
@@ -138,7 +139,7 @@ fn create(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
     let builder = builder.icon_as_template(true);
     let icon = builder.build(app)?;
-    *app.state::<TrayState>().icon.lock().unwrap() = Some(icon);
+    *app.state::<TrayState>().icon.locked() = Some(icon);
     Ok(())
 }
 
@@ -146,26 +147,26 @@ fn create(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
 pub fn update(app: &AppHandle, visible: bool, tooltip: &str, items: &[TrayItem]) -> tauri::Result<()> {
     let state = app.state::<TrayState>();
     if !visible {
-        if let Some(icon) = state.icon.lock().unwrap().take() {
+        if let Some(icon) = state.icon.locked().take() {
             let _ = icon.set_visible(false);
             app.remove_tray_by_id(TRAY_ID);
         }
-        state.last_menu.lock().unwrap().clear();
+        state.last_menu.locked().clear();
         return Ok(());
     }
     let key = format!("{items:?}");
-    let changed = *state.last_menu.lock().unwrap() != key;
-    if state.icon.lock().unwrap().is_none() {
+    let changed = *state.last_menu.locked() != key;
+    if state.icon.locked().is_none() {
         let menu = build_menu(app, items)?;
         create(app, &menu)?;
     } else if changed {
         let menu = build_menu(app, items)?;
-        if let Some(icon) = state.icon.lock().unwrap().as_ref() {
+        if let Some(icon) = state.icon.locked().as_ref() {
             icon.set_menu(Some(menu))?;
         }
     }
-    *state.last_menu.lock().unwrap() = key;
-    if let Some(icon) = state.icon.lock().unwrap().as_ref() {
+    *state.last_menu.locked() = key;
+    if let Some(icon) = state.icon.locked().as_ref() {
         icon.set_tooltip(Some(format!("Bitcrane – {tooltip}")))?;
     }
     Ok(())

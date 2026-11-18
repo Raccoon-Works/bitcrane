@@ -39,6 +39,8 @@ and runs started by hand); push to `native-check` first to check a change before
 Tests that need a test server are `#[ignore]`d; run them with `cargo test --lib -- --ignored` and
 the environment variables named in each test's ignore reason. A warning is fixed, not silenced: a
 suppression (`eslint-disable`, `#[allow]`) needs a reason next to it.
+Clippy's `unwrap_used` is on for all Rust code except tests (`lib.rs`): errors go up with `?`, and a
+real invariant is written as `expect("why this cannot fail")`.
 
 Formatting is not discussed in review: Prettier and rustfmt decide it (120 columns, see
 `.prettierrc.json` and `src-tauri/rustfmt.toml`).

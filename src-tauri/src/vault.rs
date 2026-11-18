@@ -20,6 +20,7 @@ use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent, to_native};
 use crate::remote::{Remote, RemoteWriter};
+use crate::LockExt;
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use aes_kw::KekAes256;
@@ -41,6 +42,11 @@ const HEADER: usize = 68;
 const CHUNK: usize = 32 * 1024;
 const CHUNK_CIPHER: usize = CHUNK + 28;
 const DEFAULT_THRESHOLD: usize = 220;
+// Why the RustCrypto primitives below cannot fail with the inputs this module gives them.
+const SIV_OK: &str = "AES-SIV only fails with more than 126 associated data items; at most one is passed";
+const GCM_OK: &str = "AES-GCM only fails for 64 GiB or more of plaintext; headers and chunks are far smaller";
+const HMAC_OK: &str = "HMAC accepts keys of any length";
+const WRAP_OK: &str = "AES key wrap accepts 32-byte keys (a multiple of 8, at least 16 bytes)";
 
 fn bad_vault(detail: impl Into<String>) -> AppError {
     AppError::other("Der Tresor ist beschädigt oder kein Cryptomator-Tresor.").with_detail(detail.into())
@@ -277,13 +283,13 @@ impl Keys {
 
     fn hash_dir_id(&self, dir_id: &str) -> String {
         let empty: [&[u8]; 0] = [];
-        let encrypted = self.siv().encrypt(empty, dir_id.as_bytes()).expect("siv");
+        let encrypted = self.siv().encrypt(empty, dir_id.as_bytes()).expect(SIV_OK);
         BASE32.encode(&Sha1::digest(&encrypted))
     }
 
     fn encrypt_name(&self, name: &str, dir_id: &str) -> String {
         let nfc: String = name.nfc().collect();
-        let encrypted = self.siv().encrypt([dir_id.as_bytes()], nfc.as_bytes()).expect("siv");
+        let encrypted = self.siv().encrypt([dir_id.as_bytes()], nfc.as_bytes()).expect(SIV_OK);
         format!("{}.c9r", BASE64URL.encode(&encrypted))
     }
 
@@ -303,7 +309,7 @@ impl Keys {
         payload.extend_from_slice(&content_key);
         let gcm = Aes256Gcm::new((&self.enc).into());
         let mut out = nonce.to_vec();
-        out.extend(gcm.encrypt(Nonce::from_slice(&nonce), payload.as_slice()).expect("gcm"));
+        out.extend(gcm.encrypt(Nonce::from_slice(&nonce), payload.as_slice()).expect(GCM_OK));
         (nonce, content_key, out)
     }
 
@@ -339,7 +345,7 @@ fn encrypt_chunk(gcm: &Aes256Gcm, number: u64, header_nonce: &[u8; 12], clear: &
     let mut out = nonce.to_vec();
     out.extend(
         gcm.encrypt(Nonce::from_slice(&nonce), Payload { msg: clear, aad: &chunk_aad(number, header_nonce) })
-            .expect("gcm"),
+            .expect(GCM_OK),
     );
     out
 }
@@ -429,25 +435,25 @@ fn masterkey_file(keys: &Keys, password: &str) -> AppResult<Vec<u8>> {
     let n = 32768u64;
     let kek = derive_kek(password, &salt, &scrypt_params(n, 8)?)?;
     let kw = KekAes256::from(kek);
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.mac).expect("hmac");
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.mac).expect(HMAC_OK);
     mac.update(&999u32.to_be_bytes());
     let file = json!({
         "version": 999,
         "scryptSalt": BASE64.encode(&salt),
         "scryptCostParam": n,
         "scryptBlockSize": 8,
-        "primaryMasterKey": BASE64.encode(&kw.wrap_vec(&keys.enc).expect("wrap")),
-        "hmacMasterKey": BASE64.encode(&kw.wrap_vec(&keys.mac).expect("wrap")),
+        "primaryMasterKey": BASE64.encode(&kw.wrap_vec(&keys.enc).expect(WRAP_OK)),
+        "hmacMasterKey": BASE64.encode(&kw.wrap_vec(&keys.mac).expect(WRAP_OK)),
         "versionMac": BASE64.encode(&mac.finalize().into_bytes()),
     });
-    Ok(serde_json::to_vec_pretty(&file).unwrap_or_default())
+    Ok(serde_json::to_vec_pretty(&file).expect("a JSON value always serializes"))
 }
 
 /// Checks the signature of vault.cryptomator; returns the name length limit.
 fn read_vault_config(jwt: &str, keys: &Keys) -> AppResult<usize> {
     let parts: Vec<&str> = jwt.trim().split('.').collect();
     let [header, payload, signature] = parts.as_slice() else { return Err(bad_vault("vault.cryptomator is no JWT")) };
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.jwt_key()).expect("hmac");
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.jwt_key()).expect(HMAC_OK);
     mac.update(format!("{header}.{payload}").as_bytes());
     let sig = b64url(signature).ok_or_else(|| bad_vault("signature encoding"))?;
     mac.verify_slice(&sig).map_err(|_| bad_vault("signature of vault.cryptomator"))?;
@@ -467,7 +473,7 @@ fn vault_config(keys: &Keys) -> String {
         json!({ "kid": "masterkeyfile:masterkey.cryptomator", "typ": "JWT", "alg": "HS256" }).to_string().as_bytes(),
     );
     let payload = BASE64URL_NOPAD.encode(json!({ "jti": uuid::Uuid::new_v4().to_string(), "format": 8, "cipherCombo": "SIV_GCM", "shorteningThreshold": DEFAULT_THRESHOLD }).to_string().as_bytes());
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.jwt_key()).expect("hmac");
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.jwt_key()).expect(HMAC_OK);
     mac.update(format!("{header}.{payload}").as_bytes());
     format!("{header}.{payload}.{}", BASE64URL_NOPAD.encode(&mac.finalize().into_bytes()))
 }
@@ -616,7 +622,7 @@ impl VaultConn {
         let mut id = String::new();
         for seg in segments {
             current = remote_join(&current, seg);
-            let known = self.dir_ids.lock().unwrap().get(&current).cloned();
+            let known = self.dir_ids.locked().get(&current).cloned();
             if let Some(k) = known {
                 id = k;
                 continue;
@@ -627,14 +633,14 @@ impl VaultConn {
             }
             id = String::from_utf8(self.store.read_all(&remote_join(&node.path, "dir.c9r")).await?)
                 .map_err(|_| bad_vault("dir.c9r"))?;
-            self.dir_ids.lock().unwrap().insert(current.clone(), id.clone());
+            self.dir_ids.locked().insert(current.clone(), id.clone());
         }
         Ok(id)
     }
 
     fn forget_ids(&self, prefix: &str) {
         let inner = format!("{prefix}/");
-        self.dir_ids.lock().unwrap().retain(|k, _| k != prefix && !k.starts_with(&inner));
+        self.dir_ids.locked().retain(|k, _| k != prefix && !k.starts_with(&inner));
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
@@ -728,7 +734,7 @@ impl VaultConn {
         self.store.mkdir_all(&content).await?;
         // Backup of the id inside the folder (Cryptomator 1.7+ uses it for repairs).
         self.store.write_all(&remote_join(&content, "dirid.c9r"), &encrypt_small(&self.keys, id.as_bytes())).await?;
-        self.dir_ids.lock().unwrap().insert(path.to_string(), id);
+        self.dir_ids.locked().insert(path.to_string(), id);
         Ok(())
     }
 

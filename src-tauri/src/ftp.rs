@@ -15,6 +15,7 @@ use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
+use crate::LockExt;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -197,7 +198,8 @@ impl Shared {
 
     /// TLS handshake; an unknown certificate becomes the "Erste Verbindung" question.
     async fn wrap(&self, config: Arc<rustls::ClientConfig>, tcp: TcpStream) -> AppResult<Io> {
-        let name = self.tls.clone().expect("TLS configured").1;
+        let name =
+            self.tls.clone().expect("only encrypted connections are wrapped, and those have a TLS configuration").1;
         let connector = tokio_rustls::TlsConnector::from(config);
         match tokio::time::timeout(crate::ssh::connect_timeout(self.params.timeout), connector.connect(name, tcp)).await
         {
@@ -208,7 +210,7 @@ impl Shared {
     }
 
     fn tls_error(&self, e: std::io::Error) -> AppError {
-        let seen = self.seen.as_ref().and_then(|s| s.lock().unwrap().clone());
+        let seen = self.seen.as_ref().and_then(|s| s.locked().clone());
         if let Some(cert) = seen {
             let stored = self.known.get(&self.host_id);
             if stored.as_deref() != Some(cert.fingerprint.as_str()) && e.to_string().contains("certificate") {
@@ -407,13 +409,13 @@ impl Session {
                     f.utf8 |= l.starts_with("UTF8");
                     f.epsv |= l.starts_with("EPSV");
                 }
-                *shared.feats.lock().unwrap() = f;
+                *shared.feats.locked() = f;
             }
         }
-        if shared.feats.lock().unwrap().unix_mode {
+        if shared.feats.locked().unix_mode {
             let _ = s.cmd("OPTS", Some("MLST type;size;modify;unix.mode;")).await?;
         }
-        if p.encoding == FtpEncoding::Utf8 && shared.feats.lock().unwrap().utf8 {
+        if p.encoding == FtpEncoding::Utf8 && shared.feats.locked().utf8 {
             let _ = s.cmd("OPTS", Some("UTF8 ON")).await?;
         }
         s.set_type('I').await?;
@@ -470,7 +472,7 @@ impl Session {
     /// data stream once the server has accepted the command.
     async fn data(&mut self, cmd: &str, arg: Option<&str>, what: &Message) -> AppResult<Io> {
         let host = self.shared.params.host.clone();
-        let epsv = self.shared.feats.lock().unwrap().epsv;
+        let epsv = self.shared.feats.locked().epsv;
         let port = if epsv {
             let text = self.expect("EPSV", None, &[229], &Message::new("Datenverbindung")).await?;
             // 229 Entering Extended Passive Mode (|||6446|)
@@ -566,7 +568,7 @@ impl Session {
     }
 
     async fn list(&mut self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let mlsd = self.shared.feats.lock().unwrap().mlsd;
+        let mlsd = self.shared.feats.locked().mlsd;
         let mut out = Vec::new();
         if mlsd {
             let raw = self.read_all("MLSD", Some(path), &Message::new("Ordner lesen")).await?;
@@ -606,7 +608,7 @@ impl Session {
                 hidden: 0,
             });
         }
-        if self.shared.feats.lock().unwrap().mlst {
+        if self.shared.feats.locked().mlst {
             let (code, text) = self.cmd("MLST", Some(path)).await?;
             if code == 250 {
                 if let Some(line) = text.lines().find(|l| l.starts_with(' ') || l.contains("type=")) {
@@ -700,7 +702,7 @@ impl Session {
     /// Modification time (seconds) and permissions after an upload, where the server allows it.
     async fn set_attrs(&mut self, path: &str, mtime: Option<u32>, perms: Option<u32>) {
         if let Some(m) = mtime {
-            if self.shared.feats.lock().unwrap().mfmt {
+            if self.shared.feats.locked().mfmt {
                 if let Some(t) = chrono::DateTime::from_timestamp(m as i64, 0) {
                     let _ = self.cmd("MFMT", Some(&format!("{} {path}", t.format("%Y%m%d%H%M%S")))).await;
                 }
@@ -1121,7 +1123,10 @@ pub struct FtpFinish {
 
 impl FtpFinish {
     pub async fn finish(mut self) -> AppResult<()> {
-        let mut s = self.session.take().expect("session");
+        let mut s = self
+            .session
+            .take()
+            .expect("the session is set at creation and only taken by finish or abandon, which consume self");
         let r = s.finish_data(&self.what).await;
         if r.is_ok() {
             self.conn.put(s).await;

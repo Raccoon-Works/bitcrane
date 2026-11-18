@@ -9,6 +9,7 @@
 use crate::error::{AppError, AppResult, ErrorKind, HostKeyInfo, Message};
 use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name};
+use crate::LockExt;
 use russh::client;
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg};
 use russh_sftp::client::SftpSession;
@@ -47,13 +48,13 @@ impl KnownHosts {
     }
 
     pub fn get(&self, id: &str) -> Option<String> {
-        self.map.lock().unwrap().get(id).cloned()
+        self.map.locked().get(id).cloned()
     }
 
     /// Trusts a fingerprint. It is in effect for this run even when saving fails; the error says
     /// that it will be asked about again after a restart.
     pub fn set(&self, id: &str, fingerprint: &str) -> AppResult<()> {
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.map.locked();
         map.insert(id.to_string(), fingerprint.to_string());
         self.save(&map)
     }
@@ -70,14 +71,14 @@ impl KnownHosts {
 
     /// All stored fingerprints as ("host:port", fingerprint), sorted by host.
     pub fn list(&self) -> Vec<(String, String)> {
-        let mut v: Vec<_> = self.map.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut v: Vec<_> = self.map.locked().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         v.sort();
         v
     }
 
     /// Forgets a fingerprint; the next connection asks again.
     pub fn remove(&self, id: &str) -> AppResult<()> {
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.map.locked();
         map.remove(id);
         self.save(&map)
     }
@@ -217,7 +218,7 @@ impl client::Handler for Handler {
         };
         let fingerprint = public.fingerprint(HashAlg::Sha256).to_string();
         let algorithm = public.algorithm().as_str().to_string();
-        *self.seen.lock().unwrap() = Some(SeenKey { algorithm, fingerprint: fingerprint.clone() });
+        *self.seen.locked() = Some(SeenKey { algorithm, fingerprint: fingerprint.clone() });
 
         let trusted_now = self.trust.as_deref() == Some(fingerprint.as_str());
         match self.known.get(&self.host_id) {
@@ -246,7 +247,7 @@ impl client::Handler for Handler {
         reply: client::ChannelOpenHandle,
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
-        let target = self.forwards.lock().unwrap().get(&connected_port).cloned();
+        let target = self.forwards.locked().get(&connected_port).cloned();
         let Some((host, port)) = target else {
             reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
@@ -640,7 +641,7 @@ async fn open_session(
         Ok(Ok(h)) => h,
         Ok(Err(e)) => {
             // A rejected host key ends the handshake; report which case it was.
-            if let Some(key) = seen.lock().unwrap().clone() {
+            if let Some(key) = seen.locked().clone() {
                 let stored = known.get(&host_id);
                 if stored.as_deref() != Some(key.fingerprint.as_str()) {
                     let changed = stored.is_some();

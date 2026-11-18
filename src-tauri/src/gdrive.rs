@@ -19,6 +19,7 @@ use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth;
 use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
+use crate::LockExt;
 use futures_util::TryStreamExt;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -188,7 +189,7 @@ pub async fn sign_in(
     let (verifier, challenge) = oauth::pkce();
     let state = oauth::state_token();
     let redirect = oauth::redirect_uri();
-    let mut url = reqwest::Url::parse(AUTH_URL).unwrap();
+    let mut url = reqwest::Url::parse(AUTH_URL).expect("AUTH_URL is a valid URL");
     url.query_pairs_mut()
         .append_pair("client_id", client_id.trim())
         .append_pair("response_type", "code")
@@ -371,7 +372,7 @@ impl GDriveConn {
         if path == "/" {
             return Ok(json!({ "id": "root", "name": "/", "mimeType": FOLDER }));
         }
-        let cached = self.ids.lock().unwrap().get(&path).cloned();
+        let cached = self.ids.locked().get(&path).cloned();
         if let Some(id) = cached {
             let fields = FIELDS.to_string();
             match self
@@ -398,7 +399,7 @@ impl GDriveConn {
         }
         let item = item.ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(name))?;
         if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-            self.ids.lock().unwrap().insert(path, id.to_string());
+            self.ids.locked().insert(path, id.to_string());
         }
         Ok(item)
     }
@@ -412,7 +413,7 @@ impl GDriveConn {
     fn forget(&self, path: &str) {
         let path = norm(path);
         let prefix = format!("{path}/");
-        self.ids.lock().unwrap().retain(|k, _| k != &path && !k.starts_with(&prefix));
+        self.ids.locked().retain(|k, _| k != &path && !k.starts_with(&prefix));
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
@@ -429,7 +430,7 @@ impl GDriveConn {
                 continue;
             }
             if let Some(cid) = v.get("id").and_then(|i| i.as_str()) {
-                self.ids.lock().unwrap().insert(remote_join(&base, &e.name), cid.to_string());
+                self.ids.locked().insert(remote_join(&base, &e.name), cid.to_string());
             }
             out.push(e);
         }
@@ -476,7 +477,7 @@ impl GDriveConn {
             )
             .await?;
         if let Some(id) = v.get("id").and_then(|i| i.as_str()) {
-            self.ids.lock().unwrap().insert(norm(path), id.to_string());
+            self.ids.locked().insert(norm(path), id.to_string());
         }
         Ok(())
     }
@@ -526,7 +527,7 @@ impl GDriveConn {
         )
         .await?;
         self.forget(&from);
-        self.ids.lock().unwrap().insert(to, id);
+        self.ids.locked().insert(to, id);
         Ok(())
     }
 
@@ -773,7 +774,7 @@ impl GDriveConn {
                 offset += len;
                 if last {
                     if let Some(id) = done.as_ref().and_then(|v| v.get("id")).and_then(|i| i.as_str()) {
-                        conn.ids.lock().unwrap().insert(path.clone(), id.to_string());
+                        conn.ids.locked().insert(path.clone(), id.to_string());
                     }
                     return Ok(());
                 }

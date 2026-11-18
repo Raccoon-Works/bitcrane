@@ -12,6 +12,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::remote::Remote;
+use crate::LockExt;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -159,7 +160,7 @@ impl Forwards {
                 })?;
                 // Port 0: the server chose one.
                 let port = if spec.bind_port == 0 { port } else { spec.bind_port as u32 };
-                map.lock().unwrap().insert(port, (spec.dest_host.clone(), spec.dest_port));
+                map.locked().insert(port, (spec.dest_host.clone(), spec.dest_port));
                 Running {
                     server_id: server_id.into(),
                     task: None,
@@ -168,20 +169,20 @@ impl Forwards {
             }
             other => return Err(AppError::other("Unbekannte Art der Weiterleitung: {0}").param(other)),
         };
-        self.0.lock().unwrap().insert(spec.id, running);
+        self.0.locked().insert(spec.id, running);
         Ok(())
     }
 
     /// Ends a tunnel (local port closed, remote forward cancelled on the server).
     pub async fn stop(&self, id: &str) {
-        let running = self.0.lock().unwrap().remove(id);
+        let running = self.0.locked().remove(id);
         let Some(r) = running else { return };
         if let Some(t) = r.task {
             t.abort();
         }
         if let Some((conn, host, port)) = r.remote {
             if let Ok((handle, map)) = conn.tunnel() {
-                map.lock().unwrap().remove(&port);
+                map.locked().remove(&port);
                 let _ = handle.cancel_tcpip_forward(host, port).await;
             }
         }
@@ -190,7 +191,7 @@ impl Forwards {
     /// Ends every tunnel of a server (on disconnect).
     pub async fn stop_server(&self, server_id: &str) {
         let ids: Vec<String> =
-            self.0.lock().unwrap().iter().filter(|(_, r)| r.server_id == server_id).map(|(id, _)| id.clone()).collect();
+            self.0.locked().iter().filter(|(_, r)| r.server_id == server_id).map(|(id, _)| id.clone()).collect();
         for id in ids {
             self.stop(&id).await;
         }
@@ -198,7 +199,7 @@ impl Forwards {
 
     /// Ids of the running tunnels (all servers).
     pub fn active(&self) -> Vec<String> {
-        let mut map = self.0.lock().unwrap();
+        let mut map = self.0.locked();
         // A tunnel whose listener ended (connection gone) is no longer running.
         map.retain(|_, r| r.task.as_ref().map(|t| !t.is_finished()).unwrap_or(true));
         map.keys().cloned().collect()

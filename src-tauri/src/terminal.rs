@@ -8,6 +8,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::remote::Remote;
+use crate::LockExt;
 use base64::Engine;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -65,7 +66,7 @@ impl Terminals {
             // The server profile's start command, typed in like the user would.
             let _ = tx.send(Command::Input(format!("{}\n", cmd.trim_end()).into_bytes()));
         }
-        self.0.lock().unwrap().insert(id.clone(), tx);
+        self.0.locked().insert(id.clone(), tx);
         let b64 = base64::engine::general_purpose::STANDARD;
         tokio::spawn(async move {
             let mut code = None;
@@ -131,7 +132,7 @@ impl Terminals {
         let mut reader = pair.master.try_clone_reader().map_err(|e| fail(&e))?;
         let mut writer = pair.master.take_writer().map_err(|e| fail(&e))?;
         let (tx, mut rx) = mpsc::unbounded_channel();
-        self.0.lock().unwrap().insert(id.clone(), tx);
+        self.0.locked().insert(id.clone(), tx);
         // Output: a thread of its own, the reader blocks.
         let out_app = app.clone();
         let out_id = id.clone();
@@ -175,7 +176,7 @@ impl Terminals {
     }
 
     fn send(&self, id: &str, cmd: Command) -> AppResult<()> {
-        let map = self.0.lock().unwrap();
+        let map = self.0.locked();
         let tx = map.get(id).ok_or_else(|| AppError::other("Das Terminal ist beendet."))?;
         tx.send(cmd).map_err(|_| AppError::other("Das Terminal ist beendet."))
     }
@@ -189,7 +190,7 @@ impl Terminals {
     }
 
     pub fn close(&self, id: &str) {
-        let tx = self.0.lock().unwrap().remove(id);
+        let tx = self.0.locked().remove(id);
         if let Some(tx) = tx {
             let _ = tx.send(Command::Close);
         }

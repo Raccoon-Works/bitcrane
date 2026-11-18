@@ -6,9 +6,16 @@
 //! - `transfer-progress` `{ id, done, total }`
 //! - `watch-batch` `{ watchId, changed, removed }`
 //!
-//! Mutexes are locked with `.lock().unwrap()` throughout. A lock is only poisoned when a thread
+//! Mutexes are locked with `LockExt::locked` (below) throughout. A lock is only poisoned when a thread
 //! panicked while holding it, which is a bug; the data behind it may then be half-changed, so
 //! continuing with it is worse than passing the panic on. No lock site recovers from poisoning.
+//!
+//! Production code does not call `unwrap()`: a failure that can happen is returned as an
+//! `AppError`, and a real invariant is stated with `expect("<why it cannot fail>")`. Clippy's
+//! `unwrap_used` enforces this outside tests.
+
+// Tests may unwrap freely: a panic there is the test failing, with the location in the report.
+#![cfg_attr(not(test), warn(clippy::unwrap_used))]
 
 mod archive;
 mod archive_vfs;
@@ -64,10 +71,21 @@ use ssh::KnownHosts;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 #[cfg(any(target_os = "macos", windows))]
 use tauri::Emitter;
 use tauri::Manager;
+
+/// Locking under the poisoning policy in the module docs: a poisoned lock passes the panic on.
+pub(crate) trait LockExt<T> {
+    fn locked(&self) -> MutexGuard<'_, T>;
+}
+
+impl<T> LockExt<T> for Mutex<T> {
+    fn locked(&self) -> MutexGuard<'_, T> {
+        self.lock().expect("a lock is only poisoned by an earlier panic while it was held (policy in lib.rs)")
+    }
+}
 
 /// Shared state of the running app.
 pub struct AppState {
@@ -128,8 +146,8 @@ impl AppState {
 /// Login questions waiting for the user's answers, by question id (`None`: cancelled).
 type PendingPrompts = Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Option<Vec<String>>>>>>;
 
-/// Entry point used by `main.rs`.
-pub fn run() {
+/// Entry point used by `main.rs`; an error means the app could not start (for example, a failed setup step).
+pub fn run() -> tauri::Result<()> {
     let context = tauri::generate_context!();
     // Before any window exists, so the taskbar button gets the app ID of the shortcuts (see iconmenu).
     #[cfg(windows)]
@@ -377,8 +395,7 @@ pub fn run() {
             commands::app::log_path,
             commands::app::app_version,
         ])
-        .build(context)
-        .expect("error while building Bitcrane")
+        .build(context)?
         .run(|app, event| {
             // macOS: clicking the Dock icon brings a hidden window back.
             #[cfg(target_os = "macos")]
@@ -387,4 +404,5 @@ pub fn run() {
             }
             let _ = (app, event);
         });
+    Ok(())
 }

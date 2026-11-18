@@ -14,6 +14,7 @@
 use tauri::AppHandle;
 
 use crate::tray::TrayItem;
+use crate::LockExt;
 
 /// Command line flag of a jump list entry.
 pub const ACTION_FLAG: &str = "--tray-action";
@@ -64,7 +65,7 @@ static LAST: std::sync::Mutex<Option<Content>> = std::sync::Mutex::new(None);
 pub fn update(app: &AppHandle, items: &[TrayItem]) {
     let next = content(items);
     {
-        let mut last = LAST.lock().unwrap();
+        let mut last = LAST.locked();
         if last.as_ref() == Some(&next) {
             return;
         }

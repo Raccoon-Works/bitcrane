@@ -6,5 +6,8 @@ fn main() {
     if let Some(code) = bitcrane_lib::cli::run_from_args() {
         std::process::exit(code);
     }
-    bitcrane_lib::run();
+    if let Err(e) = bitcrane_lib::run() {
+        eprintln!("Bitcrane could not start: {e}");
+        std::process::exit(1);
+    }
 }

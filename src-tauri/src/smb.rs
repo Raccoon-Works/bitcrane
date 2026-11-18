@@ -713,7 +713,12 @@ impl SmbConn {
                     pending.push_back(tokio::spawn(async move { write_all_at(&f, &buf, at).await }));
                     pos += filled as u64;
                     while pending.len() >= IN_FLIGHT {
-                        join(pending.pop_front().expect("pending")).await?;
+                        join(
+                            pending
+                                .pop_front()
+                                .expect("the loop only runs while IN_FLIGHT (at least one) writes are queued"),
+                        )
+                        .await?;
                     }
                 }
                 while let Some(t) = pending.pop_front() {

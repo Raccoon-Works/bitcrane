@@ -4,7 +4,7 @@ use crate::error::{AppError, AppResult};
 use crate::login::{Env, Login, Opened};
 use crate::secrets::Keychain;
 use crate::serverconfig::{Config, Protocol, Server};
-use crate::{ssh, vault, AppState, PendingPrompts};
+use crate::{ssh, vault, AppState, LockExt, PendingPrompts};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -75,13 +75,13 @@ pub(super) fn make_prompter(app: tauri::AppHandle, pending: PendingPrompts, serv
     Arc::new(move |request| {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let id = uuid::Uuid::new_v4().to_string();
-        pending.lock().unwrap().insert(id.clone(), tx);
+        pending.locked().insert(id.clone(), tx);
         let _ = app.emit("auth-prompt", AuthPromptEvent { id: id.clone(), server_id: server_id.clone(), request });
         let pending = pending.clone();
         Box::pin(async move {
             let answer =
                 tokio::time::timeout(std::time::Duration::from_secs(180), rx).await.ok().and_then(|r| r.ok()).flatten();
-            pending.lock().unwrap().remove(&id);
+            pending.locked().remove(&id);
             answer
         })
     })
@@ -90,7 +90,7 @@ pub(super) fn make_prompter(app: tauri::AppHandle, pending: PendingPrompts, serv
 /// Answers of the user to a server question; `None` cancels the login.
 #[tauri::command]
 pub(crate) fn auth_prompt_answer(state: State<'_, AppState>, id: String, answers: Option<Vec<String>>) {
-    if let Some(tx) = state.prompts.lock().unwrap().remove(&id) {
+    if let Some(tx) = state.prompts.locked().remove(&id) {
         let _ = tx.send(answers);
     }
 }

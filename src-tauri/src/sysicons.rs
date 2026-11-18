@@ -4,6 +4,7 @@
 //! PNG images, cached per extension, and served to the interface through the
 //! "fileicon" URI scheme (see lib.rs).
 
+use crate::LockExt;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
@@ -17,13 +18,11 @@ fn cache() -> &'static Mutex<HashMap<String, Option<Vec<u8>>>> {
 pub fn png_for_ext(ext: &str) -> Option<Vec<u8>> {
     let ext: String =
         ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(16).collect::<String>().to_ascii_lowercase();
-    if let Some(hit) = cache().lock().ok()?.get(&ext) {
+    if let Some(hit) = cache().locked().get(&ext) {
         return hit.clone();
     }
     let png = lookup(&ext);
-    if let Ok(mut c) = cache().lock() {
-        c.insert(ext, png.clone());
-    }
+    cache().locked().insert(ext, png.clone());
     png
 }
 
@@ -47,16 +46,14 @@ pub fn png_for_path(uri_path: &str) -> Option<Vec<u8>> {
     let decoded =
         percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()?.into_owned();
     let key = format!("path:{decoded}");
-    if let Some(hit) = cache().lock().ok()?.get(&key) {
+    if let Some(hit) = cache().locked().get(&key) {
         return hit.clone();
     }
     #[cfg(target_os = "macos")]
     let png = mac_icon::lookup_path(&crate::paths::to_native(&decoded).to_string_lossy());
     #[cfg(not(target_os = "macos"))]
     let png: Option<Vec<u8>> = None;
-    if let Ok(mut c) = cache().lock() {
-        c.insert(key, png.clone());
-    }
+    cache().locked().insert(key, png.clone());
     png
 }
 

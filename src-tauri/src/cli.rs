@@ -310,7 +310,8 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
         if !open.iter().any(|(i, _)| *i == id) {
             open.push((id.clone(), connect(ctx, s).await?));
         }
-        let conn = &open.iter().find(|(i, _)| *i == id).expect("connected").1;
+        let conn =
+            &open.iter().find(|(i, _)| *i == id).expect("the connection is opened just above when it is missing").1;
         let remote = if path.starts_with('/') { path } else { remote_join(conn.home(), &path) };
         let items = conn.walk(&remote).await?;
         if items.is_empty() {

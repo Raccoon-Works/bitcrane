@@ -1,7 +1,7 @@
 //! Transfers with progress events, folder watches and the sync state of places.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::{paths, transfer, AppState};
+use crate::{paths, transfer, AppState, LockExt};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -29,14 +29,14 @@ pub(crate) async fn transfer_upload(
 ) -> AppResult<u64> {
     let conn = state.conn(&server_id).await?;
     let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.lock().unwrap().insert(id.clone(), flag.clone());
+    state.cancels.locked().insert(id.clone(), flag.clone());
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
     let result = transfer::upload(&conn, &local_path, &remote_path, &opts, &progress, flag).await;
-    state.cancels.lock().unwrap().remove(&id);
+    state.cancels.locked().remove(&id);
     match result {
         Ok(v) => Ok(v),
         Err(e) => Err(state.check_lost(&server_id, e).await),
@@ -59,14 +59,14 @@ pub(crate) async fn transfer_cross(
     let src = state.conn(&from_server_id).await?;
     let dst = state.conn(&server_id).await?;
     let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.lock().unwrap().insert(id.clone(), flag.clone());
+    state.cancels.locked().insert(id.clone(), flag.clone());
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
     let result = transfer::cross(&src, &from_path, &dst, &remote_path, &opts, &progress, flag).await;
-    state.cancels.lock().unwrap().remove(&id);
+    state.cancels.locked().remove(&id);
     match result {
         Ok(v) => Ok(v),
         Err(e) => {
@@ -89,14 +89,14 @@ pub(crate) async fn transfer_download(
 ) -> AppResult<u64> {
     let conn = state.conn(&server_id).await?;
     let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.lock().unwrap().insert(id.clone(), flag.clone());
+    state.cancels.locked().insert(id.clone(), flag.clone());
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
     let result = transfer::download(&conn, &remote_path, &local_path, &opts, &progress, flag).await;
-    state.cancels.lock().unwrap().remove(&id);
+    state.cancels.locked().remove(&id);
     match result {
         Ok(v) => Ok(v),
         Err(e) => Err(state.check_lost(&server_id, e).await),
@@ -107,7 +107,7 @@ pub(crate) async fn transfer_download(
 /// stays so the transfer can continue later.
 #[tauri::command]
 pub(crate) fn transfer_cancel(state: State<'_, AppState>, id: String, discard: Option<bool>) {
-    if let Some(flag) = state.cancels.lock().unwrap().get(&id) {
+    if let Some(flag) = state.cancels.locked().get(&id) {
         flag.store(if discard.unwrap_or(false) { transfer::DISCARD } else { transfer::PAUSE }, Ordering::Relaxed);
     }
 }
@@ -193,7 +193,7 @@ pub(crate) fn sync_write(dir: String, text: String) -> AppResult<i64> {
             "Der Ordner für den Abgleich ist nicht da (Cloud-Programm nicht angemeldet oder Ordner verschoben?).",
         ));
     }
-    std::fs::create_dir_all(p.parent().unwrap())?;
+    std::fs::create_dir_all(p.parent().expect("the sync file lies in the Bitcrane folder"))?;
     let tmp = p.with_extension("json.tmp");
     std::fs::write(&tmp, text)?;
     std::fs::rename(&tmp, &p)?;

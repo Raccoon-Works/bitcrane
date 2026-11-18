@@ -7,6 +7,7 @@
 //! it in the same known-hosts file.
 
 use crate::ssh::KnownHosts;
+use crate::LockExt;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::client::WebPkiServerVerifier;
 use rustls::crypto::CryptoProvider;
@@ -36,8 +37,9 @@ impl Verifier {
     fn new(known: Arc<KnownHosts>, host_id: String, trust: Option<String>, provider: Arc<CryptoProvider>) -> Self {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let inner =
-            WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider).build().expect("root certificates");
+        let inner = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider)
+            .build()
+            .expect("the bundled root certificate list is not empty");
         Verifier { inner, known, host_id, trust, seen: Arc::new(Mutex::new(None)) }
     }
 }
@@ -58,7 +60,7 @@ impl ServerCertVerifier for Verifier {
         now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
         let fp = fingerprint(end_entity);
-        *self.seen.lock().unwrap() = Some(SeenCert { fingerprint: fp.clone() });
+        *self.seen.locked() = Some(SeenCert { fingerprint: fp.clone() });
         // A certificate from a public authority needs no confirmation.
         if self.inner.verify_server_cert(end_entity, intermediates, server_name, ocsp, now).is_ok() {
             return Ok(ServerCertVerified::assertion());
@@ -124,7 +126,7 @@ pub fn client_config(
         if min_tls13 { &[&rustls::version::TLS13] } else { &[&rustls::version::TLS13, &rustls::version::TLS12] };
     let config = rustls::ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(versions)
-        .expect("protocol versions")
+        .expect("the ring provider supports TLS 1.2 and 1.3")
         .dangerous()
         .with_custom_certificate_verifier(verifier)
         .with_no_client_auth();
@@ -139,7 +141,7 @@ pub fn public_client_config() -> Arc<rustls::ClientConfig> {
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let config = rustls::ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
-        .expect("protocol versions")
+        .expect("the ring provider supports TLS 1.2 and 1.3")
         .with_root_certificates(roots)
         .with_no_client_auth();
     Arc::new(config)

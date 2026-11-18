@@ -18,6 +18,7 @@ use crate::error::{AppError, AppResult, Message};
 use crate::model::EntryKind;
 use crate::paths::{remote_name, storable_name, sync_root_to_remote as to_remote};
 use crate::remote::Remote;
+use crate::LockExt;
 use cloud_filter::error::{CResult, CloudErrorKind};
 use cloud_filter::filter::{info, ticket, Filter, Request};
 use cloud_filter::metadata::Metadata;
@@ -153,10 +154,7 @@ impl Mounts {
             rt: Handle::current(),
         })?;
         let folder = root.to_string_lossy().to_string();
-        self.0
-            .lock()
-            .unwrap()
-            .insert(server_id, Mount { root, id, session: Box::new(session), _watcher: watcher, pending });
+        self.0.locked().insert(server_id, Mount { root, id, session: Box::new(session), _watcher: watcher, pending });
         Ok(folder)
     }
 
@@ -168,10 +166,10 @@ impl Mounts {
 
     /// Returns the folder when it had to stay (uploads outstanding or locked files).
     fn stop_inner(&self, server_id: &str, remove_folder: bool) -> Option<String> {
-        let mount = self.0.lock().unwrap().remove(server_id);
+        let mount = self.0.locked().remove(server_id);
         let (root, id, clean) = match mount {
             Some(m) => {
-                let clean = m.pending.lock().unwrap().is_empty();
+                let clean = m.pending.locked().is_empty();
                 // The connection to Windows ends before the folder is unregistered.
                 drop(m.session);
                 (m.root, m.id, clean)
@@ -196,7 +194,7 @@ impl Mounts {
     }
 
     pub fn folder(&self, server_id: &str) -> Option<String> {
-        self.0.lock().unwrap().get(server_id).map(|m| m.root.to_string_lossy().to_string())
+        self.0.locked().get(server_id).map(|m| m.root.to_string_lossy().to_string())
     }
 }
 
@@ -385,11 +383,11 @@ impl Uploader {
     async fn sync(&self, paths: Vec<PathBuf>) {
         let Ok(conn) = connection(&self.app, &self.connections, &self.connection_id, &self.server_id).await else {
             // Tried again with the next change, once the interface has connected.
-            self.pending.lock().unwrap().extend(paths);
+            self.pending.locked().extend(paths);
             return;
         };
         let mut all: Vec<PathBuf> = paths;
-        all.extend(self.pending.lock().unwrap().drain());
+        all.extend(self.pending.locked().drain());
         all.sort();
         all.dedup();
         for path in all {
@@ -428,11 +426,11 @@ impl Uploader {
                         }
                     } else {
                         // Still open in another program: try again later.
-                        self.pending.lock().unwrap().insert(path);
+                        self.pending.locked().insert(path);
                     }
                 }
                 Err(e) => {
-                    self.pending.lock().unwrap().insert(path);
+                    self.pending.locked().insert(path);
                     let _ = self.app.emit(
                         "mount-event",
                         MountEvent {

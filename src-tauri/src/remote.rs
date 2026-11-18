@@ -788,6 +788,8 @@ impl AsyncRead for RemoteReader {
     }
 }
 
+const PARTS_SET: &str = "a writer is built with all parts set, and only close or abort, which consume it, take them";
+
 pub enum RemoteWriter {
     Plain(Box<dyn AsyncWrite + Unpin + Send>),
     Ftp(Option<Io>, Option<FtpFinish>),
@@ -804,15 +806,15 @@ impl RemoteWriter {
         match &mut self {
             RemoteWriter::Plain(w) => w.shutdown().await.map_err(done),
             RemoteWriter::Ftp(io, fin) => {
-                crate::ftp::close_data(io.take().expect("open")).await?;
-                fin.take().expect("open").finish().await
+                crate::ftp::close_data(io.take().expect(PARTS_SET)).await?;
+                fin.take().expect(PARTS_SET).finish().await
             }
             RemoteWriter::Dav(w, task) => {
-                let mut w = w.take().expect("open");
+                let mut w = w.take().expect(PARTS_SET);
                 w.shutdown().await.map_err(done)?;
                 drop(w);
                 task.take()
-                    .expect("open")
+                    .expect(PARTS_SET)
                     .await
                     .map_err(|e| AppError::other("Hochladen abgebrochen.").with_detail(e.to_string()))?
             }
