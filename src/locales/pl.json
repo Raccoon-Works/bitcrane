@@ -632,6 +632,7 @@
   "Vertrauen und verbinden": "Zaufaj i połącz",
   "Verfahren": "Algorytm",
   "Fingerabdruck": "Odcisk klucza",
+  "TLS-Zertifikat": "Certyfikat TLS",
   "Fingerabdruck hat sich geändert": "Odcisk klucza się zmienił",
   "Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.": "Serwer przedstawia się inaczej niż ostatnio. Zdarza się to po ponownej instalacji, ale może też oznaczać atak. Bitcrane nie połączy się, dopóki tego nie potwierdzisz.",
   "Weniger": "Mniej",

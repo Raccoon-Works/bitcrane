@@ -10,29 +10,21 @@ use crate::ssh::KnownHosts;
 use futures_util::TryStreamExt;
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use reqwest::{Method, StatusCode};
-use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct DavParams {
     /// Full address, e.g. "https://cloud.example/remote.php/dav/files/alex".
     pub url: String,
-    #[serde(default)]
     pub user: String,
-    #[serde(default)]
     pub password: Option<String>,
-    #[serde(default)]
     pub tls13_only: bool,
-    #[serde(default)]
     pub trust: Option<String>,
-    #[serde(default)]
     pub proxy: Option<ProxyParams>,
     /// Seconds to wait for the server when connecting (per server, default 15).
-    #[serde(default)]
     pub timeout: Option<u64>,
 }
 

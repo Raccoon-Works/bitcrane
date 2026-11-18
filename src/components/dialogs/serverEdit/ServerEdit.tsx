@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { Check, Trash2 } from '../../glyphs';
 import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { isCloudProtocol, type Protocol, type Server } from '../../../backend/types';
-import { proxyAccount, testServer } from '../../../state/live';
+import { proxyRef, testServer } from '../../../state/live';
 import {
   askRemoveServer,
   closeDialog,
@@ -21,7 +21,7 @@ import {
   showToast,
   useStore,
 } from '../../../state/store';
-import { CLOUD_NAMES, googleKey, saveGoogleKey, showCloudNotSetUp } from '../../../state/cloud';
+import { CLOUD_NAMES, googleSecretStored, saveGoogleKey, showCloudNotSetUp } from '../../../state/cloud';
 import { Button } from '../../ui';
 import { Dialog } from '../Dialog';
 import { $t } from '../../../i18n';
@@ -59,7 +59,7 @@ export function ServerEdit({
   const [googleSecret, setGoogleSecret] = useState('');
   const [googleStored, setGoogleStored] = useState(false);
   useEffect(() => {
-    void googleKey().then((k) => setGoogleStored(!!k?.clientSecret));
+    void googleSecretStored().then(setGoogleStored);
   }, []);
   const [test, setTest] = useState<'idle' | 'running' | 'ok' | 'fail'>('idle');
   const [testText, setTestText] = useState('');
@@ -161,7 +161,7 @@ export function ServerEdit({
     // The proxy password goes to the keychain only.
     if (LIVE && draft.proxy?.user && proxyPassword)
       void backend
-        .secretSet(proxyAccount(draft.proxy), proxyPassword)
+        .secretStore(proxyRef(draft.proxy), proxyPassword)
         .catch(() => showToast($t('Proxy-Passwort konnte nicht gespeichert werden.'), 'error'));
     saveServer(
       {

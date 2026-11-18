@@ -7,11 +7,8 @@
  * left place is the one "upload" copies from, the right one "download" copies
  * from; this covers computer ↔ server, server ↔ server and two local folders.
  */
-import * as fs from '../backend/mockFs';
-import type { WalkItem } from '../backend/api';
-import { tauriBackend as backend } from '../backend/tauriBackend';
-import { clockOffset } from './live';
-import { LIVE, type SyncAction } from './store';
+import * as live from './live';
+import { demoWalk, LIVE, type SyncAction } from './store';
 
 export type Direction = 'up' | 'down' | 'both';
 
@@ -123,18 +120,13 @@ export function isExcluded(rel: string, excludes: string[]): boolean {
  */
 export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   const side = place.serverId ? 'remote' : 'local';
-  let items: WalkItem[];
-  if (LIVE)
-    items = side === 'local' ? await backend.localWalk(place.dir) : await backend.remoteWalk(place.serverId, place.dir);
-  else
-    items = fs.walkFiles(side, place.serverId, place.dir).map((f) => {
-      const relative = f.path.slice(place.dir.length + 1);
-      return { path: f.path, relative, localRelative: relative, size: f.entry.size, mtime: f.entry.mtime };
-    });
-  const offset = LIVE && place.serverId ? clockOffset(place.serverId) : 0;
+  const items = LIVE
+    ? await live.walkFiles(side, place.serverId, place.dir)
+    : demoWalk(side, place.serverId, place.dir);
+  const offset = place.serverId ? live.clockOffset(place.serverId) : 0;
   const map = new Map<string, Side>();
   // Walk results start with the walked folder's own name; drop it.
-  const below = (rel: string) => (LIVE ? rel.split('/').slice(1).join('/') : rel);
+  const below = (rel: string) => rel.split('/').slice(1).join('/');
   for (const it of items) {
     // Keys with the server's names, so a file stored on Windows as "a%3Ab.txt" meets "a:b.txt",
     // and in composed Unicode form (NFC): "ü" stored decomposed on one side (macOS) and composed
@@ -149,10 +141,6 @@ export async function walkPlace(place: Place): Promise<Map<string, Side>> {
       });
   }
   return map;
-}
-
-function checksum(place: Place, path: string): Promise<string> {
-  return place.serverId ? backend.remoteChecksum(place.serverId, path) : backend.localChecksum(path);
 }
 
 /** Checksums of files that have the same size on both sides (key: relative path; true = content differs). */
@@ -170,7 +158,10 @@ export async function contentDiffers(
           out.set(p.rel, false);
           return;
         }
-        const [a, b] = await Promise.all([checksum(left, p.local.path), checksum(right, p.remote.path)]);
+        const [a, b] = await Promise.all([
+          live.checksumOf(left.serverId, p.local.path),
+          live.checksumOf(right.serverId, p.remote.path),
+        ]);
         out.set(p.rel, a !== b);
       }),
     );

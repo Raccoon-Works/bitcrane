@@ -4,6 +4,14 @@
  */
 import { isCloudProtocol, type Protocol, type Server } from '../backend/types';
 
+/** Address of a WebDAV server, shown in the server dialog; the core logs in with the same one (login.rs). */
+export function davUrl(srv: Server): string {
+  const https = srv.davHttps !== false;
+  const port = srv.port && srv.port !== (https ? 443 : 80) ? `:${srv.port}` : '';
+  const path = (srv.davPath || '/').startsWith('/') ? srv.davPath || '/' : `/${srv.davPath}`;
+  return `${https ? 'https' : 'http'}://${srv.host}${port}${path}`;
+}
+
 /** Address shown next to a server name ("user@host" plus a port other than the default). */
 export function addressOf(x: Server): string {
   // Cloud services: the signed-in account.

@@ -251,7 +251,9 @@ export async function loadConfig() {
   // Which cloud services this build can add (app keys are put in at build time).
   void import('../cloud').then((m) => m.loadCloudServices());
   try {
-    const [places, home] = await Promise.all([backend.localPlaces(), backend.localStat('~')]);
+    const [found, home] = await Promise.all([backend.localPlaces(), backend.localStat('~')]);
+    // Standard folders come with a text key as their name, so they follow the interface language.
+    const places = found.map(({ standard, ...p }) => (standard ? { ...p, name: $t(p.name) } : p));
     setState({ homeName: home.name, ...(places.length ? { places } : {}) });
   } catch {
     // Keep the default places.

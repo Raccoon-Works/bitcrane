@@ -18,6 +18,7 @@ pub mod content;
 pub mod credentials;
 pub mod local;
 pub mod mount;
+pub mod secrets;
 pub mod server;
 pub mod settings;
 pub mod terminals;

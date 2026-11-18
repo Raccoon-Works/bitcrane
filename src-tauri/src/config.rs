@@ -1,16 +1,14 @@
-//! Persistent settings and secrets.
+//! Persistent settings.
 //!
 //! Servers, watches and preferences are stored as JSON in the app's config
 //! folder (macOS: ~/Library/Application Support/de.raccoonworks.bitcrane,
 //! Windows: %APPDATA%\de.raccoonworks.bitcrane). Passwords and key
 //! passphrases never go into that file: they live in the system keychain
-//! (macOS Keychain, Windows Credential Manager).
+//! (see `secrets.rs`).
 
 use crate::error::{AppError, AppResult};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-
-const KEYRING_SERVICE: &str = "Bitcrane";
 
 pub fn config_file(dir: &Path) -> PathBuf {
     dir.join("config.json")
@@ -31,12 +29,12 @@ pub fn load(dir: &Path) -> AppResult<Value> {
 
 /// Writes the configuration atomically.
 pub fn save(dir: &Path, value: &Value) -> AppResult<()> {
-    write_atomic(&config_file(dir), &serde_json::to_string_pretty(value).expect("a JSON value always serializes"))
+    Ok(write_atomic(&config_file(dir), &serde_json::to_string_pretty(value).expect("a JSON value always serializes"))?)
 }
 
 /// Writes one of Bitcrane's own files through a temporary file and a rename, so a crash or a full
 /// disk leaves the previous version whole instead of a half-written file.
-pub fn write_atomic(path: &Path, contents: &str) -> AppResult<()> {
+pub fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -56,32 +54,6 @@ pub fn keep_damaged(path: &Path) -> String {
         log::warn!("could not keep a copy of the damaged {}: {e}", path.display());
     }
     name
-}
-
-fn entry(account: &str) -> AppResult<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE, account)
-        .map_err(|e| AppError::other("Schlüsselbund nicht verfügbar.").with_detail(e.to_string()))
-}
-
-pub fn secret_get(account: &str) -> AppResult<Option<String>> {
-    match entry(account)?.get_password() {
-        Ok(v) => Ok(Some(v)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(AppError::other("Schlüsselbund nicht lesbar.").with_detail(e.to_string())),
-    }
-}
-
-pub fn secret_set(account: &str, value: &str) -> AppResult<()> {
-    entry(account)?
-        .set_password(value)
-        .map_err(|e| AppError::other("Konnte nicht im Schlüsselbund speichern.").with_detail(e.to_string()))
-}
-
-pub fn secret_delete(account: &str) -> AppResult<()> {
-    match entry(account)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(AppError::other("Konnte nicht aus dem Schlüsselbund löschen.").with_detail(e.to_string())),
-    }
 }
 
 #[cfg(test)]

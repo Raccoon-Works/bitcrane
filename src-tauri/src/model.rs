@@ -101,6 +101,10 @@ impl WalkItem {
 #[serde(rename_all = "camelCase")]
 pub struct Place {
     pub name: String,
+    /// A standard folder of the system (home, desktop, documents, downloads) whose `name` is the
+    /// interface's German text key, so it appears in the user's language.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub standard: bool,
     pub path: String,
     /// A network share (SMB, AFP, NFS, WebDAV mount or mapped network drive).
     #[serde(skip_serializing_if = "std::ops::Not::not")]

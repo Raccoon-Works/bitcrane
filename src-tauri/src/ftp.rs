@@ -29,46 +29,32 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type Io = Box<dyn Stream>;
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct FtpParams {
     pub host: String,
     pub port: u16,
-    #[serde(default)]
     pub user: String,
-    #[serde(default)]
     pub password: Option<String>,
-    #[serde(default)]
     pub tls: FtpTls,
     /// Only TLS 1.3 (otherwise 1.2 and 1.3).
-    #[serde(default)]
     pub tls13_only: bool,
     /// Encoding of file names.
-    #[serde(default)]
     pub encoding: FtpEncoding,
     /// Server time zone in minutes east of UTC; LIST shows local server times.
-    #[serde(default)]
     pub tz_offset_min: i32,
-    #[serde(default)]
     pub mode: TransferMode,
     /// Certificate fingerprint the user has just confirmed.
-    #[serde(default)]
     pub trust: Option<String>,
-    #[serde(default)]
     pub proxy: Option<ProxyParams>,
     /// Seconds to wait for the server when connecting (per server, default 15).
-    #[serde(default)]
     pub timeout: Option<u64>,
 }
 
-/// Encryption of the connection. Unknown values are refused when the parameters are read, so a
-/// typo can never end in a connection that sends the password in clear.
-#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+/// Encryption of the connection, from the server's protocol (`login.rs`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FtpTls {
     None,
     /// Plain connect, then AUTH TLS before the login.
-    #[default]
     Explicit,
     /// TLS from the first byte (port 990).
     Implicit,
@@ -246,7 +232,7 @@ pub fn cert_error(host: &str, fingerprint: String, stored: Option<String>) -> Ap
     );
     err.host_key = Some(Box::new(crate::error::HostKeyInfo {
         host: host.to_string(),
-        algorithm: "TLS-Zertifikat".into(),
+        algorithm: crate::error::TLS_CERTIFICATE.into(),
         fingerprint,
         previous: stored,
     }));
@@ -1154,15 +1140,29 @@ mod tests {
     use super::*;
     use crate::error::Param;
 
-    fn parse(json: serde_json::Value) -> Result<FtpParams, serde_json::Error> {
-        serde_json::from_value(json)
+    /// Parameters for the encoding tests; nothing is connected.
+    fn latin1_params() -> FtpParams {
+        FtpParams {
+            host: "ftp.example.test".into(),
+            port: 21,
+            user: String::new(),
+            password: None,
+            tls: FtpTls::Explicit,
+            tls13_only: false,
+            encoding: FtpEncoding::Latin1,
+            tz_offset_min: 0,
+            mode: TransferMode::Binary,
+            trust: None,
+            proxy: None,
+            timeout: None,
+        }
     }
 
     #[test]
     fn latin1_refuses_names_it_cannot_write() {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared {
-            params: parse(serde_json::json!({ "host": "ftp.example.test", "port": 21, "encoding": "latin1" })).unwrap(),
+            params: latin1_params(),
             tls: None,
             seen: None,
             host_id: String::new(),
@@ -1175,32 +1175,6 @@ mod tests {
         let err = shared.encode("Preise in €.txt").unwrap_err();
         assert_eq!(err.message.params, [Param::from("€")]);
         assert!(err.message.key.starts_with("Das Zeichen „{0}“ gibt es im Zeichensatz Latin-1 nicht."));
-    }
-
-    #[test]
-    fn settings_deserialize_from_the_stored_strings() {
-        let p = parse(serde_json::json!({
-            "host": "ftp.example.test", "port": 21,
-            "tls": "implicit", "encoding": "latin1", "mode": "auto"
-        }))
-        .unwrap();
-        assert_eq!((p.tls, p.encoding, p.mode), (FtpTls::Implicit, FtpEncoding::Latin1, TransferMode::Auto));
-        let p = parse(serde_json::json!({ "host": "ftp.example.test", "port": 21 })).unwrap();
-        assert_eq!((p.tls, p.encoding, p.mode), (FtpTls::Explicit, FtpEncoding::Utf8, TransferMode::Binary));
-        assert_eq!(parse(serde_json::json!({ "host": "h", "port": 21, "tls": "none" })).unwrap().tls, FtpTls::None);
-        assert_eq!(
-            parse(serde_json::json!({ "host": "h", "port": 21, "mode": "ascii" })).unwrap().mode,
-            TransferMode::Ascii
-        );
-    }
-
-    #[test]
-    fn unknown_settings_are_refused() {
-        for (key, value) in [("tls", "Explicit"), ("tls", "tls"), ("encoding", "utf-8"), ("mode", "text")] {
-            let mut json = serde_json::json!({ "host": "ftp.example.test", "port": 21 });
-            json[key] = value.into();
-            assert!(parse(json).is_err(), "{key}={value} must be refused");
-        }
     }
 
     #[test]

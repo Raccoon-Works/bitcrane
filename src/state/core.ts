@@ -11,7 +11,6 @@
  * `live.ts`, which calls the Rust core and receives progress through events.
  */
 import { useMemo, useSyncExternalStore } from 'react';
-import { isTauri } from '../backend/api';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { FileEntry, PaneSide, Server, Tab, Watch } from '../backend/types';
@@ -25,8 +24,12 @@ import { updateTab } from './tabs';
 import { closePaneServer } from './watches';
 import { updateSettings } from './settings';
 
-/** True inside the desktop app: real files and real servers instead of the demo data. */
-export const LIVE = isTauri;
+/**
+ * True inside the desktop app: real files and real servers instead of the demo data. Fixed when
+ * building (vite.config.ts), so the app's bundle leaves out the demo and the demo's the app; only
+ * the development server, which serves both, asks at run time whether Tauri is there.
+ */
+export const LIVE: boolean = __BITCRANE_LIVE__ ?? '__TAURI_INTERNALS__' in window;
 
 export function initialState(): AppState {
   const servers = LIVE ? [] : sampleServers();

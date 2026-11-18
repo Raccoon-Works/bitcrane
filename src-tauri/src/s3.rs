@@ -22,42 +22,32 @@ use crate::ssh::KnownHosts;
 use futures_util::TryStreamExt;
 use hmac::{Hmac, Mac};
 use reqwest::{Method, StatusCode};
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct S3Params {
     /// Host of the service, optionally with scheme and port, e.g.
     /// "s3.eu-central-1.amazonaws.com" or "http://127.0.0.1:9000".
     pub endpoint: String,
     /// Signing region ("us-east-1" when empty; Cloudflare R2 uses "auto").
-    #[serde(default)]
     pub region: String,
     /// Fixed bucket; empty = the bucket list is the root.
-    #[serde(default)]
     pub bucket: String,
     /// Access key ID.
     pub access_key: String,
     /// Secret access key (from the keychain).
-    #[serde(default)]
     pub secret: Option<String>,
     /// Bucket in the path ("host/bucket/key") instead of the host name
     /// ("bucket.host/key"); needed for MinIO and IP addresses.
-    #[serde(default)]
     pub path_style: bool,
-    #[serde(default)]
     pub tls13_only: bool,
-    #[serde(default)]
     pub trust: Option<String>,
-    #[serde(default)]
     pub proxy: Option<ProxyParams>,
     /// Seconds to wait for the service when connecting (per server, default 15).
-    #[serde(default)]
     pub timeout: Option<u64>,
 }
 

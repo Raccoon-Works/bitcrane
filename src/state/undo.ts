@@ -4,13 +4,13 @@
 import { showError } from './errors';
 
 import { tauriBackend as backend } from '../backend/tauriBackend';
+import type { Sealed } from '../backend/api';
 import { chooseFile, chooseFolder, chooseSaveTarget } from '../backend/dialogs';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { PaneSide, Server, Watch } from '../backend/types';
 
 import * as paths from '../util/paths';
-import { seal, unseal, type Sealed } from '../util/crypto';
 import { $t } from '../i18n';
 import {
   showToast,
@@ -120,10 +120,11 @@ interface ExportFile {
   servers?: Server[];
   watches?: Watch[];
   settings?: Partial<Settings>;
-  /** Version 2, encrypted: the payload above (plus secrets) sealed with a password. */
+  /**
+   * Version 2, encrypted: the payload above sealed with a password, with the stored secrets of
+   * its servers inside if wanted. Only the core opens it (src-tauri/src/commands/secrets.rs).
+   */
   encrypted?: Sealed;
-  /** Only inside an encrypted file: keychain entries (account -> secret). */
-  secrets?: Record<string, string>;
 }
 
 /** "Server und Überwachungen exportieren …": asks for the options first. */
@@ -164,13 +165,9 @@ export async function writeExport(password: string, withSecrets: boolean): Promi
     let file: ExportFile = payload;
     let secretCount = 0;
     if (password) {
-      const secrets = withSecrets ? await live.collectSecrets(servers) : undefined;
-      secretCount = secrets ? Object.keys(secrets).length : 0;
-      file = {
-        format: 'bitcrane-export',
-        version: 2,
-        encrypted: await seal(JSON.stringify({ ...payload, secrets }), password),
-      };
+      const sealed = await backend.exportSeal(payload, password, withSecrets);
+      secretCount = sealed.secrets;
+      file = { format: 'bitcrane-export', version: 2, encrypted: sealed.encrypted };
     }
     await backend.fileWrite(path, JSON.stringify(file, null, 2));
     showToast(
@@ -203,7 +200,7 @@ export async function importConfig() {
     const data = JSON.parse(await backend.fileRead(path)) as ExportFile;
     if (data.format !== 'bitcrane-export') throw new Error($t('Das ist keine Exportdatei von Bitcrane.'));
     if (data.encrypted) openDialog({ type: 'importPassword', sealed: data.encrypted });
-    else await applyImport(data);
+    else await applyImport(data, 0);
   } catch (e) {
     showError(e);
   }
@@ -211,14 +208,10 @@ export async function importConfig() {
 
 /** Decrypts an encrypted export; false when the password is wrong. */
 export async function importSealed(sealed: Sealed, password: string): Promise<boolean> {
-  let data: ExportFile;
-  try {
-    data = JSON.parse(await unseal(sealed, password)) as ExportFile;
-  } catch {
-    return false;
-  }
+  const opened = await backend.importUnseal(sealed, password);
+  if (!opened) return false;
   closeDialog();
-  await applyImport(data);
+  await applyImport(opened.data as ExportFile, opened.restored);
   return true;
 }
 
@@ -227,7 +220,8 @@ function connectionKey(x: { host: string; port: number; user: string; protocol?:
   return `${x.protocol ?? 'sftp'}|${x.user.toLowerCase()}@${x.host.toLowerCase()}:${x.port}`;
 }
 
-async function applyImport(data: ExportFile) {
+/** Takes over the servers, watches and settings of an export file; `restored` secrets went to the keychain. */
+async function applyImport(data: ExportFile, restored: number) {
   const merge = <T extends { id: string }>(cur: T[], add: T[]) => [
     ...cur.filter((x) => !add.some((a) => a.id === x.id)),
     ...add,
@@ -260,7 +254,6 @@ async function applyImport(data: ExportFile) {
     settings: data.settings ? { ...s.settings, ...data.settings } : s.settings,
     firstRun: false,
   }));
-  const restored = data.secrets ? await live.restoreSecrets(data.secrets) : 0;
   showToast(
     $t(
       'Importiert: {0} Server, {1} Überwachungen{2}.',

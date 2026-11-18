@@ -632,6 +632,7 @@
   "Vertrauen und verbinden": "Confiar y conectar",
   "Verfahren": "Algoritmo",
   "Fingerabdruck": "Huella digital",
+  "TLS-Zertifikat": "Certificado TLS",
   "Fingerabdruck hat sich geändert": "La huella digital ha cambiado",
   "Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.": "El servidor se identifica de forma distinta a la última vez. Esto ocurre tras una reinstalación, pero también puede ser un ataque. Bitcrane no se conecta hasta que lo confirmes.",
   "Weniger": "Menos",

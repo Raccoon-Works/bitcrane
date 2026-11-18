@@ -11,7 +11,6 @@ use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth::{self, ascii_json};
 use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
 use futures_util::TryStreamExt;
-use serde::Deserialize;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
@@ -23,8 +22,7 @@ const TOKEN_URL: &str = "https://api.dropboxapi.com/oauth2/token";
 const CHUNK: usize = 8 * 1024 * 1024;
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct DropboxParams {
     pub refresh_token: String,
 }

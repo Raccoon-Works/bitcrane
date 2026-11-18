@@ -16,17 +16,17 @@
  * of a server, places of this computer, window sizes, workspaces.
  *
  * Passwords travel only when the user sets a sync password (the same on every
- * computer); they are then encrypted (AES-GCM, see util/crypto.ts). The sync
- * password itself stays in each computer's keychain.
+ * computer); the core then encrypts them (AES-GCM, see src-tauri/src/secrets.rs),
+ * and they never pass through the interface. The sync password itself stays in
+ * each computer's keychain.
  */
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
-import { seal, unseal, type Sealed } from '../util/crypto';
 import { $t } from '../i18n';
 import { showError } from './errors';
 import { addLog } from './log';
 import { getState, LIVE, setState, showToast, subscribeStore, type Settings } from './store';
-import { toBackendError } from '../backend/api';
+import { toBackendError, type Sealed } from '../backend/api';
 
 /** Settings that are the same on every computer. */
 const SHARED_SETTINGS = [
@@ -46,7 +46,7 @@ const SHARED_SETTINGS = [
 type SharedKey = (typeof SHARED_SETTINGS)[number];
 
 /** Keychain entry of the sync password on this computer. */
-const SYNC_PASSWORD = 'sync-password';
+const SYNC_PASSWORD = { kind: 'syncPassword' } as const;
 /** How often the shared file is checked for changes from the other computer. */
 const POLL_MS = 30_000;
 
@@ -166,24 +166,9 @@ function patchSettings(patch: Partial<Settings>) {
   setState((st) => ({ settings: { ...st.settings, ...patch } }));
 }
 
-/** The sync password of this computer, if one is set. */
-async function syncPassword(): Promise<string | null> {
-  return LIVE ? backend.secretGet(SYNC_PASSWORD).catch(() => null) : null;
-}
-
-/** Keychain entries of these servers (passwords, passphrases, proxies, cloud sign-ins, Google key). */
-async function secretsOf(servers: Server[]): Promise<Record<string, string>> {
-  const live = await import('./live');
-  const out = await live.collectSecrets(servers);
-  for (const x of servers) {
-    if (x.protocol === 'dropbox' || x.protocol === 'gdrive' || x.protocol === 'onedrive') {
-      const v = await backend.secretGet(live.cloudAccount(x)).catch(() => null);
-      if (v) out[live.cloudAccount(x)] = v;
-    }
-  }
-  const google = await backend.secretGet('cloud-client:gdrive').catch(() => null);
-  if (google) out['cloud-client:gdrive'] = google;
-  return out;
+/** Whether this computer has a sync password. */
+function hasSyncPassword(): Promise<boolean> {
+  return LIVE ? backend.secretExists(SYNC_PASSWORD) : Promise.resolve(false);
 }
 
 /** One sync run: read, merge, apply, write back. Runs one at a time. */
@@ -241,28 +226,13 @@ async function syncOnce() {
   }
 
   // Passwords from the other computer (only with the sync password).
-  const password = await syncPassword();
-  if (theirs?.secrets && password && st.settings.syncPasswords) {
-    let secrets: Record<string, string>;
-    try {
-      secrets = JSON.parse(await unseal(theirs.secrets, password)) as Record<string, string>;
-    } catch {
-      throw new Error(
-        $t(
-          'Die Passwörter im Abgleich lassen sich mit deinem Abgleich-Passwort nicht entschlüsseln. Ist es auf allen Rechnern gleich?',
-        ),
-      );
-    }
-    // Only missing entries are filled in; a password changed here is not overwritten. A keychain
-    // that refuses to store is reported once, and the rest of the sync still applies.
-    try {
-      for (const [account, value] of Object.entries(secrets)) {
-        const have = await backend.secretGet(account).catch(() => null);
-        if (have === null) await backend.secretSet(account, value);
-      }
-    } catch (e) {
-      showError(e);
-    }
+  const withPassword = await hasSyncPassword();
+  if (theirs?.secrets && withPassword && st.settings.syncPasswords) {
+    // Only missing entries are filled in; a password changed here is not overwritten. Secrets the
+    // sync password does not open stop the sync; a keychain that refuses to store is reported, and
+    // the rest of the sync still applies.
+    const refused = await backend.syncSecretsUnseal(theirs.secrets);
+    if (refused) showError(refused);
   }
 
   // Apply here.
@@ -305,9 +275,8 @@ async function syncOnce() {
     stable(theirs.servers.map(hashServer)) === stable(data.servers.map(hashServer)) &&
     stable(theirs.settings) === stable(data.settings);
   let mtime = file?.mtime ?? 0;
-  if (!sameAsFile || (st.settings.syncPasswords && password && !theirs?.secrets)) {
-    if (st.settings.syncPasswords && password)
-      data.secrets = await seal(JSON.stringify(await secretsOf(merged)), password);
+  if (!sameAsFile || (st.settings.syncPasswords && withPassword && !theirs?.secrets)) {
+    if (st.settings.syncPasswords && withPassword) data.secrets = (await backend.syncSecretsSeal(merged)) ?? undefined;
     else if (theirs?.secrets && !st.settings.syncPasswords) data.secrets = undefined;
     else if (theirs?.secrets) data.secrets = theirs.secrets;
     mtime = await backend.syncWrite(folder, JSON.stringify(data, null, 2));
@@ -375,10 +344,10 @@ export async function setSyncFolder(folder: string | null) {
 /** Settings: sync password on (stored in this computer's keychain) or off. */
 export async function setSyncPassword(password: string | null) {
   if (password) {
-    if (LIVE) await backend.secretSet(SYNC_PASSWORD, password);
+    if (LIVE) await backend.secretStore(SYNC_PASSWORD, password);
     patchSettings({ syncPasswords: true });
   } else {
-    if (LIVE) await backend.secretDelete(SYNC_PASSWORD).catch((e) => showError(e));
+    if (LIVE) await backend.secretForget(SYNC_PASSWORD).catch((e) => showError(e));
     patchSettings({ syncPasswords: false });
   }
   void runSync();

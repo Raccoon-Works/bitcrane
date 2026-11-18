@@ -300,9 +300,14 @@ export function changePerms(serverId: string, path: string, perms: string, recur
   );
 }
 
-/** All files below a folder (for folder sizes and searching). */
+/** All files below a folder (for folder sizes, searching and comparing). */
 export function walkFiles(side: PaneSide, serverId: string, path: string): Promise<WalkItem[]> {
   return side === 'local' ? backend.localWalk(path) : backend.remoteWalk(serverId, path);
+}
+
+/** Checksum of a file of a server, or of this computer ('' as server id), with the default algorithm. */
+export function checksumOf(serverId: string, path: string): Promise<string> {
+  return serverId ? backend.remoteChecksum(serverId, path) : backend.localChecksum(path);
 }
 
 export function openUrl(url: string) {

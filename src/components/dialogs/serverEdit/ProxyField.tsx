@@ -4,8 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { Server } from '../../../backend/types';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
-import { proxyAccount } from '../../../state/live';
+import { hasSecret, proxyRef } from '../../../state/live';
 import { LIVE, useStore } from '../../../state/store';
 import { Select, TextField } from '../../ui';
 import { $t } from '../../../i18n';
@@ -30,10 +29,7 @@ export function ProxyField({
       setProxyStored(false);
       return;
     }
-    backend
-      .secretGet(proxyAccount(p))
-      .then((v) => setProxyStored(v !== null))
-      .catch(() => setProxyStored(false));
+    void hasSecret(proxyRef(p)).then(setProxyStored);
   }, [draft.proxy]);
 
   return (

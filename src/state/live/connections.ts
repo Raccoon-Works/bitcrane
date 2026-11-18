@@ -3,11 +3,11 @@
  * bookkeeping of which servers are connected.
  */
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { type Server, isCloudProtocol } from '../../backend/types';
+import { type Server, isCloudProtocol, TLS_CERTIFICATE } from '../../backend/types';
 import { type StoredConfig } from './config';
-import { serverById, getState, showToast, setState, subscribeStore, uid } from '../core';
+import { serverById, getState, showToast, setState, subscribeStore } from '../core';
 import type { AppState } from '../appState';
-import { type AuthParams, type ConnectParams, toBackendError, type BackendError } from '../../backend/api';
+import { type ConnectRequest, type SecretRef, toBackendError, type BackendError } from '../../backend/api';
 import { $t } from '../../i18n';
 import { bump, listings } from './listing';
 import { openDialog } from '../panels';
@@ -42,63 +42,32 @@ export const failed = new Set<string>();
 export const isConnected = (serverId: string) => connected.has(serverId);
 export const isConnecting = (serverId: string) => connecting.has(serverId);
 
-function passphraseAccount(srv: Pick<Server, 'keyPath'>) {
-  return `passphrase:${srv.keyPath}`;
-}
-/** Keychain entry of a cloud service's sign-in (refresh token). */
-export function cloudAccount(srv: Pick<Server, 'id'>) {
-  return `cloud:${srv.id}`;
+/** The keychain entry of a server's password (also an S3 secret key and a vault's password). */
+function passwordRef(srv: Server): SecretRef {
+  return { kind: 'password', user: srv.user, host: srv.host, port: srv.port };
 }
 
-function passwordAccount(srv: Server) {
-  return `password:${srv.user}@${srv.host}:${srv.port}`;
-}
-export function proxyAccount(p: { user?: string; host: string; port: number }) {
-  return `proxy:${p.user ?? ''}@${p.host}:${p.port}`;
+/** The keychain entry of a key file's passphrase. */
+export function passphraseRef(keyPath: Server['keyPath']): SecretRef {
+  return { kind: 'passphrase', keyPath };
 }
 
-/** Removes the stored secrets of a deleted server, unless a remaining server uses the same account. */
+/** The keychain entry of a proxy password. */
+export function proxyRef(p: { user?: string; host: string; port: number }): SecretRef {
+  return { kind: 'proxy', user: p.user ?? '', host: p.host, port: p.port };
+}
+
+/**
+ * Whether a secret is stored. Only the core reads secrets; the interface needs to know whether
+ * to ask the user for one.
+ */
+export function hasSecret(secret: SecretRef): Promise<boolean> {
+  return backend.secretExists(secret);
+}
+
+/** Removes the stored secrets of a deleted server, unless a remaining server uses the same entry. */
 export async function forgetSecrets(removed: Server, remaining: Server[]) {
-  const accounts = (x: Server) => [
-    passwordAccount(x),
-    passphraseAccount(x),
-    ...(x.proxy?.user ? [proxyAccount(x.proxy)] : []),
-    ...(isCloudProtocol(x.protocol) ? [cloudAccount(x)] : []),
-  ];
-  const inUse = new Set(remaining.flatMap(accounts));
-  // Most of these accounts were never stored; a failed removal leaves nothing the user can act on.
-  for (const a of accounts(removed)) if (!inUse.has(a)) await backend.secretDelete(a).catch(() => undefined);
-}
-
-/** Stored passwords and passphrases of these servers (for an encrypted export). */
-export async function collectSecrets(servers: Server[]): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  const accounts = new Set<string>();
-  for (const x of servers) {
-    accounts.add(passwordAccount(x));
-    if (x.keyPath) accounts.add(passphraseAccount(x));
-    if (x.proxy?.user) accounts.add(proxyAccount(x.proxy));
-  }
-  for (const a of accounts) {
-    const v = await keychain(a);
-    if (v !== undefined) out[a] = v;
-  }
-  return out;
-}
-
-/** Puts imported secrets into the system keychain. */
-export async function restoreSecrets(secrets: Record<string, string>): Promise<number> {
-  let n = 0;
-  for (const [account, value] of Object.entries(secrets)) {
-    if (
-      await backend.secretSet(account, value).then(
-        () => true,
-        () => false,
-      )
-    )
-      n++;
-  }
-  return n;
+  await backend.serverForgetSecrets(removed, remaining);
 }
 
 /** SFTP (SSH) or one of the other protocols. */
@@ -119,133 +88,61 @@ export function withTerminalButton(
   return at < 0 ? [...toolbar, 'terminal'] : [...toolbar.slice(0, at), 'terminal', ...toolbar.slice(at)];
 }
 
-/** Address of a WebDAV server. */
-export function davUrl(srv: Server): string {
-  const https = srv.davHttps !== false;
-  const port = srv.port && srv.port !== (https ? 443 : 80) ? `:${srv.port}` : '';
-  const path = (srv.davPath || '/').startsWith('/') ? srv.davPath || '/' : `/${srv.davPath}`;
-  return `${https ? 'https' : 'http'}://${srv.host}${port}${path}`;
+/** The jump server of an SFTP server, if one is set. */
+function jumpOf(srv: Server): Server | undefined {
+  const j = isSftp(srv) && srv.jumpServerId ? serverById(srv.jumpServerId) : undefined;
+  return j && j.id !== srv.id ? j : undefined;
+}
+
+/** What the user typed into the prompt, as password or passphrase. */
+function typedSecret(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secretKind'>) {
+  const kind = typed.secretKind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
+  return {
+    password: kind === 'password' ? typed.secret : undefined,
+    passphrase: kind === 'passphrase' ? typed.secret : undefined,
+  };
+}
+
+/** A login for the core: the server, its jump server and what the user typed or confirmed. */
+function loginRequest(
+  srv: Server,
+  typed: Pick<ConnectOptions, 'secret' | 'secretKind' | 'trust'> = {},
+): ConnectRequest {
+  return {
+    server: srv,
+    jump: jumpOf(srv),
+    ...typedSecret(srv, typed),
+    trust: typed.trust,
+    keepalive: getState().settings.keepAlive,
+    googleClientId: getState().settings.googleClientId?.trim() ?? '',
+  };
 }
 
 /** Connects with the server's protocol; resolves to the start folder (and SSH clock offset). */
-async function openConnection(
-  id: string,
-  srv: Server,
-  auth: AuthParams,
-  password: string | undefined,
-  trust: string | undefined,
-  jump: ConnectParams | undefined,
-  proxy: ConnectParams['proxy'],
-) {
-  if (srv.protocol === 'ftp' || srv.protocol === 'ftps') {
-    return backend.connectFtp(id, {
-      host: srv.host,
-      port: srv.port,
-      user: srv.user,
-      password,
-      trust,
-      proxy,
-      tls: srv.protocol === 'ftp' ? 'none' : srv.implicitTls ? 'implicit' : 'explicit',
-      tls13Only: !!srv.tls13Only,
-      encoding: srv.ftpEncoding ?? 'utf8',
-      tzOffsetMin: srv.ftpTimezone ?? 0,
-      mode: srv.ftpMode ?? 'binary',
-      timeout: srv.connectTimeout,
-    });
+async function openConnection(id: string, srv: Server, request: ConnectRequest) {
+  // The vault's files lie on another server, which has to be connected first.
+  if (srv.protocol === 'vault' && srv.vaultStorageId && !connected.has(srv.vaultStorageId)) {
+    throw {
+      kind: 'notConnected',
+      message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', serverById(srv.vaultStorageId)?.name ?? '?'),
+    };
   }
-  if (srv.protocol === 'webdav') {
-    return backend.connectDav(id, {
-      url: davUrl(srv),
-      user: srv.user,
-      password,
-      trust,
-      proxy,
-      tls13Only: !!srv.tls13Only,
-      timeout: srv.connectTimeout,
-    });
-  }
-  if (srv.protocol === 's3') {
-    const port = srv.port && srv.port !== (srv.s3Http ? 80 : 443) ? `:${srv.port}` : '';
-    return backend.connectS3(id, {
-      endpoint: `${srv.s3Http ? 'http' : 'https'}://${srv.host}${port}`,
-      region: srv.s3Region ?? '',
-      bucket: srv.s3Bucket ?? '',
-      accessKey: srv.user,
-      secret: password,
-      pathStyle: !!srv.s3PathStyle,
-      tls13Only: !!srv.tls13Only,
-      trust,
-      proxy,
-      timeout: srv.connectTimeout,
-    });
-  }
-  if (srv.protocol === 'vault') {
-    // The vault's files lie on another server, which has to be connected first.
-    const storage = srv.vaultStorageId ? serverById(srv.vaultStorageId) : undefined;
-    if (srv.vaultStorageId && !connected.has(srv.vaultStorageId)) {
-      throw {
-        kind: 'notConnected',
-        message: $t('Erst mit {0} verbinden, dort liegt der Tresor.', storage?.name ?? '?'),
-      };
-    }
-    return backend.vaultOpen(id, srv.host, srv.vaultStorageId, password ?? '');
-  }
-  if (srv.protocol === 'smb') {
-    return backend.connectSmb(id, {
-      host: srv.host,
-      port: srv.port || 445,
-      user: srv.user,
-      password,
-      share: srv.smbShare ?? '',
-      encrypt: !!srv.smbEncrypt,
-      timeout: srv.connectTimeout,
-    });
-  }
-  if (srv.protocol === 'dropbox') {
-    // The sign-in from the browser, kept in the keychain (see addCloudService).
-    const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken)
-      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
-    return backend.connectDropbox(id, { refreshToken });
-  }
-  if (srv.protocol === 'onedrive') {
-    const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken)
-      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
-    const r = await backend.connectOneDrive(id, { refreshToken });
-    // Microsoft renews the sign-in with each use; keep the newest one.
-    if (r.refreshToken && r.refreshToken !== refreshToken)
-      backend.secretSet(cloudAccount(srv), r.refreshToken).catch((e) => showError(e));
-    return r;
-  }
-  if (srv.protocol === 'gdrive') {
-    const refreshToken = await keychain(cloudAccount(srv));
-    if (!refreshToken)
-      throw { kind: 'authFailed', message: $t('Für {0} fehlt die Anmeldung. Bitte neu anmelden.', srv.name) };
-    const key = await (await import('../cloud')).googleKey();
-    if (!key)
-      throw {
-        kind: 'other',
-        message: $t(
-          'Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.',
-        ),
-      };
-    return backend.connectGDrive(id, { refreshToken, ...key, pdfExport: srv.gdocExport === 'pdf' });
-  }
-  return backend.connect(id, {
-    host: srv.host,
-    port: srv.port,
-    user: srv.user,
-    auth,
-    trust,
-    keepalive: getState().settings.keepAlive,
-    scp: !!srv.scp,
-    jump,
-    proxy,
-    timeout: srv.connectTimeout,
-    forwardAgent: !!srv.forwardAgent,
-    sftpCommand: srv.sftpCommand?.trim() || undefined,
-  });
+  return backend.serverConnect(id, request);
+}
+
+/**
+ * Whether the login has a password: typed just now, or stored for a method that sends one
+ * (the same rule the core follows, src-tauri/src/login.rs).
+ */
+async function hasPassword(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secretKind'> = {}) {
+  if (typedSecret(srv, typed).password !== undefined) return true;
+  return (srv.auth === 'password' || srv.auth === 'auto') && hasSecret(passwordRef(srv));
+}
+
+/** Whether the login has a key passphrase: typed just now, or stored for a method that reads a key. */
+async function hasPassphrase(srv: Server, typed: Pick<ConnectOptions, 'secret' | 'secretKind'> = {}) {
+  if (typedSecret(srv, typed).passphrase !== undefined) return true;
+  return (srv.auth === 'key' || srv.auth === 'auto') && hasSecret(passphraseRef(srv.keyPath));
 }
 
 /**
@@ -254,29 +151,14 @@ async function openConnection(
  * already trusted host key; resolves to the start folder.
  */
 export async function connectAs(connectionId: string, srv: Server): Promise<string> {
-  const { auth, password } = await buildAuth(srv);
-  if (srv.auth === 'password' && srv.user && password === undefined) {
+  if (srv.auth === 'password' && srv.user && !(await hasPassword(srv))) {
     throw {
       kind: 'passwordRequired',
       message: $t('Für {0} ist kein Passwort gespeichert. Einmal normal verbinden und das Passwort sichern.', srv.name),
     };
   }
-  const jump = isSftp(srv) ? await jumpParams(srv) : undefined;
-  const { home } = await openConnection(connectionId, srv, auth, password, undefined, jump, await proxyParams(srv));
+  const { home } = await openConnection(connectionId, srv, loginRequest(srv));
   return home;
-}
-
-/** Proxy of a server with the password from the keychain. */
-async function proxyParams(srv: Server): Promise<ConnectParams['proxy']> {
-  const p = srv.proxy;
-  if (!p?.host) return undefined;
-  return {
-    kind: p.kind,
-    host: p.host,
-    port: p.port,
-    user: p.user || undefined,
-    password: p.user ? await keychain(proxyAccount(p)) : undefined,
-  };
 }
 
 interface ConnectOptions {
@@ -290,67 +172,6 @@ interface ConnectOptions {
   saveSecret?: boolean;
   /** Background reconnect: no dialogs, no toasts on failure. */
   silent?: boolean;
-}
-
-async function keychain(account: string): Promise<string | undefined> {
-  try {
-    return (await backend.secretGet(account)) ?? undefined;
-  } catch {
-    return undefined; // No keychain: the user is asked instead.
-  }
-}
-
-/**
- * Login data of a server. Passphrase and password come from the prompt
- * (`typed`) or from the system keychain.
- */
-async function buildAuth(
-  srv: Server,
-  typed?: { secret?: string; kind?: 'passphrase' | 'password' },
-): Promise<{ auth: AuthParams; passphrase?: string; password?: string }> {
-  const kind = typed?.kind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
-  const passphrase =
-    typed?.secret !== undefined && kind === 'passphrase'
-      ? typed.secret
-      : srv.auth === 'key' || srv.auth === 'auto'
-        ? await keychain(passphraseAccount(srv))
-        : undefined;
-  const password =
-    typed?.secret !== undefined && kind === 'password'
-      ? typed.secret
-      : srv.auth === 'password' || srv.auth === 'auto'
-        ? await keychain(passwordAccount(srv))
-        : undefined;
-  switch (srv.auth) {
-    case 'key':
-      return { auth: { method: 'key', path: srv.keyPath, passphrase }, passphrase };
-    case 'agent':
-      return { auth: { method: 'agent' } };
-    case 'password':
-      return { auth: { method: 'password', password: password ?? '' }, password };
-    default:
-      return {
-        auth: { method: 'auto', keyPath: srv.keyPath || undefined, passphrase, password },
-        passphrase,
-        password,
-      };
-  }
-}
-
-/** Login data of a jump server, with its secret from the keychain if stored. */
-async function jumpParams(srv: Server, trust?: string): Promise<ConnectParams | undefined> {
-  const j = srv.jumpServerId ? serverById(srv.jumpServerId) : undefined;
-  if (!j || j.id === srv.id) return undefined;
-  const { auth } = await buildAuth(j);
-  return {
-    host: j.host,
-    port: j.port,
-    user: j.user,
-    auth,
-    trust,
-    keepalive: getState().settings.keepAlive,
-    proxy: await proxyParams(j),
-  };
 }
 
 const PROTOCOL_LABEL: Record<string, string> = {
@@ -409,13 +230,12 @@ export function connectServer(serverId: string, opts: ConnectOptions = {}): Prom
 async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolean> {
   const srv = serverById(serverId);
   if (!srv) return false;
-  const { auth, passphrase, password } = await buildAuth(srv, { secret: opts.secret, kind: opts.secretKind });
   // FTP without a user name logs in anonymously, SMB as guest; everything else needs the password.
   const needsPassword =
     srv.auth === 'password' && !(srv.protocol === 'ftp' || srv.protocol === 'ftps' || srv.protocol === 'smb')
       ? true
       : srv.auth === 'password' && !!srv.user;
-  if (needsPassword && password === undefined) {
+  if (needsPassword && !(await hasPassword(srv, opts))) {
     if (opts.trust) pendingLogin.set(serverId, { trust: opts.trust });
     if (!opts.silent) openDialog({ type: 'secret', serverId, kind: 'password' });
     return false;
@@ -423,17 +243,19 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
   try {
     if (!opts.silent)
       addLog('info', $t('Verbinde mit {0}@{1}:{2} ({3})', srv.user, srv.host, srv.port, authLabel(srv)), serverId);
-    const jump = isSftp(srv) ? await jumpParams(srv, opts.trust) : undefined;
+    const request = loginRequest(srv, opts);
+    const jump = request.jump;
     if (jump && !opts.silent)
       addLog('info', $t('Über den Sprungserver {0}@{1}:{2}', jump.user, jump.host, jump.port), serverId);
-    const proxy = jump ? undefined : await proxyParams(srv);
+    // Through a jump server its own proxy is used (see login.rs).
+    const proxy = jump ? undefined : srv.proxy?.host ? srv.proxy : undefined;
     if (proxy && !opts.silent)
       addLog(
         'info',
         $t('Über {0}-Proxy {1}:{2}', proxy.kind === 'http' ? 'HTTP' : 'SOCKS5', proxy.host, proxy.port),
         serverId,
       );
-    const { home, clockOffsetMs } = await openConnection(serverId, srv, auth, password, opts.trust, jump, proxy);
+    const { home, clockOffsetMs } = await openConnection(serverId, srv, request);
     connected.add(serverId);
     homes.set(serverId, home);
     pendingLogin.delete(serverId);
@@ -459,7 +281,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
     if (opts.saveSecret && opts.secret !== undefined) {
       const kind = opts.secretKind ?? (srv.auth === 'password' ? 'password' : 'passphrase');
       backend
-        .secretSet(kind === 'passphrase' ? passphraseAccount(srv) : passwordAccount(srv), opts.secret)
+        .secretStore(kind === 'passphrase' ? passphraseRef(srv.keyPath) : passwordRef(srv), opts.secret)
         .catch(() => {
           showToast(
             $t('Konnte das Kennwort nicht im Schlüsselbund sichern.'),
@@ -529,7 +351,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
         if (err.hostKey) openDialog({ type: 'fingerprint', mode: 'changed', serverId, key: err.hostKey });
         break;
       case 'passphraseRequired':
-        openDialog({ type: 'secret', serverId, kind: 'passphrase', wrong: passphrase !== undefined });
+        openDialog({ type: 'secret', serverId, kind: 'passphrase', wrong: await hasPassphrase(srv, opts) });
         break;
       case 'passwordRequired':
         openDialog({ type: 'secret', serverId, kind: 'password' });
@@ -537,7 +359,7 @@ async function doConnect(serverId: string, opts: ConnectOptions): Promise<boolea
       case 'authFailed':
         // A cloud service's sign-in was revoked or is missing: sign in again in the browser.
         if (isCloudProtocol(srv.protocol)) openDialog({ type: 'cloudSignIn', service: srv.protocol!, serverId });
-        else if (srv.auth === 'password' || (srv.auth === 'auto' && password !== undefined))
+        else if (srv.auth === 'password' || (srv.auth === 'auto' && (await hasPassword(srv, opts))))
           openDialog({ type: 'secret', serverId, kind: 'password', wrong: true });
         else showError(err, { prefix: srv.name, serverId, connecting: true, log: 'done' });
         break;
@@ -577,11 +399,6 @@ export async function firstStartOffers() {
   if (!getState().settings.cloudAsked) await offerCloudPlaces(false);
 }
 
-/** Whether the passphrase of this key file is stored in the keychain. */
-export async function hasStoredPassphrase(keyPath: Server['keyPath']): Promise<boolean> {
-  return (await keychain(passphraseAccount({ keyPath }))) !== undefined;
-}
-
 /** Adds a public key to ~/.ssh/authorized_keys on a connected server. */
 export async function installPublicKey(serverId: string, publicKey: string): Promise<string | null> {
   if (!connected.has(serverId))
@@ -603,37 +420,14 @@ export async function installPublicKey(serverId: string, publicKey: string): Pro
 
 /** "Verbindung testen" in the server dialog: logs in once and closes again. */
 export async function testServer(srv: Server): Promise<{ ok: boolean; text: string }> {
-  const { auth, passphrase, password } = await buildAuth(srv);
-  if (srv.auth === 'password' && password === undefined)
+  if (srv.auth === 'password' && !(await hasPassword(srv)))
     return { ok: true, text: $t('Das Passwort fragt Bitcrane beim Verbinden ab.') };
   try {
-    if (!isSftp(srv)) {
-      // Other protocols: a short connection with a temporary id.
-      const id = `test-${uid('t')}`;
-      const { home } = await openConnection(id, srv, auth, password, undefined, undefined, await proxyParams(srv));
-      await backend.disconnect(id);
-      return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
-    }
-    const jump = await jumpParams(srv);
-    const home = await backend.sshTest({
-      host: srv.host,
-      port: srv.port,
-      user: srv.user,
-      auth,
-      keepalive: false,
-      scp: !!srv.scp,
-      jump,
-      proxy: jump ? undefined : await proxyParams(srv),
-    });
-    return {
-      ok: true,
-      text: home
-        ? $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home)
-        : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.'),
-    };
+    const home = await backend.serverTest(loginRequest(srv));
+    return { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich (Startordner {0})', home) };
   } catch (e) {
     const err = toBackendError(e);
-    if (err.kind === 'passphraseRequired' && passphrase === undefined)
+    if (err.kind === 'passphraseRequired' && !(await hasPassphrase(srv)))
       return { ok: true, text: $t('Erreichbar. Die Passphrase des Schlüssels fragt Bitcrane beim Verbinden ab.') };
     if (err.kind === 'passwordRequired')
       return { ok: true, text: $t('Erreichbar. Das Passwort fragt Bitcrane beim Verbinden ab.') };
@@ -641,7 +435,7 @@ export async function testServer(srv: Server): Promise<{ ok: boolean; text: stri
       return {
         ok: true,
         text:
-          err.hostKey?.algorithm === 'TLS-Zertifikat'
+          err.hostKey?.algorithm === TLS_CERTIFICATE
             ? $t('Erreichbar. Das Zertifikat bestätigst du beim ersten Verbinden.')
             : $t('Erreichbar. Den Fingerabdruck bestätigst du beim ersten Verbinden.'),
       };

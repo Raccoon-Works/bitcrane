@@ -564,25 +564,23 @@ fn media_range(range: Option<&str>, len: u64) -> Option<(u64, u64)> {
 /// Standard places for the sidebar (only those that exist).
 pub fn places() -> Vec<Place> {
     let mut out = vec![];
-    let mut push = |name: &str, p: Option<std::path::PathBuf>| {
+    let mut push = |name: String, standard: bool, p: Option<std::path::PathBuf>| {
         if let Some(p) = p {
             if p.is_dir() {
-                out.push(Place { name: name.into(), path: to_ui(&p), network: false, free: None, label: None });
+                out.push(Place { name, standard, path: to_ui(&p), network: false, free: None, label: None });
             }
         }
     };
     // The home folder carries the user's name, like in Explorer and the Finder sidebar
-    // (the path row shows the same name).
+    // (the path row shows the same name); the others are named in the interface's language.
     let home = dirs::home_dir();
-    let home_name = home
-        .as_ref()
-        .and_then(|h| h.file_name())
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "Persönlich".into());
-    push(&home_name, home);
-    push("Schreibtisch", dirs::desktop_dir());
-    push("Dokumente", dirs::document_dir());
-    push("Downloads", dirs::download_dir());
+    match home.as_ref().and_then(|h| h.file_name()) {
+        Some(n) => push(n.to_string_lossy().into_owned(), false, home.clone()),
+        None => push("Persönlich".into(), true, home.clone()),
+    }
+    push("Schreibtisch".into(), true, dirs::desktop_dir());
+    push("Dokumente".into(), true, dirs::document_dir());
+    push("Downloads".into(), true, dirs::download_dir());
     out
 }
 
@@ -664,7 +662,14 @@ fn drives_list() -> Vec<Place> {
             let network = is_remote_drive(l);
             // Network drives keep the bare letter: asking a slow server for its label would hold up the list.
             let label = if network { None } else { volume_label(l) };
-            out.push(Place { name: format!("{l}:"), path: format!("{l}:/"), network, free: None, label });
+            out.push(Place {
+                name: format!("{l}:"),
+                standard: false,
+                path: format!("{l}:/"),
+                network,
+                free: None,
+                label,
+            });
         }
     }
     #[cfg(target_os = "macos")]
@@ -679,7 +684,7 @@ fn drives_list() -> Vec<Place> {
             let target = fs::canonicalize(e.path()).unwrap_or_else(|_| e.path());
             if target.is_dir() {
                 let network = shares.iter().any(|m| Path::new(m) == target.as_path());
-                out.push(Place { name, path: to_ui(&target), network, free: None, label: None });
+                out.push(Place { name, standard: false, path: to_ui(&target), network, free: None, label: None });
             }
         }
         out.sort_by(|a, b| (a.path != "/").cmp(&(b.path != "/")).then(a.name.cmp(&b.name)));

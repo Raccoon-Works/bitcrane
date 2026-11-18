@@ -632,6 +632,7 @@
   "Vertrauen und verbinden": "Vertrouwen en verbinden",
   "Verfahren": "Algoritme",
   "Fingerabdruck": "Vingerafdruk",
+  "TLS-Zertifikat": "TLS-certificaat",
   "Fingerabdruck hat sich geändert": "Vingerafdruk is gewijzigd",
   "Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.": "De server identificeert zich anders dan de vorige keer. Dat gebeurt na een herinstallatie, maar kan ook een aanval zijn. Bitcrane maakt geen verbinding tot je dit bevestigt.",
   "Weniger": "Minder",

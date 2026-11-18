@@ -12,7 +12,7 @@ use crate::paths::{remote_join, remote_name};
 use russh::client;
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg};
 use russh_sftp::client::SftpSession;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -64,8 +64,7 @@ impl KnownHosts {
             &serde_json::to_string_pretty(map).expect("a map of strings always serializes"),
         )
         .map_err(|e| {
-            AppError::other("Die bekannten Fingerabdrücke konnten nicht gespeichert werden.")
-                .with_detail(e.message.to_string())
+            AppError::other("Die bekannten Fingerabdrücke konnten nicht gespeichert werden.").with_detail(e.to_string())
         })
     }
 
@@ -86,15 +85,13 @@ impl KnownHosts {
 
 /* ----------------------------------------------------------------- Parameters */
 
-/// How to authenticate. Secrets are passed in by the frontend, which reads
-/// them from the system keychain (never stored in Bitcrane's own files).
+/// How to authenticate. Secrets come from the system keychain or the login prompt
+/// (`login.rs`), never from Bitcrane's own files.
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Clone, Deserialize)]
-#[serde(tag = "method", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[derive(Clone)]
 pub enum AuthParams {
     Key {
         path: String,
-        #[serde(default)]
         passphrase: Option<String>,
     },
     Agent,
@@ -104,11 +101,8 @@ pub enum AuthParams {
     /// "Automatisch": SSH agent, then the given or the default keys
     /// (~/.ssh/id_ed25519, id_ecdsa, id_rsa), then the password.
     Auto {
-        #[serde(default)]
         key_path: Option<String>,
-        #[serde(default)]
         passphrase: Option<String>,
-        #[serde(default)]
         password: Option<String>,
     },
 }
@@ -139,49 +133,36 @@ pub type Prompter = Arc<
 >;
 
 // Without Debug like `AuthParams`, which it holds.
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct ConnectParams {
     pub host: String,
     pub port: u16,
     pub user: String,
     pub auth: AuthParams,
     /// Fingerprint the user has just confirmed in the host key dialog.
-    #[serde(default)]
     pub trust: Option<String>,
     /// Send a keepalive every 30 seconds (setting "Verbindung offen halten").
-    #[serde(default = "default_true")]
     pub keepalive: bool,
     /// Transfer files over shell commands instead of SFTP (old servers and
     /// devices without an SFTP server). Without SFTP Bitcrane switches by itself.
-    #[serde(default)]
     pub scp: bool,
     /// Reach this server through another one ("Sprungserver", like ProxyJump).
-    #[serde(default)]
     pub jump: Option<Box<ConnectParams>>,
     /// SOCKS5 or HTTP proxy for the TCP connection.
-    #[serde(default)]
     pub proxy: Option<crate::proxy::ProxyParams>,
     /// Pass the local SSH agent on to the server for the built-in terminal
     /// (ssh -A), e.g. for `git pull` there without a key on the server.
-    #[serde(default)]
     pub forward_agent: bool,
     /// Seconds to wait for the server when connecting (per server, default 15).
-    #[serde(default)]
     pub timeout: Option<u64>,
     /// Own command for the SFTP server instead of the "sftp" subsystem, e.g.
     /// "sudo -n /usr/lib/openssh/sftp-server" to work with root rights (WinSCP "SFTP server").
-    #[serde(default)]
     pub sftp_command: Option<String>,
 }
 
 /// Connect timeout of a server: its own setting, kept within 5 seconds and 5 minutes.
 pub fn connect_timeout(secs: Option<u64>) -> Duration {
     Duration::from_secs(secs.unwrap_or(15).clamp(5, 300))
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /* ----------------------------------------------------------------- Handler */
@@ -1767,21 +1748,6 @@ mod integration {
 #[cfg(test)]
 mod params_tests {
     use super::*;
-
-    #[test]
-    fn auth_params_from_the_interface() {
-        let p: ConnectParams = serde_json::from_str(r#"{"host":"h","port":22,"user":"u","auth":{"method":"auto","keyPath":"~/.ssh/k","password":"x"},"jump":{"host":"j","port":22,"user":"u","auth":{"method":"agent"}}}"#).unwrap();
-        match p.auth {
-            AuthParams::Auto { key_path, password, passphrase } => {
-                assert_eq!(key_path.as_deref(), Some("~/.ssh/k"));
-                assert_eq!(password.as_deref(), Some("x"));
-                assert!(passphrase.is_none());
-            }
-            _ => panic!("wrong variant"),
-        }
-        assert!(p.keepalive, "keepalive defaults to on");
-        assert!(p.jump.is_some());
-    }
 
     #[test]
     fn known_hosts_survive_a_restart_and_a_damaged_file_is_kept() {

@@ -6,7 +6,7 @@
 import { Lock } from '../glyphs';
 import { useState } from 'react';
 import { closeDialog, importSealed, useStore, writeExport } from '../../state/store';
-import type { Sealed } from '../../util/crypto';
+import type { Sealed } from '../../backend/api';
 import { Button, Checkbox, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';

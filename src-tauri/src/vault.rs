@@ -35,7 +35,7 @@ use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use unicode_normalization::UnicodeNormalization;
 
-type Connections = Arc<tokio::sync::Mutex<HashMap<String, Arc<Remote>>>>;
+pub type Connections = Arc<tokio::sync::Mutex<HashMap<String, Arc<Remote>>>>;
 
 const HEADER: usize = 68;
 const CHUNK: usize = 32 * 1024;

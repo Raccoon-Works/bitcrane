@@ -9,7 +9,7 @@ import { Check, Copy, KeyRound, Upload } from './glyphs';
 import { useState } from 'react';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
-import { installPublicKey } from '../state/live';
+import { installPublicKey, passphraseRef } from '../state/live';
 import { LIVE, showToast } from '../state/store';
 import { Button, Checkbox, TextField } from './ui';
 import { $t } from '../i18n';
@@ -50,7 +50,7 @@ export function KeyPanel({
       const pub = await backend.keyGenerate(name, comment, pass || undefined);
       if (pass && save)
         await backend
-          .secretSet(`passphrase:${name}`, pass)
+          .secretStore(passphraseRef(name), pass)
           .catch(() => showToast($t('Die Passphrase konnte nicht im Schlüsselbund gesichert werden.'), 'error'));
       setPublicKey(pub);
       onCreated(name);

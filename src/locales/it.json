@@ -632,6 +632,7 @@
   "Vertrauen und verbinden": "Considera attendibile e connetti",
   "Verfahren": "Algoritmo",
   "Fingerabdruck": "Impronta digitale",
+  "TLS-Zertifikat": "Certificato TLS",
   "Fingerabdruck hat sich geändert": "L'impronta digitale è cambiata",
   "Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.": "Il server si identifica in modo diverso dall'ultima volta. Succede dopo una reinstallazione, ma può anche trattarsi di un attacco. Bitcrane non si connette finché non confermi.",
   "Weniger": "Meno",

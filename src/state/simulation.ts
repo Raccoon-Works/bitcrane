@@ -3,7 +3,7 @@
  * that moves transfers, watches and connection drops along (never runs in the app).
  */
 
-import { type ImportedServer } from '../backend/api';
+import { type ImportedServer, type WalkItem } from '../backend/api';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { Server, Transfer } from '../backend/types';
@@ -389,6 +389,18 @@ function simulateLog(addLog: typeof import('./log').addLog) {
 let started = false;
 
 /** Starts the simulation timer once; in the app, the live backend instead. */
+/**
+ * Prototype: all files below a folder, shaped like the core's walk (relative paths start with
+ * the walked folder's own name), so comparing folders reads both the same way.
+ */
+export function demoWalk(side: 'local' | 'remote', serverId: string, dir: string): WalkItem[] {
+  const name = paths.basename(dir) || dir;
+  return fs.walkFiles(side, serverId, dir).map((f) => {
+    const relative = `${name}/${f.path.slice(dir.length + 1)}`;
+    return { path: f.path, relative, localRelative: relative, size: f.entry.size, mtime: f.entry.mtime };
+  });
+}
+
 export function startSimulation() {
   if (started) return;
   started = true;

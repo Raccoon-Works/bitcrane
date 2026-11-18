@@ -690,6 +690,7 @@ export const EN: Record<string, string> = {
   'Vertrauen und verbinden': 'Trust and connect',
   Verfahren: 'Algorithm',
   Fingerabdruck: 'Fingerprint',
+  'TLS-Zertifikat': 'TLS certificate',
   'Fingerabdruck hat sich geändert': 'Fingerprint has changed',
   'Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.':
     'The server identifies itself differently than last time. This happens after a reinstall, but can also be an attack. Bitcrane does not connect until you confirm.',

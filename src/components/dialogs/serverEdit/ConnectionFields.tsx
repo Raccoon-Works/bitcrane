@@ -5,7 +5,7 @@
  */
 import type { Dispatch, SetStateAction } from 'react';
 import type { Server } from '../../../backend/types';
-import { davUrl } from '../../../state/live';
+import { davUrl } from '../../../util/serverAddress';
 import { useStore } from '../../../state/store';
 import { Segmented, Select, Switch, TextField } from '../../ui';
 import { $t } from '../../../i18n';

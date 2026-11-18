@@ -19,7 +19,6 @@ use crate::oauth;
 use crate::paths::{quoted_name, remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use serde::Deserialize;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
@@ -53,8 +52,7 @@ const SEGMENT: &AsciiSet = &CONTROLS
     .add(b':');
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct OneDriveParams {
     pub refresh_token: String,
 }

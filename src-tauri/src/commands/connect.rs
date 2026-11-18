@@ -1,9 +1,11 @@
 //! Connecting to servers and vaults, including the questions a server asks during login.
 
 use crate::error::AppResult;
-use crate::ssh::ConnectParams;
-use crate::{dav, ftp, remote, s3, smb, ssh, vault, AppState, PendingPrompts};
-use serde::Serialize;
+use crate::login::{Env, Login};
+use crate::secrets::Keychain;
+use crate::serverconfig::Server;
+use crate::{remote, ssh, vault, AppState, PendingPrompts};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
@@ -13,9 +15,31 @@ pub(crate) struct ConnectResult {
     pub(super) home: String,
     /// Server clock minus local clock in milliseconds, if it could be measured.
     pub(super) clock_offset_ms: Option<i64>,
-    /// OneDrive: the renewed sign-in, to be kept in place of the old one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) refresh_token: Option<String>,
+}
+
+/// A login as the interface asks for it: the server (saved, temporary or a draft being tested),
+/// its jump server, and what the user has just typed or confirmed.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConnectRequest {
+    server: Server,
+    #[serde(default)]
+    jump: Option<Server>,
+    #[serde(flatten)]
+    login: Login,
+}
+
+impl ConnectRequest {
+    /// Opens the connection; `prompt_id` is the server the login questions are shown for.
+    async fn open(&self, app: tauri::AppHandle, state: &AppState, prompt_id: String) -> AppResult<remote::Remote> {
+        let env = Env {
+            known: state.known_hosts.clone(),
+            prompter: Some(make_prompter(app, state.prompts.clone(), prompt_id)),
+            secrets: &Keychain,
+            connections: state.connections.clone(),
+        };
+        crate::login::open(&self.server, self.jump.as_ref(), &self.login, &env).await
+    }
 }
 
 /// Event payload for a question of the server (shown as a dialog).
@@ -53,103 +77,39 @@ pub(crate) fn auth_prompt_answer(state: State<'_, AppState>, id: String, answers
     }
 }
 
+/// Connects to a server with any protocol and keeps the connection under `server_id` (the
+/// server's id, or another id for a second connection such as the Explorer folder's).
 #[tauri::command]
-pub(crate) async fn ssh_connect(
+pub(crate) async fn server_connect(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     server_id: String,
-    params: ConnectParams,
+    request: ConnectRequest,
 ) -> AppResult<ConnectResult> {
     // Take it out first: closing can take a while and must not hold the lock.
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(old) = old {
         old.close().await;
     }
-    let prompter = make_prompter(app, state.prompts.clone(), server_id.clone());
-    let conn = remote::connect_ssh(&params, state.known_hosts.clone(), Some(prompter)).await?;
+    let conn = request.open(app, &state, server_id.clone()).await?;
     let home = conn.home().to_string();
     let clock_offset_ms = conn.clock_offset_ms().await;
     state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms, refresh_token: None })
+    Ok(ConnectResult { home, clock_offset_ms })
 }
 
+/// "Verbindung testen": logs in with a connection of its own and closes it again; resolves to the
+/// start folder.
 #[tauri::command]
-pub(crate) async fn ftp_connect(
+pub(crate) async fn server_test(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
-    server_id: String,
-    params: ftp::FtpParams,
-) -> AppResult<ConnectResult> {
-    // Take it out first: closing can take a while and must not hold the lock.
-    let old = state.connections.lock().await.remove(&server_id);
-    if let Some(old) = old {
-        old.close().await;
-    }
-    let conn = remote::Remote::Ftp(Arc::new(ftp::FtpConn::connect(params, state.known_hosts.clone()).await?));
+    request: ConnectRequest,
+) -> AppResult<String> {
+    let conn = request.open(app, &state, String::new()).await?;
     let home = conn.home().to_string();
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
-}
-
-#[tauri::command]
-pub(crate) async fn dav_connect(
-    state: State<'_, AppState>,
-    server_id: String,
-    params: dav::DavParams,
-) -> AppResult<ConnectResult> {
-    state.connections.lock().await.remove(&server_id);
-    let conn = remote::Remote::Dav(dav::DavConn::connect(params, state.known_hosts.clone()).await?);
-    let home = conn.home().to_string();
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
-}
-
-#[tauri::command]
-pub(crate) async fn s3_connect(
-    state: State<'_, AppState>,
-    server_id: String,
-    params: s3::S3Params,
-) -> AppResult<ConnectResult> {
-    state.connections.lock().await.remove(&server_id);
-    let conn = remote::Remote::S3(Arc::new(s3::S3Conn::connect(params, state.known_hosts.clone()).await?));
-    let home = conn.home().to_string();
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
-}
-
-#[tauri::command]
-pub(crate) async fn smb_connect(
-    state: State<'_, AppState>,
-    server_id: String,
-    params: smb::SmbParams,
-) -> AppResult<ConnectResult> {
-    let old = state.connections.lock().await.remove(&server_id);
-    if let Some(old) = old {
-        old.close().await;
-    }
-    let conn = remote::Remote::Smb(Arc::new(smb::SmbConn::connect(params).await?));
-    let home = conn.home().to_string();
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
-}
-
-/// Unlocks a Cryptomator vault and keeps it under `server_id` like a server.
-/// `storage_id` is the connection of the server the vault lies on (none: this computer).
-#[tauri::command]
-pub(crate) async fn vault_open(
-    state: State<'_, AppState>,
-    server_id: String,
-    location: String,
-    storage_id: Option<String>,
-    password: String,
-) -> AppResult<ConnectResult> {
-    let store = match storage_id {
-        Some(id) => vault::Store::Remote { connections: state.connections.clone(), id },
-        None => vault::Store::Local,
-    };
-    let conn = remote::Remote::Vault(Arc::new(vault::VaultConn::open(store, &location, &password).await?));
-    let home = conn.home().to_string();
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
-    Ok(ConnectResult { home, clock_offset_ms: None, refresh_token: None })
+    conn.close().await;
+    Ok(home)
 }
 
 /// Creates a new, empty Cryptomator vault in the folder `location`.

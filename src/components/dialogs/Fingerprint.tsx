@@ -3,7 +3,7 @@
  * fingerprint changed since the last one.
  */
 import { useState } from 'react';
-import type { HostKey } from '../../backend/types';
+import { TLS_CERTIFICATE, type HostKey } from '../../backend/types';
 import { rejectHostKey, trustHostKey } from '../../state/store';
 import { ShieldAlert, ShieldCheck } from '../glyphs';
 import { Button } from '../ui';
@@ -20,7 +20,7 @@ export function Fingerprint({
   serverId: string;
 }) {
   const [details, setDetails] = useState(false);
-  const cert = keyInfo.algorithm === 'TLS-Zertifikat';
+  const cert = keyInfo.algorithm === TLS_CERTIFICATE;
   if (mode === 'new') {
     return (
       <Dialog
@@ -55,7 +55,7 @@ export function Fingerprint({
         <div className="form-stack">
           <dl className="kv-card mono-values">
             <dt>{cert ? $t('Art') : $t('Verfahren')}</dt>
-            <dd>{keyInfo.algorithm}</dd>
+            <dd>{cert ? $t('TLS-Zertifikat') : keyInfo.algorithm}</dd>
             <dt>{$t('Fingerabdruck')}</dt>
             <dd className="mono break">{keyInfo.fingerprint}</dd>
           </dl>

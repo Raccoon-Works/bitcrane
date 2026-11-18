@@ -187,6 +187,8 @@ export type ServerColor = ServerColorKey | `#${string}`;
 /** A favourite folder in a places bar. */
 export interface Place {
   name: string;
+  /** From the core: a standard folder whose name is a text key, translated when the places are loaded. */
+  standard?: boolean;
   path: string;
   /** Cloud storage folder ("gdrive", "onedrive", "dropbox", "icloud", "box", "other"): shown with a cloud. */
   cloud?: string;
@@ -349,9 +351,13 @@ export interface Conflict {
   more: number;
 }
 
+/** `HostKey.algorithm` of a server certificate (FTPS, WebDAV, S3), a fixed code of the core (error.rs). */
+export const TLS_CERTIFICATE = 'tls-certificate';
+
 /** Host key information shown in the fingerprint dialogs. */
 export interface HostKey {
   host: string;
+  /** "ED25519", "RSA" … of an SSH key, or `TLS_CERTIFICATE`. */
   algorithm: string;
   fingerprint: string;
   previous?: string;

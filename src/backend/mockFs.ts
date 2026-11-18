@@ -168,8 +168,11 @@ function blog(local: boolean): DirNode {
   );
 }
 
-/** Local file system of the user's computer. Home is "~". */
-let localRoot: DirNode = createLocal();
+/**
+ * Local file system of the user's computer. Home is "~". Built on first use, like the remote
+ * ones: built when the module loads, it would stay in the app's bundle, which never uses it.
+ */
+let localRoot: DirNode | undefined;
 
 function createLocal(): DirNode {
   return ld({
@@ -234,7 +237,7 @@ function createRemote(serverId: string): DirNode {
 }
 
 function rootFor(side: 'local' | 'remote', serverId: string): DirNode {
-  if (side === 'local') return localRoot;
+  if (side === 'local') return (localRoot ??= createLocal());
   if (!remoteRoots[serverId]) remoteRoots[serverId] = createRemote(serverId);
   return remoteRoots[serverId];
 }
@@ -388,6 +391,6 @@ export function touch(side: 'local' | 'remote', serverId: string, path: string, 
 
 /** Resets all file systems to the initial sample data. */
 export function resetAll() {
-  localRoot = createLocal();
+  localRoot = undefined;
   for (const k of Object.keys(remoteRoots)) delete remoteRoots[k];
 }

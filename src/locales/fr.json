@@ -632,6 +632,7 @@
   "Vertrauen und verbinden": "Faire confiance et se connecter",
   "Verfahren": "Algorithme",
   "Fingerabdruck": "Empreinte",
+  "TLS-Zertifikat": "Certificat TLS",
   "Fingerabdruck hat sich geändert": "L’empreinte a changé",
   "Der Server meldet sich anders als beim letzten Mal. Das passiert nach einer Neuinstallation, kann aber auch ein Angriff sein. Bitcrane verbindet nicht, bis du es bestätigst.": "Le serveur s’identifie autrement que la dernière fois. Cela arrive après une réinstallation, mais peut aussi être une attaque. Bitcrane ne se connecte pas tant que vous n’avez pas confirmé.",
   "Weniger": "Moins",

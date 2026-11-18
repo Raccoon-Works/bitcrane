@@ -5,7 +5,7 @@
  * The browser prototype does not use it; there the store works on the
  * in-memory demo file systems in `mockFs.ts`.
  */
-import type { CloudPlace, FileEntry, HostKey, Place, PortForward } from './types';
+import type { CloudPlace, FileEntry, HostKey, Place, PortForward, Server } from './types';
 import { $t } from '../i18n';
 
 export interface WalkItem {
@@ -27,12 +27,6 @@ export interface WalkItem {
 
 export type { CloudPlace, Place } from './types';
 
-export type AuthParams =
-  | { method: 'key'; path: string; passphrase?: string }
-  | { method: 'agent' }
-  | { method: 'password'; password: string }
-  | { method: 'auto'; keyPath?: string; passphrase?: string; password?: string };
-
 /** A file whose content matches "Im Inhalt suchen". */
 export interface GrepHit {
   path: string;
@@ -46,81 +40,41 @@ export interface GrepHit {
 /** Checksum algorithms offered in "Prüfsumme". */
 export type ChecksumAlgo = 'md5' | 'sha1' | 'sha256' | 'sha512';
 
-export interface ConnectParams {
-  host: string;
-  port: number;
-  user: string;
-  auth: AuthParams;
-  /** Fingerprint the user confirmed in the host key dialog. */
+/**
+ * Where a secret is kept in the system keychain (src-tauri/src/secrets.rs). The interface names
+ * secrets but never reads them: the core uses them where they are needed.
+ */
+export type SecretRef =
+  | { kind: 'password'; user: string; host: string; port: number }
+  | { kind: 'passphrase'; keyPath: string }
+  | { kind: 'proxy'; user: string; host: string; port: number }
+  | { kind: 'cloud'; serverId: string }
+  | { kind: 'googleClient' }
+  | { kind: 'syncPassword' };
+
+/** One login (see `ConnectRequest` in src-tauri/src/commands/connect.rs). */
+export interface ConnectRequest {
+  server: Server;
+  /** Its jump server (SFTP only). */
+  jump?: Server;
+  /** Typed into the prompt just now; otherwise the stored one is used. */
+  password?: string;
+  passphrase?: string;
+  /** Fingerprint or certificate the user confirmed in the host key dialog. */
   trust?: string;
   /** Send keepalive messages (setting "Verbindung offen halten"). */
-  keepalive?: boolean;
-  /** Transfer over shell commands instead of SFTP (scp.rs); without SFTP this happens by itself. */
-  scp?: boolean;
-  /** Connect through this server first (jump server). */
-  jump?: ConnectParams;
-  /** SOCKS5 or HTTP proxy for the connection. */
-  proxy?: { kind: 'socks5' | 'http'; host: string; port: number; user?: string; password?: string };
-  /** Seconds to wait for the server when connecting (default 15). */
-  timeout?: number;
-  /** Pass the local SSH agent on for the terminal (ssh -A). */
-  forwardAgent?: boolean;
-  /** Own command for the SFTP server, e.g. "sudo -n /usr/lib/openssh/sftp-server". */
-  sftpCommand?: string;
+  keepalive: boolean;
+  /** Google Drive: client id of the user's own app key. */
+  googleClientId: string;
 }
 
-type ProxyParams = NonNullable<ConnectParams['proxy']>;
-
-/** FTP / FTPS connection (see `ftp.rs`). */
-export interface FtpConnectParams {
-  host: string;
-  port: number;
-  user: string;
-  password?: string;
-  tls: 'none' | 'explicit' | 'implicit';
-  tls13Only: boolean;
-  encoding: 'utf8' | 'latin1';
-  tzOffsetMin: number;
-  mode: 'binary' | 'ascii' | 'auto';
-  trust?: string;
-  proxy?: ProxyParams;
-  timeout?: number;
-}
-
-/** Amazon S3 or a compatible service (s3.rs). */
-export interface S3ConnectParams {
-  endpoint: string;
-  region: string;
-  bucket: string;
-  accessKey: string;
-  secret?: string;
-  pathStyle: boolean;
-  tls13Only?: boolean;
-  trust?: string;
-  proxy?: ProxyParams;
-  timeout?: number;
-}
-
-/** WebDAV connection (see `dav.rs`). */
-export interface DavConnectParams {
-  url: string;
-  user: string;
-  password?: string;
-  tls13Only: boolean;
-  trust?: string;
-  proxy?: ProxyParams;
-  timeout?: number;
-}
-
-/** SMB connection (see `smb.rs`). */
-export interface SmbConnectParams {
-  host: string;
-  port: number;
-  user: string;
-  password?: string;
-  share: string;
-  encrypt: boolean;
-  timeout?: number;
+/** Text encrypted with a password, as export and sync files store it (src-tauri/src/secrets.rs). */
+export interface Sealed {
+  kdf: string;
+  iterations: number;
+  salt: string;
+  iv: string;
+  data: string;
 }
 
 /** Options of one transfer (see `transfer.rs`). */
@@ -435,47 +389,21 @@ export interface Backend {
   /** Folder of a server shown in the Explorer right now. */
   mountFolder(serverId: string): Promise<string | null>;
 
-  connect(serverId: string, params: ConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** Logs into a server and keeps the connection under `serverId`; resolves to the start folder. */
+  serverConnect(serverId: string, request: ConnectRequest): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  /** "Verbindung testen": logs in once and closes again; resolves to the start folder. */
+  serverTest(request: ConnectRequest): Promise<string>;
   disconnect(serverId: string): Promise<void>;
-  connectFtp(serverId: string, params: FtpConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
-  connectDav(serverId: string, params: DavConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
-  connectS3(serverId: string, params: S3ConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
-  connectSmb(serverId: string, params: SmbConnectParams): Promise<{ home: string; clockOffsetMs?: number | null }>;
-  /** Unlocks a Cryptomator vault in `location` (on the server `storageId`, or this computer) under `serverId`. */
-  vaultOpen(
-    serverId: string,
-    location: string,
-    storageId: string | undefined,
-    password: string,
-  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Creates an empty Cryptomator vault in the new folder `location`. */
   vaultCreate(location: string, storageId: string | undefined, password: string): Promise<void>;
-  /** Dropbox with the refresh token from the sign-in (kept in the keychain). */
-  connectDropbox(
-    serverId: string,
-    params: { refreshToken: string },
-  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
   /** Which cloud services this build has app keys for. */
   cloudServices(): Promise<{ dropbox: boolean; onedrive: boolean }>;
   /**
-   * Sign-in in the browser; resolves with the refresh token and the account name. Google Drive
-   * needs the user's own app key (client id and secret).
+   * Sign-in in the browser; the core keeps it in the keychain for the server entry `serverId`.
+   * Resolves to the account name. Google Drive needs the user's own app key (client id here,
+   * secret in the keychain).
    */
-  cloudSignIn(
-    service: string,
-    clientId?: string,
-    clientSecret?: string,
-  ): Promise<{ refreshToken: string; account: string }>;
-  /** OneDrive; `refreshToken` in the answer is the renewed sign-in to keep. */
-  connectOneDrive(
-    serverId: string,
-    params: { refreshToken: string },
-  ): Promise<{ home: string; clockOffsetMs?: number | null; refreshToken?: string }>;
-  /** Google Drive with the refresh token and the user's own app key. */
-  connectGDrive(
-    serverId: string,
-    params: { refreshToken: string; clientId: string; clientSecret: string; pdfExport?: boolean },
-  ): Promise<{ home: string; clockOffsetMs?: number | null }>;
+  cloudSignIn(service: string, serverId: string, googleClientId: string): Promise<string>;
   cloudSignInCancel(): Promise<void>;
   remoteList(serverId: string, path: string): Promise<FileEntry[]>;
   remoteStat(serverId: string, path: string): Promise<FileEntry>;
@@ -535,9 +463,23 @@ export interface Backend {
 
   configLoad(): Promise<unknown>;
   configSave(value: unknown): Promise<void>;
-  secretGet(account: string): Promise<string | null>;
-  secretSet(account: string, value: string): Promise<void>;
-  secretDelete(account: string): Promise<void>;
+  secretStore(secret: SecretRef, value: string): Promise<void>;
+  secretForget(secret: SecretRef): Promise<void>;
+  /** Whether the secret is stored (a keychain that cannot be read counts as not). */
+  secretExists(secret: SecretRef): Promise<boolean>;
+  /** Removes the secrets of a deleted server that no remaining server shares. */
+  serverForgetSecrets(removed: Server, remaining: Server[]): Promise<void>;
+  /** Encrypts an export file's payload; `withSecrets` adds the stored secrets of its servers. */
+  exportSeal(payload: unknown, password: string, withSecrets: boolean): Promise<{ encrypted: Sealed; secrets: number }>;
+  /** Decrypts an export file and stores its secrets; null when the password is wrong. */
+  importUnseal(sealed: Sealed, password: string): Promise<{ data: unknown; restored: number } | null>;
+  /** The secrets of these servers for the sync file; null without a sync password. */
+  syncSecretsSeal(servers: Server[]): Promise<Sealed | null>;
+  /**
+   * Stores the sync file's secrets that are missing here. Fails when the sync password does not
+   * open them; resolves to the keychain's refusal, if any (an error to report).
+   */
+  syncSecretsUnseal(sealed: Sealed): Promise<unknown>;
   sshConfigHosts(): Promise<SshConfigHost[]>;
   importFind(): Promise<{ servers: ImportedServer[]; sources: string[] }>;
   /** Servers from an exported file (Transmit, FileZilla, WinSCP, Cyberduck). */
@@ -562,7 +504,6 @@ export interface Backend {
   keyInfo(path: string): Promise<KeyInfo>;
   keyGenerate(path: string, comment: string, passphrase?: string): Promise<string>;
   keyPublic(path: string): Promise<string>;
-  sshTest(params: ConnectParams): Promise<string>;
   knownHostsList(): Promise<KnownHost[]>;
   knownHostsRemove(host: string): Promise<void>;
   logWrite(lines: string[]): Promise<void>;
@@ -596,6 +537,3 @@ export function toBackendError(e: unknown): BackendError {
   if (e instanceof Error) return { kind: 'other', message: e.message };
   return { kind: 'other', message: $t('Unerwarteter Fehler.') };
 }
-
-/** True when running inside the Tauri app (not in a plain browser). */
-export const isTauri = '__TAURI_INTERNALS__' in window;

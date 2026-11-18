@@ -174,11 +174,16 @@ pub struct AppError {
     pub host_key: Option<Box<HostKeyInfo>>,
 }
 
+/// [`HostKeyInfo::algorithm`] of a server certificate (FTPS, WebDAV, S3) instead of an SSH key. A
+/// fixed code the interface recognises and names in the user's language.
+pub const TLS_CERTIFICATE: &str = "tls-certificate";
+
 /// Host key data shown in the fingerprint dialogs.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostKeyInfo {
     pub host: String,
+    /// "ED25519", "RSA" … for an SSH key, [`TLS_CERTIFICATE`] for a certificate.
     pub algorithm: String,
     pub fingerprint: String,
     #[serde(skip_serializing_if = "Option::is_none")]

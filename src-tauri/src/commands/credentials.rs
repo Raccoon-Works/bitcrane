@@ -1,9 +1,7 @@
-//! SSH keys, known hosts and secrets kept in the system keychain.
+//! SSH keys and known hosts.
 
-use super::connect::make_prompter;
-use crate::error::{AppResult, ErrorKind};
-use crate::ssh::ConnectParams;
-use crate::{config, keys, paths, remote, AppState};
+use crate::error::AppResult;
+use crate::{keys, paths, AppState};
 use serde::Serialize;
 use tauri::State;
 
@@ -68,27 +66,6 @@ pub(crate) fn key_public(path: String) -> AppResult<String> {
     keys::public_of(&path)
 }
 
-/// "Verbindung testen": connects with a separate session and closes it again.
-/// An unknown host key counts as reachable; the fingerprint is confirmed on
-/// the real connection.
-#[tauri::command]
-pub(crate) async fn ssh_test(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-    params: ConnectParams,
-) -> AppResult<String> {
-    let prompter = make_prompter(app, state.prompts.clone(), String::new());
-    match remote::connect_ssh(&params, state.known_hosts.clone(), Some(prompter)).await {
-        Ok(c) => {
-            let home = c.home().to_string();
-            c.close().await;
-            Ok(home)
-        }
-        Err(e) if e.kind == ErrorKind::HostKeyUnknown => Ok(String::new()),
-        Err(e) => Err(e),
-    }
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct KnownHostEntry {
@@ -104,19 +81,4 @@ pub(crate) fn known_hosts_list(state: State<'_, AppState>) -> Vec<KnownHostEntry
 #[tauri::command]
 pub(crate) fn known_hosts_remove(state: State<'_, AppState>, host: String) -> AppResult<()> {
     state.known_hosts.remove(&host)
-}
-
-#[tauri::command]
-pub(crate) fn secret_get(account: String) -> AppResult<Option<String>> {
-    config::secret_get(&account)
-}
-
-#[tauri::command]
-pub(crate) fn secret_set(account: String, value: String) -> AppResult<()> {
-    config::secret_set(&account, &value)
-}
-
-#[tauri::command]
-pub(crate) fn secret_delete(account: String) -> AppResult<()> {
-    config::secret_delete(&account)
 }

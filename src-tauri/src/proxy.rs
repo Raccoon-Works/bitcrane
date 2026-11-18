@@ -2,21 +2,17 @@
 
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use base64::Engine;
-use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct ProxyParams {
     /// "socks5" or "http".
     pub kind: String,
     pub host: String,
     pub port: u16,
-    #[serde(default)]
     pub user: Option<String>,
-    #[serde(default)]
     pub password: Option<String>,
 }
 

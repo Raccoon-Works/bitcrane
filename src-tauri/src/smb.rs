@@ -9,7 +9,6 @@ use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
 use futures_util::StreamExt;
-use serde::Deserialize;
 use smb::{
     Client, ClientConfig, CreateOptions, DirAccessMask, Directory, File, FileAccessMask, FileAttributes,
     FileBasicInformation, FileCreateArgs, FileDispositionInformation, FileIdBothDirectoryInformation,
@@ -22,30 +21,19 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct SmbParams {
     pub host: String,
-    #[serde(default = "default_port")]
     pub port: u16,
     /// "user", "DOMAIN\user" or "user@domain"; empty for guest access.
-    #[serde(default)]
     pub user: String,
-    #[serde(default)]
     pub password: Option<String>,
     /// Share to start in; empty starts in the list of shares.
-    #[serde(default)]
     pub share: String,
     /// Insist on SMB 3 encryption.
-    #[serde(default)]
     pub encrypt: bool,
     /// Seconds to wait for the server when connecting (per server, default 15).
-    #[serde(default)]
     pub timeout: Option<u64>,
-}
-
-fn default_port() -> u16 {
-    445
 }
 
 /// Bytes per read or write request (capped by what the server negotiated)

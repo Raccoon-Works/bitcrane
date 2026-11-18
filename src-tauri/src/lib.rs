@@ -30,6 +30,7 @@ mod links;
 #[cfg(test)]
 mod loadtest;
 mod local;
+mod login;
 mod model;
 #[cfg(windows)]
 mod mount_win;
@@ -41,6 +42,8 @@ mod proxy;
 mod remote;
 mod s3;
 mod scp;
+mod secrets;
+mod serverconfig;
 mod shell_integration;
 mod smb;
 mod ssh;
@@ -113,8 +116,9 @@ impl AppState {
         if let Some(c) = map.get(server_id) {
             if c.is_closed() {
                 map.remove(server_id);
-                return AppError::new(ErrorKind::ConnectionLost, "Verbindung unterbrochen")
-                    .with_detail(err.message.to_string());
+                // The failed operation's technical detail says what broke; its message would only
+                // repeat in German what "Verbindung unterbrochen" says in the user's language.
+                return AppError { kind: ErrorKind::ConnectionLost, message: "Verbindung unterbrochen".into(), ..err };
             }
         }
         err
@@ -275,9 +279,6 @@ pub fn run() {
             commands::cloud::cloud_services,
             commands::cloud::cloud_sign_in,
             commands::cloud::cloud_sign_in_cancel,
-            commands::cloud::dropbox_connect,
-            commands::cloud::gdrive_connect,
-            commands::cloud::onedrive_connect,
             commands::app::system_power,
             commands::local::local_checksum,
             commands::app::open_url,
@@ -307,12 +308,9 @@ pub fn run() {
             commands::content::edit_temp_path,
             commands::terminals::open_terminal,
             commands::local::path_to_ui,
-            commands::connect::ssh_connect,
+            commands::connect::server_connect,
+            commands::connect::server_test,
             commands::connect::ssh_disconnect,
-            commands::connect::ftp_connect,
-            commands::connect::dav_connect,
-            commands::connect::s3_connect,
-            commands::connect::smb_connect,
             commands::terminals::term_open,
             commands::terminals::term_write,
             commands::terminals::term_shells,
@@ -321,7 +319,6 @@ pub fn run() {
             commands::terminals::forward_active,
             commands::terminals::term_resize,
             commands::terminals::term_close,
-            commands::connect::vault_open,
             commands::connect::vault_create,
             commands::connect::auth_prompt_answer,
             commands::connect::ssh_is_connected,
@@ -347,9 +344,14 @@ pub fn run() {
             commands::transfers::watch_stop,
             commands::settings::config_load,
             commands::settings::config_save,
-            commands::credentials::secret_get,
-            commands::credentials::secret_set,
-            commands::credentials::secret_delete,
+            commands::secrets::secret_store,
+            commands::secrets::secret_forget,
+            commands::secrets::secret_exists,
+            commands::secrets::server_forget_secrets,
+            commands::secrets::export_seal,
+            commands::secrets::import_unseal,
+            commands::secrets::sync_secrets_seal,
+            commands::secrets::sync_secrets_unseal,
             commands::settings::ssh_config_hosts,
             commands::settings::import_find,
             commands::settings::import_file,
@@ -370,7 +372,6 @@ pub fn run() {
             commands::credentials::key_info,
             commands::credentials::key_generate,
             commands::credentials::key_public,
-            commands::credentials::ssh_test,
             commands::credentials::known_hosts_remove,
             commands::app::log_write,
             commands::app::log_path,

@@ -475,11 +475,20 @@ mod integration {
         let (host, port) = target.split_once(':').unwrap();
         let dir = tempfile::tempdir().unwrap();
         let known = std::sync::Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
-        let mut params: crate::ssh::ConnectParams = serde_json::from_value(serde_json::json!({
-            "host": host, "port": port.parse::<u16>().unwrap(), "user": std::env::var("BITCRANE_TEST_USER").unwrap_or_else(|_| "test".into()),
-            "auth": { "method": "key", "path": key }, "scp": true,
-        }))
-        .unwrap();
+        let mut params = crate::ssh::ConnectParams {
+            host: host.into(),
+            port: port.parse().unwrap(),
+            user: std::env::var("BITCRANE_TEST_USER").unwrap_or_else(|_| "test".into()),
+            auth: crate::ssh::AuthParams::Key { path: key, passphrase: None },
+            trust: None,
+            keepalive: true,
+            scp: true,
+            jump: None,
+            proxy: None,
+            forward_agent: false,
+            timeout: None,
+            sftp_command: None,
+        };
         let session = match crate::ssh::open(&params, known.clone(), None).await {
             Ok(s) => s,
             Err(e) => {

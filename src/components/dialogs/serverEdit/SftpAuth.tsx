@@ -8,7 +8,7 @@ import type { KeyInfo } from '../../../backend/api';
 import type { AuthMethod, Server } from '../../../backend/types';
 import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { chooseFile } from '../../../backend/dialogs';
-import { hasStoredPassphrase } from '../../../state/live';
+import { hasSecret, passphraseRef } from '../../../state/live';
 import { LIVE, useStore } from '../../../state/store';
 import { KeyPanel } from '../../KeyPanel';
 import { Button, Segmented, TextField } from '../../ui';
@@ -30,7 +30,7 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
       void backend.keyInfo(draft.keyPath).then((k) => {
         if (!cancelled) setKeyInfo(k);
       });
-      void hasStoredPassphrase(draft.keyPath).then((v) => {
+      void hasSecret(passphraseRef(draft.keyPath)).then((v) => {
         if (!cancelled) setSecretStored(v);
       });
     }, 250);

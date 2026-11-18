@@ -17,7 +17,7 @@ import type {
   Watch,
   WatchOptions,
 } from '../backend/types';
-import type { Sealed } from '../util/crypto';
+import type { Sealed } from '../backend/api';
 import type { Lang } from '../i18n';
 import type { CompareRef } from './fileOps';
 import type { SyncBase } from './sync';
