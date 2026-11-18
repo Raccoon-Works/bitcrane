@@ -154,7 +154,6 @@ export function initialState(): AppState {
       viewMode: { local: 'list', remote: 'list' },
       locationMenuFavorites: true,
       locationMenuDrives: true,
-      locationMenuServers: true,
     },
     offline: {},
     conflicts: [],

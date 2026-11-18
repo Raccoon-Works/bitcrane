@@ -2719,10 +2719,6 @@ export const EN: Record<string, string> = {
     'The sidebar favorites in the menu of the symbol at the left of the path bar, to open them in that half.',
   'Laufwerke und Freigaben dieses Computers, benannt wie in der Seitenleiste.':
     'Drives and shares of this computer, named as in the sidebar.',
-  'Zuletzt verwendete Server': 'Recently used servers',
-  'Die fünf zuletzt geöffneten Server; alle anderen über „Serverliste zeigen“.':
-    'The five servers opened last; all others through “Show server list”.',
   'Favoriten im Menü „Ort wechseln“': 'Favorites in the “Change location” menu',
   'Laufwerke im Menü „Ort wechseln“': 'Drives in the “Change location” menu',
-  'Zuletzt verwendete Server im Menü „Ort wechseln“': 'Recently used servers in the “Change location” menu',
 };

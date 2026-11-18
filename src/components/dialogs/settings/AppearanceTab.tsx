@@ -290,16 +290,6 @@ export function AppearanceSettings() {
             label={$t('Laufwerke im Menü „Ort wechseln“')}
           />
         </Row>
-        <Row
-          label={$t('Zuletzt verwendete Server')}
-          note={$t('Die fünf zuletzt geöffneten Server; alle anderen über „Serverliste zeigen“.')}
-        >
-          <Switch
-            checked={s.locationMenuServers}
-            onChange={(v) => updateSettings({ locationMenuServers: v })}
-            label={$t('Zuletzt verwendete Server im Menü „Ort wechseln“')}
-          />
-        </Row>
       </Group>
     </>
   );

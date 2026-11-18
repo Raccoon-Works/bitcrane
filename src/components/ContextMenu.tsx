@@ -5,7 +5,7 @@
 import { driveLabel, favoriteLabels, placeLabel } from '../util/placeLabel';
 import { Check } from './glyphs';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { LocalTile, ServerTile } from './ServerTile';
+import { LocalTile } from './ServerTile';
 import { DriveIcon, PlaceIcon } from './placeIcons';
 import { locationMenuGroups } from '../state/locationMenu';
 import { keyLabel } from '../state/keys';
@@ -361,7 +361,7 @@ export function ContextMenu() {
       { label: $t('Aus den Favoriten entfernen'), danger: true, run: () => editLocalPlaces(path, { remove: true }) },
     ]);
   } else if (menu.kind === 'paneSource' && tab) {
-    // The location button of a half: this computer, its favourites and drives, the servers used last.
+    // The location button of a half: this computer, its favourites and drives; servers through the server list.
     const side = menu.side;
     const st = getState();
     const mac = platform === 'mac';
@@ -370,11 +370,9 @@ export function ContextMenu() {
       tab,
       favorites: favoriteLabels(localPlaces(st)),
       drives: drivesOf(st),
-      servers: st.servers,
       show: {
         favorites: st.settings.locationMenuFavorites,
         drives: st.settings.locationMenuDrives,
-        servers: st.settings.locationMenuServers,
       },
     }))
       groups.push(
@@ -398,13 +396,6 @@ export function ContextMenu() {
                 label: driveLabel(it.place, mac),
                 icon: <DriveIcon drive={it.place} first={it.first} />,
                 run: () => openLocalIn(side, it.place.path),
-              };
-            case 'server':
-              return {
-                label: it.server.name,
-                icon: <ServerTile server={it.server} size={16} />,
-                checked: it.checked,
-                run: () => openServerIn(side, it.server.id),
               };
             case 'otherFolder':
               return { label: $t('Anderer Ordner …'), run: () => void pickLocalFolder(side) };
