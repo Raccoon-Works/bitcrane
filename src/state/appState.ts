@@ -182,6 +182,10 @@ export interface Settings {
   sidebarHidden?: SidebarSection[];
   /** Git state in local file lists (on unless switched off). */
   gitStatus?: boolean;
+  /** Groups of the location menu of a half (the symbol left of the path): favourites, drives, servers used last. */
+  locationMenuFavorites: boolean;
+  locationMenuDrives: boolean;
+  locationMenuServers: boolean;
   /** "Kopieren nach …": the folders used last. */
   copyToRecent?: string[];
   /** Interface language. */

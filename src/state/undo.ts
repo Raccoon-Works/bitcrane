@@ -12,7 +12,17 @@ import type { PaneSide, Server, Watch } from '../backend/types';
 import * as paths from '../util/paths';
 import { seal, unseal, type Sealed } from '../util/crypto';
 import { $t } from '../i18n';
-import { showToast, LIVE, setState, activeTab, panePath, paneLoc, setLeftServer, getState } from './core';
+import {
+  showToast,
+  LIVE,
+  setState,
+  activeTab,
+  panePath,
+  paneLoc,
+  setLeftServer,
+  setRightLocal,
+  getState,
+} from './core';
 import type { Settings } from './appState';
 import { openDialog, closeDialog } from './panels';
 import { openServer, navigate, updateTab, clearSelection } from './tabs';
@@ -290,6 +300,17 @@ export function openPlace(path: string) {
   // Places are on this computer: leave server-to-server mode first.
   if (activeTab()?.leftServerId) setLeftServer('');
   navigate('local', path);
+}
+
+/**
+ * Opens a folder of this computer in a half (sidebar, location menu). The
+ * right half switches from its server to this computer if needed.
+ */
+export function openLocalIn(side: PaneSide, path: string) {
+  const t = activeTab();
+  if (side === 'local') openPlace(path);
+  else if (t?.rightLocal && !t.serverId) navigate('remote', path);
+  else setRightLocal(path);
 }
 
 /** Opens a watch's folders in the current tab. */

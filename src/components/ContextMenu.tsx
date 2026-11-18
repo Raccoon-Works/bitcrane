@@ -2,16 +2,20 @@
  * Right-click menu for files. Shows only what fits the clicked entries
  * (design rule: no greyed-out items from later stages).
  */
-import { placeLabel } from '../util/placeLabel';
+import { driveLabel, favoriteLabels, placeLabel } from '../util/placeLabel';
 import { Check } from './glyphs';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { LocalTile, ServerTile } from './ServerTile';
+import { DriveIcon, PlaceIcon } from './placeIcons';
+import { locationMenuGroups } from '../state/locationMenu';
 import { keyLabel } from '../state/keys';
 import { stagePoint } from './stage';
 import { archiveFolder, crumbs, isArchiveName, join } from '../util/paths';
 import {
   activeTab,
-  LIVE,
+  drivesOf,
   localPlaces,
+  openLocalIn,
   editLocalPlaces,
   SIDEBAR_SECTIONS,
   toggleSidebarHidden,
@@ -95,6 +99,8 @@ interface Item {
   danger?: boolean;
   checked?: boolean;
   /** Colour dot before the label (Finder tags). */ dot?: string;
+  /** Symbol before the label (places and servers in the location menu). */
+  icon?: ReactNode;
 }
 
 export function ContextMenu() {
@@ -354,88 +360,63 @@ export function ContextMenu() {
     groups.push([
       { label: $t('Aus den Favoriten entfernen'), danger: true, run: () => editLocalPlaces(path, { remove: true }) },
     ]);
-  } else if (menu.kind === 'paneSource') {
-    // The location button of a half: this computer and its drives, or which server it shows.
-    const servers = getState().servers.filter((x) => !x.temporary || x.online);
-    if (menu.side === 'local') {
-      groups.push([
-        {
-          label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'),
-          checked: !tab?.leftServerId,
-          run: () => setLeftServer(''),
-        },
-      ]);
-      // Drives of this computer: switches back from a server if needed and opens the drive.
-      // The browser prototype has no real drives; it shows typical ones.
-      const drives = LIVE
-        ? getState().drives
-        : platform === 'mac'
-          ? [
-              { name: 'Macintosh HD', path: '~' },
-              { name: 'USB-Stick', path: '~/Downloads' },
-            ]
-          : [
-              { name: 'C:', path: '~' },
-              { name: 'D:', path: '~/Downloads' },
-              { name: 'F: (Google Drive)', path: '~/Projekte' },
-            ];
-      if (drives.length) groups.push(drives.map((d) => ({ label: d.name, run: () => openPlace(d.path) })));
-      // Any other folder: the system's folder dialog, or typing the path.
-      groups.push([
-        { label: $t('Anderer Ordner …'), run: () => void pickLocalFolder('local') },
-        { label: $t('Pfad eingeben …'), key: sk('editPath'), run: () => editPath('local') },
-      ]);
-      const others = servers.filter((x) => x.id !== tab?.serverId);
-      if (others.length)
-        groups.push(
-          others.map((x) => ({
-            label: x.name,
-            checked: tab?.leftServerId === x.id,
-            run: () => openServerIn('local', x.id),
-          })),
-        );
-    } else {
-      // The right half: this computer (two local halves, Total Commander) or a server.
-      groups.push([
-        {
-          label: platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC'),
-          checked: !!tab?.rightLocal && !tab.serverId,
-          run: () => setRightLocal(),
-        },
-      ]);
-      if (tab?.rightLocal && !tab.serverId) {
-        const drives = LIVE
-          ? getState().drives
-          : platform === 'mac'
-            ? [
-                { name: 'Macintosh HD', path: '~' },
-                { name: 'USB-Stick', path: '~/Downloads' },
-              ]
-            : [
-                { name: 'C:', path: '~' },
-                { name: 'D:', path: '~/Downloads' },
-                { name: 'F: (Google Drive)', path: '~/Projekte' },
-              ];
-        if (drives.length) groups.push(drives.map((d) => ({ label: d.name, run: () => setRightLocal(d.path) })));
-        groups.push([
-          { label: $t('Anderer Ordner …'), run: () => void pickLocalFolder('remote') },
-          { label: $t('Pfad eingeben …'), key: sk('editPath'), run: () => editPath('remote') },
-        ]);
-      }
-      const others = servers.filter((x) => x.id !== tab?.leftServerId);
-      if (others.length)
-        groups.push(
-          others.map((x) => ({
-            label: x.name,
-            checked: tab?.serverId === x.id,
-            run: () => openServerIn('remote', x.id),
-          })),
-        );
-    }
-    groups.push([
-      { label: $t('Serverliste zeigen'), run: () => setPaneServerList(menu.side, true) },
-      ...(onServer ? [{ label: $t('Trennen'), run: () => closePaneServer(menu.side) }] : []),
-    ]);
+  } else if (menu.kind === 'paneSource' && tab) {
+    // The location button of a half: this computer, its favourites and drives, the servers used last.
+    const side = menu.side;
+    const st = getState();
+    const mac = platform === 'mac';
+    for (const g of locationMenuGroups({
+      side,
+      tab,
+      favorites: favoriteLabels(localPlaces(st)),
+      drives: drivesOf(st),
+      servers: st.servers,
+      show: {
+        favorites: st.settings.locationMenuFavorites,
+        drives: st.settings.locationMenuDrives,
+        servers: st.settings.locationMenuServers,
+      },
+    }))
+      groups.push(
+        g.map((it): Item => {
+          switch (it.kind) {
+            case 'computer':
+              return {
+                label: mac ? $t('Dieser Mac') : $t('Dieser PC'),
+                icon: <LocalTile size={16} />,
+                checked: it.checked,
+                run: () => (side === 'local' ? setLeftServer('') : setRightLocal()),
+              };
+            case 'favorite':
+              return {
+                label: it.label,
+                icon: <PlaceIcon place={it.place} />,
+                run: () => openLocalIn(side, it.place.path),
+              };
+            case 'drive':
+              return {
+                label: driveLabel(it.place, mac),
+                icon: <DriveIcon drive={it.place} first={it.first} />,
+                run: () => openLocalIn(side, it.place.path),
+              };
+            case 'server':
+              return {
+                label: it.server.name,
+                icon: <ServerTile server={it.server} size={16} />,
+                checked: it.checked,
+                run: () => openServerIn(side, it.server.id),
+              };
+            case 'otherFolder':
+              return { label: $t('Anderer Ordner …'), run: () => void pickLocalFolder(side) };
+            case 'enterPath':
+              return { label: $t('Pfad eingeben …'), key: sk('editPath'), run: () => editPath(side) };
+            case 'serverList':
+              return { label: $t('Serverliste zeigen'), run: () => setPaneServerList(side, true) };
+            case 'disconnect':
+              return { label: $t('Trennen'), run: () => closePaneServer(side) };
+          }
+        }),
+      );
   } else if (menu.kind === 'tab' && menu.tabId) {
     const id = menu.tabId;
     const all = getState().tabs;
@@ -766,6 +747,8 @@ export function ContextMenu() {
   for (let i = groups.length - 1; i >= 0; i--) if (!groups[i].length) groups.splice(i, 1);
 
   const anyCheck = groups.flat().some((it) => it.checked !== undefined);
+  // Likewise for symbols: entries without one keep their text in line with those that have one.
+  const anyIcon = groups.flat().some((it) => it.icon);
   // Convert to stage coordinates and keep the menu inside the window. The first
   // frame places it at the click; the real size (rows are taller on Windows)
   // then moves it up or left as far as needed, and a menu taller than the window
@@ -799,6 +782,11 @@ export function ContextMenu() {
               {(it.checked !== undefined || anyCheck) && (
                 <span className="menu-check" aria-hidden="true">
                   {it.checked ? <Check size={13} strokeWidth={2.2} /> : null}
+                </span>
+              )}
+              {anyIcon && (
+                <span className="menu-icon" aria-hidden="true">
+                  {it.icon}
                 </span>
               )}
               {it.dot && <span className="tag-dot menu-tag-dot" style={{ background: it.dot }} aria-hidden="true" />}

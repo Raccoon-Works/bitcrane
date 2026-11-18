@@ -47,7 +47,7 @@ export interface Server {
   ruleId?: string;
   /** Two-letter abbreviation shown in the coloured tile. */
   mono: string;
-  /** Colour key, see `swatch` in components/serverColors.ts. */
+  /** Colour key or own colour, see `serverColorCss` in components/serverColors.ts. */
   color: ServerColor;
   /** Own picture for the server (Transmit): a small PNG as data URL (64 px), shown instead of the globe. */
   image?: string;
@@ -178,7 +178,11 @@ export interface Bookmark {
   local?: string;
 }
 
-export type ServerColor = 'blue' | 'purple' | 'green' | 'yellow' | 'orange' | 'red' | 'gray';
+/** One of the fixed server colours; "gray" means no colour. */
+export type ServerColorKey = 'blue' | 'purple' | 'green' | 'yellow' | 'orange' | 'red' | 'gray';
+
+/** A fixed colour key, or an own colour chosen in the system colour picker as "#rrggbb". */
+export type ServerColor = ServerColorKey | `#${string}`;
 
 /** A favourite folder in a places bar. */
 export interface Place {

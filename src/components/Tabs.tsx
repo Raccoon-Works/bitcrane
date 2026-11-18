@@ -10,8 +10,6 @@
 import { Plus, Settings as Gear, X } from './glyphs';
 import { addressOf } from '../util/serverAddress';
 import { LocalTile, ServerTile } from './ServerTile';
-import { swatch } from './serverColors';
-import type { CSSProperties } from 'react';
 import { IconButton, Tooltip } from './ui';
 import { useKeyLabel } from '../state/keys';
 import { closeTab, newTab, selectTab, serverById, setState, tabTitle, useStore } from '../state/store';
@@ -57,10 +55,7 @@ export function ConnectionTabs({ variant }: { variant: 'mac' | 'win' }) {
               role="tab"
               aria-selected={sel}
               tabIndex={sel ? 0 : -1}
-              className={`${cls}${sel ? ' is-sel' : ''}${srv?.color && srv.color !== 'gray' ? ' has-srv-color' : ''}`}
-              style={
-                srv?.color && srv.color !== 'gray' ? ({ '--srv-color': swatch[srv.color] } as CSSProperties) : undefined
-              }
+              className={`${cls}${sel ? ' is-sel' : ''}`}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setState({

@@ -2,18 +2,18 @@
  * Top of the server editor's detail side: the server's picture (a click
  * chooses an own one), its name and its colour.
  */
-import type { Server, ServerColor } from '../../../backend/types';
+import type { Server, ServerColorKey } from '../../../backend/types';
 import { showToast } from '../../../state/store';
 import { ServerTile } from '../../ServerTile';
-import { swatch } from '../../serverColors';
+import { isOwnColor, ownColorFromInput, serverColorCss, swatch } from '../../serverColors';
 import { TextField } from '../../ui';
 import { $t } from '../../../i18n';
 import type { SetField } from './model';
 
-const colors: ServerColor[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'orange', 'red'];
+const colors: ServerColorKey[] = ['gray', 'blue', 'purple', 'green', 'yellow', 'orange', 'red'];
 
 /** Names of the server colours for screen readers and tooltips. */
-const COLOR_NAMES: Record<ServerColor, string> = {
+const COLOR_NAMES: Record<ServerColorKey, string> = {
   gray: $t('Keine Farbe'),
   blue: $t('Blau'),
   purple: $t('Lila'),
@@ -22,6 +22,9 @@ const COLOR_NAMES: Record<ServerColor, string> = {
   orange: $t('Orange'),
   red: $t('Rot'),
 };
+
+/** Look of "Eigene Farbe …" while no own colour is chosen: a wheel of the fixed colours. */
+const COLOR_WHEEL = `conic-gradient(${[swatch.red, swatch.orange, swatch.yellow, swatch.green, swatch.blue, swatch.purple, swatch.red].join(', ')})`;
 
 /** Reads an image file and shrinks it to a 64 px square PNG (centred, transparent edges). */
 function pictureFromFile(file: File): Promise<string> {
@@ -55,6 +58,7 @@ function pictureFromFile(file: File): Promise<string> {
 }
 
 export function DetailHead({ draft, set }: { draft: Server; set: SetField }) {
+  const own = isOwnColor(draft.color);
   return (
     <div className="detail-head">
       {/* Own picture (Transmit): click the symbol to choose one; it is shrunk to 64 px and kept in the settings. */}
@@ -109,6 +113,24 @@ export function DetailHead({ draft, set }: { draft: Server; set: SetField }) {
               onClick={() => set('color', c)}
             />
           ))}
+          {/* Any other colour from the system colour picker; the input lies over the swatch, so the picker opens at it. */}
+          <label
+            className={`swatch is-own${own ? ' is-on' : ''}`}
+            title={$t('Eigene Farbe …')}
+            style={{ background: own ? draft.color : COLOR_WHEEL }}
+          >
+            <input
+              type="color"
+              role="radio"
+              aria-checked={own}
+              aria-label={$t('Eigene Farbe …')}
+              value={(serverColorCss(draft.color) ?? swatch.blue).toLowerCase()}
+              onChange={(e) => {
+                const c = ownColorFromInput(e.target.value);
+                if (c) set('color', c);
+              }}
+            />
+          </label>
           {draft.image ? (
             <button type="button" className="link small" onClick={() => set('image', undefined)}>
               {$t('Bild entfernen')}

@@ -13,21 +13,7 @@
  * - Right click on a favourite: open, copy path, move up or down, remove.
  * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
-import {
-  X,
-  CaretDown,
-  ClockCounterClockwise,
-  Cloud,
-  Desktop,
-  DownloadSimple,
-  FileText,
-  FolderSimple,
-  HardDrive,
-  HardDrives,
-  House,
-  Usb,
-  Network,
-} from '@phosphor-icons/react';
+import { X, CaretDown, ClockCounterClockwise, Desktop, Network } from '@phosphor-icons/react';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { NetworkHost } from '../backend/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,10 +27,9 @@ import {
   getState,
   localPlaces,
   moveSidebarSection,
-  navigate,
+  drivesOf,
   openDialog,
-  openPlace,
-  setRightLocal,
+  openLocalIn,
   setState,
   sidebarOrder,
   toggleSidebarCollapsed,
@@ -52,75 +37,13 @@ import {
   type SidebarSection,
 } from '../state/store';
 import { TAG_COLORS, tagName } from '../state/tags';
-import { BrandLogo } from './BrandLogo';
-import { isBrandService } from './brands';
-import { placeLabel } from '../util/placeLabel';
+import { DriveIcon, PLACE_ICON as ICON, PlaceIcon } from './placeIcons';
+import { driveLabel, favoriteLabels } from '../util/placeLabel';
 import * as paths from '../util/paths';
-
-const ICON = { size: 16, weight: 'regular', 'aria-hidden': true } as const;
-
-function PlaceIcon({ place }: { place: Place }) {
-  const last =
-    place.path
-      .replace(/[\\/]+$/, '')
-      .split(/[\\/]/)
-      .pop()
-      ?.toLowerCase() ?? '';
-  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={14} />;
-  if (place.cloud) return <Cloud {...ICON} />;
-  if (place.path === '~') return <House {...ICON} />;
-  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...ICON} />;
-  if (last === 'downloads') return <DownloadSimple {...ICON} />;
-  if (last === 'documents' || last === 'dokumente') return <FileText {...ICON} />;
-  return <FolderSimple {...ICON} />;
-}
-
-/** Start disk, other disks and removable drives look different (Finder). */
-function DriveIcon({ drive, first }: { drive: Place; first: boolean }) {
-  if (first) return <HardDrive {...ICON} />;
-  if (/usb|stick/i.test(drive.name)) return <Usb {...ICON} />;
-  return <HardDrives {...ICON} />;
-}
-
-/**
- * A Windows drive with its label, the letter first so it stays visible in a
- * narrow sidebar: "F: GAMES - DATEN", "C: Lokaler Datenträger".
- */
-function driveName(d: Place, mac: boolean): string {
-  if (mac || d.network || !/^[A-Z]:$/.test(d.name)) return d.name;
-  return `${d.name} ${d.label || $t('Lokaler Datenträger')}`;
-}
-
-/** Typical drives for the browser prototype, which has no real ones. */
-function mockDrives(mac: boolean): Place[] {
-  return mac
-    ? [
-        { name: 'Macintosh HD', path: '~' },
-        { name: 'USB-Stick', path: '~/Downloads' },
-        { name: 'iMac im Studio', path: '~/Projekte/blog', network: true },
-      ]
-    : [
-        { name: 'C:', path: '~' },
-        { name: 'D:', path: '~/Downloads', label: 'Daten' },
-        { name: 'Z: (NAS)', path: '~/Projekte/blog', network: true },
-      ];
-}
-
-/** Account part of a cloud folder's name ("GoogleDrive-name@example.com" → "name"). */
-function accountOf(place: Place): string {
-  const folder =
-    place.path
-      .replace(/[\\/]+$/, '')
-      .split(/[\\/]/)
-      .pop() ?? '';
-  if (!place.cloud || !folder.includes('-')) return '';
-  return folder.slice(folder.indexOf('-') + 1).split('@')[0];
-}
 
 /**
  * Favourites as shown: a folder reached by two paths (e.g. ~/Dropbox and its
- * target in ~/Library/CloudStorage) appears once; two accounts of the same
- * service keep both entries and are told apart by the account name.
+ * target in ~/Library/CloudStorage) appears once.
  */
 function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }> {
   const [real, setReal] = useState<Record<string, string>>({});
@@ -143,12 +66,7 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
     seen.add(target);
     return true;
   });
-  return unique.map((p) => {
-    const label = placeLabel(p);
-    const twin = unique.some((o) => o !== p && placeLabel(o) === label);
-    const acc = twin ? accountOf(p) : '';
-    return { place: p, label: acc ? `${label} (${acc})` : label };
-  });
+  return favoriteLabels(unique);
 }
 
 /** Free space in a short form ("86 GB", "512 MB"). */
@@ -199,7 +117,7 @@ export function Sidebar() {
   const places = useStore((s) => localPlaces(s));
   const shown = useShownPlaces(places);
   const recentAll = useStore((s) => s.settings.recentDirs);
-  const liveDrives = useStore((s) => s.drives);
+  const drives = useStore((s) => drivesOf(s));
   const dropHere = useStore((s) => !!s.dropHint?.sidebar);
   const homeName = useStore((s) => s.homeName);
   const savedOrder = useStore((s) => s.settings.sidebarOrder);
@@ -208,7 +126,6 @@ export function Sidebar() {
   const collapsed = useStore((s) => s.settings.sidebarCollapsed ?? NONE);
   const hidden = useStore((s) => s.settings.sidebarHidden ?? NONE);
   const mac = platform === 'mac';
-  const drives = LIVE ? liveDrives : mockDrives(mac);
   const devices = drives.filter((d) => !d.network);
   const mounted = drives.filter((d) => d.network);
   const netHosts = useNetworkHosts(!hidden.includes('shares'));
@@ -264,11 +181,7 @@ export function Sidebar() {
   })();
 
   /** Opens a folder of this computer in the active half. */
-  const open = (path: string) => {
-    if (focus === 'local') openPlace(path);
-    else if (tab?.rightLocal && !tab.serverId) navigate('remote', path);
-    else setRightLocal(path);
-  };
+  const open = (path: string) => openLocalIn(focus, path);
 
   const item = (
     key: string,
@@ -415,7 +328,7 @@ export function Sidebar() {
               const drive = /^[A-Z]:\/?$/i.test(p)
                 ? drives.find((d) => d.path.replace(/\/$/, '').toUpperCase() === p.replace(/\/$/, '').toUpperCase())
                 : undefined;
-              const base = drive ? driveName(drive, mac) : paths.basename(p) || p;
+              const base = drive ? driveLabel(drive, mac) : paths.basename(p) || p;
               const twin = recent.some((o) => o !== p && (paths.basename(o) || o) === base);
               const where = paths.parent(p);
               return item(
@@ -463,7 +376,7 @@ export function Sidebar() {
         item(
           `d:${d.path}:${d.name}`,
           <DriveIcon drive={d} first={i === 0} />,
-          driveName(d, mac),
+          driveLabel(d, mac),
           d.path,
           () => open(d.path),
           {},

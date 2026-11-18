@@ -637,6 +637,18 @@ kbd,
   width: 16px;
   height: 16px;
 }
+/* Server symbols in menus: the colour dot's ring takes the menu's colour; on the Mac's accent highlight
+   the ring follows the highlight and the symbols take the text colour, as in the system menus. */
+.menu {
+  --badge-ring: var(--bg-menu);
+}
+[data-platform='mac'] .context-menu .menu-item:is(:hover:not(:disabled), :focus-visible) {
+  --badge-ring: var(--accent);
+}
+[data-platform='mac'] .context-menu .menu-item:is(:hover:not(:disabled), :focus-visible) .menu-icon,
+[data-platform='mac'] .context-menu .menu-item:is(:hover:not(:disabled), :focus-visible) .server-glyph {
+  color: inherit;
+}
 .more-menu {
   position: absolute;
   top: 36px;
@@ -4531,6 +4543,7 @@ button.disclosure:hover {
 .server-row.is-sel {
   background: var(--sel-row);
   color: var(--sel-fg);
+  --badge-ring: var(--sel-row);
 }
 .server-row.is-sel .server-row-sub {
   color: var(--sel-sub);
@@ -4929,12 +4942,12 @@ body.is-dragging-server * {
 .server-glyph.proto-webdav {
   color: var(--glyph-dav, #8fb3e8);
 }
-.server-glyph-dot {
+.server-badge {
   position: absolute;
   right: -1px;
   bottom: -1px;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--bg-card);
+  box-shadow: 0 0 0 1.5px var(--badge-ring, var(--bg-card));
 }
 [data-theme='light'] .server-glyph {
   --glyph-server: #2a6de0;
@@ -5662,11 +5675,21 @@ body.is-resizing-h * {
     0 0 0 2px var(--bg-card),
     0 0 0 4px var(--accent-text);
 }
-.pane.is-servers .server-glyph-dot {
-  box-shadow: 0 0 0 2px var(--bg-card);
+/* "Eigene Farbe …": the system colour picker opens from an invisible input over the swatch. */
+.swatch.is-own {
+  position: relative;
 }
-.server-row.is-sel .server-glyph-dot {
-  box-shadow: 0 0 0 2px var(--sel-row);
+.swatch.is-own input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: default;
+}
+.swatch.is-own:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* Cloud services (preview): brand tones on the dark card. */
@@ -7310,29 +7333,13 @@ body.is-dragging-snippet * {
   user-select: text;
 }
 
-/* Server colour (WinSCP site colour): a tinted path bar over the server half and a line under its tab. */
+/* Server colour (WinSCP site colour): a tinted path bar over the server half; elsewhere the dot on its symbol. */
 .pane.has-srv-color .pane-head {
   background: color-mix(in srgb, var(--srv-color) 14%, transparent);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--srv-color) 45%, transparent);
 }
 .pane.has-srv-color.is-focused::after {
   background: var(--srv-color);
-}
-.mac-tab.has-srv-color,
-.win-tab.has-srv-color {
-  position: relative;
-}
-.mac-tab.has-srv-color::before,
-.win-tab.has-srv-color::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 2px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--srv-color);
-  pointer-events: none;
 }
 .result-line {
   font-variant-numeric: tabular-nums;

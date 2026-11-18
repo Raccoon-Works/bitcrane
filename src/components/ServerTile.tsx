@@ -5,7 +5,20 @@
 import { Database, GlobeHemisphereWest, LockSimple } from '@phosphor-icons/react';
 import { BrandLogo } from './BrandLogo';
 import type { Server, ServerColor } from '../backend/types';
-import { swatch } from './serverColors';
+import { serverColorCss } from './serverColors';
+
+/**
+ * The server's colour as a small dot on the lower right of its symbol, the one
+ * place the colour shows outside the server's half. A thin ring in the colour
+ * of the surface behind it (`--badge-ring`, set where that surface differs)
+ * keeps dark colours readable on dark surfaces and light ones on light surfaces.
+ */
+function ColorBadge({ color, size }: { color: ServerColor | undefined; size: number }) {
+  const css = serverColorCss(color);
+  if (!css) return null;
+  const dot = Math.max(8, Math.round(size * 0.4));
+  return <span className="server-badge" style={{ background: css, width: dot, height: dot }} />;
+}
 
 /**
  * Server symbol after Transmit and WinSCP: one calm globe, the same for
@@ -34,14 +47,10 @@ export function ServerTile({
     return <CloudTile service={proto} size={size} />;
   // An own picture replaces the globe (the colour dot stays, so groups remain recognisable).
   if (picture) {
-    const c = color ?? server?.color;
-    const dot = Math.max(7, Math.round(size * 0.36));
     return (
       <span className="server-glyph has-image" aria-hidden="true" style={{ width: size, height: size }}>
         <img src={picture} alt="" width={size} height={size} draggable={false} />
-        {c && c !== 'gray' && (
-          <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />
-        )}
+        <ColorBadge color={color ?? server?.color} size={size} />
       </span>
     );
   }
@@ -49,14 +58,10 @@ export function ServerTile({
   // The protocol stays visible in the tooltip and the server dialog.
   // An unlocked Cryptomator vault is no server: it shows a lock.
   const Icon = proto === 'vault' ? LockSimple : GlobeHemisphereWest;
-  const c = color ?? server?.color;
-  const dot = Math.max(7, Math.round(size * 0.36));
   return (
     <span className={`server-glyph proto-${proto}`} aria-hidden="true" style={{ width: size, height: size }}>
       <Icon size={size} weight="fill" />
-      {c && c !== 'gray' && (
-        <span className="server-glyph-dot" style={{ background: swatch[c], width: dot, height: dot }} />
-      )}
+      <ColorBadge color={color ?? server?.color} size={size} />
     </span>
   );
 }

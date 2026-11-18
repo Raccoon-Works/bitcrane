@@ -27,6 +27,7 @@ import { openDialog } from './panels';
 import { placeOf } from './fileOps';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
+import { DEMO_DRIVES } from './demoData';
 
 /** Places bar of a half: favourite folders of this computer, or of the server it shows. */
 export function placesFor(side: PaneSide, s: AppState = getState(), t: Tab | undefined = activeTab(s)): Place[] {
@@ -59,6 +60,11 @@ export function addPlace(side: PaneSide, path: string) {
 /** Favourites of this computer (sidebar), whatever the halves show. */
 export function localPlaces(s: AppState = getState()): Place[] {
   return s.settings.localPlaces ?? s.places;
+}
+
+/** Drives and mounted shares of this computer (sidebar, location menu of a half). */
+export function drivesOf(s: AppState = getState()): Place[] {
+  return LIVE ? s.drives : DEMO_DRIVES[s.platform];
 }
 
 /** Adds a folder of this computer to the sidebar's favourites. */

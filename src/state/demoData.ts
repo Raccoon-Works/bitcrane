@@ -2,8 +2,25 @@
  * Invented servers, watches and transfers of the browser prototype and the
  * website demo.
  */
-import type { Server, Transfer, Watch } from '../backend/types';
+import type { Place, Platform, Server, Transfer, Watch } from '../backend/types';
 import { defaultWatchOptions } from './defaults';
+
+/**
+ * Typical drives of the browser prototype, which has no real ones. Constant
+ * lists, so store selectors that return them keep a stable value.
+ */
+export const DEMO_DRIVES: Record<Platform, Place[]> = {
+  mac: [
+    { name: 'Macintosh HD', path: '~' },
+    { name: 'USB-Stick', path: '~/Downloads' },
+    { name: 'iMac im Studio', path: '~/Projekte/blog', network: true },
+  ],
+  win: [
+    { name: 'C:', path: '~' },
+    { name: 'D:', path: '~/Downloads', label: 'Daten' },
+    { name: 'Z: (NAS)', path: '~/Projekte/blog', network: true },
+  ],
+};
 
 export function sampleServers(): Server[] {
   const base = { port: 22, auth: 'key' as const, keyPath: '~/.ssh/id_ed25519', online: false };

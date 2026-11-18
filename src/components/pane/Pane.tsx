@@ -35,7 +35,7 @@ import { useTags } from '../../state/tags';
 import { isVaultListing } from '../../state/vault';
 import { PlacesBar } from '../PlacesBar';
 import { ServerList } from '../ServerList';
-import { swatch } from '../serverColors';
+import { serverColorCss } from '../serverColors';
 import { $t } from '../../i18n';
 import { ColumnHeader } from './ColumnHeader';
 import { ColumnView } from './ColumnView';
@@ -239,7 +239,7 @@ export function Pane({ side }: { side: PaneSide }) {
     list.map((entry, i) => <FileItem key={entry.name} ctx={ctx} entry={entry} index={from + i} />);
 
   // A server with its own colour (e.g. red for a live server) tints its half's path bar (WinSCP, FileZilla).
-  const srvColor = onServer && server?.color && server.color !== 'gray' ? swatch[server.color] : undefined;
+  const srvColor = onServer ? serverColorCss(server?.color) : undefined;
   return (
     <section
       data-side={side}
