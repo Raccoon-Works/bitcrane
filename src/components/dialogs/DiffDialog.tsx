@@ -31,17 +31,20 @@ export function DiffDialog({ transferId }: { transferId: string }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState('');
 
+  // The two files as plain strings, so progress updates of the transfer do not load them again.
+  // Uploads go from the local source to the server target, downloads the other way round.
+  const serverId = transfer?.serverId;
+  const remotePath = transfer && (transfer.direction === 'down' ? transfer.source : transfer.target);
+  const localPath = transfer && (transfer.direction === 'down' ? transfer.target : transfer.source);
+
   useEffect(() => {
-    if (!transfer) return;
+    if (serverId === undefined || remotePath === undefined || localPath === undefined) return;
     if (!LIVE) {
       setData({ server: DEMO_SERVER, local: DEMO_LOCAL, truncated: false });
       return;
     }
     let cancelled = false;
-    // Uploads go from the local source to the server target, downloads the other way round.
-    const [remotePath, localPath] =
-      transfer.direction === 'down' ? [transfer.source, transfer.target] : [transfer.target, transfer.source];
-    Promise.all([backend.remoteReadText(transfer.serverId, remotePath), backend.localReadText(localPath)])
+    Promise.all([backend.remoteReadText(serverId, remotePath), backend.localReadText(localPath)])
       .then(([server, local]) => {
         if (!cancelled)
           setData({ server: server.text, local: local.text, truncated: server.truncated || local.truncated });
@@ -52,8 +55,7 @@ export function DiffDialog({ transferId }: { transferId: string }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per transfer
-  }, [transferId]);
+  }, [serverId, remotePath, localPath]);
 
   const lines = useMemo(() => (data ? diffLines(data.server, data.local) : []), [data]);
   const hunks = useMemo(() => toHunks(lines), [lines]);

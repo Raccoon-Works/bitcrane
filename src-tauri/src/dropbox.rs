@@ -6,7 +6,7 @@
 //! Uploads up to 8 MB go in one request, larger files in upload sessions of
 //! 8 MB pieces. The modification time is kept as Dropbox's "client_modified".
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth::{self, ascii_json};
 use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
@@ -77,7 +77,7 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
 }
 
 /// Turns an API error answer into a clear message.
-fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
+fn api_err(status: reqwest::StatusCode, body: &str, what: &Message) -> AppError {
     let summary = serde_json::from_str::<Value>(body)
         .ok()
         .and_then(|v| v.get("error_summary").and_then(|s| s.as_str()).map(String::from))
@@ -85,11 +85,9 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
     let detail = format!("{status}: {}", if summary.is_empty() { body } else { &summary });
     // The app's permissions in the Dropbox App Console do not cover this action.
     if summary.contains("missing_scope") || body.contains("missing_scope") {
-        return AppError::new(
-            ErrorKind::Other,
-            format!("{what}: Die Bitcrane-App bei Dropbox hat dafür keine Berechtigung."),
-        )
-        .with_detail(detail);
+        return AppError::other("{0}: Die Bitcrane-App bei Dropbox hat dafür keine Berechtigung.")
+            .param(what)
+            .with_detail(detail);
     }
     if status.as_u16() == 401 {
         return AppError::new(
@@ -105,21 +103,21 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
         )
         .with_detail(detail);
     }
-    let (kind, msg) = if summary.contains("not_found") {
-        (ErrorKind::NotFound, format!("{what}: nicht gefunden."))
+    let err = if summary.contains("not_found") {
+        AppError::new(ErrorKind::NotFound, "{0}: nicht gefunden.").param(what)
     } else if summary.contains("conflict") {
-        (ErrorKind::AlreadyExists, format!("{what}: gibt es schon."))
+        AppError::new(ErrorKind::AlreadyExists, "{0}: gibt es schon.").param(what)
     } else if summary.contains("insufficient_space") {
-        (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in der Dropbox."))
+        AppError::other("{0}: kein Speicherplatz mehr in der Dropbox.").param(what)
     } else if summary.contains("no_write_permission")
         || summary.contains("disallowed_name")
         || summary.contains("restricted")
     {
-        (ErrorKind::PermissionDenied, format!("{what}: nicht erlaubt."))
+        AppError::new(ErrorKind::PermissionDenied, "{0}: nicht erlaubt.").param(what)
     } else {
-        (ErrorKind::Other, format!("{what} fehlgeschlagen."))
+        AppError::other("{0} fehlgeschlagen.").param(what)
     };
-    AppError::new(kind, msg).with_detail(detail)
+    err.with_detail(detail)
 }
 
 fn net(e: reqwest::Error) -> AppError {
@@ -254,7 +252,7 @@ impl DropboxConn {
     }
 
     /// RPC call with a JSON body; returns the JSON answer.
-    async fn rpc(&self, endpoint: &str, body: Value, what: &str) -> AppResult<Value> {
+    async fn rpc(&self, endpoint: &str, body: Value, what: &Message) -> AppResult<Value> {
         let (status, text) = self
             .post_retry(
                 &format!("{API}/{endpoint}"),
@@ -272,7 +270,7 @@ impl DropboxConn {
     /// Link to share a file or folder (Transmit "Copy Link"). An existing link is
     /// reused, otherwise a new one is made with the account's default settings.
     pub async fn share_link(&self, path: &str) -> AppResult<String> {
-        let what = format!("Link für „{}“", remote_name(path));
+        let what = Message::new("Link für „{0}“").param(remote_name(path));
         let token = self.access().await?;
         let resp = self
             .client
@@ -300,7 +298,7 @@ impl DropboxConn {
         v.pointer("/links/0/url")
             .and_then(|u| u.as_str())
             .map(String::from)
-            .ok_or_else(|| AppError::other(format!("{what}: Dropbox hat keinen Link geliefert.")))
+            .ok_or_else(|| AppError::other("{0}: Dropbox hat keinen Link geliefert.").param(what))
     }
 
     /// E-mail address of the signed-in account.
@@ -316,7 +314,7 @@ impl DropboxConn {
         let status = resp.status();
         let text = resp.text().await.map_err(net)?;
         if !status.is_success() {
-            return Err(api_err(status, &text, "Konto lesen"));
+            return Err(api_err(status, &text, &Message::new("Konto lesen")));
         }
         let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
         Ok(v.get("email")
@@ -327,7 +325,7 @@ impl DropboxConn {
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let what = format!("„{}“ lesen", remote_name(path));
+        let what = Message::new("„{0}“ lesen").param(remote_name(path));
         let mut v = self.rpc("files/list_folder", json!({ "path": dbx_path(path), "limit": 2000 }), &what).await?;
         let mut out = Vec::new();
         loop {
@@ -361,8 +359,7 @@ impl DropboxConn {
             });
         }
         let v = self.rpc("files/get_metadata", json!({ "path": p }), &quoted_name(path)).await?;
-        entry_of(&v)
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v).ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(remote_name(path)))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -373,7 +370,7 @@ impl DropboxConn {
         self.rpc(
             "files/create_folder_v2",
             json!({ "path": dbx_path(path), "autorename": false }),
-            &format!("Ordner „{}“ anlegen", remote_name(path)),
+            &Message::new("Ordner „{0}“ anlegen").param(remote_name(path)),
         )
         .await
         .map(|_| ())
@@ -394,7 +391,7 @@ impl DropboxConn {
         self.rpc(
             "files/move_v2",
             json!({ "from_path": dbx_path(from), "to_path": dbx_path(to), "autorename": false }),
-            &format!("„{}“ umbenennen", remote_name(from)),
+            &Message::new("„{0}“ umbenennen").param(remote_name(from)),
         )
         .await
         .map(|_| ())
@@ -409,7 +406,11 @@ impl DropboxConn {
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
         match self
-            .rpc("files/delete_v2", json!({ "path": dbx_path(path) }), &format!("„{}“ löschen", remote_name(path)))
+            .rpc(
+                "files/delete_v2",
+                json!({ "path": dbx_path(path) }),
+                &Message::new("„{0}“ löschen").param(remote_name(path)),
+            )
             .await
         {
             Err(e) if e.kind == ErrorKind::NotFound => Ok(()),
@@ -418,7 +419,12 @@ impl DropboxConn {
     }
 
     /// Copy inside the Dropbox, with "Kopie" names on clashes.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -426,8 +432,8 @@ impl DropboxConn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
-            self.rpc("files/copy_v2", json!({ "from_path": dbx_path(from), "to_path": dbx_path(&remote_join(dest_dir, &name)), "autorename": false }), &format!("„{}“ kopieren", remote_name(from))).await?;
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
+            self.rpc("files/copy_v2", json!({ "from_path": dbx_path(from), "to_path": dbx_path(&remote_join(dest_dir, &name)), "autorename": false }), &Message::new("„{0}“ kopieren").param(remote_name(from))).await?;
             taken.insert(name.clone());
             out.push(name);
         }
@@ -442,7 +448,7 @@ impl DropboxConn {
         if root.kind != EntryKind::Dir {
             return Ok(vec![WalkItem::with_real_names(path.to_string(), rel(path), root.size, root.mtime)]);
         }
-        let what = format!("„{}“ lesen", remote_name(path));
+        let what = Message::new("„{0}“ lesen").param(remote_name(path));
         let mut v = self
             .rpc("files/list_folder", json!({ "path": dbx_path(path), "recursive": true, "limit": 2000 }), &what)
             .await?;
@@ -482,7 +488,7 @@ impl DropboxConn {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(api_err(status, &text, &format!("„{}“ lesen", remote_name(path))));
+            return Err(api_err(status, &text, &Message::new("„{0}“ lesen").param(remote_name(path))));
         }
         if offset > 0 && status != reqwest::StatusCode::PARTIAL_CONTENT {
             return Err(AppError::other("Dropbox kann hier nicht an einer Stelle weiterlesen.").with_detail("no-range"));
@@ -500,7 +506,7 @@ impl DropboxConn {
         c
     }
 
-    async fn content_call(&self, endpoint: &str, arg: Value, body: Vec<u8>, what: &str) -> AppResult<Value> {
+    async fn content_call(&self, endpoint: &str, arg: Value, body: Vec<u8>, what: &Message) -> AppResult<Value> {
         let headers = [("Dropbox-API-Arg", ascii_json(&arg)), ("Content-Type", "application/octet-stream".to_string())];
         // Calls that commit a file are serialized (see `write_lock`); sending the
         // data of a large file in pieces ("append") runs in parallel.
@@ -524,7 +530,7 @@ impl DropboxConn {
         let conn = self.clone();
         let path = path.to_string();
         let task = tokio::spawn(async move {
-            let what = format!("„{}“ schreiben", remote_name(&path));
+            let what = Message::new("„{0}“ schreiben").param(remote_name(&path));
             let mut session: Option<String> = None;
             let mut offset: u64 = 0;
             loop {

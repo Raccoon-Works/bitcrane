@@ -141,42 +141,6 @@ test-rdma = []
 name = "smb"
 path = "src/lib.rs"
 
-[[test]]
-name = "basic"
-path = "tests/basic.rs"
-
-[[test]]
-name = "closes"
-path = "tests/closes.rs"
-
-[[test]]
-name = "common"
-path = "tests/common.rs"
-
-[[test]]
-name = "dialects"
-path = "tests/dialects.rs"
-
-[[test]]
-name = "info_query"
-path = "tests/info_query.rs"
-
-[[test]]
-name = "long_dir"
-path = "tests/long_dir.rs"
-
-[[test]]
-name = "multichannel"
-path = "tests/multichannel.rs"
-
-[[test]]
-name = "notify"
-path = "tests/notify.rs"
-
-[[test]]
-name = "rpc"
-path = "tests/rpc.rs"
-
 [dependencies.aead]
 version = "^0.6"
 optional = true

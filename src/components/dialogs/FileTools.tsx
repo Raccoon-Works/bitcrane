@@ -42,6 +42,21 @@ const ALGOS: Array<{ value: ChecksumAlgo; label: string }> = [
 ];
 const HEX_LEN: Record<ChecksumAlgo, number> = { md5: 32, sha1: 40, sha256: 64, sha512: 128 };
 
+/** A pasted checksum without spaces, in lower case. */
+const cleanSum = (text: string) => text.trim().toLowerCase().replace(/\s+/g, '');
+
+/** The algorithm a pasted value belongs to, by its length (32 = MD5, 40 = SHA-1 ...). */
+const algoOfSum = (text: string): ChecksumAlgo | undefined => {
+  const v = cleanSum(text);
+  return (Object.keys(HEX_LEN) as ChecksumAlgo[]).find((a) => HEX_LEN[a] === v.length && /^[0-9a-f]+$/.test(v));
+};
+
+/** A file whose checksum the dialog shows: where it is and its path. */
+interface SumFile {
+  loc: [PaneSide, string];
+  path: string;
+}
+
 /** Demo value for the browser prototype (right length for the algorithm). */
 async function fakeSum(seed: string, algo: ChecksumAlgo): Promise<string> {
   const data = new TextEncoder().encode(seed);
@@ -88,53 +103,56 @@ function SumLine({ label, path, sum }: { label: string; path: string; sum: Sum }
 export function ChecksumDialog({ side, name }: { side: PaneSide; name: string }) {
   const tab = activeTab();
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
-  const path = join(panePath(side), name);
-  const otherPath = join(panePath(other), name);
-  const counterpart = tab
-    ? listEntries(...paneLoc(other, tab), panePath(other))?.find((e) => e.name === name && e.kind === 'file')
-    : undefined;
+  // The file chosen when the dialog opened, and the file of the same name in the other half then.
+  const [files] = useState(() => {
+    if (!tab) return null;
+    const mine: SumFile = { loc: paneLoc(side, tab), path: join(panePath(side), name) };
+    const counterpart = listEntries(...paneLoc(other, tab), panePath(other))?.find(
+      (e) => e.name === name && e.kind === 'file',
+    );
+    const theirs: SumFile | undefined = counterpart && { loc: paneLoc(other, tab), path: join(panePath(other), name) };
+    return { mine, theirs };
+  });
   const [algo, setAlgo] = useState<ChecksumAlgo>(() => getState().settings.checksumAlgo ?? 'sha256');
   const [mine, setMine] = useState<Sum>({ state: 'busy' });
   const [theirs, setTheirs] = useState<Sum>({ state: 'busy' });
   const [expected, setExpected] = useState('');
 
   useEffect(() => {
-    if (!tab) return;
+    if (!files) return;
     let current = true;
-    const run = (s: PaneSide, p: string, set: (v: Sum) => void) => {
+    const run = ({ loc: [ls, sid], path }: SumFile, set: (v: Sum) => void) => {
       set({ state: 'busy' });
-      const [ls, sid] = paneLoc(s, tab);
       const job = LIVE
         ? ls === 'local'
-          ? backend.localChecksum(p, algo)
-          : backend.remoteChecksum(sid, p, algo)
-        : fakeSum(basename(p), algo);
+          ? backend.localChecksum(path, algo)
+          : backend.remoteChecksum(sid, path, algo)
+        : fakeSum(basename(path), algo);
       job.then(
         (hex) => current && set({ state: 'ok', hex }),
         (e) => current && set({ state: 'error', text: toBackendError(e).message }),
       );
     };
-    run(side, path, setMine);
-    if (counterpart) run(other, otherPath, setTheirs);
+    run(files.mine, setMine);
+    if (files.theirs) run(files.theirs, setTheirs);
     return () => {
       current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- computed when the dialog opens and when the algorithm changes
-  }, [algo]);
+  }, [files, algo]);
 
   const pickAlgo = (a: ChecksumAlgo) => {
     setAlgo(a);
     updateSettings({ checksumAlgo: a });
   };
-  // A pasted value decides the algorithm by its length (32 = MD5, 40 = SHA-1 ...).
-  const pasted = expected.trim().toLowerCase().replace(/\s+/g, '');
-  const pastedAlgo = (Object.keys(HEX_LEN) as ChecksumAlgo[]).find(
-    (a) => HEX_LEN[a] === pasted.length && /^[0-9a-f]+$/.test(pasted),
-  );
-  useEffect(() => {
-    if (pastedAlgo && pastedAlgo !== algo) pickAlgo(pastedAlgo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the pasted value changes
-  }, [pastedAlgo]);
+  // A pasted value decides the algorithm, once when it becomes a value of another length.
+  const pasteExpected = (value: string) => {
+    const before = algoOfSum(expected);
+    const after = algoOfSum(value);
+    setExpected(value);
+    if (after && after !== before && after !== algo) pickAlgo(after);
+  };
+  const pasted = cleanSum(expected);
+  const pastedAlgo = algoOfSum(expected);
 
   const same = mine.state === 'ok' && theirs.state === 'ok' ? mine.hex === theirs.hex : undefined;
   const matchesPasted = pasted && mine.state === 'ok' && pastedAlgo === algo ? mine.hex === pasted : undefined;
@@ -163,8 +181,8 @@ export function ChecksumDialog({ side, name }: { side: PaneSide; name: string })
     >
       <div className="form-stack">
         <Segmented<ChecksumAlgo> label={$t('Verfahren')} value={algo} onChange={pickAlgo} options={ALGOS} />
-        <SumLine label={label(side)} path={path} sum={mine} />
-        {counterpart && <SumLine label={label(other)} path={otherPath} sum={theirs} />}
+        {files && <SumLine label={label(side)} path={files.mine.path} sum={mine} />}
+        {files?.theirs && <SumLine label={label(other)} path={files.theirs.path} sum={theirs} />}
         {same === true && (
           <p className="row-inline tone-ok">
             <Check size={15} strokeWidth={2.2} aria-hidden="true" />
@@ -181,7 +199,7 @@ export function ChecksumDialog({ side, name }: { side: PaneSide; name: string })
           <TextField
             label={$t('Erwarteten Wert einfügen')}
             value={expected}
-            onChange={setExpected}
+            onChange={pasteExpected}
             mono
             placeholder={$t('Erwarteten Wert einfügen, z. B. von der Download-Seite')}
           />
@@ -222,20 +240,22 @@ const LINK_TIMES: Array<{ value: string; label: string }> = [
  * stored on the service; the link is signed here with the access key.
  */
 export function PresignDialog({ side, name }: { side: PaneSide; name: string }) {
-  const tab = activeTab();
-  const path = join(panePath(side), name);
+  // The file chosen when the dialog opened: its server and path.
+  const [file] = useState(() => {
+    const tab = activeTab();
+    return tab && { serverId: paneLoc(side, tab)[1], path: join(panePath(side), name) };
+  });
   const [secs, setSecs] = useState(() => String(getState().settings.presignSecs ?? 86400));
   const [link, setLink] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
-    if (!tab) return;
+    if (!file) return;
     let current = true;
     setLink('');
     setError('');
-    const [, sid] = paneLoc(side, tab);
     const job = LIVE
-      ? backend.remotePresign(sid, path, Number(secs))
-      : Promise.resolve(`https://bucket.s3.example.com${path}?X-Amz-Expires=${secs}&X-Amz-Signature=…`);
+      ? backend.remotePresign(file.serverId, file.path, Number(secs))
+      : Promise.resolve(`https://bucket.s3.example.com${file.path}?X-Amz-Expires=${secs}&X-Amz-Signature=…`);
     job.then(
       (l) => current && setLink(l),
       (e) => current && setError(toBackendError(e).message),
@@ -243,8 +263,7 @@ export function PresignDialog({ side, name }: { side: PaneSide; name: string }) 
     return () => {
       current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- signed again whenever the duration changes
-  }, [secs]);
+  }, [file, secs]);
   const until = new Date(Date.now() + Number(secs) * 1000).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',

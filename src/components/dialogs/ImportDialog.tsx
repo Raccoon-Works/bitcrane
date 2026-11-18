@@ -64,10 +64,14 @@ export function ImportDialog() {
   const [found, setFound] = useState<{ servers: ImportedServer[]; sources: string[] } | null>(
     LIVE ? null : { servers: DEMO, sources: ['SSH-Konfiguration', 'FileZilla', 'WinSCP'] },
   );
-  const existing = new Set(
-    getState()
-      .servers.filter((x) => !x.temporary)
-      .map(keyOf),
+  // The saved servers when the dialog opened: what is new is ticked and marked against these.
+  const [existing] = useState(
+    () =>
+      new Set(
+        getState()
+          .servers.filter((x) => !x.temporary)
+          .map(keyOf),
+      ),
   );
   const [picked, setPicked] = useState<Set<number>>(new Set());
   // Offered by Bitcrane itself on the first start (not opened from the menu).
@@ -87,8 +91,7 @@ export function ImportDialog() {
             .map(([, i]) => i),
         ),
       );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the list arrives
-  }, [found]);
+  }, [found, existing]);
 
   const [fileNote, setFileNote] = useState('');
   const fromFile = async () => {

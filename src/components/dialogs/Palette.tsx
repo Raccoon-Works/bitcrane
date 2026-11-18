@@ -21,7 +21,8 @@ import {
   useStore,
 } from '../../state/store';
 import { Dialog } from './Dialog';
-import { $t, tr } from '../../i18n';
+import { $t } from '../../i18n';
+import { placeLabel } from '../../util/placeLabel';
 
 interface Entry {
   id: string;
@@ -56,7 +57,7 @@ export function Palette() {
         out.push({
           id: `pl:${side}:${p.path}`,
           group: $t('Orte'),
-          label: tr(p.name),
+          label: placeLabel(p),
           hint: p.path,
           run: () => navigate(side, p.path),
         });

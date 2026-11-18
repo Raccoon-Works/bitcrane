@@ -26,6 +26,7 @@ import { $t } from '../i18n';
 import { showError } from './errors';
 import { addLog } from './log';
 import { getState, LIVE, setState, showToast, subscribeStore, type Settings } from './store';
+import { toBackendError } from '../backend/api';
 
 /** Settings that are the same on every computer. */
 const SHARED_SETTINGS = [
@@ -193,7 +194,7 @@ export function runSync(): Promise<void> {
   }
   running = syncOnce()
     .catch((e) => {
-      const message = (e as { message?: string }).message ?? String(e);
+      const message = toBackendError(e).message;
       patchSettings({ syncError: message });
       addLog('warn', $t('Abgleich zwischen Rechnern fehlgeschlagen.'), undefined, message);
     })

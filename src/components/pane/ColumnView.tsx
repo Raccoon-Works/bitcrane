@@ -13,7 +13,9 @@ import {
   isPackage,
   loadFolder,
   navigate,
+  paneLoc,
   revealSearchResult,
+  useListings,
   useStore,
 } from '../../state/store';
 import { formatDate, formatSize } from '../../util/format';
@@ -38,23 +40,28 @@ export function ColumnView({
   /** The rows of the folder shown. */
   children: ReactNode;
 }) {
-  const fsRev = useStore((s) => s.fsRev);
+  const listings = useListings();
   const showHidden = useStore((s) => s.settings.showHidden);
+  const showSystem = useStore((s) => s.settings.showSystem);
   const sort = useStore((s) => s.settings.sort[side]);
-  const serverId = useStore((s) => activeTab(s)?.serverId);
-  const leftServerId = useStore((s) => activeTab(s)?.leftServerId);
+  const hasTab = useStore((s) => !!activeTab(s));
+  // Where the half's files are, as two strings (a selector must not return a new array).
+  const ls = useStore((s) => paneLoc(side, activeTab(s))[0]);
+  const sid = useStore((s) => paneLoc(side, activeTab(s))[1]);
   const parentDir = path && paths.parent(path) !== path ? paths.parent(path) : null;
   const chosen = selected.length === 1 ? entries.find((e) => e.name === selected[0]) : undefined;
   const childDir = chosen?.kind === 'dir' && !isPackage(side, chosen) ? paths.join(path, chosen.name) : null;
   const parentRows = useMemo(
-    () => (parentDir ? folderRows(side, parentDir) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the listing is read from the store; these values say when it changed
-    [side, parentDir, fsRev, showHidden, sort, serverId, leftServerId],
+    () =>
+      hasTab && parentDir
+        ? folderRows([ls, sid], parentDir, { showHidden, showSystem, sort }, listings.list)
+        : undefined,
+    [hasTab, ls, sid, parentDir, showHidden, showSystem, sort, listings],
   );
   const childRows = useMemo(
-    () => (childDir ? folderRows(side, childDir) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the listing is read from the store; these values say when it changed
-    [side, childDir, fsRev, showHidden, sort, serverId, leftServerId],
+    () =>
+      hasTab && childDir ? folderRows([ls, sid], childDir, { showHidden, showSystem, sort }, listings.list) : undefined,
+    [hasTab, ls, sid, childDir, showHidden, showSystem, sort, listings],
   );
   useEffect(() => {
     if (parentDir) loadFolder(side, parentDir);

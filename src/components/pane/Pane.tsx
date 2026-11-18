@@ -17,19 +17,18 @@ import {
   canGoUp,
   clearPaneSelection,
   getState,
-  listEntries,
-  paneEntries,
   paneLoc,
   paneShowsServers,
-  paneStatus,
+  paneRows,
   placesFor,
   setFocusSide,
   setIconSize,
   setState,
+  useListings,
   useStore,
   watchForLocal,
 } from '../../state/store';
-import { compareMarks } from '../../state/tools';
+import { compareMarksOf } from '../../state/tools';
 import { useGit } from '../../state/git';
 import { useTags } from '../../state/tags';
 import { isVaultListing } from '../../state/vault';
@@ -53,9 +52,11 @@ export function Pane({ side }: { side: PaneSide }) {
   const tab = useStore((s) => activeTab(s));
   const platform = useStore((s) => s.platform);
   const fsRev = useStore((s) => s.fsRev);
+  const listings = useListings();
   // The search filters only the half it was started in.
   const search = useStore((s) => (s.searchSide === side ? s.search : ''));
   const showHidden = useStore((s) => s.settings.showHidden);
+  const showSystem = useStore((s) => s.settings.showSystem);
   const sel = useStore((s) => s.selection[side]);
   const focusSide = useStore((s) => s.focusSide);
   const renaming = useStore((s) => s.renaming);
@@ -106,15 +107,25 @@ export function Pane({ side }: { side: PaneSide }) {
   // Only a half on a server has an entry in `offline`.
   const offline = !!offlineInfo;
   const entries = useMemo(
-    () => paneEntries(side),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the listing is read from the store; these values say when it changed
-    [side, path, fsRev, search, showHidden, tab?.serverId, tab?.leftServerId, sort, viewMode, expanded, showServers],
+    () =>
+      !tab || showServers
+        ? []
+        : paneRows(
+            {
+              loc: [ls, sid],
+              base: path,
+              opened: viewMode === 'list' ? expanded : [],
+              search,
+              view: { showHidden, showSystem, sort },
+            },
+            listings.list,
+          ),
+    [tab, showServers, ls, sid, path, viewMode, expanded, search, showHidden, showSystem, sort, listings],
   );
   // A Cryptomator vault: its folder shows the encrypted files plus a way to unlock it.
   const isVault = useMemo(() => isVaultListing(entries.map((e) => e.name)), [entries]);
   const openSet = useMemo(() => new Set(expanded), [expanded]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the status is read from the store; these values say when it changed
-  const status = useMemo(() => paneStatus(side), [side, path, fsRev, tab?.serverId, tab?.leftServerId]);
+  const status = useMemo(() => listings.status(side, tab), [side, tab, listings]);
 
   // "nur Server" tags: remote entries that are missing in the paired local folder.
   const watch = useStore((s) => (tab && !tab.leftServerId ? watchForLocal(tab.localPath, s) : undefined));
@@ -125,14 +136,13 @@ export function Pane({ side }: { side: PaneSide }) {
     watch.remotePath + tab.localPath.slice(watch.localPath.length) === tab.remotePath;
   const otherNames = useMemo(() => {
     if (!paired || !tab) return null;
-    const other = listEntries(
+    const other = listings.list(
       side === 'local' ? 'remote' : 'local',
       tab.serverId,
       side === 'local' ? tab.remotePath : tab.localPath,
     );
     return other ? new Set(other.map((e) => e.name)) : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the other half is read from the store; these values say when it changed
-  }, [paired, tab?.localPath, tab?.remotePath, fsRev, side]);
+  }, [paired, tab, side, listings]);
 
   // Entries currently being uploaded (local side) or downloaded (remote side).
   const busy = useMemo(() => {
@@ -164,9 +174,8 @@ export function Pane({ side }: { side: PaneSide }) {
   // "Verzeichnisse vergleichen" (WinSCP): marks for what differs from the other half.
   const compareOn = useStore((s) => s.compareDirs);
   const marks = useMemo(
-    () => (compareOn ? compareMarks(side) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the marks are read from the store; these values say when it changed
-    [compareOn, side, fsRev, tab?.localPath, tab?.remotePath, tab?.serverId, tab?.leftServerId, tab?.rightLocal],
+    () => (compareOn ? compareMarksOf(side, tab, listings.list) : null),
+    [compareOn, side, tab, listings],
   );
 
   const sidebarOn = useStore((s) => s.settings.sidebar !== false);

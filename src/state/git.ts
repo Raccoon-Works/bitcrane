@@ -6,7 +6,7 @@
  */
 import { showError } from './errors';
 import { tauriBackend as backend } from '../backend/tauriBackend';
-import type { GitStatus } from '../backend/api';
+import { toBackendError, type GitStatus } from '../backend/api';
 import { useEffect, useState } from 'react';
 import { $t } from '../i18n';
 import { addLog } from './log';
@@ -99,8 +99,8 @@ export async function gitRun(
     showToast($t('Git: {0} erledigt.', label), 'ok');
     return true;
   } catch (e) {
-    const err = e as { message?: string; detail?: string };
-    addLog('error', `Git ${label}: ${err.detail ?? err.message ?? String(e)}`);
+    const err = toBackendError(e);
+    addLog('error', `Git ${label}: ${err.detail ?? err.message}`);
     showError(e);
     return false;
   } finally {

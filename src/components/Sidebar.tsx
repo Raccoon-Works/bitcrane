@@ -24,7 +24,6 @@ import {
   removeRecent,
   activeTab,
   editLocalPlaces,
-  getState,
   localPlaces,
   moveSidebarSection,
   drivesOf,
@@ -47,17 +46,18 @@ import * as paths from '../util/paths';
  */
 function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }> {
   const [real, setReal] = useState<Record<string, string>>({});
+  // Resolved again only when the set of paths changes, not when a place is renamed.
   const key = places.map((p) => p.path).join('\n');
   useEffect(() => {
-    if (!LIVE || !places.length) return;
+    if (!LIVE || !key) return;
+    const list = key.split('\n');
     let live = true;
-    void backend.localRealPaths(places.map((p) => p.path)).then((r) => {
-      if (live) setReal(Object.fromEntries(places.map((p, i) => [p.path, r[i] ?? p.path])));
+    void backend.localRealPaths(list).then((r) => {
+      if (live) setReal(Object.fromEntries(list.map((p, i) => [p, r[i] ?? p])));
     });
     return () => {
       live = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolved again only when the set of places changes
   }, [key]);
   const seen = new Set<string>();
   const unique = places.filter((p) => {
@@ -121,8 +121,7 @@ export function Sidebar() {
   const dropHere = useStore((s) => !!s.dropHint?.sidebar);
   const homeName = useStore((s) => s.homeName);
   const savedOrder = useStore((s) => s.settings.sidebarOrder);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- computed again when the saved order changes
-  const order = useMemo(() => sidebarOrder(getState()), [savedOrder]);
+  const order = useMemo(() => sidebarOrder(savedOrder), [savedOrder]);
   const collapsed = useStore((s) => s.settings.sidebarCollapsed ?? NONE);
   const hidden = useStore((s) => s.settings.sidebarHidden ?? NONE);
   const mac = platform === 'mac';

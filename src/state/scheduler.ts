@@ -31,6 +31,7 @@ import {
   type Place,
 } from './syncPlan';
 import { $t } from '../i18n';
+import { toBackendError } from '../backend/api';
 
 const HOUR_MS = 3600 * 1000;
 /** Comparisons running right now (a slow run is not started a second time). */
@@ -130,7 +131,7 @@ async function runScheduled(f: SyncFavorite): Promise<void> {
     );
     if (n || deleteCount || notDeleted || conflicts) void notify($t('Abgleich „{0}“', f.name), result);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = toBackendError(e).message;
     saveResult(f.id, $t('Fehler: {0}', msg));
     addLog(
       'error',

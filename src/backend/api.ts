@@ -6,7 +6,7 @@
  * in-memory demo file systems in `mockFs.ts`.
  */
 import type { CloudPlace, FileEntry, HostKey, Place, PortForward } from './types';
-import { $t, tr } from '../i18n';
+import { $t } from '../i18n';
 
 export interface WalkItem {
   /** Full path (UI form). */
@@ -175,10 +175,24 @@ export type ErrorKind =
 /** Error shape returned by every backend call. */
 export interface BackendError {
   kind: ErrorKind;
+  /** In the interface language. */
   message: string;
   detail?: string;
   hostKey?: HostKey;
 }
+
+/**
+ * A message of the Rust core (see src-tauri/src/error.rs): the German text, which is also the key
+ * of the translation, and the values for its `{0}`, `{1}` …. A value is shown as it is (a file
+ * name, a host) or is a message of its own.
+ */
+export interface BackendMessage {
+  key: string;
+  params?: Array<string | BackendMessage>;
+}
+
+/** An error as the Rust core sends it. */
+type RustError = BackendMessage & Omit<BackendError, 'message'>;
 
 export interface WatchBatch {
   watchId: string;
@@ -561,12 +575,24 @@ export interface TextContent {
   truncated: boolean;
 }
 
-/** Normalises anything thrown by a backend call into a `BackendError`. */
+/** A message of the Rust core in the interface language; its values are never translated. */
+export function messageText(m: BackendMessage): string {
+  return $t(m.key, ...(m.params ?? []).map((p) => (typeof p === 'string' ? p : messageText(p))));
+}
+
+/**
+ * Normalises anything thrown by a backend call into a `BackendError`: an error of the Rust core,
+ * one the interface made itself (already in its language), or the text of a Tauri plugin.
+ */
 export function toBackendError(e: unknown): BackendError {
-  // Messages from the Rust side are German; tr() gives the English version if needed.
-  if (e && typeof e === 'object' && 'kind' in e && 'message' in e)
-    return { ...(e as BackendError), message: tr((e as BackendError).message) };
-  if (typeof e === 'string') return { kind: 'other', message: tr(e) };
+  if (e && typeof e === 'object' && 'kind' in e) {
+    if ('key' in e) {
+      const { key, params, ...rest } = e as RustError;
+      return { ...rest, message: messageText({ key, params }) };
+    }
+    if ('message' in e) return e as BackendError;
+  }
+  if (typeof e === 'string') return { kind: 'other', message: e };
   if (e instanceof Error) return { kind: 'other', message: e.message };
   return { kind: 'other', message: $t('Unerwarteter Fehler.') };
 }

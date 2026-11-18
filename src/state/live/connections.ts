@@ -42,7 +42,7 @@ export const failed = new Set<string>();
 export const isConnected = (serverId: string) => connected.has(serverId);
 export const isConnecting = (serverId: string) => connecting.has(serverId);
 
-function passphraseAccount(srv: Server) {
+function passphraseAccount(srv: Pick<Server, 'keyPath'>) {
   return `passphrase:${srv.keyPath}`;
 }
 /** Keychain entry of a cloud service's sign-in (refresh token). */
@@ -577,10 +577,9 @@ export async function firstStartOffers() {
   if (!getState().settings.cloudAsked) await offerCloudPlaces(false);
 }
 
-/** Whether a passphrase / password for this server is stored in the keychain. */
-export async function hasStoredSecret(srv: Server): Promise<boolean> {
-  if (srv.auth === 'agent') return false;
-  return (await keychain(srv.auth === 'password' ? passwordAccount(srv) : passphraseAccount(srv))) !== undefined;
+/** Whether the passphrase of this key file is stored in the keychain. */
+export async function hasStoredPassphrase(keyPath: Server['keyPath']): Promise<boolean> {
+  return (await keychain(passphraseAccount({ keyPath }))) !== undefined;
 }
 
 /** Adds a public key to ~/.ssh/authorized_keys on a connected server. */

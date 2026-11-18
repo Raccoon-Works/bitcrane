@@ -15,12 +15,14 @@ import { connectAs } from './live';
 import { showError } from './errors';
 import { addLog } from './log';
 import { getState, serverById, setState, showToast, subscribeStore } from './store';
+import { toBackendError, messageText, type BackendMessage } from '../backend/api';
 
 interface MountEvent {
   serverId: string;
   kind: 'uploaded' | 'error' | 'connect';
   name: string;
-  message: string;
+  /** What went wrong, for 'error'. */
+  message?: BackendMessage;
 }
 
 const connectionId = (serverId: string) => `mount:${serverId}`;
@@ -34,8 +36,7 @@ const lastError = new Map<string, number>();
 const signature = (srv: Server) =>
   JSON.stringify([srv.name, srv.host, srv.port, srv.user, srv.protocol, srv.remoteStart, srv.smbShare, srv.davPath]);
 
-const errorText = (e: unknown) =>
-  typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e);
+const errorText = (e: unknown) => toBackendError(e).message;
 
 /** Starts the Explorer folder of one server. */
 async function mount(srv: Server, quiet: boolean): Promise<void> {
@@ -116,13 +117,14 @@ export async function initMounts() {
     if (!srv) return;
     if (ev.kind === 'uploaded') {
       addLog('ok', $t('Aus dem Explorer-Ordner hochgeladen: {0}', ev.name), ev.serverId);
-    } else if (ev.kind === 'error') {
-      addLog('error', `${ev.name}: ${ev.message}`, ev.serverId);
+    } else if (ev.kind === 'error' && ev.message) {
+      const text = `${ev.name}: ${messageText(ev.message)}`;
+      addLog('error', text, ev.serverId);
       // One message per server and minute is enough; details are in the log.
       const now = Date.now();
       if (now - (lastError.get(ev.serverId) ?? 0) > 60_000) {
         lastError.set(ev.serverId, now);
-        showToast($t('Explorer-Ordner {0}: {1}', srv.name, `${ev.name}: ${ev.message}`), 'error');
+        showToast($t('Explorer-Ordner {0}: {1}', srv.name, text), 'error');
       }
     } else if (ev.kind === 'connect') {
       const now = Date.now();

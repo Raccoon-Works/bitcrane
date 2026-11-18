@@ -16,7 +16,7 @@
 //!   chunks, each AES-GCM with its own nonce and the chunk number plus header
 //!   nonce as associated data.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent, to_native};
 use crate::remote::{Remote, RemoteWriter};
@@ -46,10 +46,15 @@ fn bad_vault(detail: impl Into<String>) -> AppError {
     AppError::other("Der Tresor ist beschädigt oder kein Cryptomator-Tresor.").with_detail(detail.into())
 }
 
-fn crypto_err(what: &str) -> AppError {
-    AppError::other(format!("Entschlüsseln fehlgeschlagen ({what}). Die Datei im Tresor ist beschädigt."))
+fn crypto_err(part: &Message) -> AppError {
+    AppError::other("Entschlüsseln fehlgeschlagen ({0}). Die Datei im Tresor ist beschädigt.")
+        .param(part)
         .with_detail("integrity")
 }
+
+/// The parts of an encrypted file [`crypto_err`] names.
+const FILE_HEADER: Message = Message::new("Dateikopf");
+const BLOCK: Message = Message::new("Block");
 
 /* ------------------------------------------------------------------ Storage */
 
@@ -304,11 +309,11 @@ impl Keys {
 
     fn read_header(&self, header: &[u8]) -> AppResult<([u8; 12], [u8; 32])> {
         if header.len() < HEADER {
-            return Err(crypto_err("Dateikopf"));
+            return Err(crypto_err(&FILE_HEADER));
         }
         let gcm = Aes256Gcm::new((&self.enc).into());
         let payload =
-            gcm.decrypt(Nonce::from_slice(&header[..12]), &header[12..HEADER]).map_err(|_| crypto_err("Dateikopf"))?;
+            gcm.decrypt(Nonce::from_slice(&header[..12]), &header[12..HEADER]).map_err(|_| crypto_err(&FILE_HEADER))?;
         let mut nonce = [0u8; 12];
         nonce.copy_from_slice(&header[..12]);
         let mut key = [0u8; 32];
@@ -341,10 +346,10 @@ fn encrypt_chunk(gcm: &Aes256Gcm, number: u64, header_nonce: &[u8; 12], clear: &
 
 fn decrypt_chunk(gcm: &Aes256Gcm, number: u64, header_nonce: &[u8; 12], chunk: &[u8]) -> AppResult<Vec<u8>> {
     if chunk.len() < 28 {
-        return Err(crypto_err("Block"));
+        return Err(crypto_err(&BLOCK));
     }
     gcm.decrypt(Nonce::from_slice(&chunk[..12]), Payload { msg: &chunk[12..], aad: &chunk_aad(number, header_nonce) })
-        .map_err(|_| crypto_err("Block"))
+        .map_err(|_| crypto_err(&BLOCK))
 }
 
 /// Size of the decrypted content for an encrypted file of `size` bytes.
@@ -507,7 +512,7 @@ pub struct VaultConn {
 }
 
 fn not_found(path: &str) -> AppError {
-    AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path)))
+    AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(remote_name(path))
 }
 
 impl VaultConn {
@@ -542,10 +547,7 @@ impl VaultConn {
     /// Creates a new, empty vault in the folder `root` (which must not exist yet).
     pub async fn create(store: Store, root: &str, password: &str) -> AppResult<()> {
         if store.stat(root).await.is_some() {
-            return Err(AppError::new(
-                ErrorKind::AlreadyExists,
-                format!("„{}“ gibt es hier schon.", remote_name(root)),
-            ));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(root)));
         }
         let keys = {
             let mut rng = rand::rng();
@@ -621,7 +623,7 @@ impl VaultConn {
             }
             let node = self.node(&id, seg).await?.ok_or_else(|| not_found(&current))?;
             if node.kind != Kind::Dir {
-                return Err(AppError::other(format!("„{seg}“ ist kein Ordner.")));
+                return Err(AppError::other("„{0}“ ist kein Ordner.").param(seg));
             }
             id = String::from_utf8(self.store.read_all(&remote_join(&node.path, "dir.c9r")).await?)
                 .map_err(|_| bad_vault("dir.c9r"))?;
@@ -712,7 +714,7 @@ impl VaultConn {
         let parent_id = self.dir_id(&remote_parent(path)).await?;
         let name = remote_name(path);
         if self.node(&parent_id, &name).await?.is_some() {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{name}“ gibt es hier schon.")));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(name));
         }
         let (storage, encrypted, shortened) = self.storage_name(&name, &parent_id);
         let node = remote_join(&self.content_dir(&parent_id), &storage);
@@ -736,7 +738,7 @@ impl VaultConn {
             current = remote_join(&current, seg);
             match self.stat(&current).await {
                 Ok(e) if e.kind == EntryKind::Dir => {}
-                Ok(_) => return Err(AppError::other(format!("„{seg}“ ist kein Ordner."))),
+                Ok(_) => return Err(AppError::other("„{0}“ ist kein Ordner.").param(seg)),
                 Err(_) => self.mkdir(&current).await?,
             }
         }
@@ -794,7 +796,7 @@ impl VaultConn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
         self.move_node(from, to).await
     }
@@ -817,13 +819,13 @@ impl VaultConn {
     pub async fn reader(self: &Arc<Self>, path: &str, offset: u64) -> AppResult<Box<dyn AsyncRead + Unpin + Send>> {
         let node = self.node_of(path).await?;
         if node.kind != Kind::File {
-            return Err(AppError::other(format!("„{}“ ist ein Ordner.", remote_name(path))));
+            return Err(AppError::other("„{0}“ ist ein Ordner.").param(remote_name(path)));
         }
         let content = node.content();
         let mut head = vec![0u8; HEADER];
         {
             let mut r = self.store.reader(&content, 0).await?;
-            r.read_exact(&mut head).await.map_err(|_| crypto_err("Dateikopf"))?;
+            r.read_exact(&mut head).await.map_err(|_| crypto_err(&FILE_HEADER))?;
         }
         let (header_nonce, key) = self.keys.read_header(&head)?;
         let first = offset / CHUNK as u64;

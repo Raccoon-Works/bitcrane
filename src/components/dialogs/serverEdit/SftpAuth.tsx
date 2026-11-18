@@ -8,7 +8,7 @@ import type { KeyInfo } from '../../../backend/api';
 import type { AuthMethod, Server } from '../../../backend/types';
 import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { chooseFile } from '../../../backend/dialogs';
-import { hasStoredSecret } from '../../../state/live';
+import { hasStoredPassphrase } from '../../../state/live';
 import { LIVE, useStore } from '../../../state/store';
 import { KeyPanel } from '../../KeyPanel';
 import { Button, Segmented, TextField } from '../../ui';
@@ -30,7 +30,7 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
       void backend.keyInfo(draft.keyPath).then((k) => {
         if (!cancelled) setKeyInfo(k);
       });
-      void hasStoredSecret(draft).then((v) => {
+      void hasStoredPassphrase(draft.keyPath).then((v) => {
         if (!cancelled) setSecretStored(v);
       });
     }, 250);
@@ -38,7 +38,6 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
       cancelled = true;
       window.clearTimeout(t);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- checked again only when the key or the login method changes
   }, [draft.keyPath, draft.auth]);
 
   const chooseKey = async () => {

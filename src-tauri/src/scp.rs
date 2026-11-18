@@ -6,7 +6,7 @@
 //! Bitcrane falls back to this by itself when a server refuses SFTP; the
 //! server settings can also ask for it directly.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
 use crate::ssh::{Handler, Session};
@@ -36,32 +36,28 @@ struct Output {
 
 impl Output {
     /// Turns a failed command into a message, recognising the usual causes.
-    fn check(self, what: &str) -> AppResult<Vec<u8>> {
+    fn check(self, what: &Message) -> AppResult<Vec<u8>> {
         if self.code == 0 {
             return Ok(self.out);
         }
         let err = self.err.trim().to_string();
         let lower = err.to_lowercase();
-        let kind_msg =
+        let failure =
             if lower.contains("no such file") || lower.contains("not found") && !lower.contains("command not found") {
-                (ErrorKind::NotFound, format!("{what} gibt es nicht."))
+                AppError::new(ErrorKind::NotFound, "{0} gibt es nicht.").param(what)
             } else if lower.contains("permission denied")
                 || lower.contains("operation not permitted")
                 || lower.contains("read-only")
             {
-                (ErrorKind::PermissionDenied, format!("Kein Zugriff auf {what}."))
+                AppError::new(ErrorKind::PermissionDenied, "Kein Zugriff auf {0}.").param(what)
             } else if lower.contains("file exists") || lower.contains("already exists") {
-                (ErrorKind::AlreadyExists, format!("{what} gibt es hier schon."))
+                AppError::new(ErrorKind::AlreadyExists, "{0} gibt es hier schon.").param(what)
             } else if lower.contains("no space") {
-                (ErrorKind::Other, "Auf dem Server ist kein Platz mehr.".to_string())
+                AppError::other("Auf dem Server ist kein Platz mehr.")
             } else {
-                (ErrorKind::Other, format!("Der Server hat {what} abgelehnt."))
+                AppError::other("Der Server hat {0} abgelehnt.").param(what)
             };
-        Err(AppError::new(kind_msg.0, kind_msg.1).with_detail(if err.is_empty() {
-            format!("exit {}", self.code)
-        } else {
-            err
-        }))
+        Err(failure.with_detail(if err.is_empty() { format!("exit {}", self.code) } else { err }))
     }
 }
 
@@ -237,7 +233,7 @@ impl ScpConn {
         Ok(out)
     }
 
-    async fn ok(&self, command: &str, what: &str) -> AppResult<Vec<u8>> {
+    async fn ok(&self, command: &str, what: &Message) -> AppResult<Vec<u8>> {
         self.run(command).await?.check(what)
     }
 
@@ -255,7 +251,7 @@ impl ScpConn {
         let line = String::from_utf8_lossy(&out).lines().next().unwrap_or_default().to_string();
         // The name in the line is the path as given; the entry gets the plain name.
         let mut e = parse_ls_line(&line, Local::now())
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("{} gibt es nicht.", quoted_name(path))))?;
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, "{0} gibt es nicht.").param(quoted_name(path)))?;
         e.name = remote_name(path);
         Ok(e)
     }
@@ -274,7 +270,7 @@ impl ScpConn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "{0} gibt es hier schon.").param(quoted_name(to)));
         }
         self.ok(&format!("mv -- {} {}", quote(from), quote(to)), &quoted_name(from)).await.map(|_| ())
     }
@@ -337,7 +333,12 @@ impl ScpConn {
     }
 
     /// Copies on the server with `cp`, with "Kopie" names on clashes.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -345,7 +346,7 @@ impl ScpConn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             self.ok(&format!("cp -Rp -- {} {}", quote(from), quote(&remote_join(dest_dir, &name))), &quoted_name(from))
                 .await?;
             taken.insert(name.clone());

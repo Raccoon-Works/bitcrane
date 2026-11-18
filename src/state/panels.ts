@@ -5,7 +5,7 @@
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { PaneSide, Tab } from '../backend/types';
-import type { WalkItem } from '../backend/api';
+import { toBackendError, type WalkItem } from '../backend/api';
 
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
@@ -202,7 +202,7 @@ async function runContentSearch(query: string) {
         loading: false,
         results: [],
         more: false,
-        error: (e as { message?: string })?.message ?? String(e),
+        error: toBackendError(e).message,
         content: true,
       },
     });
@@ -273,7 +273,7 @@ async function runDeepSearch(query: string) {
         loading: false,
         results: [],
         more: false,
-        error: (e as { message?: string })?.message ?? String(e),
+        error: toBackendError(e).message,
       },
     });
   }

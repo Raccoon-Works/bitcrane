@@ -146,7 +146,7 @@ pub fn rename(path: &str, new_name: &str) -> AppResult<()> {
     let from = to_native(path);
     let to = from.with_file_name(new_name);
     if to.exists() {
-        return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{new_name}“ gibt es hier schon.")));
+        return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(new_name));
     }
     fs::rename(from, to)?;
     Ok(())
@@ -261,8 +261,25 @@ pub fn checksum_with(path: &str, algo: Algo) -> AppResult<String> {
     Ok(hex(&h.finalize()))
 }
 
+/// Words in the interface language for names Bitcrane makes up. The interface sends them with
+/// each operation that may need them, as only it knows the language.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NameWords {
+    /// Added to the name of a copy ("Kopie", "copy").
+    pub copy: String,
+    /// Name of a new archive of several items ("Archiv", "Archive").
+    pub archive: String,
+}
+
+#[cfg(test)]
+impl NameWords {
+    pub fn german() -> Self {
+        Self { copy: "Kopie".into(), archive: "Archiv".into() }
+    }
+}
+
 /// Free name for a copy: the name itself, else "name Kopie.ext", "name Kopie 2.ext", ...
-pub fn copy_name(exists: impl Fn(&str) -> bool, name: &str) -> String {
+pub fn copy_name(exists: impl Fn(&str) -> bool, name: &str, words: &NameWords) -> String {
     if !exists(name) {
         return name.to_string();
     }
@@ -271,7 +288,8 @@ pub fn copy_name(exists: impl Fn(&str) -> bool, name: &str) -> String {
         _ => (name, ""),
     };
     for n in 1.. {
-        let candidate = if n == 1 { format!("{stem} Kopie{ext}") } else { format!("{stem} Kopie {n}{ext}") };
+        let copy = &words.copy;
+        let candidate = if n == 1 { format!("{stem} {copy}{ext}") } else { format!("{stem} {copy} {n}{ext}") };
         if !exists(&candidate) {
             return candidate;
         }
@@ -296,9 +314,10 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
 
 /// "Zusammenführen" (Transmit "Merge"): puts the contents of folder `from` into the existing
 /// folder `to`. Sub-folders present on both sides are merged as well; a file whose name is
-/// already taken is kept next to the existing one as "… Kopie" (nothing is overwritten).
+/// already taken is kept next to the existing one as "… Kopie" (in the interface language, see
+/// [`NameWords`]; nothing is overwritten).
 /// With `moving`, entries are moved (renamed) where possible and the emptied source is removed.
-fn merge_tree(from: &Path, to: &Path, moving: bool) -> std::io::Result<()> {
+fn merge_tree(from: &Path, to: &Path, moving: bool, words: &NameWords) -> std::io::Result<()> {
     for item in fs::read_dir(from)? {
         let item = item?;
         let src = item.path();
@@ -306,10 +325,10 @@ fn merge_tree(from: &Path, to: &Path, moving: bool) -> std::io::Result<()> {
         let existing = to.join(&name);
         let src_is_dir = fs::symlink_metadata(&src)?.is_dir();
         if src_is_dir && existing.is_dir() {
-            merge_tree(&src, &existing, moving)?;
+            merge_tree(&src, &existing, moving, words)?;
             continue;
         }
-        let target = to.join(copy_name(|n| to.join(n).exists(), &name));
+        let target = to.join(copy_name(|n| to.join(n).exists(), &name, words));
         if !moving || fs::rename(&src, &target).is_err() {
             copy_tree(&src, &target)?;
             if moving {
@@ -336,7 +355,7 @@ fn merges_into(from: &Path, dest: &Path, name: &str) -> bool {
 /// Copies files or folders into `dest_dir` on this computer. Returns the new names.
 /// With `merge`, a folder whose name already exists there is merged into it instead of
 /// getting a " Kopie" name.
-pub fn copy(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
+pub fn copy(paths: &[String], dest_dir: &str, merge: bool, words: &NameWords) -> AppResult<Vec<String>> {
     if crate::archive_vfs::split(dest_dir).is_some() {
         return Err(crate::archive_vfs::read_only());
     }
@@ -346,7 +365,7 @@ pub fn copy(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<Stri
         // Out of an archive: the entry is extracted into the target.
         if let Some((archive, inner)) = crate::archive_vfs::split(p) {
             if !inner.is_empty() {
-                out.push(crate::archive_vfs::extract(&archive, &inner, &dest)?);
+                out.push(crate::archive_vfs::extract(&archive, &inner, &dest, words)?);
                 continue;
             }
         }
@@ -356,11 +375,11 @@ pub fn copy(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<Stri
         }
         let name = from.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         if merge && merges_into(&from, &dest, &name) {
-            merge_tree(&from, &dest.join(&name), false)?;
+            merge_tree(&from, &dest.join(&name), false, words)?;
             out.push(name);
             continue;
         }
-        let target = copy_name(|n| dest.join(n).exists(), &name);
+        let target = copy_name(|n| dest.join(n).exists(), &name, words);
         copy_tree(&from, &dest.join(&target))?;
         out.push(target);
     }
@@ -389,7 +408,7 @@ pub fn copy_file_over(from: &str, to: &str) -> AppResult<()> {
 /// this is a rename; across drives the item is copied and the original then
 /// goes to the trash (never deleted permanently). A name that already exists
 /// in the target gets " Kopie" like a copy. Returns the new names.
-pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec<String>> {
+pub fn move_into(paths: &[String], dest_dir: &str, merge: bool, words: &NameWords) -> AppResult<Vec<String>> {
     if crate::archive_vfs::split(dest_dir).is_some()
         || paths.iter().any(|p| crate::archive_vfs::split(p).is_some_and(|(_, inner)| !inner.is_empty()))
     {
@@ -404,11 +423,11 @@ pub fn move_into(paths: &[String], dest_dir: &str, merge: bool) -> AppResult<Vec
         }
         let name = from.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         if merge && merges_into(&from, &dest, &name) {
-            merge_tree(&from, &dest.join(&name), true)?;
+            merge_tree(&from, &dest.join(&name), true, words)?;
             out.push(name);
             continue;
         }
-        let target = copy_name(|n| dest.join(n).exists(), &name);
+        let target = copy_name(|n| dest.join(n).exists(), &name, words);
         let to = dest.join(&target);
         if fs::rename(&from, &to).is_err() {
             // Different drive: copy, then the original into the trash.
@@ -800,6 +819,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn copy_names_use_the_word_of_the_interface() {
+        let taken = ["bot.py", "bot copy.py", "notes"];
+        let exists = |n: &str| taken.contains(&n);
+        let english = NameWords { copy: "copy".into(), archive: "Archive".into() };
+        assert_eq!(copy_name(exists, "new.py", &english), "new.py");
+        assert_eq!(copy_name(exists, "bot.py", &english), "bot copy 2.py");
+        assert_eq!(copy_name(exists, "notes", &english), "notes copy");
+        assert_eq!(copy_name(exists, "bot.py", &NameWords::german()), "bot Kopie.py");
+        // A leading dot is part of the name, not an extension.
+        assert_eq!(copy_name(|n| n == ".env", ".env", &english), ".env copy");
+    }
+
+    #[test]
     fn media_ranges() {
         let mb4 = MEDIA_PIECE;
         assert_eq!(media_range(None, 10), Some((0, 9)));
@@ -858,7 +890,7 @@ mod tests {
         fs::write(a.join("css/x.css"), "x").unwrap();
         fs::write(b.join("index.html"), "old").unwrap();
         fs::write(b.join("css/y.css"), "y").unwrap();
-        let made = copy(&[to_ui(&a)], &to_ui(&base.join("b")), true).unwrap();
+        let made = copy(&[to_ui(&a)], &to_ui(&base.join("b")), true, &NameWords::german()).unwrap();
         assert_eq!(made, vec!["site".to_string()]);
         // Both css files side by side, the existing index.html kept, the new one as a copy.
         assert!(b.join("css/x.css").exists() && b.join("css/y.css").exists());
@@ -867,7 +899,7 @@ mod tests {
         // Moving merges as well and removes the emptied source.
         fs::create_dir_all(base.join("c/site/js")).unwrap();
         fs::write(base.join("c/site/js/app.js"), "a").unwrap();
-        move_into(&[to_ui(&base.join("c/site"))], &to_ui(&base.join("b")), true).unwrap();
+        move_into(&[to_ui(&base.join("c/site"))], &to_ui(&base.join("b")), true, &NameWords::german()).unwrap();
         assert!(b.join("js/app.js").exists() && !base.join("c/site").exists());
         let _ = fs::remove_dir_all(&base);
     }
@@ -880,7 +912,7 @@ mod tests {
         fs::create_dir_all(&b).unwrap();
         fs::write(a.join("x.txt"), "1").unwrap();
         fs::write(b.join("x.txt"), "2").unwrap();
-        let made = move_into(&[to_ui(&a.join("x.txt"))], &to_ui(&b), false).unwrap();
+        let made = move_into(&[to_ui(&a.join("x.txt"))], &to_ui(&b), false, &NameWords::german()).unwrap();
         assert_eq!(made, vec!["x Kopie.txt".to_string()]);
         assert!(!a.join("x.txt").exists());
         assert_eq!(fs::read_to_string(b.join("x.txt")).unwrap(), "2");
@@ -918,11 +950,20 @@ mod tests {
         assert_eq!(w[0].relative, "sub/a.py");
 
         // Copies: a clash gets "Kopie", folders are copied with content, never into themselves.
-        assert_eq!(copy(&[format!("{base}/c.txt")], &base, false).unwrap(), vec!["c Kopie.txt".to_string()]);
-        assert_eq!(copy(&[format!("{base}/c.txt")], &base, false).unwrap(), vec!["c Kopie 2.txt".to_string()]);
-        assert_eq!(copy(&[format!("{base}/sub")], &base, false).unwrap(), vec!["sub Kopie".to_string()]);
+        assert_eq!(
+            copy(&[format!("{base}/c.txt")], &base, false, &NameWords::german()).unwrap(),
+            vec!["c Kopie.txt".to_string()]
+        );
+        assert_eq!(
+            copy(&[format!("{base}/c.txt")], &base, false, &NameWords::german()).unwrap(),
+            vec!["c Kopie 2.txt".to_string()]
+        );
+        assert_eq!(
+            copy(&[format!("{base}/sub")], &base, false, &NameWords::german()).unwrap(),
+            vec!["sub Kopie".to_string()]
+        );
         assert!(dir.path().join("sub Kopie/a.py").exists());
-        assert!(copy(&[format!("{base}/sub")], &format!("{base}/sub"), false).is_err());
+        assert!(copy(&[format!("{base}/sub")], &format!("{base}/sub"), false, &NameWords::german()).is_err());
     }
 }
 

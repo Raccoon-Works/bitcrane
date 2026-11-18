@@ -14,7 +14,7 @@
 //! `mount:<server id>`, opened by the interface (which has the passwords).
 //! When it is missing, the interface is asked to connect again.
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, Message};
 use crate::model::EntryKind;
 use crate::paths::{remote_name, storable_name, sync_root_to_remote as to_remote};
 use crate::remote::Remote;
@@ -54,7 +54,9 @@ struct MountEvent {
     /// "uploaded", "error" or "connect" (the connection is gone, please connect again).
     kind: &'static str,
     name: String,
-    message: String,
+    /// What went wrong, for "error".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<Message>,
 }
 
 struct Mount {
@@ -69,8 +71,8 @@ struct Mount {
 #[derive(Default)]
 pub struct Mounts(Mutex<HashMap<String, Mount>>);
 
-fn fail(message: &str, e: impl std::fmt::Debug) -> AppError {
-    AppError::other(message.to_string()).with_detail(format!("{e:?}"))
+fn fail(message: Message, e: impl std::fmt::Debug) -> AppError {
+    AppError::other(message).with_detail(format!("{e:?}"))
 }
 
 /// Folder for a server: %USERPROFILE%\Bitcrane\<name>.
@@ -82,7 +84,8 @@ fn folder_for(name: &str) -> PathBuf {
 }
 
 fn sync_root_id(server_id: &str) -> AppResult<SyncRootId> {
-    let sid = SecurityId::current_user().map_err(|e| fail("Das Windows-Konto konnte nicht ermittelt werden.", e))?;
+    let sid = SecurityId::current_user()
+        .map_err(|e| fail(Message::new("Das Windows-Konto konnte nicht ermittelt werden."), e))?;
     Ok(SyncRootIdBuilder::new(PROVIDER).user_security_id(sid).account_name(server_id).build())
 }
 
@@ -106,7 +109,7 @@ impl Mounts {
         self.stop_inner(&server_id, false);
         let root = folder_for(&name);
         std::fs::create_dir_all(&root)
-            .map_err(|e| fail("Der Ordner für den Server konnte nicht angelegt werden.", e))?;
+            .map_err(|e| fail(Message::new("Der Ordner für den Server konnte nicht angelegt werden."), e))?;
         let id = sync_root_id(&server_id)?;
         // A renamed server gets a new folder: the old registration goes first.
         if id.is_registered().unwrap_or(false) && id.info().map(|i| i.path() != root).unwrap_or(true) {
@@ -122,8 +125,9 @@ impl Mounts {
                 .with_icon(format!("{exe},0"))
                 .with_version(env!("CARGO_PKG_VERSION"))
                 .with_path(&root)
-                .map_err(|e| fail("Der Ordner konnte nicht bei Windows angemeldet werden.", e))?;
-            id.register(info).map_err(|e| fail("Der Ordner konnte nicht bei Windows angemeldet werden.", e))?;
+                .map_err(|e| fail(Message::new("Der Ordner konnte nicht bei Windows angemeldet werden."), e))?;
+            id.register(info)
+                .map_err(|e| fail(Message::new("Der Ordner konnte nicht bei Windows angemeldet werden."), e))?;
         }
         let pending: Arc<Mutex<HashSet<PathBuf>>> = Default::default();
         let filter = ServerFilter {
@@ -137,7 +141,7 @@ impl Mounts {
         let rt = Handle::current();
         let session = Session::new()
             .connect_async(&root, filter, move |f| rt.block_on(f))
-            .map_err(|e| fail("Die Verbindung zum Explorer konnte nicht hergestellt werden.", e))?;
+            .map_err(|e| fail(Message::new("Die Verbindung zum Explorer konnte nicht hergestellt werden."), e))?;
         let watcher = start_watcher(Uploader {
             app,
             connections,
@@ -208,12 +212,7 @@ async fn connection(
         None => {
             let _ = app.emit(
                 "mount-event",
-                MountEvent {
-                    server_id: server_id.to_string(),
-                    kind: "connect",
-                    name: String::new(),
-                    message: String::new(),
-                },
+                MountEvent { server_id: server_id.to_string(), kind: "connect", name: String::new(), message: None },
             );
             Err(CloudErrorKind::NetworkUnavailable)
         }
@@ -249,7 +248,7 @@ impl ServerFilter {
                 server_id: self.server_id.clone(),
                 kind: "error",
                 name: name.to_string(),
-                message: e.message.clone(),
+                message: Some(e.message.clone()),
             },
         );
     }
@@ -423,7 +422,7 @@ impl Uploader {
                                     server_id: self.server_id.clone(),
                                     kind: "uploaded",
                                     name: remote_name(&remote_path),
-                                    message: String::new(),
+                                    message: None,
                                 },
                             );
                         }
@@ -440,7 +439,7 @@ impl Uploader {
                             server_id: self.server_id.clone(),
                             kind: "error",
                             name: remote_name(&remote_path),
-                            message: e.message.clone(),
+                            message: Some(e.message.clone()),
                         },
                     );
                 }
@@ -475,7 +474,9 @@ fn start_watcher(uploader: Uploader) -> AppResult<Debouncer<notify::RecommendedW
         let u = uploader.clone();
         u.rt.clone().spawn(async move { u.sync(paths).await });
     })
-    .map_err(|e| fail("Der Ordner kann nicht überwacht werden.", e))?;
-    debouncer.watch(&root, RecursiveMode::Recursive).map_err(|e| fail("Der Ordner kann nicht überwacht werden.", e))?;
+    .map_err(|e| fail(Message::new("Der Ordner kann nicht überwacht werden."), e))?;
+    debouncer
+        .watch(&root, RecursiveMode::Recursive)
+        .map_err(|e| fail(Message::new("Der Ordner kann nicht überwacht werden."), e))?;
     Ok(debouncer)
 }

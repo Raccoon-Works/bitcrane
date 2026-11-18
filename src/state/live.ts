@@ -26,7 +26,7 @@ export {
   davUrl,
   disconnectServer,
   forgetSecrets,
-  hasStoredSecret,
+  hasStoredPassphrase,
   homeOf,
   installPublicKey,
   isConnected,

@@ -15,7 +15,7 @@
 //! - Google Docs, Sheets and Slides have no file content of their own and
 //!   cannot be downloaded as they are; they are listed with size 0.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth;
 use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
@@ -143,27 +143,27 @@ fn entry_of(v: &Value, pdf: bool) -> Option<FileEntry> {
 }
 
 /// Turns an API error answer into a clear message.
-fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
+fn api_err(status: reqwest::StatusCode, body: &str, what: &Message) -> AppError {
     let v = serde_json::from_str::<Value>(body).unwrap_or(Value::Null);
     let reason = v.pointer("/error/errors/0/reason").and_then(|r| r.as_str()).unwrap_or_default().to_string();
     let message = v.pointer("/error/message").and_then(|r| r.as_str()).unwrap_or(body).to_string();
     let detail = format!("{status}: {message}");
     match status.as_u16() {
         401 => AppError::new(ErrorKind::AuthFailed, "Die Anmeldung bei Google Drive ist nicht mehr gültig. Bitte neu anmelden.").with_detail(detail),
-        404 => AppError::new(ErrorKind::NotFound, format!("{what}: nicht gefunden.")).with_detail(detail),
+        404 => AppError::new(ErrorKind::NotFound, "{0}: nicht gefunden.").param(what).with_detail(detail),
         429 => AppError::new(ErrorKind::ConnectionLost, "Google Drive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.").with_detail(detail),
         403 if reason.contains("RateLimit") || reason.contains("rateLimit") => {
             AppError::new(ErrorKind::ConnectionLost, "Google Drive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.").with_detail(detail)
         }
-        403 if reason == "exportSizeLimitExceeded" => AppError::new(ErrorKind::Other, format!("{what}: Das Dokument ist zu groß zum Umwandeln (Google wandelt höchstens 10 MB um). In Google Drive selbst herunterladen.")).with_detail(detail),
-        403 if reason.contains("storageQuota") => AppError::new(ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in Google Drive.")).with_detail(detail),
+        403 if reason == "exportSizeLimitExceeded" => AppError::new(ErrorKind::Other, "{0}: Das Dokument ist zu groß zum Umwandeln (Google wandelt höchstens 10 MB um). In Google Drive selbst herunterladen.").param(what).with_detail(detail),
+        403 if reason.contains("storageQuota") => AppError::new(ErrorKind::Other, "{0}: kein Speicherplatz mehr in Google Drive.").param(what).with_detail(detail),
         403 if reason == "accessNotConfigured" || message.contains("has not been used") || message.contains("is disabled") => AppError::new(
             ErrorKind::Other,
             "In deinem Google-Cloud-Projekt ist die „Google Drive API“ noch nicht aktiviert (siehe Anleitung, Schritt 2).",
         )
         .with_detail(detail),
-        403 => AppError::new(ErrorKind::PermissionDenied, format!("{what}: nicht erlaubt.")).with_detail(detail),
-        _ => AppError::new(ErrorKind::Other, format!("{what} fehlgeschlagen.")).with_detail(detail),
+        403 => AppError::new(ErrorKind::PermissionDenied, "{0}: nicht erlaubt.").param(what).with_detail(detail),
+        _ => AppError::new(ErrorKind::Other, "{0} fehlgeschlagen.").param(what).with_detail(detail),
     }
 }
 
@@ -295,7 +295,7 @@ impl GDriveConn {
         url: &str,
         query: &[(&str, &str)],
         body: Option<Value>,
-        what: &str,
+        what: &Message,
     ) -> AppResult<Value> {
         let token = self.access().await?;
         let mut req = self.client.request(method, url).bearer_auth(token).query(query);
@@ -319,7 +319,7 @@ impl GDriveConn {
                 &format!("{API}/about"),
                 &[("fields", "user(emailAddress,displayName)")],
                 None,
-                "Konto lesen",
+                &Message::new("Konto lesen"),
             )
             .await?;
         Ok(v.pointer("/user/emailAddress")
@@ -330,7 +330,7 @@ impl GDriveConn {
     }
 
     /// All children of a folder id (every page).
-    async fn children(&self, parent: &str, what: &str) -> AppResult<Vec<Value>> {
+    async fn children(&self, parent: &str, what: &Message) -> AppResult<Vec<Value>> {
         let q = format!("{} in parents and trashed = false", quoted(parent));
         let fields = format!("nextPageToken,files({FIELDS})");
         let mut out = Vec::new();
@@ -352,7 +352,7 @@ impl GDriveConn {
     }
 
     /// The item with this name in a folder (the first one if Drive has several).
-    async fn child(&self, parent: &str, name: &str, what: &str) -> AppResult<Option<Value>> {
+    async fn child(&self, parent: &str, name: &str, what: &Message) -> AppResult<Option<Value>> {
         let q = format!("{} in parents and name = {} and trashed = false", quoted(parent), quoted(name));
         let fields = format!("files({FIELDS})");
         let v = self
@@ -399,7 +399,7 @@ impl GDriveConn {
                 }
             }
         }
-        let item = item.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", name)))?;
+        let item = item.ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(name))?;
         if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
             self.ids.lock().unwrap().insert(path, id.to_string());
         }
@@ -419,7 +419,7 @@ impl GDriveConn {
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let what = format!("„{}“ lesen", remote_name(path));
+        let what = Message::new("„{0}“ lesen").param(remote_name(path));
         let id = self.id_of(path).await?;
         let base = norm(path);
         let items = self.children(&id, &what).await?;
@@ -456,7 +456,7 @@ impl GDriveConn {
         }
         let v = self.lookup(path).await?;
         entry_of(&v, self.pdf)
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(remote_name(path)))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -464,9 +464,9 @@ impl GDriveConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        let what = format!("Ordner „{}“ anlegen", remote_name(path));
+        let what = Message::new("Ordner „{0}“ anlegen").param(remote_name(path));
         if self.exists(path).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{what}: gibt es schon.")));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "{0}: gibt es schon.").param(what));
         }
         let parent = self.id_of(&remote_parent(&norm(path))).await?;
         let v = self
@@ -498,10 +498,10 @@ impl GDriveConn {
 
     /// Renames and/or moves an item; refuses when the target name is taken.
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
-        let what = format!("„{}“ umbenennen", remote_name(from));
+        let what = Message::new("„{0}“ umbenennen").param(remote_name(from));
         let (from, to) = (norm(from), norm(to));
         if self.exists(&to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es schon.", remote_name(&to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es schon.").param(remote_name(&to)));
         }
         let item = self.lookup(&from).await?;
         let id = item.get("id").and_then(|i| i.as_str()).unwrap_or_default().to_string();
@@ -542,7 +542,7 @@ impl GDriveConn {
                 &format!("{API}/files/{old}"),
                 &[],
                 None,
-                &format!("„{}“ ersetzen", remote_name(to)),
+                &Message::new("„{0}“ ersetzen").param(remote_name(to)),
             )
             .await?;
             self.forget(to);
@@ -562,7 +562,7 @@ impl GDriveConn {
             &format!("{API}/files/{id}"),
             &[("fields", "id")],
             Some(json!({ "trashed": true })),
-            &format!("„{}“ löschen", remote_name(path)),
+            &Message::new("„{0}“ löschen").param(remote_name(path)),
         )
         .await?;
         self.forget(path);
@@ -570,7 +570,12 @@ impl GDriveConn {
     }
 
     /// Copy inside the Drive, with "Kopie" names on clashes; folders are copied with their content.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -578,7 +583,7 @@ impl GDriveConn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             self.copy_item(from, &remote_join(dest_dir, &name)).await?;
             taken.insert(name.clone());
             out.push(name);
@@ -587,7 +592,7 @@ impl GDriveConn {
     }
 
     async fn copy_item(&self, from: &str, to: &str) -> AppResult<()> {
-        let what = format!("„{}“ kopieren", remote_name(from));
+        let what = Message::new("„{0}“ kopieren").param(remote_name(from));
         let src = self.lookup(from).await?;
         if is_dir(&src) {
             self.mkdir(to).await?;
@@ -628,7 +633,7 @@ impl GDriveConn {
                 &format!("{API}/files/{id}"),
                 &[("fields", "webViewLink")],
                 None,
-                &format!("Link für „{}“", remote_name(path)),
+                &Message::new("Link für „{0}“").param(remote_name(path)),
             )
             .await?;
         v.get("webViewLink")
@@ -639,7 +644,7 @@ impl GDriveConn {
 
     /// Reads a file from `offset` (HTTP Range).
     pub async fn reader(&self, path: &str, offset: u64) -> AppResult<Box<dyn AsyncRead + Unpin + Send>> {
-        let what = format!("„{}“ lesen", remote_name(path));
+        let what = Message::new("„{0}“ lesen").param(remote_name(path));
         let item = self.lookup(path).await?;
         let mime = item.get("mimeType").and_then(|m| m.as_str()).unwrap_or_default();
         let id = item.get("id").and_then(|i| i.as_str()).unwrap_or_default();
@@ -652,7 +657,7 @@ impl GDriveConn {
             }
             self.client.get(format!("{API}/files/{id}/export")).query(&[("mimeType", export_mime)]).bearer_auth(token)
         } else if mime.starts_with("application/vnd.google-apps.") {
-            return Err(AppError::other(format!("„{}“ ist ein Google-Element, das sich nicht herunterladen lässt (z. B. ein Formular). In Google Drive öffnen.", remote_name(path))));
+            return Err(AppError::other("„{0}“ ist ein Google-Element, das sich nicht herunterladen lässt (z. B. ein Formular). In Google Drive öffnen.").param(remote_name(path)));
         } else {
             self.client.get(format!("{API}/files/{id}")).query(&[("alt", "media")]).bearer_auth(token)
         };
@@ -676,7 +681,7 @@ impl GDriveConn {
 
     /// Starts a resumable upload: a new file in the parent folder, or new
     /// content for an existing one. Returns the session address.
-    async fn start_upload(&self, path: &str, mtime: Option<u32>, what: &str) -> AppResult<String> {
+    async fn start_upload(&self, path: &str, mtime: Option<u32>, what: &Message) -> AppResult<String> {
         let token = self.access().await?;
         let mut meta = json!({});
         if let Some(t) = mtime.and_then(rfc3339) {
@@ -718,7 +723,7 @@ impl GDriveConn {
         start: u64,
         piece: Vec<u8>,
         total: Option<u64>,
-        what: &str,
+        what: &Message,
     ) -> AppResult<Option<Value>> {
         let range = match (piece.is_empty(), total) {
             (true, Some(t)) => format!("bytes */{t}"),
@@ -749,7 +754,7 @@ impl GDriveConn {
         let conn = self.clone();
         let path = norm(path);
         let task = tokio::spawn(async move {
-            let what = format!("„{}“ schreiben", remote_name(&path));
+            let what = Message::new("„{0}“ schreiben").param(remote_name(&path));
             let session = conn.start_upload(&path, mtime, &what).await?;
             let mut offset: u64 = 0;
             loop {

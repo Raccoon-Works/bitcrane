@@ -21,6 +21,7 @@ import * as paths from '../util/paths';
 import { addLog } from './log';
 import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
 import { isConnected, refreshVisible } from './live';
+import { toBackendError } from '../backend/api';
 
 /** Editor settings with their standard values (CodeEditor.tsx and Settings › Allgemein). */
 interface EditorPrefs {
@@ -193,7 +194,7 @@ export async function openFile(serverId: string, path: string) {
     });
     if (serverId) addLog('info', $t('Im Editor geöffnet: {0}', path), serverId);
   } catch (e) {
-    patchDoc(doc.id, { loading: false, error: (e as { message?: string }).message ?? String(e) });
+    patchDoc(doc.id, { loading: false, error: toBackendError(e).message });
   }
 }
 

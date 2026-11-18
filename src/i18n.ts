@@ -57,30 +57,11 @@ export function rememberLanguage(lang: Lang) {
   }
 }
 
-/** Patterns for texts with variable parts (messages from the Rust side). */
-const PATTERNS: Array<[RegExp, string]> = Object.entries(DICT ?? {})
-  .filter(([k]) => /\{\d\}/.test(k))
-  .map(([k, v]) => [
-    new RegExp('^' + k.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\\?\{(\d)\\?\}/g, '(.*?)') + '$', 's'),
-    v,
-  ]);
-
 /** Translates a text; `{0}`, `{1}` … are replaced by the arguments. */
 export function $t(text: string, ...args: unknown[]): string {
   // "Wort#context" tells apart equal German words with different meanings.
   const out = DICT ? (DICT[text] ?? text.split('#')[0]) : text.split('#')[0];
   return args.length ? out.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)] ?? '')) : out;
-}
-
-/** Translates a complete text from outside (e.g. an error message from the backend). */
-export function tr(message: string): string {
-  if (!DICT || !message) return message;
-  if (DICT[message]) return DICT[message];
-  for (const [re, en] of PATTERNS) {
-    const m = message.match(re);
-    if (m) return en.replace(/\{(\d)\}/g, (_, i) => tr(m[Number(i) + 1] ?? ''));
-  }
-  return message;
 }
 
 /* Mac menus in English use title case ("Open in New Tab"); Windows keeps

@@ -22,7 +22,7 @@ pub fn load(dir: &Path) -> AppResult<Value> {
     match std::fs::read_to_string(&path) {
         Ok(s) => serde_json::from_str(&s).map_err(|e| {
             let name = keep_damaged(&path);
-            AppError::other(format!("Die Einstellungen waren beschädigt und wurden nicht geladen. Eine Kopie liegt als {name} im Einstellungsordner.")).with_detail(e.to_string())
+            AppError::other("Die Einstellungen waren beschädigt und wurden nicht geladen. Eine Kopie liegt als {0} im Einstellungsordner.").param(name).with_detail(e.to_string())
         }),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Value::Null),
         Err(e) => Err(e.into()),

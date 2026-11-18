@@ -279,7 +279,7 @@ pub async fn download(
     flag: Arc<AtomicU8>,
 ) -> AppResult<u64> {
     let meta = conn.meta(remote_path).await.ok_or_else(|| {
-        AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Server nicht.", remote_name(remote_path)))
+        AppError::new(ErrorKind::NotFound, "„{0}“ gibt es auf dem Server nicht.").param(remote_name(remote_path))
     })?;
     let total = meta.size;
     let native = to_native(local_path);
@@ -378,7 +378,7 @@ pub async fn cross(
     flag: Arc<AtomicU8>,
 ) -> AppResult<u64> {
     let meta = src.meta(src_path).await.ok_or_else(|| {
-        AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es auf dem Quell-Server nicht.", remote_name(src_path)))
+        AppError::new(ErrorKind::NotFound, "„{0}“ gibt es auf dem Quell-Server nicht.").param(remote_name(src_path))
     })?;
     let total = meta.size;
     let keep_mtime = meta.mtime.filter(|_| opts.keep_mtime);

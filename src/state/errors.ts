@@ -8,7 +8,7 @@
  * Technical details (the server's own wording, OS error codes) never go into
  * the toast; they are written to the protocol, and the hint points there.
  */
-import { toBackendError, type BackendError } from '../backend/api';
+import { toBackendError } from '../backend/api';
 import { $t } from '../i18n';
 import { addLog } from './log';
 import { showToast } from './store';
@@ -33,8 +33,7 @@ function sentence(s: string): string {
  * its own does not happen and the settings are the likely cause.
  */
 export function explainError(e: unknown, opts: { connecting?: boolean; logged?: boolean } = {}): ErrorText {
-  const err: BackendError =
-    e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
+  const err = toBackendError(e);
   const text = sentence(err.message);
   let hint = '';
   switch (err.kind) {
@@ -77,8 +76,7 @@ export function showError(
   e: unknown,
   opts: { prefix?: string; serverId?: string; connecting?: boolean; log?: boolean | 'done' } = {},
 ) {
-  const err: BackendError =
-    e && typeof e === 'object' && 'kind' in e && 'message' in e ? (e as BackendError) : toBackendError(e);
+  const err = toBackendError(e);
   if (err.kind === 'cancelled') return;
   // 'done': the caller already wrote the error to the protocol.
   const logged = opts.log !== false && !!err.detail;

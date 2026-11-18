@@ -4,7 +4,7 @@
 //! names get " Kopie" like copies do.
 
 use crate::error::{AppError, AppResult};
-use crate::local::copy_name;
+use crate::local::{copy_name, NameWords};
 use crate::paths::to_native;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -17,18 +17,17 @@ fn zip_error(e: impl ToString) -> AppError {
 }
 
 /// Packs `paths` (all in one folder) into a zip next to them. One item becomes
-/// "name.zip", several become "Archiv.zip". Returns the name of the archive.
-pub fn compress(paths: &[String]) -> AppResult<String> {
+/// "name.zip", several become "Archiv.zip" (in the interface language). Returns the name of the
+/// archive.
+pub fn compress(paths: &[String], words: &NameWords) -> AppResult<String> {
     let items: Vec<PathBuf> = paths.iter().map(|p| to_native(p)).collect();
     let first = items.first().ok_or_else(|| AppError::other("Nichts ausgewählt."))?;
     let dir = first.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
-    let base = if items.len() == 1 {
-        let name = first.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into());
-        format!("{name}.zip")
-    } else {
-        "Archiv.zip".to_string()
+    let base = match (items.len(), first.file_name()) {
+        (1, Some(name)) => format!("{}.zip", name.to_string_lossy()),
+        _ => format!("{}.zip", words.archive),
     };
-    let name = copy_name(|n| dir.join(n).exists(), &base);
+    let name = copy_name(|n| dir.join(n).exists(), &base, words);
     let target = dir.join(&name);
     let result = write_zip(&items, &target);
     if result.is_err() {
@@ -85,20 +84,20 @@ fn write_zip(items: &[PathBuf], target: &Path) -> AppResult<()> {
 /// Unpacks a zip into a new folder next to it (named like the archive) and
 /// returns the folder's name. An archive with an entry that could land outside that folder is
 /// refused as a whole (see `archive_vfs::safe_entry_path`).
-pub fn extract(path: &str) -> AppResult<String> {
+pub fn extract(path: &str, words: &NameWords) -> AppResult<String> {
     let archive = to_native(path);
     // tar and tar.gz: through the archive reader (same "../" protection).
     if !archive.to_string_lossy().to_ascii_lowercase().ends_with(".zip") {
         let dir = archive.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
-        return crate::archive_vfs::extract(&archive, "", &dir);
+        return crate::archive_vfs::extract(&archive, "", &dir, words);
     }
     let dir = archive.parent().map(Path::to_path_buf).ok_or_else(|| AppError::other("Ordner nicht gefunden."))?;
-    let stem = archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into());
+    let stem = archive.file_stem().map_or_else(|| words.archive.clone(), |n| n.to_string_lossy().into_owned());
     let file = fs::File::open(&archive)
         .map_err(|e| AppError::other("Das Archiv konnte nicht geöffnet werden.").with_detail(e.to_string()))?;
     let mut zip = zip::ZipArchive::new(io::BufReader::new(file))
         .map_err(|e| AppError::other("Das ist kein gültiges Zip-Archiv.").with_detail(e.to_string()))?;
-    let name = copy_name(|n| dir.join(n).exists(), &stem);
+    let name = copy_name(|n| dir.join(n).exists(), &stem, words);
     let out = dir.join(&name);
     fs::create_dir(&out).map_err(|e| {
         AppError::other("Der Ordner zum Entpacken konnte nicht angelegt werden.").with_detail(e.to_string())
@@ -148,16 +147,35 @@ mod tests {
         fs::write(base.join("site/index.html"), "<h1>Hallo</h1>").unwrap();
         fs::write(base.join("site/css/a.css"), "body{}").unwrap();
         let p = base.join("site").to_string_lossy().into_owned();
-        let name = compress(&[p]).unwrap();
+        let name = compress(&[p], &NameWords::german()).unwrap();
         assert_eq!(name, "site.zip");
         // A second archive does not overwrite the first.
-        assert_eq!(compress(&[base.join("site").to_string_lossy().into_owned()]).unwrap(), "site Kopie.zip");
-        let folder = extract(&base.join("site.zip").to_string_lossy()).unwrap();
+        assert_eq!(
+            compress(&[base.join("site").to_string_lossy().into_owned()], &NameWords::german()).unwrap(),
+            "site Kopie.zip"
+        );
+        let folder = extract(&base.join("site.zip").to_string_lossy(), &NameWords::german()).unwrap();
         // "site" exists next to the archive, so it is unpacked into "site Kopie".
         assert_eq!(folder, "site Kopie");
         let out = base.join(&folder);
         assert_eq!(fs::read_to_string(out.join("site/index.html")).unwrap(), "<h1>Hallo</h1>");
         assert_eq!(fs::read_to_string(out.join("site/css/a.css")).unwrap(), "body{}");
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn made_up_names_follow_the_interface_language() {
+        let base = std::env::temp_dir().join(format!("bitcrane-zip-words-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        for name in ["a.txt", "b.txt"] {
+            fs::write(base.join(name), name).unwrap();
+        }
+        let both = ["a.txt", "b.txt"].map(|n| base.join(n).to_string_lossy().into_owned());
+        let english = NameWords { copy: "copy".into(), archive: "Archive".into() };
+        assert_eq!(compress(&both, &english).unwrap(), "Archive.zip");
+        assert_eq!(compress(&both, &english).unwrap(), "Archive copy.zip");
+        assert_eq!(compress(&both, &NameWords::german()).unwrap(), "Archiv.zip");
         let _ = fs::remove_dir_all(&base);
     }
 }

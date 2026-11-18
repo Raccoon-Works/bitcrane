@@ -22,7 +22,9 @@ bitcrane help
 ```
 
 `<server>` ist der Name des Servers in Bitcrane (Groß-/Kleinschreibung egal). Ohne
-Pfad gilt der Startordner des Servers. `--quiet` zeigt nur Fehler.
+Pfad gilt der Startordner des Servers. `--quiet` zeigt nur Fehler. Ausgaben und
+Fehlermeldungen sind auf Englisch, wie bei Kommandozeilen-Programmen üblich, damit
+Skripte unabhängig von der Sprache der App funktionieren.
 
 Rückgabewert: `0` alles übertragen, `1` Verbindung oder eine Datei fehlgeschlagen,
 `2` falsch aufgerufen.
@@ -68,7 +70,8 @@ bitcrane help
 ```
 
 `<server>` is the name of the server in Bitcrane (case-insensitive). Without a path,
-the server's start folder is used. `--quiet` only prints errors.
+the server's start folder is used. `--quiet` only prints errors. Output and error
+messages are in English, whatever the language of the app.
 
 Exit code: `0` everything transferred, `1` the connection or a file failed, `2` wrong usage.
 

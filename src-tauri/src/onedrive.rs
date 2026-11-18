@@ -13,7 +13,7 @@
 //!   10 MiB pieces (Graph wants multiples of 320 KiB and the total size).
 //! - The modification time is kept as "fileSystemInfo.lastModifiedDateTime".
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth;
 use crate::paths::{quoted_name, remote_name, remote_parent};
@@ -127,7 +127,7 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
 }
 
 /// Turns an API error answer into a clear message.
-fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
+fn api_err(status: reqwest::StatusCode, body: &str, what: &Message) -> AppError {
     let v = serde_json::from_str::<Value>(body).unwrap_or(Value::Null);
     let code = v.pointer("/error/code").and_then(|c| c.as_str()).unwrap_or_default().to_string();
     let message = v.pointer("/error/message").and_then(|m| m.as_str()).unwrap_or(body).to_string();
@@ -138,18 +138,18 @@ fn api_err(status: reqwest::StatusCode, body: &str, what: &str) -> AppError {
             "Die Anmeldung bei OneDrive ist nicht mehr gültig. Bitte neu anmelden.",
         )
         .with_detail(detail),
-        404 => AppError::new(ErrorKind::NotFound, format!("{what}: nicht gefunden.")).with_detail(detail),
-        409 => AppError::new(ErrorKind::AlreadyExists, format!("{what}: gibt es schon.")).with_detail(detail),
+        404 => AppError::new(ErrorKind::NotFound, "{0}: nicht gefunden.").param(what).with_detail(detail),
+        409 => AppError::new(ErrorKind::AlreadyExists, "{0}: gibt es schon.").param(what).with_detail(detail),
         429 | 503 => AppError::new(
             ErrorKind::ConnectionLost,
             "OneDrive bremst gerade (zu viele Anfragen). Gleich noch einmal versuchen.",
         )
         .with_detail(detail),
         507 => {
-            AppError::new(ErrorKind::Other, format!("{what}: kein Speicherplatz mehr in OneDrive.")).with_detail(detail)
+            AppError::new(ErrorKind::Other, "{0}: kein Speicherplatz mehr in OneDrive.").param(what).with_detail(detail)
         }
-        403 => AppError::new(ErrorKind::PermissionDenied, format!("{what}: nicht erlaubt.")).with_detail(detail),
-        _ => AppError::new(ErrorKind::Other, format!("{what} fehlgeschlagen.")).with_detail(detail),
+        403 => AppError::new(ErrorKind::PermissionDenied, "{0}: nicht erlaubt.").param(what).with_detail(detail),
+        _ => AppError::new(ErrorKind::Other, "{0} fehlgeschlagen.").param(what).with_detail(detail),
     }
 }
 
@@ -258,7 +258,7 @@ impl OneDriveConn {
     }
 
     /// A JSON call; `body` None means no request body.
-    async fn call(&self, method: reqwest::Method, url: &str, body: Option<Value>, what: &str) -> AppResult<Value> {
+    async fn call(&self, method: reqwest::Method, url: &str, body: Option<Value>, what: &Message) -> AppResult<Value> {
         let token = self.access().await?;
         let mut req = self.client.request(method, url).bearer_auth(token);
         if let Some(b) = body {
@@ -280,7 +280,7 @@ impl OneDriveConn {
                 reqwest::Method::GET,
                 &format!("{GRAPH}/me?$select=mail,userPrincipalName,displayName"),
                 None,
-                "Konto lesen",
+                &Message::new("Konto lesen"),
             )
             .await?;
         Ok(["mail", "userPrincipalName", "displayName"]
@@ -291,7 +291,7 @@ impl OneDriveConn {
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let what = format!("„{}“ lesen", remote_name(path));
+        let what = Message::new("„{0}“ lesen").param(remote_name(path));
         let mut url = format!(
             "{}?$top=1000&$select=name,size,folder,file,fileSystemInfo,lastModifiedDateTime",
             item_url(path, "children")
@@ -324,8 +324,7 @@ impl OneDriveConn {
             });
         }
         let v = self.call(reqwest::Method::GET, &item_url(path, ""), None, &quoted_name(path)).await?;
-        entry_of(&v)
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
+        entry_of(&v).ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(remote_name(path)))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -333,7 +332,7 @@ impl OneDriveConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        let what = format!("Ordner „{}“ anlegen", remote_name(path));
+        let what = Message::new("Ordner „{0}“ anlegen").param(remote_name(path));
         let body = json!({ "name": remote_name(path), "folder": {}, "@microsoft.graph.conflictBehavior": "fail" });
         self.call(reqwest::Method::POST, &item_url(&remote_parent(&norm(path)), "children"), Some(body), &what)
             .await
@@ -360,9 +359,9 @@ impl OneDriveConn {
 
     /// Renames and/or moves an item; refuses when the target name is taken.
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
-        let what = format!("„{}“ umbenennen", remote_name(from));
+        let what = Message::new("„{0}“ umbenennen").param(remote_name(from));
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es schon.").param(remote_name(to)));
         }
         let mut body = json!({ "name": remote_name(to) });
         if remote_parent(&norm(from)) != remote_parent(&norm(to)) {
@@ -382,7 +381,12 @@ impl OneDriveConn {
     /// Moves to the OneDrive recycle bin.
     pub async fn remove(&self, path: &str) -> AppResult<()> {
         match self
-            .call(reqwest::Method::DELETE, &item_url(path, ""), None, &format!("„{}“ löschen", remote_name(path)))
+            .call(
+                reqwest::Method::DELETE,
+                &item_url(path, ""),
+                None,
+                &Message::new("„{0}“ löschen").param(remote_name(path)),
+            )
             .await
         {
             Err(e) if e.kind == ErrorKind::NotFound => Ok(()),
@@ -392,7 +396,12 @@ impl OneDriveConn {
 
     /// Copy inside the OneDrive, with "Kopie" names on clashes. Graph copies in
     /// the background; Bitcrane waits until it is done (at most two minutes per item).
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -400,8 +409,8 @@ impl OneDriveConn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
-            let what = format!("„{}“ kopieren", remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
+            let what = Message::new("„{0}“ kopieren").param(remote_name(from));
             let token = self.access().await?;
             let body = json!({ "parentReference": Self::parent_ref(dest_dir), "name": name });
             let resp = self
@@ -429,7 +438,7 @@ impl OneDriveConn {
     }
 
     /// Polls the status address of a background copy (no sign-in needed there).
-    async fn wait_for_copy(&self, monitor: &str, what: &str) -> AppResult<()> {
+    async fn wait_for_copy(&self, monitor: &str, what: &Message) -> AppResult<()> {
         let deadline = Instant::now() + Duration::from_secs(120);
         loop {
             let resp = self.client.get(monitor).send().await.map_err(net)?;
@@ -437,16 +446,16 @@ impl OneDriveConn {
             match v.get("status").and_then(|s| s.as_str()) {
                 Some("completed") => return Ok(()),
                 Some("failed") => {
-                    return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(v.to_string()))
+                    return Err(AppError::other("{0} fehlgeschlagen.").param(what).with_detail(v.to_string()))
                 }
                 // A finished copy redirects to the new item and has no status any more.
                 None if v.get("id").is_some() => return Ok(()),
                 _ => {}
             }
             if Instant::now() > deadline {
-                return Err(AppError::other(format!(
-                    "{what}: OneDrive kopiert noch im Hintergrund. Bitte gleich neu laden."
-                )));
+                return Err(
+                    AppError::other("{0}: OneDrive kopiert noch im Hintergrund. Bitte gleich neu laden.").param(what)
+                );
             }
             tokio::time::sleep(Duration::from_millis(800)).await;
         }
@@ -465,7 +474,7 @@ impl OneDriveConn {
     /// A view link anyone with the link can open (Transmit "Copy Link"). Accounts
     /// that do not allow such links (some work accounts) get a link for their organisation.
     pub async fn share_link(&self, path: &str) -> AppResult<String> {
-        let what = format!("Link für „{}“", remote_name(path));
+        let what = Message::new("Link für „{0}“").param(remote_name(path));
         let url = item_url(path, "createLink");
         let v = match self
             .call(reqwest::Method::POST, &url, Some(json!({ "type": "view", "scope": "anonymous" })), &what)
@@ -481,7 +490,7 @@ impl OneDriveConn {
         v.pointer("/link/webUrl")
             .and_then(|u| u.as_str())
             .map(String::from)
-            .ok_or_else(|| AppError::other(format!("{what}: OneDrive hat keinen Link geliefert.")))
+            .ok_or_else(|| AppError::other("{0}: OneDrive hat keinen Link geliefert.").param(what))
     }
 
     /// Reads a file from `offset` (HTTP Range; Graph redirects to the download address).
@@ -495,7 +504,7 @@ impl OneDriveConn {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(api_err(status, &text, &format!("„{}“ lesen", remote_name(path))));
+            return Err(api_err(status, &text, &Message::new("„{0}“ lesen").param(remote_name(path))));
         }
         if offset > 0 && status != reqwest::StatusCode::PARTIAL_CONTENT {
             return Err(
@@ -513,13 +522,13 @@ impl OneDriveConn {
             reqwest::Method::PATCH,
             &item_url(path, ""),
             Some(json!({ "fileSystemInfo": { "lastModifiedDateTime": t } })),
-            &format!("„{}“ schreiben", remote_name(path)),
+            &Message::new("„{0}“ schreiben").param(remote_name(path)),
         )
         .await
         .map(|_| ())
     }
 
-    async fn put_simple(&self, path: &str, body: Vec<u8>, what: &str) -> AppResult<()> {
+    async fn put_simple(&self, path: &str, body: Vec<u8>, what: &Message) -> AppResult<()> {
         let token = self.access().await?;
         let resp = self
             .client
@@ -549,7 +558,7 @@ impl OneDriveConn {
         let conn = self.clone();
         let path = norm(path);
         let task = tokio::spawn(async move {
-            let what = format!("„{}“ schreiben", remote_name(&path));
+            let what = Message::new("„{0}“ schreiben").param(remote_name(&path));
             let read_err = |e: std::io::Error| {
                 AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
             };
@@ -588,7 +597,7 @@ impl OneDriveConn {
         (Box::new(w), task)
     }
 
-    async fn start_session(&self, path: &str, mtime: Option<u32>, what: &str) -> AppResult<String> {
+    async fn start_session(&self, path: &str, mtime: Option<u32>, what: &Message) -> AppResult<String> {
         let mut item = json!({ "@microsoft.graph.conflictBehavior": "replace" });
         if let Some(t) = mtime.and_then(rfc3339) {
             item["fileSystemInfo"] = json!({ "lastModifiedDateTime": t });
@@ -603,7 +612,7 @@ impl OneDriveConn {
     }
 
     /// Sends one piece to an upload session (the session address needs no sign-in).
-    async fn send_piece(&self, session: &str, start: u64, piece: Vec<u8>, total: u64, what: &str) -> AppResult<()> {
+    async fn send_piece(&self, session: &str, start: u64, piece: Vec<u8>, total: u64, what: &Message) -> AppResult<()> {
         let end = start + piece.len() as u64 - 1;
         let resp = self
             .client

@@ -105,17 +105,23 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
 
   // The two halves as places.
   const thisComputer = platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC');
-  const placeOfSide = (side: 'local' | 'remote'): Place => {
+  // Built from plain values, so they stay the same objects from one render to the next.
+  const serverOf = (side: 'local' | 'remote') => {
     const [ls, sid] = paneLoc(side, tab);
-    const serverId = ls === 'remote' ? sid : '';
-    return {
-      serverId,
-      dir: tab ? (side === 'local' ? tab.localPath : tab.remotePath) : '',
-      name: serverId ? (serverById(serverId)?.name ?? $t('Server')) : thisComputer,
-    };
+    return ls === 'remote' ? sid : '';
   };
-  const left = placeOfSide('local');
-  const right = placeOfSide('remote');
+  const nameOf = (serverId: string) => (serverId ? (serverById(serverId)?.name ?? $t('Server')) : thisComputer);
+  const [leftServer, rightServer] = [serverOf('local'), serverOf('remote')];
+  const [leftDir, rightDir] = [tab?.localPath ?? '', tab?.remotePath ?? ''];
+  const [leftName, rightName] = [nameOf(leftServer), nameOf(rightServer)];
+  const left = useMemo<Place>(
+    () => ({ serverId: leftServer, dir: leftDir, name: leftName }),
+    [leftServer, leftDir, leftName],
+  );
+  const right = useMemo<Place>(
+    () => ({ serverId: rightServer, dir: rightDir, name: rightName }),
+    [rightServer, rightDir, rightName],
+  );
   // The usual case (this computer left, a server right) keeps the words "hochladen" and "herunterladen".
   const classic = !left.serverId && !!right.serverId;
 
@@ -158,7 +164,8 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
 
   // "Inhalt prüfen": checksums for files of the same size on both sides.
   useEffect(() => {
-    if (!byContent || !data || !tab) {
+    // Data exists only once both folders were read, which needs a tab.
+    if (!byContent || !data) {
       setDiffers(null);
       return;
     }
@@ -180,8 +187,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- compared again only when the data or the method changes
-  }, [byContent, data]);
+  }, [byContent, data, excludes, left, right]);
 
   const lines: Line[] = useMemo(
     () =>

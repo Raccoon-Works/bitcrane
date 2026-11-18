@@ -5,6 +5,7 @@
 //! paths are absolute (`/Volumes/Data` on macOS, `D:/Daten` on Windows).
 //! Remote paths are plain POSIX paths.
 
+use crate::error::Message;
 use std::path::{Path, PathBuf};
 
 /// Returns the user's home folder.
@@ -67,9 +68,10 @@ pub fn remote_name(path: &str) -> String {
     path.trim_end_matches('/').rsplit('/').next().unwrap_or(path).to_string()
 }
 
-/// Last segment of a POSIX path in German quotation marks, for messages ("„bot.py“").
-pub fn quoted_name(path: &str) -> String {
-    format!("„{}“", remote_name(path))
+/// Last segment of a POSIX path in quotation marks, for messages ("„bot.py“", in English
+/// "“bot.py”"); the interface picks the marks of its language.
+pub fn quoted_name(path: &str) -> Message {
+    Message::new("„{0}“").param(remote_name(path))
 }
 
 #[cfg(test)]

@@ -56,7 +56,7 @@ pub fn build_excludes(patterns: &[String]) -> AppResult<GlobSet> {
     for p in patterns.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         b.add(
             Glob::new(p)
-                .map_err(|e| AppError::other(format!("Ungültiges Muster „{p}“.")).with_detail(e.to_string()))?,
+                .map_err(|e| AppError::other("Ungültiges Muster „{0}“.").param(p).with_detail(e.to_string()))?,
         );
     }
     // Bitcrane's own temporary upload/download files are never relevant.

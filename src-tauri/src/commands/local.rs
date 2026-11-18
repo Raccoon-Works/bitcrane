@@ -1,6 +1,7 @@
 //! Files and folders on this computer: listing, operations, archives, tags and Git.
 
 use crate::error::{AppError, AppResult};
+use crate::local::NameWords;
 use crate::model::{FileEntry, Place, WalkItem};
 use crate::{archive, archive_vfs, git, local, model, netshares, paths, tags};
 
@@ -69,7 +70,7 @@ pub(crate) async fn git_action(
 ) -> AppResult<String> {
     tokio::task::spawn_blocking(move || git::action(&root, &what, &paths, &message, all))
         .await
-        .map_err(|e| AppError::other(e.to_string()))?
+        .map_err(|e| AppError::other("Unerwarteter Fehler.").with_detail(e.to_string()))?
 }
 
 #[tauri::command]
@@ -80,32 +81,37 @@ pub(crate) fn local_checksum(path: String, algo: Option<String>) -> AppResult<St
 /// Copies on a worker thread: two local halves can copy large folders,
 /// which must not block the window.
 #[tauri::command]
-pub(crate) async fn local_copy(paths: Vec<String>, dest_dir: String, merge: Option<bool>) -> AppResult<Vec<String>> {
-    tauri::async_runtime::spawn_blocking(move || local::copy(&paths, &dest_dir, merge.unwrap_or(false)))
+pub(crate) async fn local_copy(
+    paths: Vec<String>,
+    dest_dir: String,
+    merge: Option<bool>,
+    words: NameWords,
+) -> AppResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || local::copy(&paths, &dest_dir, merge.unwrap_or(false), &words))
         .await
         .map_err(|e| AppError::other("Kopieren wurde unterbrochen.").with_detail(e.to_string()))?
 }
 
 /// Packs files and folders of this computer into a zip next to them; returns the archive's name.
 #[tauri::command]
-pub(crate) async fn local_zip(paths: Vec<String>) -> AppResult<String> {
-    tauri::async_runtime::spawn_blocking(move || archive::compress(&paths))
+pub(crate) async fn local_zip(paths: Vec<String>, words: NameWords) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || archive::compress(&paths, &words))
         .await
         .map_err(|e| AppError::other("Komprimieren wurde unterbrochen.").with_detail(e.to_string()))?
 }
 
 /// Unpacks a zip of this computer into a new folder next to it; returns the folder's name.
 #[tauri::command]
-pub(crate) async fn local_unzip(path: String) -> AppResult<String> {
-    tauri::async_runtime::spawn_blocking(move || archive::extract(&path))
+pub(crate) async fn local_unzip(path: String, words: NameWords) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || archive::extract(&path, &words))
         .await
         .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
 }
 
 /// Extracts entries of archives into a temporary folder (to upload them); returns the folder and the names.
 #[tauri::command]
-pub(crate) async fn archive_extract_temp(paths: Vec<String>) -> AppResult<(String, Vec<String>)> {
-    tauri::async_runtime::spawn_blocking(move || archive_vfs::extract_to_temp(&paths))
+pub(crate) async fn archive_extract_temp(paths: Vec<String>, words: NameWords) -> AppResult<(String, Vec<String>)> {
+    tauri::async_runtime::spawn_blocking(move || archive_vfs::extract_to_temp(&paths, &words))
         .await
         .map_err(|e| AppError::other("Entpacken wurde unterbrochen.").with_detail(e.to_string()))?
 }
@@ -125,8 +131,13 @@ pub(crate) async fn local_copy_files(pairs: Vec<(String, String)>) -> AppResult<
 
 /// Moves files or folders between two local folders (two local halves).
 #[tauri::command]
-pub(crate) async fn local_move(paths: Vec<String>, dest_dir: String, merge: Option<bool>) -> AppResult<Vec<String>> {
-    tauri::async_runtime::spawn_blocking(move || local::move_into(&paths, &dest_dir, merge.unwrap_or(false)))
+pub(crate) async fn local_move(
+    paths: Vec<String>,
+    dest_dir: String,
+    merge: Option<bool>,
+    words: NameWords,
+) -> AppResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || local::move_into(&paths, &dest_dir, merge.unwrap_or(false), &words))
         .await
         .map_err(|e| AppError::other("Verschieben wurde unterbrochen.").with_detail(e.to_string()))?
 }

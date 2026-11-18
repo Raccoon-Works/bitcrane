@@ -5,7 +5,7 @@
 //! the server where the server allows it; with a share in the server settings
 //! the connection starts there.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
 use futures_util::StreamExt;
@@ -93,16 +93,16 @@ fn is_connection_error(e: &smb::Error) -> bool {
 }
 
 /// Turns an SMB error into a message. `what` names the object ("„a.txt“").
-fn map_err(e: smb::Error, what: &str) -> AppError {
+fn map_err(e: smb::Error, what: &Message) -> AppError {
     let detail = e.to_string();
     let err = match status_of(&e) {
-        Some(status::ACCESS_DENIED) => AppError::new(ErrorKind::PermissionDenied, format!("Kein Zugriff auf {what}.")),
+        Some(status::ACCESS_DENIED) => AppError::new(ErrorKind::PermissionDenied, "Kein Zugriff auf {0}.").param(what),
         Some(status::NAME_NOT_FOUND | status::PATH_NOT_FOUND) => {
-            AppError::new(ErrorKind::NotFound, format!("{what} gibt es nicht."))
+            AppError::new(ErrorKind::NotFound, "{0} gibt es nicht.").param(what)
         }
-        Some(status::NAME_COLLISION) => AppError::new(ErrorKind::AlreadyExists, format!("{what} gibt es hier schon.")),
-        Some(status::SHARING_VIOLATION) => AppError::other(format!("{what} ist auf dem Server gerade geöffnet.")),
-        Some(status::DELETE_PENDING) => AppError::new(ErrorKind::NotFound, format!("{what} wird gerade gelöscht.")),
+        Some(status::NAME_COLLISION) => AppError::new(ErrorKind::AlreadyExists, "{0} gibt es hier schon.").param(what),
+        Some(status::SHARING_VIOLATION) => AppError::other("{0} ist auf dem Server gerade geöffnet.").param(what),
+        Some(status::DELETE_PENDING) => AppError::new(ErrorKind::NotFound, "{0} wird gerade gelöscht.").param(what),
         Some(status::LOGON_FAILURE) => {
             AppError::new(ErrorKind::AuthFailed, "Benutzername oder Passwort stimmen nicht.")
         }
@@ -111,15 +111,15 @@ fn map_err(e: smb::Error, what: &str) -> AppError {
         }
         Some(status::PASSWORD_EXPIRED) => AppError::new(ErrorKind::AuthFailed, "Das Passwort ist abgelaufen."),
         Some(status::BAD_NETWORK_NAME) => {
-            AppError::new(ErrorKind::NotFound, format!("Die Freigabe {what} gibt es auf dem Server nicht."))
+            AppError::new(ErrorKind::NotFound, "Die Freigabe {0} gibt es auf dem Server nicht.").param(what)
         }
-        Some(status::DIRECTORY_NOT_EMPTY) => AppError::other(format!("{what} ist nicht leer.")),
-        Some(status::NOT_A_DIRECTORY) => AppError::other(format!("{what} ist kein Ordner.")),
-        Some(status::FILE_IS_A_DIRECTORY) => AppError::other(format!("{what} ist ein Ordner.")),
+        Some(status::DIRECTORY_NOT_EMPTY) => AppError::other("{0} ist nicht leer.").param(what),
+        Some(status::NOT_A_DIRECTORY) => AppError::other("{0} ist kein Ordner.").param(what),
+        Some(status::FILE_IS_A_DIRECTORY) => AppError::other("{0} ist ein Ordner.").param(what),
         _ if is_connection_error(&e) => {
             AppError::new(ErrorKind::ConnectionLost, "Die Verbindung zum Server ist abgebrochen.")
         }
-        _ => AppError::other(format!("Der Server hat {what} abgelehnt.")),
+        _ => AppError::other("Der Server hat {0} abgelehnt.").param(what),
     };
     err.with_detail(detail)
 }
@@ -220,7 +220,7 @@ impl SmbConn {
 
     fn unc(&self, share: &str) -> AppResult<UncPath> {
         UncPath::new(&self.params.host).and_then(|u| u.with_share(share)).map_err(|e| {
-            AppError::other(format!("„{share}“ ist kein gültiger Name einer Freigabe.")).with_detail(e.to_string())
+            AppError::other("„{0}“ ist kein gültiger Name einer Freigabe.").param(share).with_detail(e.to_string())
         })
     }
 
@@ -239,13 +239,12 @@ impl SmbConn {
 
     fn connect_err(&self, e: smb::Error, share: &str) -> AppError {
         if matches!(e, smb::Error::TransportError(_) | smb::Error::IoError(_)) {
-            return AppError::new(
-                ErrorKind::Unreachable,
-                format!("{} ist nicht erreichbar (Port {}).", self.params.host, self.params.port),
-            )
-            .with_detail(e.to_string());
+            return AppError::new(ErrorKind::Unreachable, "{0} ist nicht erreichbar (Port {1}).")
+                .param(&self.params.host)
+                .param(self.params.port.to_string())
+                .with_detail(e.to_string());
         }
-        map_err(e, &format!("„{share}“"))
+        map_err(e, &Message::new("„{0}“").param(share))
     }
 
     async fn ensure_share(&self, client: &Client, share: &str) -> AppResult<()> {
@@ -290,7 +289,7 @@ impl SmbConn {
             Resource::Directory(d) => Ok(Arc::new(d)),
             other => {
                 close(other).await;
-                Err(AppError::other(format!("{} ist kein Ordner.", quoted_name(path))))
+                Err(AppError::other("{0} ist kein Ordner.").param(quoted_name(path)))
             }
         }
     }
@@ -304,7 +303,7 @@ impl SmbConn {
             Resource::File(f) => Ok(f),
             other => {
                 close(other).await;
-                Err(AppError::other(format!("{} ist ein Ordner.", quoted_name(path))))
+                Err(AppError::other("{0} ist ein Ordner.").param(quoted_name(path)))
             }
         }
     }
@@ -458,7 +457,7 @@ impl SmbConn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "{0} gibt es hier schon.").param(quoted_name(to)));
         }
         self.move_to(from, to, false).await
     }
@@ -540,15 +539,14 @@ impl SmbConn {
             other => {
                 close(other).await;
                 let _ = src.close().await;
-                return Err(AppError::other(format!("{} lässt sich nicht anlegen.", quoted_name(to))));
+                return Err(AppError::other("{0} lässt sich nicht anlegen.").param(quoted_name(to)));
             }
         };
-        let mut result = if dst.same_tree(&src) {
-            dst.srv_copy(&src).await.map_err(|e| map_err(e, &quoted_name(to)))
-        } else {
-            Err(AppError::other(""))
-        };
-        if result.is_err() {
+        // A copy on the server when both are on the same share; otherwise, or when the server
+        // refuses it, through this computer (the server's reason does not matter then).
+        let copied_on_server = dst.same_tree(&src) && dst.srv_copy(&src).await.is_ok();
+        let mut result = Ok(());
+        if !copied_on_server {
             result = async {
                 let len = smb::GetLen::get_len(&src).await.map_err(|e| map_err(e, &quoted_name(from)))?;
                 let chunk = self.chunk_size().await as u64;
@@ -586,14 +584,19 @@ impl SmbConn {
     }
 
     /// Copies on the server, with "Kopie" names on clashes.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
         for from in paths {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             self.copy_tree(from, &remote_join(dest_dir, &name)).await?;
             taken.insert(name.clone());
             out.push(name);
@@ -684,7 +687,7 @@ impl SmbConn {
             Resource::File(f) => OpenFile(Arc::new(f)),
             other => {
                 close(other).await;
-                return Err(AppError::other(format!("{} ist ein Ordner.", quoted_name(path))));
+                return Err(AppError::other("{0} ist ein Ordner.").param(quoted_name(path)));
             }
         };
         if offset > 0 {
@@ -892,7 +895,9 @@ mod integration {
         r.read_to_string(&mut got).await.unwrap();
         assert_eq!(got, "welt!");
         assert_eq!(
-            conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(),
+            conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b"), &crate::local::NameWords::german())
+                .await
+                .unwrap(),
             vec!["über Kopie.txt".to_string()]
         );
         assert_eq!(

@@ -7,6 +7,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Backend, WatchBatch } from './api';
 import type { FileEntry } from './types';
+import { $t } from '../i18n';
+
+/**
+ * Words for names the Rust core makes up, in the interface language: " Kopie" for a copy whose
+ * name is taken, "Archiv.zip" for an archive of several items. Only the interface knows the
+ * language, so it sends them with each operation that may need them.
+ */
+const words = { copy: $t('Kopie'), archive: $t('Archiv') };
 
 const progressHandlers = new Map<string, (done: number, total: number) => void>();
 const watchHandlers = new Map<string, (b: WatchBatch) => void>();
@@ -73,10 +81,10 @@ export const tauriBackend: Backend = {
   localChecksum: (path, algo) => invoke('local_checksum', { path, algo }),
   remoteChecksum: (serverId, path, algo) => invoke('remote_checksum', { serverId, path, algo }),
   remoteSymlink: (serverId, link, target) => invoke('remote_symlink', { serverId, link, target }),
-  localCopy: (paths, destDir, merge) => invoke('local_copy', { paths, destDir, merge: !!merge }),
-  localMove: (paths, destDir, merge) => invoke('local_move', { paths, destDir, merge: !!merge }),
+  localCopy: (paths, destDir, merge) => invoke('local_copy', { paths, destDir, merge: !!merge, words }),
+  localMove: (paths, destDir, merge) => invoke('local_move', { paths, destDir, merge: !!merge, words }),
   localCopyFiles: (pairs) => invoke('local_copy_files', { pairs }),
-  localZip: (paths) => invoke('local_zip', { paths }),
+  localZip: (paths) => invoke('local_zip', { paths, words }),
   takePendingUploads: () => invoke('take_pending_uploads'),
   takeStartAction: () => invoke('take_start_action'),
   takeStartLink: () => invoke('take_start_link'),
@@ -85,14 +93,14 @@ export const tauriBackend: Backend = {
     invoke('mount_start', { connectionId, serverId, name, remoteRoot }),
   mountStop: (serverId, removeFolder) => invoke('mount_stop', { serverId, removeFolder }),
   mountFolder: (serverId) => invoke('mount_folder', { serverId }),
-  archiveExtractTemp: (paths) => invoke('archive_extract_temp', { paths }),
+  archiveExtractTemp: (paths) => invoke('archive_extract_temp', { paths, words }),
   syncRead: (dir) => invoke('sync_read', { dir }),
   syncWrite: (dir, text) => invoke('sync_write', { dir, text }),
   remoteShareLink: (serverId, path) => invoke('remote_share_link', { serverId, path }),
   remotePresign: (serverId, path, secs) => invoke('remote_presign', { serverId, path, secs }),
   localGrep: (path, query, max) => invoke('local_grep', { path, query, max }),
   remoteGrep: (serverId, path, query, max) => invoke('remote_grep', { serverId, path, query, max }),
-  localUnzip: (path) => invoke('local_unzip', { path }),
+  localUnzip: (path) => invoke('local_unzip', { path, words }),
   localWalk: (path) => invoke('local_walk', { path }),
   localPlaces: () => invoke('local_places'),
   localDrives: () => invoke('local_drives'),
@@ -125,7 +133,7 @@ export const tauriBackend: Backend = {
   remoteRename: (serverId, path, newName) => invoke('remote_rename', { serverId, path, newName }),
   remoteRemove: (serverId, paths) => invoke('remote_remove', { serverId, paths }),
   remoteMove: (serverId, from, to) => invoke('remote_move', { serverId, from, to }),
-  remoteCopy: (serverId, paths, destDir) => invoke('remote_copy', { serverId, paths, destDir }),
+  remoteCopy: (serverId, paths, destDir) => invoke('remote_copy', { serverId, paths, destDir, words }),
   remoteChmod: (serverId, path, perms, recursive) => invoke('remote_chmod', { serverId, path, perms, recursive }),
   remoteWalk: (serverId, path) => invoke('remote_walk', { serverId, path }),
   remoteExec: (serverId, command) => invoke('remote_exec', { serverId, command }),

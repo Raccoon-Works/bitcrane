@@ -7,7 +7,7 @@
 
 use crate::dav::DavConn;
 use crate::dropbox::DropboxConn;
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::gdrive::GDriveConn;
 use crate::model::{EntryKind, FileEntry, WalkItem};
@@ -79,9 +79,14 @@ pub struct Meta {
     pub perms: Option<u32>,
 }
 
-fn unsupported(what: &str, protocol: &str) -> AppError {
-    AppError::new(ErrorKind::Other, format!("{what} geht über {protocol} nicht."))
+fn unsupported(what: &Message, protocol: &str) -> AppError {
+    AppError::new(ErrorKind::Other, "{0} geht über {1} nicht.").param(what).param(protocol)
 }
+
+/// What [`unsupported`] names, one message each.
+const SET_PERMISSIONS: Message = Message::new("Rechte setzen");
+const SHARE_LINK: Message = Message::new("Ein Link zum Teilen");
+const CREATE_SYMLINK: Message = Message::new("Symbolische Links anlegen");
 
 impl Remote {
     pub fn home(&self) -> &str {
@@ -203,10 +208,7 @@ impl Remote {
     /// "Neue Datei": an empty file, refused when the name is taken.
     pub async fn new_file(&self, path: &str) -> AppResult<()> {
         if self.exists(path).await {
-            return Err(AppError::new(
-                ErrorKind::AlreadyExists,
-                format!("„{}“ gibt es hier schon.", remote_name(path)),
-            ));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(path)));
         }
         let w = self.writer(path, 0, Some(0), None).await?;
         w.close().await
@@ -331,14 +333,14 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.chmod(path, mode, recursive).await,
             Remote::Ftp(c) => c.chmod(path, mode, recursive).await,
-            Remote::Dav(_) => Err(unsupported("Rechte setzen", "WebDAV")),
-            Remote::Dropbox(_) => Err(unsupported("Rechte setzen", "Dropbox")),
-            Remote::GDrive(_) => Err(unsupported("Rechte setzen", "Google Drive")),
-            Remote::OneDrive(_) => Err(unsupported("Rechte setzen", "OneDrive")),
-            Remote::Smb(_) => Err(unsupported("Rechte setzen", "SMB")),
+            Remote::Dav(_) => Err(unsupported(&SET_PERMISSIONS, "WebDAV")),
+            Remote::Dropbox(_) => Err(unsupported(&SET_PERMISSIONS, "Dropbox")),
+            Remote::GDrive(_) => Err(unsupported(&SET_PERMISSIONS, "Google Drive")),
+            Remote::OneDrive(_) => Err(unsupported(&SET_PERMISSIONS, "OneDrive")),
+            Remote::Smb(_) => Err(unsupported(&SET_PERMISSIONS, "SMB")),
             Remote::Scp(c) => c.chmod(path, mode, recursive).await,
-            Remote::Vault(_) => Err(unsupported("Rechte setzen", "Cryptomator")),
-            Remote::S3(_) => Err(unsupported("Rechte setzen", "S3")),
+            Remote::Vault(_) => Err(unsupported(&SET_PERMISSIONS, "Cryptomator")),
+            Remote::S3(_) => Err(unsupported(&SET_PERMISSIONS, "S3")),
         }
     }
 
@@ -348,13 +350,13 @@ impl Remote {
             Remote::Dropbox(c) => c.share_link(path).await,
             Remote::GDrive(c) => c.share_link(path).await,
             Remote::OneDrive(c) => c.share_link(path).await,
-            Remote::Sftp(_) => Err(unsupported("Ein Link zum Teilen", "SFTP")),
-            Remote::Ftp(_) => Err(unsupported("Ein Link zum Teilen", "FTP")),
-            Remote::Dav(_) => Err(unsupported("Ein Link zum Teilen", "WebDAV")),
-            Remote::Smb(_) => Err(unsupported("Ein Link zum Teilen", "SMB")),
-            Remote::Scp(_) => Err(unsupported("Ein Link zum Teilen", "SCP")),
-            Remote::Vault(_) => Err(unsupported("Ein Link zum Teilen", "Cryptomator")),
-            Remote::S3(_) => Err(unsupported("Ein Link zum Teilen", "S3")),
+            Remote::Sftp(_) => Err(unsupported(&SHARE_LINK, "SFTP")),
+            Remote::Ftp(_) => Err(unsupported(&SHARE_LINK, "FTP")),
+            Remote::Dav(_) => Err(unsupported(&SHARE_LINK, "WebDAV")),
+            Remote::Smb(_) => Err(unsupported(&SHARE_LINK, "SMB")),
+            Remote::Scp(_) => Err(unsupported(&SHARE_LINK, "SCP")),
+            Remote::Vault(_) => Err(unsupported(&SHARE_LINK, "Cryptomator")),
+            Remote::S3(_) => Err(unsupported(&SHARE_LINK, "S3")),
         }
     }
 
@@ -389,8 +391,9 @@ impl Remote {
             Remote::Scp(c) => c.exec(command).await,
             _ => Err(AppError::new(
                 ErrorKind::Other,
-                format!("Befehle auf dem Server gibt es nur mit SFTP (SSH), nicht über {}.", self.protocol()),
-            )),
+                "Befehle auf dem Server gibt es nur mit SFTP (SSH), nicht über {0}.",
+            )
+            .param(self.protocol())),
         }
     }
 
@@ -398,10 +401,10 @@ impl Remote {
     /// (SSH only; other protocols would have to download every file).
     pub async fn grep(&self, base: &str, query: &str, max: usize) -> AppResult<Vec<crate::model::GrepHit>> {
         if !matches!(self, Remote::Sftp(_) | Remote::Scp(_)) {
-            return Err(AppError::other(format!(
-                "Die Suche im Inhalt gibt es auf diesem Computer und auf SSH-Servern, nicht über {}.",
-                self.protocol()
-            )));
+            return Err(AppError::other(
+                "Die Suche im Inhalt gibt es auf diesem Computer und auf SSH-Servern, nicht über {0}.",
+            )
+            .param(self.protocol()));
         }
         let q = crate::scp::quote;
         // -I skips binary files, -m 1 stops at the first hit per file, -F searches the text literally.
@@ -441,10 +444,8 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.open_shell(cols, rows, command).await,
             Remote::Scp(c) => c.open_shell(cols, rows, command).await,
-            _ => Err(AppError::new(
-                ErrorKind::Other,
-                format!("Ein Terminal gibt es nur mit SSH, nicht über {}.", self.protocol()),
-            )),
+            _ => Err(AppError::new(ErrorKind::Other, "Ein Terminal gibt es nur mit SSH, nicht über {0}.")
+                .param(self.protocol())),
         }
     }
 
@@ -455,10 +456,8 @@ impl Remote {
         match self {
             Remote::Sftp(c) => Ok(c.tunnel()),
             Remote::Scp(c) => Ok(c.tunnel()),
-            _ => Err(AppError::new(
-                ErrorKind::Other,
-                format!("Port-Weiterleitungen gibt es nur mit SSH, nicht über {}.", self.protocol()),
-            )),
+            _ => Err(AppError::new(ErrorKind::Other, "Port-Weiterleitungen gibt es nur mit SSH, nicht über {0}.")
+                .param(self.protocol())),
         }
     }
 
@@ -466,7 +465,7 @@ impl Remote {
         match self {
             Remote::Sftp(c) => c.symlink(link, target).await,
             Remote::Scp(c) => c.symlink(link, target).await,
-            _ => Err(unsupported("Symbolische Links anlegen", self.protocol())),
+            _ => Err(unsupported(&CREATE_SYMLINK, self.protocol())),
         }
     }
 
@@ -519,16 +518,21 @@ impl Remote {
 
     /// Copies on the server: `cp` over SSH, COPY over WebDAV, through this
     /// computer over FTP (FTP has no copy command).
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         match self {
-            Remote::Sftp(c) => c.copy_within(paths, dest_dir).await,
-            Remote::Dav(c) => c.copy_within(paths, dest_dir).await,
-            Remote::S3(c) => c.copy_within(paths, dest_dir).await,
-            Remote::Dropbox(c) => c.copy_within(paths, dest_dir).await,
-            Remote::GDrive(c) => c.copy_within(paths, dest_dir).await,
-            Remote::OneDrive(c) => c.copy_within(paths, dest_dir).await,
-            Remote::Smb(c) => c.copy_within(paths, dest_dir).await,
-            Remote::Scp(c) => c.copy_within(paths, dest_dir).await,
+            Remote::Sftp(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::Dav(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::S3(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::Dropbox(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::GDrive(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::OneDrive(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::Smb(c) => c.copy_within(paths, dest_dir, words).await,
+            Remote::Scp(c) => c.copy_within(paths, dest_dir, words).await,
             Remote::Ftp(_) | Remote::Vault(_) => {
                 let mut taken: std::collections::HashSet<String> =
                     self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
@@ -537,7 +541,7 @@ impl Remote {
                     if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                         return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
                     }
-                    let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+                    let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
                     Box::pin(self.copy_through(from, &remote_join(dest_dir, &name))).await?;
                     taken.insert(name.clone());
                     out.push(name);
@@ -931,7 +935,9 @@ pub(crate) mod integration {
         let local_sum = crate::local::checksum_with(&local_ui, crate::local::Algo::Sha256).unwrap();
         assert_eq!(conn.checksum_with(&target, crate::local::Algo::Sha256).await.unwrap(), local_sum);
         assert_eq!(
-            conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub")).await.unwrap(),
+            conn.copy_within(std::slice::from_ref(&target), &format!("{base}/sub"), &crate::local::NameWords::german())
+                .await
+                .unwrap(),
             vec!["big Kopie.bin".to_string()]
         );
         assert_eq!(conn.stat(&format!("{base}/sub/big Kopie.bin")).await.unwrap().size, 1_500_000);

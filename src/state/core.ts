@@ -10,7 +10,7 @@
  * drops and folder watch events. In the app (`LIVE`), actions delegate to
  * `live.ts`, which calls the Rust core and receives progress through events.
  */
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { isTauri } from '../backend/api';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
@@ -397,6 +397,23 @@ export function listEntries(side: PaneSide, serverId: string, path: string): Fil
   return LIVE ? live.cachedList(side, serverId, path) : fs.list(side, serverId, path);
 }
 
+/** The folder listings (`list`) and the state of loading them (`status`), at revision `rev` (`fsRev`). */
+export interface Listings {
+  rev: number;
+  list: typeof listEntries;
+  status: typeof paneStatus;
+}
+
+/**
+ * React hook: the folder listings as a value that changes whenever they do. The listing cache and
+ * the connection state live outside the store; `fsRev` says when they changed. Memos that read
+ * them go through this value and list it as a dependency.
+ */
+export function useListings(): Listings {
+  const rev = useStore((s) => s.fsRev);
+  return useMemo(() => ({ rev, list: listEntries, status: paneStatus }), [rev]);
+}
+
 /** Single entry by path, or undefined when unknown. */
 export function statEntry(side: PaneSide, serverId: string, path: string): FileEntry | undefined {
   return LIVE ? live.cachedStat(side, serverId, path) : fs.stat(side, serverId, path);
@@ -410,7 +427,7 @@ export function isDirEntry(side: PaneSide, serverId: string, path: string): bool
 /** Loading / error / connection state of a pane (live mode only). */
 export function paneStatus(
   side: PaneSide,
-  s: AppState = state,
+  t: Tab | undefined,
 ): {
   loading: boolean;
   error?: string;
@@ -419,21 +436,21 @@ export function paneStatus(
   notConnected?: boolean;
   connecting?: boolean;
 } {
-  if (!LIVE) return { loading: false };
-  const t = activeTab(s);
-  if (!t) return { loading: false };
+  if (!LIVE || !t) return { loading: false };
   const [ls, sid] = paneLoc(side, t);
   if (ls === 'remote' && !live.isConnected(sid))
     return { loading: false, notConnected: true, connecting: live.isConnecting(sid) };
-  return live.listingStatus(ls, sid, panePath(side, s));
+  return live.listingStatus(ls, sid, side === 'local' ? t.localPath : t.remotePath);
 }
 
 /** Sections of the sidebar in their default order. */
 export const SIDEBAR_SECTIONS: SidebarSection[] = ['favorites', 'recent', 'devices', 'shares', 'tags'];
 
 /** Sidebar sections in the user's order (new sections are added at their default place). */
-export function sidebarOrder(s: AppState = state): SidebarSection[] {
-  const saved = (s.settings.sidebarOrder ?? []).filter((x) => SIDEBAR_SECTIONS.includes(x));
+export function sidebarOrder(
+  savedOrder: AppState['settings']['sidebarOrder'] = state.settings.sidebarOrder,
+): SidebarSection[] {
+  const saved = (savedOrder ?? []).filter((x) => SIDEBAR_SECTIONS.includes(x));
   const missing = SIDEBAR_SECTIONS.filter((x) => !saved.includes(x));
   return [...saved, ...missing];
 }
@@ -458,19 +475,42 @@ export function toggleSidebarHidden(id: SidebarSection) {
   setState({ contextMenu: null });
 }
 
+/** The settings that decide which entries of a folder are shown, and in which order. */
+export interface RowView {
+  showHidden: boolean;
+  showSystem?: boolean;
+  sort: AppState['settings']['sort'][PaneSide];
+}
+
+/** The row settings of a half. */
+export function rowView(side: PaneSide, s: AppState = state): RowView {
+  return { showHidden: s.settings.showHidden, showSystem: s.settings.showSystem, sort: s.settings.sort[side] };
+}
+
+/**
+ * Entries of a folder as a half shows them: protected system items (e.g. Windows' old
+ * "Anwendungsdaten" junctions) stay out like in Explorer, dot files and items marked hidden
+ * follow "Versteckte Dateien zeigen", then sorted.
+ */
+function visibleRows(list: FileEntry[], view: RowView): FileEntry[] {
+  let rows = list;
+  if (!view.showSystem) rows = rows.filter((e) => (e.hidden ?? 0) < 2);
+  if (!view.showHidden) rows = rows.filter((e) => !e.name.startsWith('.') && !e.hidden);
+  return sortEntries(rows, view.sort);
+}
+
 /**
  * Entries of any folder of a half, filtered and sorted like the half itself
  * (column view: the folder above and the folder chosen). Undefined until read.
  */
-export function folderRows(side: PaneSide, dir: string, s: AppState = state): FileEntry[] | undefined {
-  const t = activeTab(s);
-  if (!t) return undefined;
-  const loc = paneLoc(side, t);
-  let list = listEntries(...loc, dir);
-  if (!list) return undefined;
-  if (!s.settings.showSystem) list = list.filter((e) => (e.hidden ?? 0) < 2);
-  if (!s.settings.showHidden) list = list.filter((e) => !e.name.startsWith('.') && !e.hidden);
-  return sortEntries(list, s.settings.sort[side]);
+export function folderRows(
+  loc: [PaneSide, string],
+  dir: string,
+  view: RowView,
+  list: typeof listEntries = listEntries,
+): FileEntry[] | undefined {
+  const entries = list(...loc, dir);
+  return entries && visibleRows(entries, view);
 }
 
 /** Reads a folder of a half when it is not cached yet (call from effects, not while rendering). */
@@ -488,19 +528,36 @@ export function loadFolder(side: PaneSide, dir: string) {
 export function paneEntries(side: PaneSide, s: AppState = state): FileEntry[] {
   const t = activeTab(s);
   if (!t || paneShowsServers(side, t)) return [];
-  const loc = paneLoc(side, t);
-  const base = panePath(side, s);
-  const open = new Set(s.settings.viewMode[side] === 'list' ? s.expanded[side] : []);
-  const q = s.searchSide === side ? s.search.trim().toLowerCase() : '';
+  return paneRows({
+    loc: paneLoc(side, t),
+    base: panePath(side, s),
+    opened: s.settings.viewMode[side] === 'list' ? s.expanded[side] : [],
+    search: s.searchSide === side ? s.search : '',
+    view: rowView(side, s),
+  });
+}
+
+/** What decides the rows of a half that shows files, besides the listings. */
+export interface PaneRowsInput {
+  loc: [PaneSide, string];
+  /** The folder shown. */
+  base: string;
+  /** Folders opened in place (list view), relative to `base`. */
+  opened: string[];
+  /** The search of this half, as typed. */
+  search: string;
+  view: RowView;
+}
+
+/** The rows of `paneEntries`, from explicit inputs (the half's component subscribes to them). */
+export function paneRows(input: PaneRowsInput, list: typeof listEntries = listEntries): FileEntry[] {
+  const { loc, base, view } = input;
+  const open = new Set(input.opened);
+  const q = input.search.trim().toLowerCase();
   const level = (rel: string, depth: number): FileEntry[] => {
-    let list = listEntries(...loc, rel ? paths.join(base, rel) : base) ?? [];
-    // Protected system items (e.g. Windows' old "Anwendungsdaten" junctions) stay out like in Explorer;
-    // dot files and items marked hidden follow "Versteckte Dateien zeigen".
-    if (!s.settings.showSystem) list = list.filter((e) => (e.hidden ?? 0) < 2);
-    if (!s.settings.showHidden) list = list.filter((e) => !e.name.startsWith('.') && !e.hidden);
-    list = sortEntries(list, s.settings.sort[side]);
+    const rows = folderRows(loc, rel ? paths.join(base, rel) : base, view, list) ?? [];
     const out: FileEntry[] = [];
-    for (const e of list) {
+    for (const e of rows) {
       const name = rel ? `${rel}/${e.name}` : e.name;
       const opened = e.kind === 'dir' && open.has(name);
       // The search filter shows matching rows and keeps opened folders with matches inside.

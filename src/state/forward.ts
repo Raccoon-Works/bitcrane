@@ -9,6 +9,7 @@ import type { PortForward } from '../backend/types';
 import { $t } from '../i18n';
 import { addLog } from './log';
 import { getState, LIVE, serverById, setState, showToast } from './store';
+import { toBackendError } from '../backend/api';
 
 /** Short description, e.g. "localhost:5433 → db:5432" or "SOCKS localhost:1080". */
 function describeForward(f: PortForward): string {
@@ -42,7 +43,7 @@ export async function startForward(serverId: string, f: PortForward): Promise<bo
     addLog('ok', $t('Tunnel gestartet: {0}', describeForward(f)), serverId);
     return true;
   } catch (e) {
-    const msg = (e as { message?: string }).message ?? String(e);
+    const msg = toBackendError(e).message;
     addLog('error', $t('Tunnel {0}: {1}', describeForward(f), msg), serverId);
     showToast($t('Tunnel von {0}: {1}', srv?.name ?? '', msg), 'error');
     return false;

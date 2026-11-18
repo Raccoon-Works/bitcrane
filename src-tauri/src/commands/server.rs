@@ -1,6 +1,7 @@
 //! Files on a connected server: listing, operations, commands and drag and drop out of the app.
 
 use crate::error::{AppError, AppResult};
+use crate::local::NameWords;
 use crate::model::{FileEntry, WalkItem};
 use crate::{local, model, paths, AppState};
 use serde::Serialize;
@@ -217,8 +218,9 @@ pub(crate) async fn remote_copy(
     server_id: String,
     paths: Vec<String>,
     dest_dir: String,
+    words: NameWords,
 ) -> AppResult<Vec<String>> {
-    remote!(state, server_id, |c| c.copy_within(&paths, &dest_dir))
+    remote!(state, server_id, |c| c.copy_within(&paths, &dest_dir, &words))
 }
 
 #[tauri::command]

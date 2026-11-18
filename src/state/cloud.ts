@@ -27,6 +27,7 @@ import {
 } from './store';
 import { addLog } from './log';
 import { $t } from '../i18n';
+import { toBackendError } from '../backend/api';
 
 export const CLOUD_NAMES: Record<string, string> = { dropbox: 'Dropbox', onedrive: 'OneDrive', gdrive: 'Google Drive' };
 
@@ -128,9 +129,9 @@ export async function signInToCloud(service: Protocol, serverId?: string): Promi
     saveServer(srv, true);
     return null;
   } catch (e) {
-    const err = e as { kind?: string; message?: string; detail?: string };
+    const err = toBackendError(e);
     if (err.kind === 'cancelled') return null;
-    return `${err.message ?? String(e)}${err.detail ? ` (${err.detail})` : ''}`;
+    return `${err.message}${err.detail ? ` (${err.detail})` : ''}`;
   }
 }
 

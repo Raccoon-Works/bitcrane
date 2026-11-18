@@ -185,6 +185,8 @@ const phrases = () => ({
   Completions: $t('Vorschläge'),
 });
 
+const fontTheme = (size: number) => EditorView.theme({ '&': { fontSize: `${size}px` } });
+
 const languageNames = [...languages].sort((a, b) => a.name.localeCompare(b.name)).map((l) => l.name);
 
 export function CodeEditor() {
@@ -208,8 +210,6 @@ export function CodeEditor() {
   const doc = ed.docs.find((d) => d.id === ed.active) ?? null;
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
-
-  const fontTheme = (size: number) => EditorView.theme({ '&': { fontSize: `${size}px` } });
 
   /** Loads the colours for a language (by name or file name) into the editor. */
   const applyLanguage = async (id: string, desc: LanguageDescription | null) => {
@@ -394,7 +394,7 @@ export function CodeEditor() {
       // Keep the state (text, history, cursor) for when the document is shown again.
       if (view.current && saved.has(doc.id)) saved.set(doc.id, view.current.state);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only when another document is shown or has loaded
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only when another document is shown or has loaded; on every edit it would reset the view
   }, [doc?.id, doc?.loading, doc?.error]);
 
   // Text getters always read the live view for the shown document.
@@ -429,9 +429,10 @@ export function CodeEditor() {
       comp.font.reconfigure(fontTheme(prefs.fontSize)),
     ];
     view.current?.dispatch({ effects });
-    for (const [id, s] of states.current) if (id !== ed.active) states.current.set(id, s.update({ effects }).state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the two settings are applied; the views read the rest themselves
-  }, [prefs.wrap, prefs.fontSize]);
+    // The shown document got them through the view; the others are updated in their kept states.
+    for (const [id, s] of states.current)
+      if (id !== activeRef.current) states.current.set(id, s.update({ effects }).state);
+  }, [comp, prefs.wrap, prefs.fontSize]);
 
   const chooseLanguage = (name: string) => {
     if (!doc) return;

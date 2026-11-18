@@ -22,6 +22,7 @@ mod forward;
 mod ftp;
 mod gdrive;
 mod git;
+mod i18n;
 mod iconmenu;
 mod import;
 mod keys;
@@ -112,7 +113,8 @@ impl AppState {
         if let Some(c) = map.get(server_id) {
             if c.is_closed() {
                 map.remove(server_id);
-                return AppError::new(ErrorKind::ConnectionLost, "Verbindung unterbrochen").with_detail(err.message);
+                return AppError::new(ErrorKind::ConnectionLost, "Verbindung unterbrochen")
+                    .with_detail(err.message.to_string());
             }
         }
         err

@@ -14,7 +14,7 @@
 //! modification time travels as metadata (`x-amz-meta-mtime`, seconds, the
 //! convention rclone and others use too).
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent};
 use crate::proxy::ProxyParams;
@@ -150,34 +150,35 @@ fn error_code(xml: &str) -> (String, String) {
     (get("Code"), get("Message"))
 }
 
-fn status_err(status: StatusCode, body: &str, what: &str) -> AppError {
+fn status_err(status: StatusCode, body: &str, what: &Message) -> AppError {
     let (code, message) = error_code(body);
     let detail = if code.is_empty() { status.to_string() } else { format!("{status} {code}: {message}") };
-    let (kind, msg) = match (status.as_u16(), code.as_str()) {
-        (_, "InvalidAccessKeyId") => {
-            (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Diesen Zugriffsschlüssel kennt der Dienst nicht.".to_string())
-        }
-        (_, "SignatureDoesNotMatch") => {
-            (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Der geheime Schlüssel passt nicht.".to_string())
-        }
-        (_, "NoSuchBucket") => (ErrorKind::NotFound, "Diesen Bucket gibt es nicht.".to_string()),
-        (_, "NoSuchKey") | (404, _) => (ErrorKind::NotFound, format!("{what}: nicht gefunden.")),
-        (301, _) | (_, "PermanentRedirect") | (_, "AuthorizationHeaderMalformed") => (
-            ErrorKind::Other,
-            "Der Bucket liegt in einer anderen Region. Bitte die Region in den Server-Einstellungen prüfen."
-                .to_string(),
+    let err = match (status.as_u16(), code.as_str()) {
+        (_, "InvalidAccessKeyId") => AppError::new(
+            ErrorKind::AuthFailed,
+            "Anmeldung abgelehnt: Diesen Zugriffsschlüssel kennt der Dienst nicht.",
         ),
-        (403, "AccessDenied") | (403, _) => (ErrorKind::PermissionDenied, format!("{what}: keine Berechtigung.")),
+        (_, "SignatureDoesNotMatch") => {
+            AppError::new(ErrorKind::AuthFailed, "Anmeldung abgelehnt: Der geheime Schlüssel passt nicht.")
+        }
+        (_, "NoSuchBucket") => AppError::new(ErrorKind::NotFound, "Diesen Bucket gibt es nicht."),
+        (_, "NoSuchKey") | (404, _) => AppError::new(ErrorKind::NotFound, "{0}: nicht gefunden.").param(what),
+        (301, _) | (_, "PermanentRedirect") | (_, "AuthorizationHeaderMalformed") => AppError::other(
+            "Der Bucket liegt in einer anderen Region. Bitte die Region in den Server-Einstellungen prüfen.",
+        ),
+        (403, "AccessDenied") | (403, _) => {
+            AppError::new(ErrorKind::PermissionDenied, "{0}: keine Berechtigung.").param(what)
+        }
         (409, "BucketAlreadyExists") | (409, "BucketAlreadyOwnedByYou") => {
-            (ErrorKind::AlreadyExists, "Diesen Bucket-Namen gibt es schon.".to_string())
+            AppError::new(ErrorKind::AlreadyExists, "Diesen Bucket-Namen gibt es schon.")
         }
-        (_, "EntityTooLarge") => (ErrorKind::Other, format!("{what}: Die Datei ist für diesen Dienst zu groß.")),
+        (_, "EntityTooLarge") => AppError::other("{0}: Die Datei ist für diesen Dienst zu groß.").param(what),
         (_, "QuotaExceeded") | (_, "StorageQuotaExceeded") => {
-            (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr."))
+            AppError::other("{0}: kein Speicherplatz mehr.").param(what)
         }
-        _ => (ErrorKind::Other, format!("{what} fehlgeschlagen.")),
+        _ => AppError::other("{0} fehlgeschlagen.").param(what),
     };
-    AppError::new(kind, msg).with_detail(detail)
+    err.with_detail(detail)
 }
 
 fn net_err(e: reqwest::Error) -> AppError {
@@ -407,7 +408,7 @@ impl S3Conn {
         Ok(format!("{}://{}{}?{}&X-Amz-Signature={signature}", self.scheme, r.host, r.path, r.canonical_query()))
     }
 
-    async fn send(&self, r: &Req, what: &str) -> AppResult<reqwest::Response> {
+    async fn send(&self, r: &Req, what: &Message) -> AppResult<reqwest::Response> {
         let resp = self.build(r, EMPTY_SHA256).send().await.map_err(net_err)?;
         if resp.status().is_success() {
             return Ok(resp);
@@ -419,7 +420,7 @@ impl S3Conn {
 
     async fn buckets(&self) -> AppResult<Vec<(String, i64)>> {
         let r = self.req(Method::GET, None, "");
-        let body = self.send(&r, "Buckets lesen").await?.text().await.map_err(net_err)?;
+        let body = self.send(&r, &Message::new("Buckets lesen")).await?.text().await.map_err(net_err)?;
         Ok(parse_buckets(&body))
     }
 
@@ -443,7 +444,7 @@ impl S3Conn {
         if let Some(m) = max {
             r.query.push(("max-keys".into(), m.to_string()));
         }
-        let body = self.send(&r, "Ordner lesen").await?.text().await.map_err(net_err)?;
+        let body = self.send(&r, &Message::new("Ordner lesen")).await?.text().await.map_err(net_err)?;
         Ok(parse_listing(&body))
     }
 
@@ -524,14 +525,14 @@ impl S3Conn {
             return Ok(FileEntry::plain(name, false, size, mtime_of(resp.headers())));
         }
         if resp.status() != StatusCode::NOT_FOUND {
-            return Err(status_err(resp.status(), "", &format!("„{name}“")));
+            return Err(status_err(resp.status(), "", &Message::new("„{0}“").param(name)));
         }
         // No object: a folder when anything lies below it.
         let page = self.list_page(&bucket, &Self::dir_prefix(&key), Some("/"), None, Some(1)).await?;
         if !page.files.is_empty() || !page.prefixes.is_empty() {
             return Ok(FileEntry::plain(name, true, 0, 0));
         }
-        Err(AppError::new(ErrorKind::NotFound, format!("„{name}“ gibt es nicht.")))
+        Err(AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(name))
     }
 
     pub async fn exists(&self, path: &str) -> bool {
@@ -559,7 +560,7 @@ impl S3Conn {
             }
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(status_err(status, &text, &format!("Bucket „{bucket}“ anlegen")));
+            return Err(status_err(status, &text, &Message::new("Bucket „{0}“ anlegen").param(bucket)));
         }
         let r = self.req(Method::PUT, Some(&bucket), &Self::dir_prefix(&key));
         let resp = self.build(&r, EMPTY_SHA256).header("content-length", "0").send().await.map_err(net_err)?;
@@ -568,7 +569,7 @@ impl S3Conn {
         } else {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            Err(status_err(status, &text, &format!("Ordner „{}“ anlegen", remote_name(path))))
+            Err(status_err(status, &text, &Message::new("Ordner „{0}“ anlegen").param(remote_name(path))))
         }
     }
 
@@ -588,7 +589,7 @@ impl S3Conn {
         } else {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            Err(status_err(status, &text, &format!("„{}“ löschen", remote_name(key))))
+            Err(status_err(status, &text, &Message::new("„{0}“ löschen").param(remote_name(key))))
         }
     }
 
@@ -607,7 +608,7 @@ impl S3Conn {
             Err(status_err(
                 if status.is_success() { StatusCode::INTERNAL_SERVER_ERROR } else { status },
                 &text,
-                &format!("„{}“ kopieren", remote_name(from)),
+                &Message::new("„{0}“ kopieren").param(remote_name(from)),
             ))
         }
     }
@@ -666,7 +667,7 @@ impl S3Conn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
         self.move_path(from, to).await
     }
@@ -675,7 +676,12 @@ impl S3Conn {
         self.move_path(from, to).await
     }
 
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -683,7 +689,7 @@ impl S3Conn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             let to = remote_join(dest_dir, &name);
             let (fb, fk) = self.split(from);
             let (tb, tk) = self.split(&to);
@@ -744,7 +750,7 @@ impl S3Conn {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(status_err(status, &text, &format!("„{}“ lesen", remote_name(path))));
+            return Err(status_err(status, &text, &Message::new("„{0}“ lesen").param(remote_name(path))));
         }
         if offset > 0 && status != StatusCode::PARTIAL_CONTENT {
             return Err(AppError::other("Der Dienst kann nicht an einer Stelle weiterlesen.").with_detail("no-range"));
@@ -789,7 +795,7 @@ impl S3Conn {
     ) -> AppResult<()> {
         let (bucket, key) = self.split(path);
         let Some(bucket) = bucket else { return Err(AppError::other("Dateien gehören in einen Bucket.")) };
-        let what = format!("„{}“ schreiben", remote_name(path));
+        let what = Message::new("„{0}“ schreiben").param(remote_name(path));
         let meta: Vec<(String, String)> =
             mtime.map(|m| vec![("x-amz-meta-mtime".to_string(), m.to_string())]).unwrap_or_default();
         let first = Self::read_part(&mut r, part_size).await?;
@@ -820,7 +826,7 @@ impl S3Conn {
             d.descendants().find(|n| n.tag_name().name() == "UploadId").and_then(|n| n.text()).map(str::to_string)
         });
         let Some(upload_id) = upload_id else {
-            return Err(AppError::other(format!("{what} fehlgeschlagen.")).with_detail(body));
+            return Err(AppError::other("{0} fehlgeschlagen.").param(what).with_detail(body));
         };
         let result: AppResult<()> = async {
             let mut etags: Vec<String> = Vec::new();
@@ -1055,7 +1061,10 @@ mod integration {
         conn.reader("/a b/gross.bin", 0).await.unwrap().read_to_end(&mut back).await.unwrap();
         assert!(back == big, "multipart content");
         // Copy, rename (folder), walk, remove.
-        assert_eq!(conn.copy_within(&[file.to_string()], "/a b").await.unwrap(), vec!["über Kopie.txt".to_string()]);
+        assert_eq!(
+            conn.copy_within(&[file.to_string()], "/a b", &crate::local::NameWords::german()).await.unwrap(),
+            vec!["über Kopie.txt".to_string()]
+        );
         conn.rename("/a b", "/neu").await.unwrap();
         assert!(!conn.exists("/a b").await);
         assert_eq!(conn.walk("/neu").await.unwrap().len(), 3);

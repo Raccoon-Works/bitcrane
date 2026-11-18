@@ -64,7 +64,10 @@ Formatting is not discussed in review: Prettier and rustfmt decide it (120 colum
 7. **Both platforms, both themes, both languages.** Every visible change is checked on macOS and
    Windows, in light and dark, in German and English. German texts are the keys in `src/i18n.ts`,
    English is in `src/i18n.en.ts`, further languages in `src/locales/` (missing texts fall back to
-   English).
+   English). Messages of the Rust core follow the same scheme: a fixed German key with parameters
+   (`Message` and `AppError` in `src-tauri/src/error.rs`), translated by the interface; names and
+   hosts go into the parameters and are never translated. `src/backend/rustMessages.test.ts`
+   fails when a key has no English text.
 8. **Invented data only.** Screenshots, demo data, tests and examples use made-up names,
    servers and files, never real personal data.
 9. **No emojis in the interface.**

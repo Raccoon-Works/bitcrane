@@ -46,9 +46,10 @@ pub struct Forwards(Mutex<HashMap<String, Running>>);
 fn bind_error(spec: &ForwardSpec, e: std::io::Error) -> AppError {
     let what = format!("{}:{}", spec.bind_host, spec.bind_port);
     if e.kind() == std::io::ErrorKind::AddrInUse {
-        AppError::new(ErrorKind::Other, format!("Der Port {what} ist auf diesem Computer schon belegt."))
+        AppError::new(ErrorKind::Other, "Der Port {0} ist auf diesem Computer schon belegt.").param(what)
     } else {
-        AppError::new(ErrorKind::Other, format!("Der Port {what} kann nicht geöffnet werden."))
+        AppError::new(ErrorKind::Other, "Der Port {0} kann nicht geöffnet werden.")
+            .param(what)
             .with_detail(e.to_string())
     }
 }
@@ -152,11 +153,9 @@ impl Forwards {
             "remote" => {
                 let (handle, map) = conn.tunnel()?;
                 let port = handle.tcpip_forward(spec.bind_host.clone(), spec.bind_port as u32).await.map_err(|e| {
-                    AppError::new(
-                        ErrorKind::Other,
-                        format!("Der Server lehnt die Weiterleitung von Port {} ab.", spec.bind_port),
-                    )
-                    .with_detail(e.to_string())
+                    AppError::other("Der Server lehnt die Weiterleitung von Port {0} ab.")
+                        .param(spec.bind_port.to_string())
+                        .with_detail(e.to_string())
                 })?;
                 // Port 0: the server chose one.
                 let port = if spec.bind_port == 0 { port } else { spec.bind_port as u32 };
@@ -167,7 +166,7 @@ impl Forwards {
                     remote: Some((conn.clone(), spec.bind_host.clone(), port)),
                 }
             }
-            other => return Err(AppError::other(format!("Unbekannte Art der Weiterleitung: {other}"))),
+            other => return Err(AppError::other("Unbekannte Art der Weiterleitung: {0}").param(other)),
         };
         self.0.lock().unwrap().insert(spec.id, running);
         Ok(())

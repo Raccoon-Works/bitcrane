@@ -4,7 +4,7 @@
 //! command, so the user's configuration, credential helper and SSH keys apply;
 //! without git (or outside a repository) there is simply no git display.
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, Message, Param};
 use crate::paths::{to_native, to_ui};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -122,11 +122,11 @@ pub fn action(root: &str, what: &str, paths: &[String], message: &str, all: bool
         if out.status.success() {
             Ok(text)
         } else {
-            Err(AppError::other(format!(
-                "Git: {}",
-                text.lines().find(|l| !l.trim().is_empty()).unwrap_or("fehlgeschlagen")
-            ))
-            .with_detail(text))
+            let reason = match text.lines().find(|l| !l.trim().is_empty()) {
+                Some(line) => Param::from(line),
+                None => Param::from(Message::new("fehlgeschlagen")),
+            };
+            Err(AppError::other("Git: {0}").param(reason).with_detail(text))
         }
     };
     match what {

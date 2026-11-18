@@ -68,11 +68,20 @@ export function toggleCompareDirs() {
  */
 export function compareMarks(side: PaneSide): Map<string, CompareMark> | null {
   const s = getState();
-  const t = activeTab(s);
-  if (!s.compareDirs || !t || paneShowsServers('local', t) || paneShowsServers('remote', t)) return null;
+  return s.compareDirs ? compareMarksOf(side, activeTab(s)) : null;
+}
+
+/** The marks of `compareMarks` for a tab, with "Verzeichnisse vergleichen" switched on. */
+export function compareMarksOf(
+  side: PaneSide,
+  t: Tab | undefined,
+  list: typeof listEntries = listEntries,
+): Map<string, CompareMark> | null {
+  if (!t || paneShowsServers('local', t) || paneShowsServers('remote', t)) return null;
   const other: PaneSide = side === 'local' ? 'remote' : 'local';
-  const mine = listEntries(...paneLoc(side, t), panePath(side, s));
-  const theirs = listEntries(...paneLoc(other, t), panePath(other, s));
+  const pathOf = (p: PaneSide) => (p === 'local' ? t.localPath : t.remotePath);
+  const mine = list(...paneLoc(side, t), pathOf(side));
+  const theirs = list(...paneLoc(other, t), pathOf(other));
   if (!mine || !theirs) return null;
   const offset = (p: PaneSide) => {
     const [ls, sid] = paneLoc(p, t);

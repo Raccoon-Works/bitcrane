@@ -6,7 +6,7 @@
 //! changed key aborts the connection; the user confirms the fingerprint in
 //! the UI and the frontend reconnects with `trust` set to that fingerprint.
 
-use crate::error::{AppError, AppResult, ErrorKind, HostKeyInfo};
+use crate::error::{AppError, AppResult, ErrorKind, HostKeyInfo, Message};
 use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name};
 use russh::client;
@@ -64,7 +64,8 @@ impl KnownHosts {
             &serde_json::to_string_pretty(map).expect("a map of strings always serializes"),
         )
         .map_err(|e| {
-            AppError::other("Die bekannten Fingerabdrücke konnten nicht gespeichert werden.").with_detail(e.message)
+            AppError::other("Die bekannten Fingerabdrücke konnten nicht gespeichert werden.")
+                .with_detail(e.message.to_string())
         })
     }
 
@@ -665,9 +666,9 @@ async fn open_session(
                     let mut err = AppError::new(
                         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
                         if changed {
-                            "Der Fingerabdruck des Servers hat sich geändert."
+                            Message::new("Der Fingerabdruck des Servers hat sich geändert.")
                         } else {
-                            "Dieser Server ist noch nicht bekannt."
+                            Message::new("Dieser Server ist noch nicht bekannt.")
                         },
                     );
                     err.host_key = Some(Box::new(HostKeyInfo {
@@ -729,9 +730,9 @@ pub async fn open(params: &ConnectParams, known: Arc<KnownHosts>, prompter: Opti
                 RemoteForwards::default(),
             )
             .await
-            .map_err(|mut e| {
-                e.message = format!("Sprungserver {}: {}", jump_params.host, e.message);
-                e
+            .map_err(|e| AppError {
+                message: Message::new("Sprungserver {0}: {1}").param(&jump_params.host).param(e.message),
+                ..e
             })?;
             let channel = jump
                 .channel_open_direct_tcpip(params.host.clone(), params.port as u32, "127.0.0.1", 0)
@@ -1062,7 +1063,7 @@ impl Connection {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
         self.sftp.rename(from, to).await?;
         Ok(())
@@ -1114,10 +1115,7 @@ impl Connection {
     /// Creates a symbolic link `link` that points to `target`.
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
         if self.exists(link).await {
-            return Err(AppError::new(
-                ErrorKind::AlreadyExists,
-                format!("„{}“ gibt es hier schon.", remote_name(link)),
-            ));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(link)));
         }
         // OpenSSH's sftp-server reads the two paths in swapped order (a known quirk);
         // russh-sftp sends (link, target), so pass them swapped for OpenSSH.
@@ -1163,7 +1161,12 @@ impl Connection {
     /// Copies files or folders into `dest_dir` on the same server. Uses `cp`
     /// when the server allows commands (fast, the data stays on the server),
     /// otherwise copies through this connection. Returns the new names.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -1171,7 +1174,7 @@ impl Connection {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             let to = remote_join(dest_dir, &name);
             let quoted = |p: &str| format!("'{}'", p.replace('\'', "'\\''"));
             let via_cp = match self.exec(&format!("cp -Rp -- {} {}", quoted(from), quoted(&to))).await {
@@ -1348,7 +1351,7 @@ mod integration {
         // The same port again: a clear message.
         let busy =
             crate::forward::Forwards::default().start("s", conn.clone(), spec("x", "local", 47811)).await.unwrap_err();
-        assert!(busy.message.contains("belegt"), "{}", busy.message);
+        assert_eq!(busy.message.key, "Der Port {0} ist auf diesem Computer schon belegt.");
 
         fw.start("s", conn.clone(), spec("d", "dynamic", 47812)).await.unwrap();
         let mut s = tokio::net::TcpStream::connect("127.0.0.1:47812").await.unwrap();
@@ -1520,15 +1523,25 @@ mod integration {
         );
 
         // 3d. Copies on the server: a clash gets "Kopie", folders are copied with content.
-        let made = conn.copy_within(&[format!("{base}/v.py")], &base).await.unwrap();
+        let made =
+            conn.copy_within(&[format!("{base}/v.py")], &base, &crate::local::NameWords::german()).await.unwrap();
         assert_eq!(made, vec!["v Kopie.py".to_string()]);
-        let made = conn.copy_within(&[format!("{base}/v.py")], &base).await.unwrap();
+        let made =
+            conn.copy_within(&[format!("{base}/v.py")], &base, &crate::local::NameWords::german()).await.unwrap();
         assert_eq!(made, vec!["v Kopie 2.py".to_string()]);
         conn.mkdir_all(&format!("{base}/c")).await.unwrap();
-        let made = conn.copy_within(&[format!("{base}/a")], &format!("{base}/c")).await.unwrap();
+        let made = conn
+            .copy_within(&[format!("{base}/a")], &format!("{base}/c"), &crate::local::NameWords::german())
+            .await
+            .unwrap();
         assert_eq!(made, vec!["a".to_string()]);
         assert_eq!(conn.walk(&format!("{base}/c/a")).await.unwrap().len(), 1);
-        assert!(conn.copy_within(&[format!("{base}/c")], &format!("{base}/c/a")).await.is_err(), "not into itself");
+        assert!(
+            conn.copy_within(&[format!("{base}/c")], &format!("{base}/c/a"), &crate::local::NameWords::german())
+                .await
+                .is_err(),
+            "not into itself"
+        );
         // Without commands on the server the copy goes through the connection.
         match &conn {
             crate::remote::Remote::Sftp(c) => c,

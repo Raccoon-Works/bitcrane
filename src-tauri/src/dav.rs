@@ -2,7 +2,7 @@
 //! and web hosts. Paths in Bitcrane are relative to the server's WebDAV
 //! address ("/" is the address itself).
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
 use crate::proxy::ProxyParams;
@@ -99,17 +99,17 @@ fn net_err(
     AppError::new(ErrorKind::ConnectionLost, "Verbindung zum WebDAV-Server unterbrochen.").with_detail(text)
 }
 
-fn status_err(status: StatusCode, what: &str) -> AppError {
-    let (kind, msg) = match status.as_u16() {
-        401 => (ErrorKind::AuthFailed, "Anmeldung abgelehnt: Benutzer oder Passwort falsch.".to_string()),
-        403 => (ErrorKind::PermissionDenied, format!("{what}: keine Berechtigung.")),
-        404 | 409 => (ErrorKind::NotFound, format!("{what}: nicht gefunden.")),
-        405 | 412 => (ErrorKind::AlreadyExists, format!("{what}: gibt es schon.")),
-        423 => (ErrorKind::PermissionDenied, format!("{what}: Datei ist gesperrt.")),
-        507 => (ErrorKind::Other, format!("{what}: kein Speicherplatz mehr auf dem Server.")),
-        _ => (ErrorKind::Other, format!("{what} fehlgeschlagen.")),
+fn status_err(status: StatusCode, what: &Message) -> AppError {
+    let err = match status.as_u16() {
+        401 => AppError::new(ErrorKind::AuthFailed, "Anmeldung abgelehnt: Benutzer oder Passwort falsch."),
+        403 => AppError::new(ErrorKind::PermissionDenied, "{0}: keine Berechtigung.").param(what),
+        404 | 409 => AppError::new(ErrorKind::NotFound, "{0}: nicht gefunden.").param(what),
+        405 | 412 => AppError::new(ErrorKind::AlreadyExists, "{0}: gibt es schon.").param(what),
+        423 => AppError::new(ErrorKind::PermissionDenied, "{0}: Datei ist gesperrt.").param(what),
+        507 => AppError::other("{0}: kein Speicherplatz mehr auf dem Server.").param(what),
+        _ => AppError::other("{0} fehlgeschlagen.").param(what),
     };
-    AppError::new(kind, msg).with_detail(status.to_string())
+    err.with_detail(status.to_string())
 }
 
 const PROPFIND_BODY: &str = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/></d:prop></d:propfind>"#;
@@ -238,10 +238,10 @@ impl DavConn {
             401 if params.password.is_none() => {
                 Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort."))
             }
-            401 => Err(status_err(resp.status(), "Anmeldung")),
+            401 => Err(status_err(resp.status(), &Message::new("Anmeldung"))),
             404 => Err(AppError::new(ErrorKind::NotFound, "Unter dieser Adresse gibt es keinen WebDAV-Ordner.")),
             405 | 501 => Err(AppError::other("Diese Adresse spricht kein WebDAV.")),
-            _ => Err(status_err(resp.status(), "Verbinden")),
+            _ => Err(status_err(resp.status(), &Message::new("Verbinden"))),
         }
     }
 
@@ -310,7 +310,7 @@ impl DavConn {
         let mut e = all
             .pop()
             .map(|(_, e)| e)
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))?;
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(remote_name(path)))?;
         e.name = remote_name(path);
         Ok(e)
     }
@@ -324,7 +324,7 @@ impl DavConn {
         if resp.status().is_success() {
             Ok(())
         } else {
-            Err(status_err(resp.status(), &format!("Ordner „{}“ anlegen", remote_name(path))))
+            Err(status_err(resp.status(), &Message::new("Ordner „{0}“ anlegen").param(remote_name(path))))
         }
     }
 
@@ -344,7 +344,14 @@ impl DavConn {
         Ok(())
     }
 
-    async fn move_or_copy(&self, method: &[u8], from: &str, to: &str, overwrite: bool, what: &str) -> AppResult<()> {
+    async fn move_or_copy(
+        &self,
+        method: &[u8],
+        from: &str,
+        to: &str,
+        overwrite: bool,
+        what: &Message,
+    ) -> AppResult<()> {
         let resp = self
             .send(
                 self.request(Method::from_bytes(method).unwrap(), from)
@@ -361,17 +368,22 @@ impl DavConn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
-        self.move_or_copy(b"MOVE", from, to, false, &format!("„{}“ umbenennen", remote_name(from))).await
+        self.move_or_copy(b"MOVE", from, to, false, &Message::new("„{0}“ umbenennen").param(remote_name(from))).await
     }
 
     pub async fn replace(&self, from: &str, to: &str) -> AppResult<()> {
-        self.move_or_copy(b"MOVE", from, to, true, &format!("„{}“ ersetzen", remote_name(to))).await
+        self.move_or_copy(b"MOVE", from, to, true, &Message::new("„{0}“ ersetzen").param(remote_name(to))).await
     }
 
     /// Server-side copy (WebDAV COPY), with "Kopie" names on clashes.
-    pub async fn copy_within(&self, paths: &[String], dest_dir: &str) -> AppResult<Vec<String>> {
+    pub async fn copy_within(
+        &self,
+        paths: &[String],
+        dest_dir: &str,
+        words: &crate::local::NameWords,
+    ) -> AppResult<Vec<String>> {
         let mut taken: std::collections::HashSet<String> =
             self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
         let mut out = Vec::new();
@@ -379,13 +391,13 @@ impl DavConn {
             if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             self.move_or_copy(
                 b"COPY",
                 from,
                 &remote_join(dest_dir, &name),
                 false,
-                &format!("„{}“ kopieren", remote_name(from)),
+                &Message::new("„{0}“ kopieren").param(remote_name(from)),
             )
             .await?;
             taken.insert(name.clone());
@@ -399,7 +411,7 @@ impl DavConn {
         if resp.status().is_success() || resp.status() == StatusCode::NOT_FOUND {
             Ok(())
         } else {
-            Err(status_err(resp.status(), &format!("„{}“ löschen", remote_name(path))))
+            Err(status_err(resp.status(), &Message::new("„{0}“ löschen").param(remote_name(path))))
         }
     }
 
@@ -421,7 +433,7 @@ impl DavConn {
         let resp = self.send(req).await?;
         let status = resp.status();
         if !status.is_success() {
-            return Err(status_err(status, &format!("„{}“ lesen", remote_name(path))));
+            return Err(status_err(status, &Message::new("„{0}“ lesen").param(remote_name(path))));
         }
         if offset > 0 && status != StatusCode::PARTIAL_CONTENT {
             return Err(AppError::other("Der Server kann nicht an einer Stelle weiterlesen.").with_detail("no-range"));
@@ -448,7 +460,7 @@ impl DavConn {
         if let Some(m) = mtime {
             req = req.header("X-OC-MTime", m.to_string());
         }
-        let what = format!("„{}“ schreiben", remote_name(path));
+        let what = Message::new("„{0}“ schreiben").param(remote_name(path));
         let task = tokio::spawn(async move {
             let resp = req.send().await.map_err(|e| {
                 AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
@@ -541,7 +553,13 @@ mod integration {
                 conn.list(&format!("{base}/a b")).await.unwrap().into_iter().map(|e| e.name).collect();
             assert_eq!(names, vec!["über.txt".to_string()]);
             assert_eq!(
-                conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b")).await.unwrap(),
+                conn.copy_within(
+                    std::slice::from_ref(&file),
+                    &format!("{base}/a b"),
+                    &crate::local::NameWords::german()
+                )
+                .await
+                .unwrap(),
                 vec!["über Kopie.txt".to_string()]
             );
             conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();

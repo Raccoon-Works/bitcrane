@@ -10,9 +10,9 @@
 //! connection keeps a small pool of logged-in sessions: browsing uses one,
 //! every transfer takes its own.
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
-use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
 use serde::Deserialize;
@@ -146,7 +146,7 @@ fn lost(e: impl std::fmt::Display) -> AppError {
 }
 
 /// Maps a negative reply to an error the interface understands.
-fn reply_error(code: u32, text: &str, what: &str) -> AppError {
+fn reply_error(code: u32, text: &str, what: &Message) -> AppError {
     let t = text.to_lowercase();
     let kind = match code {
         530 => ErrorKind::AuthFailed,
@@ -162,11 +162,11 @@ fn reply_error(code: u32, text: &str, what: &str) -> AppError {
         _ => ErrorKind::Other,
     };
     let message = match kind {
-        ErrorKind::AuthFailed => "Anmeldung abgelehnt: Benutzer oder Passwort falsch.".to_string(),
-        ErrorKind::PermissionDenied => format!("{what}: keine Berechtigung."),
-        ErrorKind::NotFound => format!("{what}: nicht gefunden."),
-        ErrorKind::AlreadyExists => format!("{what}: gibt es schon."),
-        _ => format!("{what} fehlgeschlagen."),
+        ErrorKind::AuthFailed => Message::new("Anmeldung abgelehnt: Benutzer oder Passwort falsch."),
+        ErrorKind::PermissionDenied => Message::new("{0}: keine Berechtigung.").param(what),
+        ErrorKind::NotFound => Message::new("{0}: nicht gefunden.").param(what),
+        ErrorKind::AlreadyExists => Message::new("{0}: gibt es schon.").param(what),
+        _ => Message::new("{0} fehlgeschlagen.").param(what),
     };
     AppError::new(kind, message).with_detail(format!("{code} {}", text.trim()))
 }
@@ -181,9 +181,7 @@ impl Shared {
         s.chars()
             .map(|c| {
                 u8::try_from(u32::from(c)).map_err(|_| {
-                    AppError::other(format!(
-                        "Das Zeichen „{c}“ gibt es im Zeichensatz Latin-1 nicht. Bitte den Namen ändern oder beim Server den Zeichensatz UTF-8 wählen."
-                    ))
+                    AppError::other("Das Zeichen „{0}“ gibt es im Zeichensatz Latin-1 nicht. Bitte den Namen ändern oder beim Server den Zeichensatz UTF-8 wählen.").param(c.to_string())
                 })
             })
             .collect()
@@ -241,9 +239,9 @@ pub fn cert_error(host: &str, fingerprint: String, stored: Option<String>) -> Ap
     let mut err = AppError::new(
         if changed { ErrorKind::HostKeyChanged } else { ErrorKind::HostKeyUnknown },
         if changed {
-            "Das Zertifikat des Servers hat sich geändert."
+            Message::new("Das Zertifikat des Servers hat sich geändert.")
         } else {
-            "Das Zertifikat dieses Servers ist noch nicht bekannt."
+            Message::new("Das Zertifikat dieses Servers ist noch nicht bekannt.")
         },
     );
     err.host_key = Some(Box::new(crate::error::HostKeyInfo {
@@ -329,7 +327,7 @@ impl Session {
     }
 
     /// Runs a command that must answer with one of `ok`.
-    async fn expect(&mut self, cmd: &str, arg: Option<&str>, ok: &[u32], what: &str) -> AppResult<String> {
+    async fn expect(&mut self, cmd: &str, arg: Option<&str>, ok: &[u32], what: &Message) -> AppResult<String> {
         let (code, text) = self.cmd(cmd, arg).await?;
         if ok.contains(&code) {
             Ok(text)
@@ -394,17 +392,17 @@ impl Session {
                 };
                 let (code, text) = s.cmd("PASS", Some(&pass)).await?;
                 if code != 230 && code != 202 {
-                    return Err(reply_error(code, &text, "Anmeldung"));
+                    return Err(reply_error(code, &text, &Message::new("Anmeldung")));
                 }
             }
-            _ => return Err(reply_error(code, &text, "Anmeldung")),
+            _ => return Err(reply_error(code, &text, &Message::new("Anmeldung"))),
         }
         if s.tls.is_some() {
-            s.expect("PBSZ", Some("0"), &[200], "TLS").await.map_err(|e| {
+            s.expect("PBSZ", Some("0"), &[200], &Message::new("TLS")).await.map_err(|e| {
                 AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.")
                     .with_detail(e.detail.unwrap_or_default())
             })?;
-            s.expect("PROT", Some("P"), &[200], "TLS").await.map_err(|e| {
+            s.expect("PROT", Some("P"), &[200], &Message::new("TLS")).await.map_err(|e| {
                 AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.")
                     .with_detail(e.detail.unwrap_or_default())
             })?;
@@ -438,7 +436,7 @@ impl Session {
 
     async fn set_type(&mut self, kind: char) -> AppResult<()> {
         if self.kind != kind {
-            self.expect("TYPE", Some(&kind.to_string()), &[200], "Übertragungsart").await?;
+            self.expect("TYPE", Some(&kind.to_string()), &[200], &Message::new("Übertragungsart")).await?;
             self.kind = kind;
         }
         Ok(())
@@ -462,7 +460,7 @@ impl Session {
     }
 
     async fn pwd(&mut self) -> AppResult<String> {
-        let text = self.expect("PWD", None, &[257], "Startordner").await?;
+        let text = self.expect("PWD", None, &[257], &Message::new("Startordner")).await?;
         // 257 "/home/test" is the current directory ("" inside the name stands for ").
         let start = text.find('"').map(|i| i + 1).unwrap_or(0);
         let mut out = String::new();
@@ -484,15 +482,15 @@ impl Session {
 
     /// Opens a passive data connection and runs `cmd` on it. Returns the
     /// data stream once the server has accepted the command.
-    async fn data(&mut self, cmd: &str, arg: Option<&str>, what: &str) -> AppResult<Io> {
+    async fn data(&mut self, cmd: &str, arg: Option<&str>, what: &Message) -> AppResult<Io> {
         let host = self.shared.params.host.clone();
         let epsv = self.shared.feats.lock().unwrap().epsv;
         let port = if epsv {
-            let text = self.expect("EPSV", None, &[229], "Datenverbindung").await?;
+            let text = self.expect("EPSV", None, &[229], &Message::new("Datenverbindung")).await?;
             // 229 Entering Extended Passive Mode (|||6446|)
             text.split('|').filter_map(|x| x.parse::<u16>().ok()).next().ok_or_else(|| lost(format!("EPSV: {text}")))?
         } else {
-            let text = self.expect("PASV", None, &[227], "Datenverbindung").await?;
+            let text = self.expect("PASV", None, &[227], &Message::new("Datenverbindung")).await?;
             let nums: Vec<u32> = text
                 .split(|c: char| !c.is_ascii_digit())
                 .filter(|x| !x.is_empty())
@@ -562,7 +560,7 @@ impl Session {
     }
 
     /// Waits for the end of a transfer ("226 Transfer complete").
-    async fn finish_data(&mut self, what: &str) -> AppResult<()> {
+    async fn finish_data(&mut self, what: &Message) -> AppResult<()> {
         let (code, text) = self.reply().await?;
         if (200..300).contains(&code) {
             Ok(())
@@ -571,7 +569,7 @@ impl Session {
         }
     }
 
-    async fn read_all(&mut self, cmd: &str, arg: Option<&str>, what: &str) -> AppResult<Vec<u8>> {
+    async fn read_all(&mut self, cmd: &str, arg: Option<&str>, what: &Message) -> AppResult<Vec<u8>> {
         let mut data = self.data(cmd, arg, what).await?;
         let mut buf = Vec::new();
         data.read_to_end(&mut buf).await.map_err(lost)?;
@@ -585,7 +583,7 @@ impl Session {
         let mlsd = self.shared.feats.lock().unwrap().mlsd;
         let mut out = Vec::new();
         if mlsd {
-            let raw = self.read_all("MLSD", Some(path), "Ordner lesen").await?;
+            let raw = self.read_all("MLSD", Some(path), &Message::new("Ordner lesen")).await?;
             for line in raw.split(|c| *c == b'\n') {
                 if let Some(e) = parse_mlsx(&self.shared.decode(line.strip_suffix(b"\r").unwrap_or(line))) {
                     out.push(e);
@@ -594,8 +592,8 @@ impl Session {
         } else {
             // "LIST -a" shows hidden files on most servers; the path goes via CWD
             // so names with spaces work everywhere.
-            self.expect("CWD", Some(path), &[250], "Ordner öffnen").await?;
-            let raw = self.read_all("LIST", Some("-a"), "Ordner lesen").await?;
+            self.expect("CWD", Some(path), &[250], &Message::new("Ordner öffnen")).await?;
+            let raw = self.read_all("LIST", Some("-a"), &Message::new("Ordner lesen")).await?;
             let tz = self.shared.params.tz_offset_min;
             for line in raw.split(|c| *c == b'\n') {
                 if let Some(e) = parse_list_line(&self.shared.decode(line.strip_suffix(b"\r").unwrap_or(line)), tz) {
@@ -632,7 +630,7 @@ impl Session {
                     }
                 }
             } else if code >= 500 {
-                return Err(reply_error(code, &text, &remote_name(path)));
+                return Err(reply_error(code, &text, &quoted_name(path)));
             }
         }
         let name = remote_name(path);
@@ -640,7 +638,7 @@ impl Session {
             .await?
             .into_iter()
             .find(|e| e.name == name)
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{name}“ gibt es nicht.")))
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es nicht.").param(name))
     }
 
     async fn exists(&mut self, path: &str) -> AppResult<bool> {
@@ -652,7 +650,7 @@ impl Session {
     }
 
     async fn mkdir(&mut self, path: &str) -> AppResult<()> {
-        self.expect("MKD", Some(path), &[257, 250], &format!("Ordner „{}“ anlegen", remote_name(path)))
+        self.expect("MKD", Some(path), &[257, 250], &Message::new("Ordner „{0}“ anlegen").param(remote_name(path)))
             .await
             .map(|_| ())
     }
@@ -674,12 +672,16 @@ impl Session {
     }
 
     async fn rename(&mut self, from: &str, to: &str) -> AppResult<()> {
-        self.expect("RNFR", Some(from), &[350], &format!("„{}“ umbenennen", remote_name(from))).await?;
-        self.expect("RNTO", Some(to), &[250], &format!("„{}“ umbenennen", remote_name(from))).await.map(|_| ())
+        self.expect("RNFR", Some(from), &[350], &Message::new("„{0}“ umbenennen").param(remote_name(from))).await?;
+        self.expect("RNTO", Some(to), &[250], &Message::new("„{0}“ umbenennen").param(remote_name(from)))
+            .await
+            .map(|_| ())
     }
 
     async fn delete_file(&mut self, path: &str) -> AppResult<()> {
-        self.expect("DELE", Some(path), &[250, 200], &format!("„{}“ löschen", remote_name(path))).await.map(|_| ())
+        self.expect("DELE", Some(path), &[250, 200], &Message::new("„{0}“ löschen").param(remote_name(path)))
+            .await
+            .map(|_| ())
     }
 
     async fn remove(&mut self, path: &str) -> AppResult<()> {
@@ -688,7 +690,8 @@ impl Session {
             for c in self.list(path).await? {
                 Box::pin(self.remove(&remote_join(path, &c.name))).await?;
             }
-            self.expect("RMD", Some(path), &[250, 200], &format!("Ordner „{}“ löschen", remote_name(path))).await?;
+            self.expect("RMD", Some(path), &[250, 200], &Message::new("Ordner „{0}“ löschen").param(remote_name(path)))
+                .await?;
         } else {
             self.delete_file(path).await?;
         }
@@ -698,7 +701,8 @@ impl Session {
     async fn chmod(&mut self, path: &str, mode: u32, recursive: bool) -> AppResult<()> {
         let e = self.stat(path).await?;
         let own = if recursive && e.kind != EntryKind::Dir { mode & 0o666 } else { mode };
-        self.expect("SITE", Some(&format!("CHMOD {:o} {path}", own)), &[200, 250], "Rechte setzen").await?;
+        self.expect("SITE", Some(&format!("CHMOD {:o} {path}", own)), &[200, 250], &Message::new("Rechte setzen"))
+            .await?;
         if recursive && e.kind == EntryKind::Dir {
             for c in self.list(path).await? {
                 Box::pin(self.chmod(&remote_join(path, &c.name), mode, true)).await?;
@@ -1027,7 +1031,7 @@ impl FtpConn {
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("„{}“ gibt es hier schon.", remote_name(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
         with_session!(self, |s| s.rename(from, to))
     }
@@ -1067,9 +1071,9 @@ impl FtpConn {
         let kind = s.kind_for(path);
         s.set_type(kind).await?;
         if offset > 0 {
-            s.expect("REST", Some(&offset.to_string()), &[350], "Fortsetzen").await?;
+            s.expect("REST", Some(&offset.to_string()), &[350], &Message::new("Fortsetzen")).await?;
         }
-        let io = s.data("RETR", Some(path), &format!("„{}“ lesen", remote_name(path))).await?;
+        let io = s.data("RETR", Some(path), &Message::new("„{0}“ lesen").param(remote_name(path))).await?;
         Ok((io, FtpFinish { conn: self.clone(), session: Some(s), what: "Lesen".into() }))
     }
 
@@ -1079,7 +1083,11 @@ impl FtpConn {
         let kind = s.kind_for(path);
         s.set_type(kind).await?;
         let io = s
-            .data(if append { "APPE" } else { "STOR" }, Some(path), &format!("„{}“ schreiben", remote_name(path)))
+            .data(
+                if append { "APPE" } else { "STOR" },
+                Some(path),
+                &Message::new("„{0}“ schreiben").param(remote_name(path)),
+            )
             .await?;
         Ok((io, FtpFinish { conn: self.clone(), session: Some(s), what: "Schreiben".into() }))
     }
@@ -1122,7 +1130,7 @@ pub async fn close_data(mut io: Io) -> AppResult<()> {
 pub struct FtpFinish {
     conn: Arc<FtpConn>,
     session: Option<Session>,
-    what: String,
+    what: Message,
 }
 
 impl FtpFinish {
@@ -1144,6 +1152,7 @@ impl FtpFinish {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Param;
 
     fn parse(json: serde_json::Value) -> Result<FtpParams, serde_json::Error> {
         serde_json::from_value(json)
@@ -1164,7 +1173,8 @@ mod tests {
         assert_eq!(shared.encode("Größe.txt").unwrap(), b"Gr\xf6\xdfe.txt");
         assert_eq!(shared.decode(b"Gr\xf6\xdfe.txt"), "Größe.txt");
         let err = shared.encode("Preise in €.txt").unwrap_err();
-        assert!(err.message.starts_with("Das Zeichen „€“ gibt es im Zeichensatz Latin-1 nicht."), "{}", err.message);
+        assert_eq!(err.message.params, [Param::from("€")]);
+        assert!(err.message.key.starts_with("Das Zeichen „{0}“ gibt es im Zeichensatz Latin-1 nicht."));
     }
 
     #[test]
@@ -1248,11 +1258,11 @@ mod tests {
 
     #[test]
     fn maps_reply_errors() {
-        assert_eq!(reply_error(530, "Login incorrect.", "x").kind, ErrorKind::AuthFailed);
-        assert_eq!(reply_error(550, "Permission denied.", "x").kind, ErrorKind::PermissionDenied);
-        assert_eq!(reply_error(550, "Failed to open file.", "x").kind, ErrorKind::NotFound);
+        assert_eq!(reply_error(530, "Login incorrect.", &Message::new("x")).kind, ErrorKind::AuthFailed);
+        assert_eq!(reply_error(550, "Permission denied.", &Message::new("x")).kind, ErrorKind::PermissionDenied);
+        assert_eq!(reply_error(550, "Failed to open file.", &Message::new("x")).kind, ErrorKind::NotFound);
         assert_eq!(
-            reply_error(550, "Create directory operation failed. File exists", "x").kind,
+            reply_error(550, "Create directory operation failed. File exists", &Message::new("x")).kind,
             ErrorKind::AlreadyExists
         );
     }

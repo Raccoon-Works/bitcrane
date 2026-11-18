@@ -5,7 +5,7 @@
 //! extracted first), but nothing inside can be changed.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::local::copy_name;
+use crate::local::{copy_name, NameWords};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{to_native, to_ui};
 use std::collections::BTreeMap;
@@ -184,7 +184,7 @@ pub fn list(archive: &Path, inner: &str) -> AppResult<Vec<FileEntry>> {
     let all = items(archive)?;
     let prefix = if inner.is_empty() { String::new() } else { format!("{inner}/") };
     if !inner.is_empty() && !all.iter().any(|i| i.dir && i.path == inner) {
-        return Err(AppError::new(ErrorKind::NotFound, format!("„{inner}“ gibt es im Archiv nicht.")));
+        return Err(AppError::new(ErrorKind::NotFound, "„{0}“ gibt es im Archiv nicht.").param(inner));
     }
     let mut seen: BTreeMap<String, FileEntry> = BTreeMap::new();
     for it in &all {
@@ -219,7 +219,7 @@ pub fn stat(archive: &Path, inner: &str) -> AppResult<FileEntry> {
     let it = all
         .iter()
         .find(|i| i.path == inner)
-        .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{inner}“ gibt es im Archiv nicht.")))?;
+        .ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es im Archiv nicht.").param(inner))?;
     Ok(entry(inner.rsplit('/').next().unwrap_or(inner), it))
 }
 
@@ -281,19 +281,18 @@ pub fn read(archive: &Path, inner: &str, limit: usize) -> AppResult<Vec<u8>> {
         out = Some(buf);
         Ok(false)
     })?;
-    out.ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{inner}“ gibt es im Archiv nicht.")))
+    out.ok_or_else(|| AppError::new(ErrorKind::NotFound, "„{0}“ gibt es im Archiv nicht.").param(inner))
 }
 
 /// Copies an entry (file or folder) out of the archive into `dest_dir`; a
-/// clashing name gets " Kopie". Returns the name used.
-pub fn extract(archive: &Path, inner: &str, dest_dir: &Path) -> AppResult<String> {
-    let base = inner.rsplit('/').next().unwrap_or(inner).to_string();
-    let base = if base.is_empty() {
-        archive.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Archiv".into())
-    } else {
-        base
+/// clashing name gets " Kopie" (in the interface language). Returns the name used.
+pub fn extract(archive: &Path, inner: &str, dest_dir: &Path, words: &NameWords) -> AppResult<String> {
+    let base = match inner.rsplit('/').next().unwrap_or(inner) {
+        // The whole archive: its own name, or the word for an archive when it has none.
+        "" => archive.file_stem().map_or_else(|| words.archive.clone(), |n| n.to_string_lossy().into_owned()),
+        name => name.to_string(),
     };
-    let name = copy_name(|n| dest_dir.join(n).exists(), &base);
+    let name = copy_name(|n| dest_dir.join(n).exists(), &base, words);
     let is_dir = inner.is_empty() || stat(archive, inner)?.kind == EntryKind::Dir;
     let target_root = dest_dir.join(&name);
     if is_dir {
@@ -347,13 +346,13 @@ pub fn walk(archive: &Path, inner: &str, ui_path: &str) -> AppResult<Vec<WalkIte
 
 /// Extracts entries (paths inside archives) into a new temporary folder, so
 /// they can be uploaded like ordinary files. Returns the folder and the names.
-pub fn extract_to_temp(paths: &[String]) -> AppResult<(String, Vec<String>)> {
+pub fn extract_to_temp(paths: &[String], words: &NameWords) -> AppResult<(String, Vec<String>)> {
     let dir = std::env::temp_dir().join("bitcrane-archive").join(uuid::Uuid::new_v4().simple().to_string());
     fs::create_dir_all(&dir).map_err(err)?;
     let mut names = Vec::new();
     for p in paths {
         let (archive, inner) = split(p).ok_or_else(|| err(format!("{p}: not in an archive")))?;
-        names.push(extract(&archive, &inner, &dir)?);
+        names.push(extract(&archive, &inner, &dir, words)?);
     }
     Ok((to_ui(&dir), names))
 }
@@ -369,7 +368,7 @@ mod tests {
         fs::create_dir_all(base.join("site/css")).unwrap();
         fs::write(base.join("site/index.html"), "<h1>Hallo</h1>").unwrap();
         fs::write(base.join("site/css/a.css"), "body{}").unwrap();
-        crate::archive::compress(&[base.join("site").to_string_lossy().into_owned()]).unwrap();
+        crate::archive::compress(&[base.join("site").to_string_lossy().into_owned()], &NameWords::german()).unwrap();
         let zip = base.join("site.zip");
         let p = |rest: &str| format!("{}{rest}", zip.to_string_lossy());
         let (a, inner) = split(&p("/site/css")).unwrap();
@@ -384,7 +383,7 @@ mod tests {
         assert_eq!(read(&zip, "site/index.html", 100).unwrap(), b"<h1>Hallo</h1>");
         let out = base.join("out");
         fs::create_dir_all(&out).unwrap();
-        assert_eq!(extract(&zip, "site/css", &out).unwrap(), "css");
+        assert_eq!(extract(&zip, "site/css", &out, &NameWords::german()).unwrap(), "css");
         assert_eq!(fs::read_to_string(out.join("css/a.css")).unwrap(), "body{}");
         // tar.gz with an implied folder
         let tgz = base.join("b.tgz");
@@ -437,7 +436,7 @@ mod tests {
         for (i, entry) in ["../evil.txt", "/tmp/evil.txt", "C:/evil.txt"].iter().enumerate() {
             let tar = base.join(format!("t{i}.tar"));
             crafted_tar(&tar, entry);
-            assert!(extract(&tar, "", &out).is_err(), "tar entry {entry} must be refused");
+            assert!(extract(&tar, "", &out, &NameWords::german()).is_err(), "tar entry {entry} must be refused");
             let zip = base.join(format!("z{i}.zip"));
             {
                 let mut w = zip::ZipWriter::new(fs::File::create(&zip).unwrap());
@@ -447,8 +446,11 @@ mod tests {
                 io::Write::write_all(&mut w, b"bad").unwrap();
                 w.finish().unwrap();
             }
-            assert!(crate::archive::extract(&zip.to_string_lossy()).is_err(), "zip entry {entry} must be refused");
-            assert!(extract(&zip, "", &out).is_err(), "zip entry {entry} must be refused");
+            assert!(
+                crate::archive::extract(&zip.to_string_lossy(), &NameWords::german()).is_err(),
+                "zip entry {entry} must be refused"
+            );
+            assert!(extract(&zip, "", &out, &NameWords::german()).is_err(), "zip entry {entry} must be refused");
         }
         // Nothing escaped, and no half-extracted folder is left behind.
         assert!(!base.join("evil.txt").exists());

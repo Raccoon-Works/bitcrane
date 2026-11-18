@@ -5,7 +5,7 @@
  */
 import { listen } from '@tauri-apps/api/event';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
-import type { LocalShell } from '../../backend/api';
+import { toBackendError, type LocalShell } from '../../backend/api';
 import type { Tab } from '../../backend/types';
 import { $t } from '../../i18n';
 import { fromBase64 } from '../../util/base64';
@@ -178,7 +178,7 @@ export function attachTerminal(id: string, container: HTMLElement) {
             shell: session.serverId ? undefined : session.shell || terminalSettings().localShell || undefined,
           })
           .catch((e) => {
-            l.term.writeln(`\x1b[31m${(e as { message?: string }).message ?? String(e)}\x1b[0m`);
+            l.term.writeln(`\x1b[31m${toBackendError(e).message}\x1b[0m`);
             markEnded(id);
           });
       // A terminal reopened at the start waits until its server is connected.

@@ -14,8 +14,13 @@
 //!
 //! On Windows Bitcrane is a windowed program, so the command line attaches to
 //! the console it was started from.
+//!
+//! Everything it prints is English, as is usual for command lines and independent of the app's
+//! language (docs/cli.md says so). Its own texts are written in English here; messages of the
+//! core, whose keys are German, are printed with their English text from the interface's
+//! dictionary (see `i18n.rs`).
 
-use crate::error::{AppError, AppResult, ErrorKind};
+use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::ftp::FtpTls;
 use crate::model::EntryKind;
 use crate::paths::{remote_join, remote_name, to_ui};
@@ -95,7 +100,7 @@ async fn run(mut args: Vec<String>) -> i32 {
     let config = match crate::config::load(&dir) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("bitcrane: {}", e.message);
+            eprintln!("bitcrane: {}", e.message.english());
             return 1;
         }
     };
@@ -119,21 +124,21 @@ async fn run(mut args: Vec<String>) -> i32 {
     match result {
         Ok(()) => 0,
         Err(e) if e.kind == ErrorKind::Other && e.detail.as_deref() == Some("usage") => {
-            eprintln!("bitcrane: {}\n\n{USAGE}", e.message);
+            eprintln!("bitcrane: {}\n\n{USAGE}", e.message.english());
             2
         }
         Err(e) => {
             match &e.detail {
-                Some(d) if d != "usage" => eprintln!("bitcrane: {} ({d})", e.message),
-                _ => eprintln!("bitcrane: {}", e.message),
+                Some(d) if d != "usage" => eprintln!("bitcrane: {} ({d})", e.message.english()),
+                _ => eprintln!("bitcrane: {}", e.message.english()),
             }
             1
         }
     }
 }
 
-fn usage(message: &str) -> AppError {
-    AppError::other(message.to_string()).with_detail("usage")
+fn usage(message: impl Into<Message>) -> AppError {
+    AppError::other(message).with_detail("usage")
 }
 
 fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
@@ -145,7 +150,7 @@ fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
 fn take_option(args: &mut Vec<String>, name: &str) -> AppResult<Option<String>> {
     let Some(i) = args.iter().position(|a| a == name) else { return Ok(None) };
     if i + 1 >= args.len() {
-        return Err(usage(&format!("{name} needs a value")));
+        return Err(usage(Message::new("{0} needs a value").param(name)));
     }
     let v = args.remove(i + 1);
     args.remove(i);
@@ -173,34 +178,37 @@ fn servers(ctx: &Ctx) {
     }
 }
 
+/// Looks up a saved password or token by account name. The command line reads the system keychain;
+/// tests pass their own.
+type Secrets<'a> = &'a dyn Fn(&str) -> Option<String>;
+
+fn keychain(account: &str) -> Option<String> {
+    crate::config::secret_get(account).ok().flatten()
+}
+
 /// "name:path" -> (server, path). A Windows drive ("C:\x") is not a server.
-fn split_target<'a>(ctx: &'a Ctx, spec: &str) -> AppResult<(&'a Value, Option<String>)> {
+fn find_target<'a>(servers: &'a [Value], spec: &str) -> AppResult<(&'a Value, Option<String>)> {
     let (name, path) = match spec.split_once(':') {
         Some((n, p)) => (n, Some(p.to_string()).filter(|p| !p.is_empty())),
         None => (spec, None),
     };
-    let found = ctx
-        .servers
+    let found = servers
         .iter()
         .find(|s| str_of(s, "id") == name)
-        .or_else(|| ctx.servers.iter().find(|s| str_of(s, "name").eq_ignore_ascii_case(name)));
+        .or_else(|| servers.iter().find(|s| str_of(s, "name").eq_ignore_ascii_case(name)));
     found.map(|s| (s, path)).ok_or_else(|| {
-        AppError::new(ErrorKind::NotFound, format!("No saved server called \"{name}\" (see: bitcrane servers)."))
+        AppError::new(ErrorKind::NotFound, "No saved server called \"{0}\" (see: bitcrane servers).").param(name)
     })
 }
 
-fn secret(account: &str) -> Option<String> {
-    crate::config::secret_get(account).ok().flatten()
-}
-
 /// Login data for SSH, built like the app does (live.ts buildAuth).
-fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectParams> {
+fn ssh_params(servers: &[Value], s: &Value, depth: u8, secrets: Secrets) -> AppResult<crate::ssh::ConnectParams> {
     let host = str_of(s, "host");
     let port = s.get("port").and_then(Value::as_u64).unwrap_or(22);
     let user = str_of(s, "user");
     let key_path = str_of(s, "keyPath");
-    let password = secret(&format!("password:{user}@{host}:{port}"));
-    let passphrase = secret(&format!("passphrase:{key_path}"));
+    let password = secrets(&format!("password:{user}@{host}:{port}"));
+    let passphrase = secrets(&format!("passphrase:{key_path}"));
     let auth = match str_of(s, "auth") {
         "key" => json!({ "method": "key", "path": key_path, "passphrase": passphrase }),
         "agent" => json!({ "method": "agent" }),
@@ -209,8 +217,9 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
             None => {
                 return Err(AppError::new(
                     ErrorKind::PasswordRequired,
-                    format!("No password saved for {}. Connect once in Bitcrane and save it.", str_of(s, "name")),
-                ))
+                    "No password saved for {0}. Connect once in Bitcrane and save it.",
+                )
+                .param(str_of(s, "name")))
             }
         },
         _ => {
@@ -218,8 +227,8 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
         }
     };
     let jump = match s.get("jumpServerId").and_then(Value::as_str) {
-        Some(id) if depth < 4 && id != str_of(s, "id") => match ctx.servers.iter().find(|x| str_of(x, "id") == id) {
-            Some(j) => Some(Box::new(ssh_params(ctx, j, depth + 1)?)),
+        Some(id) if depth < 4 && id != str_of(s, "id") => match servers.iter().find(|x| str_of(x, "id") == id) {
+            Some(j) => Some(Box::new(ssh_params(servers, j, depth + 1, secrets)?)),
             None => None,
         },
         _ => None,
@@ -230,7 +239,7 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
     }))
     .map_err(|e| AppError::other("Server entry not readable.").with_detail(e.to_string()))?;
     params.jump = jump;
-    params.proxy = proxy(s);
+    params.proxy = proxy(s, secrets);
     Ok(params)
 }
 
@@ -238,11 +247,12 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
 /// silently becoming the default.
 fn setting<T: serde::de::DeserializeOwned + Default>(s: &Value, key: &str) -> AppResult<T> {
     s.get(key).map_or(Ok(T::default()), |v| {
-        serde_json::from_value(v.clone()).map_err(|e| AppError::other(format!("Invalid {key}: {e}")))
+        serde_json::from_value(v.clone())
+            .map_err(|e| AppError::other("Invalid {0}: {1}").param(key).param(e.to_string()))
     })
 }
 
-fn proxy(s: &Value) -> Option<crate::proxy::ProxyParams> {
+fn proxy(s: &Value, secrets: Secrets) -> Option<crate::proxy::ProxyParams> {
     let p = s.get("proxy")?;
     let host = str_of(p, "host");
     if host.is_empty() {
@@ -250,7 +260,7 @@ fn proxy(s: &Value) -> Option<crate::proxy::ProxyParams> {
     }
     let port = p.get("port").and_then(Value::as_u64).unwrap_or(1080);
     let user = p.get("user").and_then(Value::as_str).filter(|u| !u.is_empty()).map(str::to_string);
-    let password = user.as_ref().and_then(|u| secret(&format!("proxy:{u}@{host}:{port}")));
+    let password = user.as_ref().and_then(|u| secrets(&format!("proxy:{u}@{host}:{port}")));
     Some(crate::proxy::ProxyParams {
         kind: str_of(p, "kind").to_string(),
         host: host.to_string(),
@@ -260,98 +270,123 @@ fn proxy(s: &Value) -> Option<crate::proxy::ProxyParams> {
     })
 }
 
+/// Host, port (0 when not set: the protocol's default) and user of a server that is not SSH.
+fn login(s: &Value) -> (String, u16, String) {
+    let port = s.get("port").and_then(Value::as_u64).unwrap_or(0) as u16;
+    (str_of(s, "host").to_string(), port, str_of(s, "user").to_string())
+}
+
+fn saved_password(s: &Value, secrets: Secrets) -> Option<String> {
+    let (host, port, user) = login(s);
+    secrets(&format!("password:{user}@{host}:{port}"))
+}
+
+fn flag(s: &Value, key: &str, default: bool) -> bool {
+    s.get(key).and_then(Value::as_bool).unwrap_or(default)
+}
+
+/// ":port" for a URL, empty for the default port of the scheme.
+fn port_part(port: u16, default: u16) -> String {
+    if port == 0 || port == default {
+        String::new()
+    } else {
+        format!(":{port}")
+    }
+}
+
+fn ftp_params(s: &Value, secrets: Secrets) -> AppResult<crate::ftp::FtpParams> {
+    let (host, port, user) = login(s);
+    let tls = if str_of(s, "protocol") == "ftp" {
+        FtpTls::None
+    } else if flag(s, "implicitTls", false) {
+        FtpTls::Implicit
+    } else {
+        FtpTls::Explicit
+    };
+    Ok(crate::ftp::FtpParams {
+        timeout: None,
+        password: saved_password(s, secrets),
+        host,
+        port,
+        user,
+        tls,
+        tls13_only: flag(s, "tls13Only", false),
+        encoding: setting(s, "ftpEncoding")?,
+        tz_offset_min: s.get("ftpTimezone").and_then(Value::as_i64).unwrap_or(0) as i32,
+        mode: setting(s, "ftpMode")?,
+        trust: None,
+        proxy: proxy(s, secrets),
+    })
+}
+
+fn dav_params(s: &Value, secrets: Secrets) -> crate::dav::DavParams {
+    let (host, port, user) = login(s);
+    let https = flag(s, "davHttps", true);
+    let path = match str_of(s, "davPath") {
+        "" => "/".to_string(),
+        p if p.starts_with('/') => p.to_string(),
+        p => format!("/{p}"),
+    };
+    let (scheme, default_port) = if https { ("https", 443) } else { ("http", 80) };
+    crate::dav::DavParams {
+        timeout: None,
+        url: format!("{scheme}://{host}{}{path}", port_part(port, default_port)),
+        password: saved_password(s, secrets),
+        user,
+        tls13_only: flag(s, "tls13Only", false),
+        trust: None,
+        proxy: proxy(s, secrets),
+    }
+}
+
+fn s3_params(s: &Value, secrets: Secrets) -> crate::s3::S3Params {
+    let (host, port, user) = login(s);
+    let (scheme, default_port) = if flag(s, "s3Http", false) { ("http", 80) } else { ("https", 443) };
+    crate::s3::S3Params {
+        timeout: None,
+        endpoint: format!("{scheme}://{host}{}", port_part(port, default_port)),
+        region: str_of(s, "s3Region").to_string(),
+        bucket: str_of(s, "s3Bucket").to_string(),
+        secret: saved_password(s, secrets),
+        access_key: user,
+        path_style: flag(s, "s3PathStyle", false),
+        tls13_only: flag(s, "tls13Only", false),
+        trust: None,
+        proxy: proxy(s, secrets),
+    }
+}
+
+fn smb_params(s: &Value, secrets: Secrets) -> crate::smb::SmbParams {
+    let (host, port, user) = login(s);
+    crate::smb::SmbParams {
+        timeout: None,
+        password: saved_password(s, secrets),
+        host,
+        port: if port == 0 { 445 } else { port },
+        user,
+        share: str_of(s, "smbShare").to_string(),
+        encrypt: flag(s, "smbEncrypt", false),
+    }
+}
+
 /// Connects to a saved server with any protocol.
 async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
     let name = str_of(s, "name");
     if !ctx.quiet {
         eprintln!("Connecting to {name} ...");
     }
-    let host = str_of(s, "host").to_string();
-    let port = s.get("port").and_then(Value::as_u64).unwrap_or(0) as u16;
-    let user = str_of(s, "user").to_string();
-    let password = || secret(&format!("password:{user}@{host}:{port}"));
     let cloud_token = || {
-        secret(&format!("cloud:{}", str_of(s, "id"))).ok_or_else(|| {
-            AppError::new(ErrorKind::AuthFailed, format!("{name} is not signed in. Sign in once in Bitcrane."))
+        keychain(&format!("cloud:{}", str_of(s, "id"))).ok_or_else(|| {
+            AppError::new(ErrorKind::AuthFailed, "{0} is not signed in. Sign in once in Bitcrane.").param(name)
         })
     };
-    let protocol = str_of(s, "protocol");
-    let conn = match protocol {
+    let conn = match str_of(s, "protocol") {
         "ftp" | "ftps" => {
-            let tls = if protocol == "ftp" {
-                FtpTls::None
-            } else if s.get("implicitTls").and_then(Value::as_bool).unwrap_or(false) {
-                FtpTls::Implicit
-            } else {
-                FtpTls::Explicit
-            };
-            let params = crate::ftp::FtpParams {
-                timeout: None,
-                host: host.clone(),
-                port,
-                user: user.clone(),
-                password: password(),
-                tls,
-                tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
-                encoding: setting(s, "ftpEncoding")?,
-                tz_offset_min: s.get("ftpTimezone").and_then(Value::as_i64).unwrap_or(0) as i32,
-                mode: setting(s, "ftpMode")?,
-                trust: None,
-                proxy: proxy(s),
-            };
-            Remote::Ftp(Arc::new(crate::ftp::FtpConn::connect(params, ctx.known.clone()).await?))
+            Remote::Ftp(Arc::new(crate::ftp::FtpConn::connect(ftp_params(s, &keychain)?, ctx.known.clone()).await?))
         }
-        "webdav" => {
-            let https = s.get("davHttps").and_then(Value::as_bool).unwrap_or(true);
-            let port_part =
-                if port == 0 || port == if https { 443 } else { 80 } { String::new() } else { format!(":{port}") };
-            let path = match str_of(s, "davPath") {
-                "" => "/".to_string(),
-                p if p.starts_with('/') => p.to_string(),
-                p => format!("/{p}"),
-            };
-            let url = format!("{}://{host}{port_part}{path}", if https { "https" } else { "http" });
-            let params = crate::dav::DavParams {
-                timeout: None,
-                url,
-                user: user.clone(),
-                password: password(),
-                tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
-                trust: None,
-                proxy: proxy(s),
-            };
-            Remote::Dav(crate::dav::DavConn::connect(params, ctx.known.clone()).await?)
-        }
-        "s3" => {
-            let http = s.get("s3Http").and_then(Value::as_bool).unwrap_or(false);
-            let port_part =
-                if port == 0 || port == if http { 80 } else { 443 } { String::new() } else { format!(":{port}") };
-            let params = crate::s3::S3Params {
-                timeout: None,
-                endpoint: format!("{}://{host}{port_part}", if http { "http" } else { "https" }),
-                region: str_of(s, "s3Region").to_string(),
-                bucket: str_of(s, "s3Bucket").to_string(),
-                access_key: user.clone(),
-                secret: password(),
-                path_style: s.get("s3PathStyle").and_then(Value::as_bool).unwrap_or(false),
-                tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
-                trust: None,
-                proxy: proxy(s),
-            };
-            Remote::S3(Arc::new(crate::s3::S3Conn::connect(params, ctx.known.clone()).await?))
-        }
-        "smb" => {
-            let params = crate::smb::SmbParams {
-                timeout: None,
-                host: host.clone(),
-                port: if port == 0 { 445 } else { port },
-                user: user.clone(),
-                password: password(),
-                share: str_of(s, "smbShare").to_string(),
-                encrypt: s.get("smbEncrypt").and_then(Value::as_bool).unwrap_or(false),
-            };
-            Remote::Smb(Arc::new(crate::smb::SmbConn::connect(params).await?))
-        }
+        "webdav" => Remote::Dav(crate::dav::DavConn::connect(dav_params(s, &keychain), ctx.known.clone()).await?),
+        "s3" => Remote::S3(Arc::new(crate::s3::S3Conn::connect(s3_params(s, &keychain), ctx.known.clone()).await?)),
+        "smb" => Remote::Smb(Arc::new(crate::smb::SmbConn::connect(smb_params(s, &keychain)).await?)),
         "dropbox" => Remote::Dropbox(Arc::new(
             crate::dropbox::DropboxConn::connect(crate::dropbox::DropboxParams { refresh_token: cloud_token()? })
                 .await?,
@@ -369,7 +404,7 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
         }
         "gdrive" => {
             let client_id = str_of(&ctx.settings, "googleClientId").trim().to_string();
-            let client_secret = secret("cloud-client:gdrive").unwrap_or_default();
+            let client_secret = keychain("cloud-client:gdrive").unwrap_or_default();
             if client_id.is_empty() || client_secret.is_empty() {
                 return Err(AppError::other("The Google app key is missing. Enter it once in Bitcrane."));
             }
@@ -383,35 +418,35 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
                 .await?,
             ))
         }
-        _ => crate::remote::connect_ssh(&ssh_params(ctx, s, 0)?, ctx.known.clone(), None).await.map_err(|e| match e
-            .kind
-        {
-            ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => {
-                AppError::new(e.kind, format!("The host key of {name} is not confirmed. Connect once in Bitcrane."))
-            }
-            _ => e,
-        })?,
+        _ => crate::remote::connect_ssh(&ssh_params(&ctx.servers, s, 0, &keychain)?, ctx.known.clone(), None)
+            .await
+            .map_err(|e| match e.kind {
+                ErrorKind::HostKeyUnknown | ErrorKind::HostKeyChanged => {
+                    AppError::new(e.kind, "The host key of {0} is not confirmed. Connect once in Bitcrane.").param(name)
+                }
+                _ => e,
+            })?,
     };
     Ok(conn)
 }
 
 /// The folder a command works in: the given path, else the server's start folder.
-fn start_dir(conn: &Remote, s: &Value, path: Option<String>) -> String {
+fn start_dir(home: &str, s: &Value, path: Option<String>) -> String {
     match path {
         Some(p) if p.starts_with('/') => p,
-        Some(p) => remote_join(conn.home(), &p),
+        Some(p) => remote_join(home, &p),
         None => match str_of(s, "remoteStart") {
             p if p.starts_with('/') => p.to_string(),
-            _ => conn.home().to_string(),
+            _ => home.to_string(),
         },
     }
 }
 
 async fn ls(ctx: &Ctx, args: &[String]) -> AppResult<()> {
     let [spec] = args else { return Err(usage("ls needs exactly one <server>[:<path>]")) };
-    let (s, path) = split_target(ctx, spec)?;
+    let (s, path) = find_target(&ctx.servers, spec)?;
     let conn = connect(ctx, s).await?;
-    let dir = start_dir(&conn, s, path);
+    let dir = start_dir(conn.home(), s, path);
     let list = conn.list(&dir).await;
     conn.close().await;
     for e in list? {
@@ -442,14 +477,14 @@ async fn upload(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
     if args.is_empty() {
         return Err(usage("upload needs at least one local file or folder"));
     }
-    let (s, path) = split_target(ctx, &to)?;
+    let (s, path) = find_target(&ctx.servers, &to)?;
     let conn = connect(ctx, s).await?;
-    let dest = start_dir(&conn, s, path);
+    let dest = start_dir(conn.home(), s, path);
     let opts = options(ctx);
     let mut failed = 0;
     for local in &args {
         let abs = std::fs::canonicalize(local).map_err(|e| {
-            AppError::new(ErrorKind::NotFound, format!("\"{local}\" not found.")).with_detail(e.to_string())
+            AppError::new(ErrorKind::NotFound, "\"{0}\" not found.").param(local).with_detail(e.to_string())
         })?;
         let ui = to_ui(&abs);
         for item in crate::local::walk(&ui)? {
@@ -464,14 +499,14 @@ async fn upload(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
                 }
                 Err(e) => {
                     failed += 1;
-                    eprintln!("failed {target}: {}", e.message);
+                    eprintln!("failed {target}: {}", e.message.english());
                 }
             }
         }
     }
     conn.close().await;
     if failed > 0 {
-        return Err(AppError::other(format!("{failed} file(s) failed.")));
+        return Err(AppError::other("{0} file(s) failed.").param(failed.to_string()));
     }
     Ok(())
 }
@@ -482,14 +517,14 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
         return Err(usage("download needs at least one <server>:<path>"));
     }
     let dest = std::fs::canonicalize(&to).map_err(|e| {
-        AppError::new(ErrorKind::NotFound, format!("Local folder \"{to}\" not found.")).with_detail(e.to_string())
+        AppError::new(ErrorKind::NotFound, "Local folder \"{0}\" not found.").param(to).with_detail(e.to_string())
     })?;
     let dest_ui = to_ui(&dest);
     let mut failed = 0;
     // One connection per server, even when several paths name the same one.
     let mut open: Vec<(String, Remote)> = Vec::new();
     for spec in &args {
-        let (s, path) = split_target(ctx, spec)?;
+        let (s, path) = find_target(&ctx.servers, spec)?;
         let Some(path) = path else { return Err(usage("download needs <server>:<path>")) };
         let id = str_of(s, "id").to_string();
         if !open.iter().any(|(i, _)| *i == id) {
@@ -520,7 +555,7 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
                 }
                 Err(e) => {
                     failed += 1;
-                    eprintln!("failed {}: {}", item.path, e.message);
+                    eprintln!("failed {}: {}", item.path, e.message.english());
                 }
             }
         }
@@ -529,7 +564,144 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
         c.close().await;
     }
     if failed > 0 {
-        return Err(AppError::other(format!("{failed} file(s) failed.")));
+        return Err(AppError::other("{0} file(s) failed.").param(failed.to_string()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ftp::FtpEncoding;
+    use crate::ssh::AuthParams;
+
+    /// Invented servers as the app stores them in its settings file.
+    fn servers() -> Vec<Value> {
+        vec![
+            json!({ "id": "s1", "name": "Webserver", "host": "web.example", "port": 2222, "user": "anna",
+                    "auth": "password", "jumpServerId": "s2" }),
+            json!({ "id": "s2", "name": "Bastion", "host": "jump.example", "user": "ops", "auth": "key",
+                    "keyPath": "~/.ssh/id_ed25519", "proxy": { "kind": "socks5", "host": "proxy.example",
+                    "user": "pu" } }),
+            json!({ "id": "f1", "name": "Shop FTP", "protocol": "ftps", "host": "ftp.example", "user": "shop",
+                    "implicitTls": true, "ftpEncoding": "latin1" }),
+            json!({ "id": "d1", "name": "Cloud", "protocol": "webdav", "host": "dav.example", "port": 8443,
+                    "user": "ben", "davPath": "remote.php/dav" }),
+            json!({ "id": "b1", "name": "Bucket", "protocol": "s3", "host": "s3.example", "port": 443,
+                    "user": "AKIDEXAMPLE", "s3Region": "eu-central-1", "s3Bucket": "fotos" }),
+            json!({ "id": "n1", "name": "NAS", "protocol": "smb", "host": "nas.example", "user": "ben",
+                    "smbShare": "daten" }),
+        ]
+    }
+
+    /// The keychain of the tests: every account has a password of its own name.
+    fn secrets(account: &str) -> Option<String> {
+        Some(format!("secret for {account}"))
+    }
+
+    fn no_secrets(_: &str) -> Option<String> {
+        None
+    }
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|a| a.to_string()).collect()
+    }
+
+    #[test]
+    fn flags_and_options_are_taken_out_of_the_arguments() {
+        let mut a = args(&["upload", "--quiet", "a.txt", "--to", "Webserver:/srv", "b.txt"]);
+        assert!(take_flag(&mut a, "--quiet"));
+        assert!(!take_flag(&mut a, "--quiet"));
+        assert_eq!(take_option(&mut a, "--to").unwrap().as_deref(), Some("Webserver:/srv"));
+        assert_eq!(a, args(&["upload", "a.txt", "b.txt"]));
+        assert_eq!(take_option(&mut a, "--to").unwrap(), None);
+        let missing = take_option(&mut args(&["download", "--to"]), "--to").unwrap_err();
+        assert_eq!(missing.detail.as_deref(), Some("usage"));
+        assert_eq!(missing.message.english(), "--to needs a value");
+    }
+
+    #[test]
+    fn servers_are_found_by_id_or_name_with_an_optional_path() {
+        let all = servers();
+        let (s, path) = find_target(&all, "webserver:/var/www").unwrap();
+        assert_eq!((str_of(s, "id"), path.as_deref()), ("s1", Some("/var/www")));
+        let (s, path) = find_target(&all, "f1").unwrap();
+        assert_eq!((str_of(s, "name"), path), ("Shop FTP", None));
+        // "name:" without a path means the start folder.
+        assert_eq!(find_target(&all, "NAS:").unwrap().1, None);
+        let unknown = find_target(&all, "C:\\Users").unwrap_err();
+        assert_eq!(unknown.kind, ErrorKind::NotFound);
+        assert_eq!(unknown.message.english(), "No saved server called \"C\" (see: bitcrane servers).");
+    }
+
+    #[test]
+    fn ssh_login_comes_from_the_entry_the_keychain_and_the_jump_server() {
+        let all = servers();
+        let p = ssh_params(&all, &all[0], 0, &secrets).unwrap();
+        assert_eq!((p.host.as_str(), p.port, p.user.as_str()), ("web.example", 2222, "anna"));
+        assert!(
+            matches!(&p.auth, AuthParams::Password { password } if password == "secret for password:anna@web.example:2222")
+        );
+        let jump = p.jump.expect("jump server");
+        assert_eq!((jump.host.as_str(), jump.port), ("jump.example", 22));
+        assert!(matches!(&jump.auth, AuthParams::Key { path, passphrase: Some(_) } if path == "~/.ssh/id_ed25519"));
+        let proxy = jump.proxy.expect("proxy");
+        assert_eq!((proxy.host.as_str(), proxy.port, proxy.user.as_deref()), ("proxy.example", 1080, Some("pu")));
+        assert_eq!(proxy.password.as_deref(), Some("secret for proxy:pu@proxy.example:1080"));
+        assert!(p.proxy.is_none());
+    }
+
+    #[test]
+    fn ssh_with_password_needs_a_saved_one() {
+        let all = servers();
+        let e = ssh_params(&all, &all[0], 0, &no_secrets).err().expect("no password saved");
+        assert_eq!(e.kind, ErrorKind::PasswordRequired);
+        assert_eq!(e.message.english(), "No password saved for Webserver. Connect once in Bitcrane and save it.");
+    }
+
+    #[test]
+    fn a_jump_server_pointing_at_itself_is_ignored() {
+        let looped = [json!({ "id": "x", "name": "Loop", "host": "loop.example", "jumpServerId": "x" })];
+        assert!(ssh_params(&looped, &looped[0], 0, &no_secrets).unwrap().jump.is_none());
+    }
+
+    #[test]
+    fn ftp_dav_s3_and_smb_parameters_follow_the_saved_entry() {
+        let all = servers();
+        let ftp = ftp_params(&all[2], &secrets).unwrap();
+        assert_eq!(
+            (ftp.host.as_str(), ftp.port, ftp.tls, ftp.encoding),
+            ("ftp.example", 0, FtpTls::Implicit, FtpEncoding::Latin1)
+        );
+        assert_eq!(ftp.password.as_deref(), Some("secret for password:shop@ftp.example:0"));
+
+        let dav = dav_params(&all[3], &secrets);
+        assert_eq!(dav.url, "https://dav.example:8443/remote.php/dav");
+        let dav_default_port = dav_params(&json!({ "host": "dav.example", "port": 443 }), &no_secrets);
+        assert_eq!(dav_default_port.url, "https://dav.example/");
+
+        let s3 = s3_params(&all[4], &secrets);
+        assert_eq!(
+            (s3.endpoint.as_str(), s3.bucket.as_str(), s3.access_key.as_str()),
+            ("https://s3.example", "fotos", "AKIDEXAMPLE")
+        );
+
+        let smb = smb_params(&all[5], &no_secrets);
+        assert_eq!((smb.port, smb.share.as_str(), smb.password), (445, "daten", None));
+    }
+
+    #[test]
+    fn an_unknown_setting_value_is_refused() {
+        let e = ftp_params(&json!({ "protocol": "ftp", "ftpMode": "sideways" }), &no_secrets).err().expect("refused");
+        assert!(e.message.english().starts_with("Invalid ftpMode: "), "{}", e.message.english());
+    }
+
+    #[test]
+    fn the_start_folder_is_the_path_the_saved_start_or_home() {
+        let s = json!({ "remoteStart": "/srv/www" });
+        assert_eq!(start_dir("/home/anna", &s, Some("/tmp".into())), "/tmp");
+        assert_eq!(start_dir("/home/anna", &s, Some("logs".into())), "/home/anna/logs");
+        assert_eq!(start_dir("/home/anna", &s, None), "/srv/www");
+        assert_eq!(start_dir("/home/anna", &json!({}), None), "/home/anna");
+    }
 }
