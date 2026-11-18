@@ -7,9 +7,9 @@
 //! 8 MB pieces. The modification time is kept as Dropbox's "client_modified".
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth::{self, ascii_json};
-use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -61,10 +61,6 @@ fn dbx_path(path: &str) -> String {
     }
 }
 
-fn parse_time(s: Option<&str>) -> i64 {
-    s.and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map(|d| d.timestamp_millis()).unwrap_or(0)
-}
-
 /// One entry of a folder listing or of get_metadata.
 fn entry_of(v: &Value) -> Option<FileEntry> {
     let tag = v.get(".tag")?.as_str()?;
@@ -74,7 +70,7 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
         return None;
     }
     // The time the file was changed on the computer it came from; Dropbox keeps it as sent.
-    let mtime = parse_time(
+    let mtime = crate::model::rfc3339_ms(
         v.get("client_modified").and_then(|t| t.as_str()).or_else(|| v.get("server_modified").and_then(|t| t.as_str())),
     );
     Some(FileEntry::plain(name, dir, v.get("size").and_then(|s| s.as_u64()).unwrap_or(0), mtime))
@@ -344,11 +340,7 @@ impl DropboxConn {
             let cursor = v.get("cursor").and_then(|c| c.as_str()).unwrap_or_default().to_string();
             v = self.rpc("files/list_folder/continue", json!({ "cursor": cursor }), &what).await?;
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -358,7 +350,7 @@ impl DropboxConn {
             // The top folder has no metadata of its own.
             return Ok(FileEntry {
                 name: "/".into(),
-                kind: "dir".into(),
+                kind: EntryKind::Dir,
                 size: 0,
                 mtime: 0,
                 perms: "755".into(),
@@ -368,7 +360,7 @@ impl DropboxConn {
                 hidden: 0,
             });
         }
-        let v = self.rpc("files/get_metadata", json!({ "path": p }), &format!("„{}“", remote_name(path))).await?;
+        let v = self.rpc("files/get_metadata", json!({ "path": p }), &quoted_name(path)).await?;
         entry_of(&v)
             .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
@@ -447,13 +439,8 @@ impl DropboxConn {
         let base = remote_parent(path);
         let root = self.stat(path).await?;
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
-        if root.kind != "dir" {
-            return Ok(vec![WalkItem {
-                path: path.to_string(),
-                relative: rel(path),
-                size: root.size,
-                mtime: root.mtime,
-            }]);
+        if root.kind != EntryKind::Dir {
+            return Ok(vec![WalkItem::with_real_names(path.to_string(), rel(path), root.size, root.mtime)]);
         }
         let what = format!("„{}“ lesen", remote_name(path));
         let mut v = self
@@ -468,7 +455,7 @@ impl DropboxConn {
                 // path_display keeps the user's spelling of the names.
                 let Some(p) = e.get("path_display").and_then(|p| p.as_str()) else { continue };
                 if let Some(f) = entry_of(e) {
-                    out.push(WalkItem { path: p.to_string(), relative: rel(p), size: f.size, mtime: f.mtime });
+                    out.push(WalkItem::with_real_names(p.to_string(), rel(p), f.size, f.mtime));
                 }
             }
             if !v.get("has_more").and_then(|h| h.as_bool()).unwrap_or(false) {
@@ -601,7 +588,7 @@ mod tests {
         assert_eq!(dbx_path("/Fotos/2026/"), "/Fotos/2026");
         let v = json!({ ".tag": "file", "name": "a.txt", "size": 42, "client_modified": "2026-10-29T08:00:00Z", "server_modified": "2026-10-29T09:00:00Z" });
         let e = entry_of(&v).unwrap();
-        assert_eq!((e.kind.as_str(), e.size, e.mtime), ("file", 42, 1793260800000));
+        assert_eq!((e.kind, e.size, e.mtime), (EntryKind::File, 42, 1793260800000));
         assert!(entry_of(&json!({ ".tag": "deleted", "name": "x" })).is_none());
         let c = DropboxConn::commit("/a/ü.txt", Some(1793260800));
         assert_eq!(c["client_modified"], "2026-10-29T08:00:00Z");

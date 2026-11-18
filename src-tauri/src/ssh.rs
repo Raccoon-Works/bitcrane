@@ -7,7 +7,7 @@
 //! the UI and the frontend reconnects with `trust` set to that fingerprint.
 
 use crate::error::{AppError, AppResult, ErrorKind, HostKeyInfo};
-use crate::model::{perms_string, FileEntry, WalkItem};
+use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name};
 use russh::client;
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg};
@@ -476,6 +476,11 @@ async fn password_login(
     Ok((st, methods))
 }
 
+/// Keys "Automatisch" offers at most before a stored password. OpenSSH servers close the
+/// connection after `MaxAuthTries` failed attempts (6 by default), and every key offered counts;
+/// four leave room for the password and its keyboard-interactive fallback.
+const KEY_TRIES_BEFORE_PASSWORD: usize = 4;
+
 /// Default private keys tried by "Automatisch", like the ssh command does.
 fn default_keys() -> Vec<String> {
     ["id_ed25519", "id_ecdsa", "id_rsa"]
@@ -498,7 +503,8 @@ async fn authenticate(
         AuthParams::Password { password } => password_login(handle, params, password, &prompter).await?,
         AuthParams::Key { path, passphrase } => key_login(handle, &user, path, passphrase.as_deref()).await?,
         AuthParams::Agent => {
-            if authenticate_with_agent(handle, &user).await? {
+            let mut unlimited = usize::MAX;
+            if authenticate_with_agent(handle, &user, &mut unlimited).await? {
                 (Step::Done, Vec::new())
             } else {
                 (Step::Rejected, Vec::new())
@@ -506,43 +512,52 @@ async fn authenticate(
         }
         AuthParams::Auto { key_path, passphrase, password } => {
             let mut result = (Step::Rejected, Vec::new());
-            // 1. SSH agent (silently skipped when there is none).
-            if let Ok(true) = authenticate_with_agent(handle, &user).await {
-                result = (Step::Done, Vec::new());
+            let mut tries_left = if password.is_some() { KEY_TRIES_BEFORE_PASSWORD } else { usize::MAX };
+            let mut needs_passphrase = false;
+            // 1. The key chosen for this server, the one most likely to be accepted; an encrypted
+            //    key needs its passphrase.
+            if let Some(k) = key_path {
+                match key_login(handle, &user, k, passphrase.as_deref()).await {
+                    Ok(r) => {
+                        tries_left -= 1;
+                        result = r;
+                    }
+                    Err(e) => needs_passphrase = e.kind == ErrorKind::PassphraseRequired,
+                }
             }
-            // 2. The chosen key, then the default keys; encrypted keys need their passphrase.
+            // 2. SSH agent (silently skipped when there is none).
             if matches!(result.0, Step::Rejected) {
-                let mut keys: Vec<String> = key_path.iter().cloned().collect();
-                keys.extend(default_keys().into_iter().filter(|k| Some(k) != key_path.as_ref()));
-                let mut needs_passphrase = false;
-                for k in keys {
-                    let pass = if Some(&k) == key_path.as_ref() { passphrase.as_deref() } else { None };
-                    match key_login(handle, &user, &k, pass).await {
-                        Ok(r) if !matches!(r.0, Step::Rejected) => {
-                            result = r;
+                if let Ok(true) = authenticate_with_agent(handle, &user, &mut tries_left).await {
+                    result = (Step::Done, Vec::new());
+                }
+            }
+            // 3. The default keys, as long as attempts are left.
+            if matches!(result.0, Step::Rejected) {
+                for k in default_keys().into_iter().filter(|k| Some(k) != key_path.as_ref()) {
+                    if tries_left == 0 {
+                        break;
+                    }
+                    if let Ok(r) = key_login(handle, &user, &k, None).await {
+                        tries_left -= 1;
+                        let accepted = !matches!(r.0, Step::Rejected);
+                        result = r;
+                        if accepted {
                             break;
                         }
-                        Ok(r) => result.1 = r.1,
-                        Err(e) if e.kind == ErrorKind::PassphraseRequired && Some(&k) == key_path.as_ref() => {
-                            needs_passphrase = true
-                        }
-                        Err(_) => {}
                     }
                 }
-                // 3. Password (or keyboard-interactive), asked for if not given.
-                if matches!(result.0, Step::Rejected) {
-                    match password {
-                        Some(pw) => result = password_login(handle, params, pw, &prompter).await?,
-                        None if needs_passphrase => {
-                            return Err(AppError::new(
-                                ErrorKind::PassphraseRequired,
-                                "Der Schlüssel ist mit einer Passphrase geschützt.",
-                            ))
-                        }
-                        None => {
-                            return Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort."))
-                        }
+            }
+            // 4. Password (or keyboard-interactive), asked for if not given.
+            if matches!(result.0, Step::Rejected) {
+                match password {
+                    Some(pw) => result = password_login(handle, params, pw, &prompter).await?,
+                    None if needs_passphrase => {
+                        return Err(AppError::new(
+                            ErrorKind::PassphraseRequired,
+                            "Der Schlüssel ist mit einer Passphrase geschützt.",
+                        ))
                     }
+                    None => return Err(AppError::new(ErrorKind::PasswordRequired, "Der Server möchte ein Passwort.")),
                 }
             }
             result
@@ -788,33 +803,39 @@ impl Session {
     }
 }
 
-/// Agent sockets to try on macOS and Linux, in this order. Apps started from
-/// the Finder do not see `SSH_AUTH_SOCK` from a shell profile, so the usual
-/// places of the Bitwarden and 1Password agents are checked as well.
+/// Agent sockets to try on macOS, in this order. Apps started from the Finder do not see
+/// `SSH_AUTH_SOCK` from a shell profile, so the usual places of the Bitwarden and 1Password
+/// agents are checked as well. Each agent appears once, also when it is reached through a link
+/// (1Password suggests linking ~/.1password/agent.sock): every key offered twice would count
+/// against the server's `MaxAuthTries`.
 #[cfg(unix)]
 fn agent_sockets() -> Vec<std::path::PathBuf> {
     let home = crate::paths::home();
+    let candidates = std::env::var_os("SSH_AUTH_SOCK").map(std::path::PathBuf::from).into_iter().chain(
+        [
+            ".bitwarden-ssh-agent.sock",
+            "Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock",
+            "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
+            ".1password/agent.sock",
+        ]
+        .map(|rel| home.join(rel)),
+    );
     let mut out = Vec::new();
-    if let Some(sock) = std::env::var_os("SSH_AUTH_SOCK") {
-        out.push(std::path::PathBuf::from(sock));
-    }
-    for rel in [
-        ".bitwarden-ssh-agent.sock",
-        "Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock",
-        "snap/bitwarden/current/.bitwarden-ssh-agent.sock",
-        "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
-        ".1password/agent.sock",
-    ] {
-        let p = home.join(rel);
-        if !out.contains(&p) {
-            out.push(p);
+    for real in candidates.filter_map(|p| std::fs::canonicalize(p).ok()) {
+        if !out.contains(&real) {
+            out.push(real);
         }
     }
-    out.into_iter().filter(|p| p.exists()).collect()
+    out
 }
 
+/// Offers the keys of the SSH agents, at most `tries_left` of them (counted down).
 #[cfg(unix)]
-async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &str) -> AppResult<bool> {
+async fn authenticate_with_agent(
+    handle: &mut client::Handle<Handler>,
+    user: &str,
+    tries_left: &mut usize,
+) -> AppResult<bool> {
     let sockets = agent_sockets();
     if sockets.is_empty() {
         return Err(AppError::new(
@@ -825,7 +846,7 @@ async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &st
     let mut any_keys = false;
     for sock in sockets {
         let Ok(mut agent) = russh::keys::agent::client::AgentClient::connect_uds(&sock).await else { continue };
-        match try_agent_identities(handle, user, &mut agent).await {
+        match try_agent_identities(handle, user, &mut agent, tries_left).await {
             Ok(AgentOutcome::Accepted) => return Ok(true),
             Ok(AgentOutcome::Rejected) => any_keys = true,
             Ok(AgentOutcome::NoKeys) | Err(_) => {}
@@ -838,21 +859,26 @@ async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &st
     }
 }
 
+/// Offers the keys of the SSH agents, at most `tries_left` of them (counted down).
 #[cfg(windows)]
-async fn authenticate_with_agent(handle: &mut client::Handle<Handler>, user: &str) -> AppResult<bool> {
+async fn authenticate_with_agent(
+    handle: &mut client::Handle<Handler>,
+    user: &str,
+    tries_left: &mut usize,
+) -> AppResult<bool> {
     // Windows' OpenSSH agent pipe (also used by 1Password and Bitwarden), then Pageant.
     let mut any_keys = false;
     if let Ok(mut agent) =
         russh::keys::agent::client::AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await
     {
-        match try_agent_identities(handle, user, &mut agent).await {
+        match try_agent_identities(handle, user, &mut agent, tries_left).await {
             Ok(AgentOutcome::Accepted) => return Ok(true),
             Ok(AgentOutcome::Rejected) => any_keys = true,
             _ => {}
         }
     }
     if let Ok(mut agent) = russh::keys::agent::client::AgentClient::connect_pageant().await {
-        match try_agent_identities(handle, user, &mut agent).await {
+        match try_agent_identities(handle, user, &mut agent, tries_left).await {
             Ok(AgentOutcome::Accepted) => return Ok(true),
             Ok(AgentOutcome::Rejected) => any_keys = true,
             _ => {}
@@ -876,6 +902,7 @@ async fn try_agent_identities<S>(
     handle: &mut client::Handle<Handler>,
     user: &str,
     agent: &mut russh::keys::agent::client::AgentClient<S>,
+    tries_left: &mut usize,
 ) -> AppResult<AgentOutcome>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
@@ -886,6 +913,10 @@ where
     }
     let hash = handle.best_supported_rsa_hash().await?.flatten();
     for id in identities {
+        if *tries_left == 0 {
+            break;
+        }
+        *tries_left -= 1;
         // Certificates in the agent (company SSH CAs) are offered as certificates;
         // keys on hardware tokens (FIDO2, "sk-" keys) sign inside the agent like any other key.
         let result = match &id {
@@ -918,7 +949,7 @@ impl Connection {
     fn entry(name: String, attrs: &russh_sftp::protocol::FileAttributes) -> FileEntry {
         FileEntry {
             name,
-            kind: if attrs.is_dir() { "dir".into() } else { "file".into() },
+            kind: if attrs.is_dir() { EntryKind::Dir } else { EntryKind::File },
             size: if attrs.is_dir() { 0 } else { attrs.size.unwrap_or(0) },
             mtime: attrs.mtime.map(|t| t as i64 * 1000).unwrap_or(0),
             perms: attrs.permissions.map(perms_string).unwrap_or_else(|| "644".into()),
@@ -950,11 +981,7 @@ impl Connection {
             entry.link = link;
             out.push(entry);
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -1230,9 +1257,9 @@ impl Connection {
     }
 }
 
-/// Integration tests against a real SSH server. They run only when
-/// `BITCRANE_TEST_SSH=host:port` is set (plus the user and key variables
-/// below), so a normal `cargo test` stays offline.
+/// Integration tests against a real SSH server, ignored by a normal `cargo test`. They run with
+/// `cargo test -- --ignored` and `BITCRANE_TEST_SSH=host:port` plus the user and key variables
+/// below; a missing variable fails the test instead of letting it pass unseen.
 #[cfg(test)]
 mod integration {
     use super::*;
@@ -1250,18 +1277,19 @@ mod integration {
         password: String,
     }
 
-    fn env() -> Option<Env> {
-        let target = std::env::var("BITCRANE_TEST_SSH").ok()?;
-        let (host, port) = target.split_once(':')?;
-        Some(Env {
+    fn env() -> Env {
+        let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set"));
+        let target = var("BITCRANE_TEST_SSH");
+        let (host, port) = target.split_once(':').expect("BITCRANE_TEST_SSH is host:port");
+        Env {
             host: host.into(),
-            port: port.parse().ok()?,
+            port: port.parse().expect("BITCRANE_TEST_SSH has a port number"),
             user: std::env::var("BITCRANE_TEST_USER").unwrap_or_else(|_| "test".into()),
-            key: std::env::var("BITCRANE_TEST_KEY").ok()?,
-            key_pass: std::env::var("BITCRANE_TEST_KEY_PASS").ok()?,
-            passphrase: std::env::var("BITCRANE_TEST_PASSPHRASE").ok()?,
-            password: std::env::var("BITCRANE_TEST_PASSWORD").ok()?,
-        })
+            key: var("BITCRANE_TEST_KEY"),
+            key_pass: var("BITCRANE_TEST_KEY_PASS"),
+            passphrase: var("BITCRANE_TEST_PASSPHRASE"),
+            password: var("BITCRANE_TEST_PASSWORD"),
+        }
     }
 
     fn params(e: &Env, auth: AuthParams, trust: Option<String>) -> ConnectParams {
@@ -1283,9 +1311,10 @@ mod integration {
 
     /// Local, dynamic (SOCKS5) and remote tunnels each reach the SSH server's own port.
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_SSH and the key variables"]
     async fn port_forwarding() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let Some(e) = env() else { return };
+        let e = env();
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };
@@ -1347,8 +1376,9 @@ mod integration {
     }
 
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_SSH and the key variables"]
     async fn full_flow() {
-        let Some(e) = env() else { return };
+        let e = env();
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")));
         let key = || AuthParams::Key { path: e.key.clone(), passphrase: None };

@@ -3,8 +3,8 @@
 //! address ("/" is the address itself).
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
-use crate::paths::{remote_join, remote_name};
+use crate::model::{EntryKind, FileEntry, WalkItem};
+use crate::paths::{quoted_name, remote_join, remote_name};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
 use futures_util::TryStreamExt;
@@ -170,7 +170,7 @@ fn parse_multistatus(xml: &str, base_path: &str) -> Vec<(String, FileEntry)> {
             rel,
             FileEntry {
                 name,
-                kind: if is_dir { "dir".into() } else { "file".into() },
+                kind: if is_dir { EntryKind::Dir } else { EntryKind::File },
                 size: if is_dir { 0 } else { size },
                 mtime,
                 perms: if is_dir { "755".into() } else { "644".into() },
@@ -288,7 +288,7 @@ impl DavConn {
             )
             .await?;
         if resp.status().as_u16() != 207 {
-            return Err(status_err(resp.status(), &format!("„{}“", remote_name(path))));
+            return Err(status_err(resp.status(), &quoted_name(path)));
         }
         let xml = resp.text().await.map_err(|e| {
             AppError::new(ErrorKind::ConnectionLost, "Antwort unvollständig.").with_detail(e.to_string())
@@ -301,11 +301,7 @@ impl DavConn {
         let me = if me.is_empty() { "/" } else { me };
         let mut out: Vec<FileEntry> =
             self.propfind(path, "1").await?.into_iter().filter(|(p, _)| p != me).map(|(_, e)| e).collect();
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -482,21 +478,23 @@ mod tests {
         let r = parse_multistatus(xml, "/dav/files/c");
         assert_eq!(r.len(), 3);
         assert_eq!(r[0].0, "/");
-        assert_eq!((r[1].0.as_str(), r[1].1.kind.as_str()), ("/Neuer Ordner", "dir"));
+        assert_eq!((r[1].0.as_str(), r[1].1.kind), ("/Neuer Ordner", EntryKind::Dir));
         assert_eq!(r[1].1.mtime, 1793102400000);
         assert_eq!((r[2].1.name.as_str(), r[2].1.size), ("über.txt", 42));
     }
 }
 
-/// Integration test against a WebDAV server: `BITCRANE_TEST_DAV=http://…,https://…`.
+/// Integration test against a WebDAV server (`cargo test -- --ignored`):
+/// `BITCRANE_TEST_DAV=http://…,https://…`.
 #[cfg(test)]
 mod integration {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_DAV"]
     async fn dav_round_trip() {
-        let Ok(urls) = std::env::var("BITCRANE_TEST_DAV") else { return };
+        let urls = std::env::var("BITCRANE_TEST_DAV").expect("BITCRANE_TEST_DAV=http://…,https://…");
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
         for url in urls.split(',') {

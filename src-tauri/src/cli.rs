@@ -17,6 +17,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::FtpTls;
+use crate::model::EntryKind;
 use crate::paths::{remote_join, remote_name, to_ui};
 use crate::remote::Remote;
 use crate::ssh::KnownHosts;
@@ -417,11 +418,11 @@ async fn ls(ctx: &Ctx, args: &[String]) -> AppResult<()> {
         let when = chrono::DateTime::from_timestamp_millis(e.mtime)
             .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_default();
-        let size = if e.kind == "dir" { "-".to_string() } else { e.size.to_string() };
+        let size = if e.kind == EntryKind::Dir { "-".to_string() } else { e.size.to_string() };
         println!(
             "{}\t{size}\t{when}\t{}",
-            if e.kind == "dir" { "d" } else { "f" },
-            if e.kind == "dir" { format!("{}/", e.name) } else { e.name }
+            if e.kind == EntryKind::Dir { "d" } else { "f" },
+            if e.kind == EntryKind::Dir { format!("{}/", e.name) } else { e.name }
         );
     }
     Ok(())
@@ -501,7 +502,7 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
             eprintln!("nothing to download in {}", remote_name(&remote));
         }
         for item in items {
-            let target = remote_join(&dest_ui, &item.relative);
+            let target = remote_join(&dest_ui, &item.local_relative);
             match crate::transfer::download(
                 conn,
                 &item.path,

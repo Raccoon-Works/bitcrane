@@ -15,7 +15,8 @@
 //! When it is missing, the interface is asked to connect again.
 
 use crate::error::{AppError, AppResult};
-use crate::paths::{remote_name, sync_root_to_remote as to_remote};
+use crate::model::EntryKind;
+use crate::paths::{remote_name, storable_name, sync_root_to_remote as to_remote};
 use crate::remote::Remote;
 use cloud_filter::error::{CResult, CloudErrorKind};
 use cloud_filter::filter::{info, ticket, Filter, Request};
@@ -304,11 +305,12 @@ impl Filter for ServerFilter {
         let mut placeholders: Vec<PlaceholderFile> = entries
             .into_iter()
             // Half-written uploads stay invisible; existing local files are not replaced.
-            .filter(|e| !e.name.ends_with(".bitcrane-part") && !dir.join(&e.name).exists())
-            .map(|e| {
+            .map(|e| (storable_name(&e.name), e))
+            .filter(|(name, e)| !e.name.ends_with(".bitcrane-part") && !dir.join(name).exists())
+            .map(|(name, e)| {
                 let written = file_time(e.mtime);
-                let meta = if e.kind == "dir" { Metadata::directory() } else { Metadata::file().size(e.size) };
-                PlaceholderFile::new(&e.name)
+                let meta = if e.kind == EntryKind::Dir { Metadata::directory() } else { Metadata::file().size(e.size) };
+                PlaceholderFile::new(&name)
                     .metadata(meta.written(written).created(written).changed(written))
                     .mark_in_sync()
             })

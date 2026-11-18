@@ -9,8 +9,6 @@ import {
   parent,
   relFolder,
   segments,
-  winNameFromSafe,
-  winSafeRel,
 } from './paths';
 
 describe('segments', () => {
@@ -135,38 +133,5 @@ describe('archives', () => {
     expect(archiveFolder('~/a/site.zip')).toBe(true);
     expect(archiveFolder('~/a/site.zip/css')).toBe(true);
     expect(archiveFolder('~/a/site')).toBe(false);
-  });
-});
-
-describe('Windows-safe names', () => {
-  it('encodes characters Windows forbids', () => {
-    expect(winSafeRel('a:b.txt')).toBe('a%3Ab.txt');
-    expect(winSafeRel('dir/what?.txt')).toBe('dir/what%3F.txt');
-    expect(winSafeRel('tab\tname')).toBe('tab%09name');
-  });
-
-  it('encodes a trailing dot or space', () => {
-    expect(winSafeRel('name.')).toBe('name%2E');
-    expect(winSafeRel('name ')).toBe('name%20');
-  });
-
-  it('encodes the first letter of reserved names', () => {
-    expect(winSafeRel('CON')).toBe('%43ON');
-    expect(winSafeRel('con.txt')).toBe('%63on.txt');
-    expect(winSafeRel('lpt1')).toBe('%6Cpt1');
-    expect(winSafeRel('console.txt')).toBe('console.txt');
-  });
-
-  it('leaves other percent signs alone in both directions', () => {
-    expect(winSafeRel('100%41')).toBe('100%41');
-    expect(winNameFromSafe('100%41')).toBe('100%41');
-    expect(winNameFromSafe('%41BC')).toBe('%41BC');
-    expect(winNameFromSafe('a%2Eb')).toBe('a%2Eb');
-  });
-
-  it('round-trips the names it encodes', () => {
-    for (const name of ['a:b', 'q?*<>|"', 'CON', 'con.txt', 'lpt1.log', 'x.', 'a b ', 'back\\slash', 'plain.txt']) {
-      expect(winNameFromSafe(winSafeRel(name))).toBe(name);
-    }
   });
 });

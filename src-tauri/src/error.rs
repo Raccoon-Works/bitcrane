@@ -76,6 +76,13 @@ impl AppError {
     pub fn other(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::Other, message)
     }
+
+    /// What a system feature answers on a system Bitcrane does not support (CONTRIBUTING rule 3).
+    /// Linux builds exist only for development, tests and Clippy, so they get this instead.
+    #[cfg(not(any(target_os = "macos", windows)))]
+    pub fn unsupported_system() -> Self {
+        Self::other("Das gibt es nur unter macOS und Windows.")
+    }
 }
 
 impl std::fmt::Display for AppError {

@@ -7,25 +7,16 @@ use russh::keys::ssh_key::LineEnding;
 use russh::keys::{Algorithm, PrivateKey};
 use std::path::Path;
 
-/// Writes a file readable only by the user (private keys must not be readable by others).
+/// Writes a new file, never replacing one. On macOS it is readable only by the user (ssh refuses
+/// private keys that others can read); on Windows the file gets the permissions of its folder.
 fn write_private(path: &Path, content: &str) -> AppResult<()> {
+    use std::io::Write;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
     #[cfg(unix)]
-    {
-        use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut f = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path)?;
-        f.write_all(content.as_bytes())?;
-        Ok(())
-    }
-    #[cfg(not(unix))]
-    {
-        // On Windows the file lives in the user's profile, which only the user can read.
-        if path.exists() {
-            return Err(AppError::new(ErrorKind::AlreadyExists, "Diese Datei gibt es schon."));
-        }
-        std::fs::write(path, content)?;
-        Ok(())
-    }
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options.open(path)?.write_all(content.as_bytes())?;
+    Ok(())
 }
 
 /// Creates `path` (private key) and `path.pub` (public key). Returns the public key line.
@@ -154,16 +145,21 @@ mod tests {
         assert!(matches!(russh::keys::load_secret_key(&locked, None), Err(russh::keys::Error::KeyIsEncrypted)));
         assert!(russh::keys::load_secret_key(&locked, Some("geheim")).is_ok());
         assert!(generate(&locked, "x", None).is_err(), "never overwrites an existing key");
-        // PuTTY keys (created with puttygen during the integration setup) if present.
-        if std::path::Path::new("/tmp/sshtest/kp.ppk").exists() {
-            let p = public_of("/tmp/sshtest/kp.ppk").unwrap();
-            assert!(p.starts_with("ssh-ed25519 "));
-            assert_eq!(p.split(' ').nth(1), public_of("/tmp/sshtest/id_plain").unwrap().split(' ').nth(1));
-        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             assert_eq!(std::fs::metadata(dir.path().join("plain")).unwrap().permissions().mode() & 0o777, 0o600);
         }
+    }
+
+    /// The public half of a passphrase-protected PuTTY key is read without the passphrase.
+    #[test]
+    #[ignore = "needs the SSH test keys: BITCRANE_TEST_PPK_PASS (puttygen copy of BITCRANE_TEST_KEY)"]
+    fn reads_the_public_half_of_putty_keys() {
+        let ppk = std::env::var("BITCRANE_TEST_PPK_PASS").expect("BITCRANE_TEST_PPK_PASS");
+        let key = std::env::var("BITCRANE_TEST_KEY").expect("BITCRANE_TEST_KEY");
+        let p = public_of(&ppk).unwrap();
+        assert!(p.starts_with("ssh-ed25519 "));
+        assert_eq!(p.split(' ').nth(1), public_of(&key).unwrap().split(' ').nth(1));
     }
 }

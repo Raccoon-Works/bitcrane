@@ -1057,7 +1057,6 @@
   "Datenverbindung": "Conexión de datos",
   "Ungültiger Servername für TLS.": "Nombre de servidor no válido para TLS.",
   "Datei konnte nicht abgeschlossen werden.": "No se ha podido finalizar el archivo.",
-  "Diese Datei gibt es schon.": "Este archivo ya existe.",
   "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.": "Ya existe una clave con este nombre. Elige otro nombre.",
   "Schlüssel konnte nicht erzeugt werden.": "No se ha podido generar la clave.",
   "Öffentlicher Schlüssel fehlerhaft.": "Clave pública no válida.",

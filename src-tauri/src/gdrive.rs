@@ -16,9 +16,9 @@
 //!   cannot be downloaded as they are; they are listed with size 0.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth;
-use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -113,10 +113,6 @@ fn quoted(name: &str) -> String {
     format!("'{}'", name.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
-fn parse_time(s: Option<&str>) -> i64 {
-    s.and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map(|d| d.timestamp_millis()).unwrap_or(0)
-}
-
 fn rfc3339(secs: u32) -> Option<String> {
     chrono::DateTime::from_timestamp(secs as i64, 0).map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
@@ -142,7 +138,7 @@ fn entry_of(v: &Value, pdf: bool) -> Option<FileEntry> {
         name,
         dir,
         v.get("size").and_then(|s| s.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0),
-        parse_time(v.get("modifiedTime").and_then(|t| t.as_str())),
+        crate::model::rfc3339_ms(v.get("modifiedTime").and_then(|t| t.as_str())),
     ))
 }
 
@@ -374,7 +370,7 @@ impl GDriveConn {
     /// Metadata of a path, looked up folder by folder (ids are cached).
     async fn lookup(&self, path: &str) -> AppResult<Value> {
         let path = norm(path);
-        let what = format!("„{}“", remote_name(&path));
+        let what = quoted_name(&path);
         if path == "/" {
             return Ok(json!({ "id": "root", "name": "/", "mimeType": FOLDER }));
         }
@@ -440,11 +436,7 @@ impl GDriveConn {
             }
             out.push(e);
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -452,7 +444,7 @@ impl GDriveConn {
         if norm(path) == "/" {
             return Ok(FileEntry {
                 name: "/".into(),
-                kind: "dir".into(),
+                kind: EntryKind::Dir,
                 size: 0,
                 mtime: 0,
                 perms: "755".into(),
@@ -799,9 +791,9 @@ mod tests {
         assert_eq!(norm("/Fotos/2026/"), "/Fotos/2026");
         assert_eq!(quoted("Max's \\ Ordner"), "'Max\\'s \\\\ Ordner'");
         let f = entry_of(&json!({ "id": "1", "name": "a.txt", "mimeType": "text/plain", "size": "42", "modifiedTime": "2026-10-29T08:00:00.000Z" }), false).unwrap();
-        assert_eq!((f.kind.as_str(), f.size, f.mtime), ("file", 42, 1793260800000));
+        assert_eq!((f.kind, f.size, f.mtime), (EntryKind::File, 42, 1793260800000));
         let d = entry_of(&json!({ "id": "2", "name": "Fotos", "mimeType": FOLDER }), false).unwrap();
-        assert_eq!(d.kind, "dir");
+        assert_eq!(d.kind, EntryKind::Dir);
         assert!(entry_of(
             &json!({ "id": "3", "name": "x", "mimeType": "application/vnd.google-apps.shortcut" }),
             false

@@ -5,6 +5,7 @@
 import * as fs from '../backend/mockFs';
 import * as live from './live';
 import type { PaneSide, Tab } from '../backend/types';
+import type { WalkItem } from '../backend/api';
 
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
@@ -109,10 +110,7 @@ function pruneSelection() {
 }
 
 /** Walk results per folder, reused for a minute while typing. */
-const walkCache = new Map<
-  string,
-  { at: number; items: Array<{ path: string; relative: string; size: number; mtime: number }> }
->();
+const walkCache = new Map<string, { at: number; items: WalkItem[] }>();
 let deepTimer: number | undefined;
 let deepRun = 0;
 
@@ -235,20 +233,24 @@ async function runDeepSearch(query: string) {
     if (!cached || Date.now() - cached.at > 60_000) {
       const items = LIVE
         ? await live.walkFiles(...loc, base)
-        : fs.walkFiles(...loc, base).map((f) => ({
-            path: f.path,
-            relative: paths.basename(base) + f.path.slice(base.length),
-            size: f.entry.size,
-            mtime: f.entry.mtime,
-          }));
+        : fs.walkFiles(...loc, base).map((f) => {
+            const relative = paths.basename(base) + f.path.slice(base.length);
+            return { path: f.path, relative, localRelative: relative, size: f.entry.size, mtime: f.entry.mtime };
+          });
       cached = { at: Date.now(), items };
       walkCache.set(key, cached);
     }
     if (run !== deepRun) return;
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     const all = cached.items
-      // Walk results start with the walked folder's own name.
-      .map((i) => ({ path: i.path, rel: i.relative.split('/').slice(1).join('/'), size: i.size, mtime: i.mtime }))
+      // Walk results start with the walked folder's own name; files of this computer are shown
+      // with the names they have here.
+      .map((i) => ({
+        path: i.path,
+        rel: (side === 'local' ? i.localRelative : i.relative).split('/').slice(1).join('/'),
+        size: i.size,
+        mtime: i.mtime,
+      }))
       .filter(
         (i) =>
           (getState().settings.showHidden || !i.rel.split('/').some((seg) => seg.startsWith('.'))) &&

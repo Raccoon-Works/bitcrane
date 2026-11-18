@@ -115,14 +115,7 @@ const IS_MAC = !/Win/i.test(`${navigator.platform} ${navigator.userAgent}`);
 function titleCase(text: string): string {
   // Split into quoted and unquoted parts; only the unquoted ones change.
   const parts = text.split(/(“[^”]*”|„[^“]*“|"[^"]*"|'[^']*')/);
-  const words = parts.flatMap((p, i) =>
-    i % 2
-      ? []
-      : p
-          .split(/(\s+)/)
-          .filter((w) => w.trim())
-          .map((w) => w),
-  );
+  const words = parts.flatMap((p, i) => (i % 2 ? [] : p.split(/(\s+)/).filter((w) => w.trim())));
   const last = words.length - 1;
   let n = -1;
   return parts

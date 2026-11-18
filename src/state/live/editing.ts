@@ -98,7 +98,7 @@ export async function editRemote(serverId: string, remotePath: string, app?: str
     if (!known) {
       // One watcher per working copy; it reports each save of the editor.
       await backend.watchStart(watchId, parent(localPath), false, [], 400, (b) => {
-        if (b.changed.includes(localPath)) uploadEdited(localPath);
+        if (b.changed.some((f) => f.path === localPath)) uploadEdited(localPath);
       });
     }
     publishEdits();

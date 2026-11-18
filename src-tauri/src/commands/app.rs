@@ -49,30 +49,34 @@ pub(crate) fn open_mac_settings(page: String) -> AppResult<()> {
 /// once all transfers are done. The interface asks with a countdown before calling this.
 #[tauri::command]
 pub(crate) fn system_power(action: String) -> AppResult<()> {
-    let (program, args): (&str, Vec<&str>) = match action.as_str() {
-        #[cfg(target_os = "macos")]
-        "sleep" => ("osascript", vec!["-e", "tell application \"System Events\" to sleep"]),
-        #[cfg(target_os = "macos")]
-        "shutdown" => ("osascript", vec!["-e", "tell application \"System Events\" to shut down"]),
-        #[cfg(windows)]
-        "sleep" => ("rundll32.exe", vec!["powrprof.dll,SetSuspendState", "0,1,0"]),
-        #[cfg(windows)]
-        "shutdown" => ("shutdown", vec!["/s", "/t", "0"]),
-        #[cfg(all(unix, not(target_os = "macos")))]
-        "sleep" => ("systemctl", vec!["suspend"]),
-        #[cfg(all(unix, not(target_os = "macos")))]
-        "shutdown" => ("systemctl", vec!["poweroff"]),
-        _ => return Err(AppError::other("Unbekannte Aktion.")),
-    };
-    let mut cmd = std::process::Command::new(program);
-    cmd.args(args);
-    #[cfg(windows)]
+    #[cfg(any(target_os = "macos", windows))]
     {
-        use std::os::windows::process::CommandExt;
-        // CREATE_NO_WINDOW: no console window flashes up.
-        cmd.creation_flags(0x0800_0000);
+        let (program, args): (&str, Vec<&str>) = match action.as_str() {
+            #[cfg(target_os = "macos")]
+            "sleep" => ("osascript", vec!["-e", "tell application \"System Events\" to sleep"]),
+            #[cfg(target_os = "macos")]
+            "shutdown" => ("osascript", vec!["-e", "tell application \"System Events\" to shut down"]),
+            #[cfg(windows)]
+            "sleep" => ("rundll32.exe", vec!["powrprof.dll,SetSuspendState", "0,1,0"]),
+            #[cfg(windows)]
+            "shutdown" => ("shutdown", vec!["/s", "/t", "0"]),
+            _ => return Err(AppError::other("Unbekannte Aktion.")),
+        };
+        let mut cmd = std::process::Command::new(program);
+        cmd.args(args);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            // CREATE_NO_WINDOW: no console window flashes up.
+            cmd.creation_flags(0x0800_0000);
+        }
+        cmd.spawn().map(|_| ()).map_err(AppError::from)
     }
-    cmd.spawn().map(|_| ()).map_err(AppError::from)
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = action;
+        Err(AppError::unsupported_system())
+    }
 }
 
 /// Opens a web address in the default browser (only http and https).
@@ -93,9 +97,14 @@ pub(crate) fn open_url(url: String) -> AppResult<()> {
         c.arg("url.dll,FileProtocolHandler").creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         c
     };
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut cmd = std::process::Command::new("xdg-open");
-    cmd.arg(&url).spawn().map(|_| ()).map_err(AppError::from)
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        cmd.arg(&url).spawn().map(|_| ()).map_err(AppError::from)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        Err(AppError::unsupported_system())
+    }
 }
 
 /// How Bitcrane was started: `autostart` is true for a start at login.

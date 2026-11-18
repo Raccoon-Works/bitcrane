@@ -11,7 +11,7 @@
 //! every transfer takes its own.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{perms_string, FileEntry, WalkItem};
+use crate::model::{perms_string, EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
@@ -172,12 +172,21 @@ fn reply_error(code: u32, text: &str, what: &str) -> AppError {
 }
 
 impl Shared {
-    fn encode(&self, s: &str) -> Vec<u8> {
-        if self.params.encoding == FtpEncoding::Latin1 {
-            s.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }).collect()
-        } else {
-            s.as_bytes().to_vec()
+    /// A command argument in the server's encoding. A character Latin-1 does not have ("€") is
+    /// refused: written as "?" it would name a different file, or match several.
+    fn encode(&self, s: &str) -> AppResult<Vec<u8>> {
+        if self.params.encoding == FtpEncoding::Utf8 {
+            return Ok(s.as_bytes().to_vec());
         }
+        s.chars()
+            .map(|c| {
+                u8::try_from(u32::from(c)).map_err(|_| {
+                    AppError::other(format!(
+                        "Das Zeichen „{c}“ gibt es im Zeichensatz Latin-1 nicht. Bitte den Namen ändern oder beim Server den Zeichensatz UTF-8 wählen."
+                    ))
+                })
+            })
+            .collect()
     }
 
     fn decode(&self, b: &[u8]) -> String {
@@ -295,7 +304,7 @@ async fn send_line<W: AsyncWrite + Unpin>(w: &mut W, shared: &Shared, cmd: &str,
     let mut line = cmd.as_bytes().to_vec();
     if let Some(a) = arg {
         line.push(b' ');
-        line.extend(shared.encode(a));
+        line.extend(shared.encode(a)?);
     }
     line.extend_from_slice(b"\r\n");
     w.write_all(&line).await.map_err(lost)?;
@@ -595,11 +604,7 @@ impl Session {
             }
         }
         out.retain(|e| e.name != "." && e.name != "..");
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -607,7 +612,7 @@ impl Session {
         if path == "/" {
             return Ok(FileEntry {
                 name: "/".into(),
-                kind: "dir".into(),
+                kind: EntryKind::Dir,
                 size: 0,
                 mtime: 0,
                 perms: "755".into(),
@@ -679,7 +684,7 @@ impl Session {
 
     async fn remove(&mut self, path: &str) -> AppResult<()> {
         let e = self.stat(path).await?;
-        if e.kind == "dir" && e.link.is_none() {
+        if e.kind == EntryKind::Dir && e.link.is_none() {
             for c in self.list(path).await? {
                 Box::pin(self.remove(&remote_join(path, &c.name))).await?;
             }
@@ -692,9 +697,9 @@ impl Session {
 
     async fn chmod(&mut self, path: &str, mode: u32, recursive: bool) -> AppResult<()> {
         let e = self.stat(path).await?;
-        let own = if recursive && e.kind != "dir" { mode & 0o666 } else { mode };
+        let own = if recursive && e.kind != EntryKind::Dir { mode & 0o666 } else { mode };
         self.expect("SITE", Some(&format!("CHMOD {:o} {path}", own)), &[200, 250], "Rechte setzen").await?;
-        if recursive && e.kind == "dir" {
+        if recursive && e.kind == EntryKind::Dir {
             for c in self.list(path).await? {
                 Box::pin(self.chmod(&remote_join(path, &c.name), mode, true)).await?;
             }
@@ -741,7 +746,7 @@ pub fn parse_mlsx(line: &str) -> Option<FileEntry> {
     }
     let mut e = FileEntry {
         name: name.to_string(),
-        kind: "file".into(),
+        kind: EntryKind::File,
         size: 0,
         mtime: 0,
         perms: "644".into(),
@@ -759,7 +764,7 @@ pub fn parse_mlsx(line: &str) -> Option<FileEntry> {
                     return None;
                 }
                 if v == "dir" {
-                    e.kind = "dir".into();
+                    e.kind = EntryKind::Dir;
                 } else if let Some(target) = v.strip_prefix("os.unix=slink:") {
                     e.link = Some(target.to_string());
                 } else if v.starts_with("os.unix=symlink") {
@@ -778,7 +783,7 @@ pub fn parse_mlsx(line: &str) -> Option<FileEntry> {
             _ => {}
         }
     }
-    if e.kind == "dir" {
+    if e.kind == EntryKind::Dir {
         e.size = 0;
     }
     Some(e)
@@ -865,7 +870,7 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
         let is_dir = first == 'd';
         return Some(FileEntry {
             name,
-            kind: if is_dir { "dir".into() } else { "file".into() },
+            kind: if is_dir { EntryKind::Dir } else { EntryKind::File },
             size: if is_dir { 0 } else { size },
             mtime,
             perms: perms_from_text(fields[0].1),
@@ -902,7 +907,7 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
     let is_dir = what.eq_ignore_ascii_case("<DIR>");
     Some(FileEntry {
         name,
-        kind: if is_dir { "dir".into() } else { "file".into() },
+        kind: if is_dir { EntryKind::Dir } else { EntryKind::File },
         size: if is_dir { 0 } else { what.parse().ok()? },
         mtime: d.and_time(t).and_utc().timestamp_millis() - offset_ms,
         perms: if is_dir { "755".into() } else { "644".into() },
@@ -1145,6 +1150,24 @@ mod tests {
     }
 
     #[test]
+    fn latin1_refuses_names_it_cannot_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared {
+            params: parse(serde_json::json!({ "host": "ftp.example.test", "port": 21, "encoding": "latin1" })).unwrap(),
+            tls: None,
+            seen: None,
+            host_id: String::new(),
+            known: Arc::new(KnownHosts::load(dir.path().join("known.json"))),
+            feats: Mutex::new(Feats::default()),
+            feats_known: Default::default(),
+        };
+        assert_eq!(shared.encode("Größe.txt").unwrap(), b"Gr\xf6\xdfe.txt");
+        assert_eq!(shared.decode(b"Gr\xf6\xdfe.txt"), "Größe.txt");
+        let err = shared.encode("Preise in €.txt").unwrap_err();
+        assert!(err.message.starts_with("Das Zeichen „€“ gibt es im Zeichensatz Latin-1 nicht."), "{}", err.message);
+    }
+
+    #[test]
     fn settings_deserialize_from_the_stored_strings() {
         let p = parse(serde_json::json!({
             "host": "ftp.example.test", "port": 21,
@@ -1173,7 +1196,7 @@ mod tests {
     #[test]
     fn parses_unix_list_lines() {
         let e = parse_list_line("-rw-r--r--    1 1000     1000         1234 Jan 05  2024 bot file.py", 0).unwrap();
-        assert_eq!((e.name.as_str(), e.kind.as_str(), e.size, e.perms.as_str()), ("bot file.py", "file", 1234, "644"));
+        assert_eq!((e.name.as_str(), e.kind, e.size, e.perms.as_str()), ("bot file.py", EntryKind::File, 1234, "644"));
         assert_eq!(
             e.mtime,
             chrono::NaiveDate::from_ymd_opt(2024, 1, 5)
@@ -1184,7 +1207,7 @@ mod tests {
                 .timestamp_millis()
         );
         let d = parse_list_line("drwxr-xr-x    2 ftp ftp 4096 Mar 01 10:20 cogs", 60).unwrap();
-        assert_eq!((d.name.as_str(), d.kind.as_str(), d.perms.as_str()), ("cogs", "dir", "755"));
+        assert_eq!((d.name.as_str(), d.kind, d.perms.as_str()), ("cogs", EntryKind::Dir, "755"));
         let l = parse_list_line("lrwxrwxrwx 1 u g 7 Feb 2 2025 web -> /var/www", 0).unwrap();
         assert_eq!((l.name.as_str(), l.link.as_deref()), ("web", Some("/var/www")));
         // Without group column.
@@ -1196,7 +1219,7 @@ mod tests {
     #[test]
     fn parses_dos_list_lines() {
         let e = parse_list_line("10-27-26  12:34PM       <DIR>          Neuer Ordner", 0).unwrap();
-        assert_eq!((e.name.as_str(), e.kind.as_str()), ("Neuer Ordner", "dir"));
+        assert_eq!((e.name.as_str(), e.kind), ("Neuer Ordner", EntryKind::Dir));
         let f = parse_list_line("10-27-26  09:05AM                 2048 a b.txt", 0).unwrap();
         assert_eq!((f.name.as_str(), f.size), ("a b.txt", 2048));
         // Sizes that also appear in the date must not shift the name.
@@ -1220,7 +1243,7 @@ mod tests {
                 .timestamp_millis()
         );
         assert!(parse_mlsx("type=cdir;modify=20261027120000; .").is_none());
-        assert_eq!(parse_mlsx("type=dir;modify=20261027120000; sub").unwrap().kind, "dir");
+        assert_eq!(parse_mlsx("type=dir;modify=20261027120000; sub").unwrap().kind, EntryKind::Dir);
     }
 
     #[test]
@@ -1235,18 +1258,18 @@ mod tests {
     }
 }
 
-/// Integration tests against real FTP servers (plain, explicit and implicit
-/// TLS). They run only when `BITCRANE_TEST_FTP=host:plain,explicit,implicit`
-/// is set, e.g. `127.0.0.1:2121,2990,2991`.
+/// Integration tests against real FTP servers (plain, explicit and implicit TLS), ignored by a
+/// normal `cargo test`. They run with `cargo test -- --ignored` and
+/// `BITCRANE_TEST_FTP=host:plain,explicit,implicit`, e.g. `127.0.0.1:2121,2990,2991`.
 #[cfg(test)]
 mod integration {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    fn env() -> Option<(String, Vec<u16>)> {
-        let v = std::env::var("BITCRANE_TEST_FTP").ok()?;
-        let (host, ports) = v.split_once(':')?;
-        Some((host.to_string(), ports.split(',').filter_map(|p| p.parse().ok()).collect()))
+    fn env() -> (String, Vec<u16>) {
+        let v = std::env::var("BITCRANE_TEST_FTP").expect("BITCRANE_TEST_FTP=host:plain,explicit,implicit");
+        let (host, ports) = v.split_once(':').expect("BITCRANE_TEST_FTP starts with host:");
+        (host.to_string(), ports.split(',').map(|p| p.parse().expect("FTP port number")).collect())
     }
 
     fn params(host: &str, port: u16, tls: FtpTls, trust: Option<String>) -> FtpParams {
@@ -1280,7 +1303,7 @@ mod integration {
         close_data(w).await.unwrap();
         fin.finish().await.unwrap();
         let st = conn.stat(&file).await.unwrap();
-        assert_eq!((st.size, st.kind.as_str()), (10, "file"));
+        assert_eq!((st.size, st.kind), (10, EntryKind::File));
         let (mut r, fin) = conn.reader(&file, 6).await.unwrap();
         let mut got = String::new();
         r.read_to_string(&mut got).await.unwrap();
@@ -1307,8 +1330,9 @@ mod integration {
     }
 
     #[tokio::test]
+    #[ignore = "needs test servers: BITCRANE_TEST_FTP"]
     async fn ftp_plain_and_tls() {
-        let Some((host, ports)) = env() else { return };
+        let (host, ports) = env();
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
 

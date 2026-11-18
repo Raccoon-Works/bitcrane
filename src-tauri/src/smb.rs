@@ -6,8 +6,8 @@
 //! the connection starts there.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
-use crate::paths::{remote_join, remote_name};
+use crate::model::{EntryKind, FileEntry, WalkItem};
+use crate::paths::{quoted_name, remote_join, remote_name};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use smb::{
@@ -128,10 +128,6 @@ fn io_err(e: std::io::Error) -> AppError {
     AppError::new(ErrorKind::ConnectionLost, "Übertragung über SMB abgebrochen.").with_detail(e.to_string())
 }
 
-fn quoted(path: &str) -> String {
-    format!("„{}“", remote_name(path))
-}
-
 /// "/share/a/b" -> ("share", "a/b"); "/" -> None.
 fn split(path: &str) -> Option<(String, String)> {
     let p = path.trim_matches('/');
@@ -165,7 +161,7 @@ fn from_secs(secs: u32) -> smb::binrw_util::prelude::FileTime {
 fn entry(name: String, dir: bool, size: u64, mtime: i64) -> FileEntry {
     FileEntry {
         name,
-        kind: if dir { "dir" } else { "file" }.into(),
+        kind: if dir { EntryKind::Dir } else { EntryKind::File },
         size: if dir { 0 } else { size },
         mtime,
         perms: String::new(),
@@ -174,14 +170,6 @@ fn entry(name: String, dir: bool, size: u64, mtime: i64) -> FileEntry {
         link: None,
         hidden: 0,
     }
-}
-
-fn sort(list: &mut [FileEntry]) {
-    list.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-        ("dir", "file") => std::cmp::Ordering::Less,
-        ("file", "dir") => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
 }
 
 impl SmbConn {
@@ -287,7 +275,7 @@ impl SmbConn {
                     retried = true;
                     self.reset().await;
                 }
-                Err(e) => return Err(map_err(e, &quoted(path))),
+                Err(e) => return Err(map_err(e, &quoted_name(path))),
             }
         }
     }
@@ -302,7 +290,7 @@ impl SmbConn {
             Resource::Directory(d) => Ok(Arc::new(d)),
             other => {
                 close(other).await;
-                Err(AppError::other(format!("{} ist kein Ordner.", quoted(path))))
+                Err(AppError::other(format!("{} ist kein Ordner.", quoted_name(path))))
             }
         }
     }
@@ -316,7 +304,7 @@ impl SmbConn {
             Resource::File(f) => Ok(f),
             other => {
                 close(other).await;
-                Err(AppError::other(format!("{} ist ein Ordner.", quoted(path))))
+                Err(AppError::other(format!("{} ist ein Ordner.", quoted_name(path))))
             }
         }
     }
@@ -339,7 +327,7 @@ impl SmbConn {
                         .filter(|n| !n.is_empty() && !n.ends_with('$'))
                         .map(|n| entry(n, true, 0, 0))
                         .collect();
-                    sort(&mut out);
+                    crate::model::sort_listing(&mut out);
                     return Ok(out);
                 }
                 Err(e) if !retried && matches!(e, smb::Error::ConnectionStopped) => {
@@ -384,8 +372,8 @@ impl SmbConn {
         }
         .await;
         let _ = dir.close().await;
-        result.map_err(|e| map_err(e, &quoted(path)))?;
-        sort(&mut out);
+        result.map_err(|e| map_err(e, &quoted_name(path)))?;
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -403,7 +391,7 @@ impl SmbConn {
             Resource::Pipe(_) => Err(smb::Error::UnsupportedOperation("pipe".into())),
         };
         close(res).await;
-        let info = info.map_err(|e| map_err(e, &quoted(path)))?;
+        let info = info.map_err(|e| map_err(e, &quoted_name(path)))?;
         let name = if rest.is_empty() { share } else { remote_name(path) };
         Ok(entry(name, info.file_attributes.directory(), info.end_of_file, to_ms(&info.last_write_time)))
     }
@@ -465,12 +453,12 @@ impl SmbConn {
             Resource::Pipe(_) => Err(smb::Error::UnsupportedOperation("pipe".into())),
         };
         close(res).await;
-        result.map_err(|e| map_err(e, &quoted(to)))
+        result.map_err(|e| map_err(e, &quoted_name(to)))
     }
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted_name(to))));
         }
         self.move_to(from, to, false).await
     }
@@ -493,7 +481,7 @@ impl SmbConn {
             Resource::Pipe(_) => Err(smb::Error::UnsupportedOperation("pipe".into())),
         };
         close(res).await;
-        result.map_err(|e| map_err(e, &quoted(path)))
+        result.map_err(|e| map_err(e, &quoted_name(path)))
     }
 
     /// Deletes a file or a folder with everything in it.
@@ -507,14 +495,14 @@ impl SmbConn {
             Err(e) if e.kind == ErrorKind::NotFound => return Ok(()),
             Err(e) => return Err(e),
         };
-        if st.kind == "dir" {
+        if st.kind == EntryKind::Dir {
             // Depth first: a folder can only go once it is empty.
             let mut dirs = vec![path.to_string()];
             let mut order = Vec::new();
             while let Some(dir) = dirs.pop() {
                 for e in self.list(&dir).await? {
                     let p = remote_join(&dir, &e.name);
-                    if e.kind == "dir" {
+                    if e.kind == EntryKind::Dir {
                         dirs.push(p);
                     } else {
                         self.delete_one(&p).await?;
@@ -552,17 +540,17 @@ impl SmbConn {
             other => {
                 close(other).await;
                 let _ = src.close().await;
-                return Err(AppError::other(format!("{} lässt sich nicht anlegen.", quoted(to))));
+                return Err(AppError::other(format!("{} lässt sich nicht anlegen.", quoted_name(to))));
             }
         };
         let mut result = if dst.same_tree(&src) {
-            dst.srv_copy(&src).await.map_err(|e| map_err(e, &quoted(to)))
+            dst.srv_copy(&src).await.map_err(|e| map_err(e, &quoted_name(to)))
         } else {
             Err(AppError::other(""))
         };
         if result.is_err() {
             result = async {
-                let len = smb::GetLen::get_len(&src).await.map_err(|e| map_err(e, &quoted(from)))?;
+                let len = smb::GetLen::get_len(&src).await.map_err(|e| map_err(e, &quoted_name(from)))?;
                 let chunk = self.chunk_size().await as u64;
                 let mut buf = vec![0u8; chunk as usize];
                 let mut pos = 0u64;
@@ -587,7 +575,7 @@ impl SmbConn {
     }
 
     async fn copy_tree(&self, from: &str, to: &str) -> AppResult<()> {
-        if self.stat(from).await?.kind != "dir" {
+        if self.stat(from).await?.kind != EntryKind::Dir {
             return self.copy_file(from, to).await;
         }
         self.mkdir(to).await?;
@@ -626,7 +614,7 @@ impl SmbConn {
     /// Reads a file from `offset`, with several requests in flight.
     pub async fn reader(&self, path: &str, offset: u64) -> AppResult<Box<dyn AsyncRead + Unpin + Send>> {
         let file = OpenFile(Arc::new(self.open_file(path, FileAccessMask::new().with_generic_read(true)).await?));
-        let len = smb::GetLen::get_len(&*file.0).await.map_err(|e| map_err(e, &quoted(path)))?;
+        let len = smb::GetLen::get_len(&*file.0).await.map_err(|e| map_err(e, &quoted_name(path)))?;
         let chunk = self.chunk_size().await as u64;
         let (mut w, r) = tokio::io::duplex(2 * chunk as usize);
         tokio::spawn(async move {
@@ -696,15 +684,15 @@ impl SmbConn {
             Resource::File(f) => OpenFile(Arc::new(f)),
             other => {
                 close(other).await;
-                return Err(AppError::other(format!("{} ist ein Ordner.", quoted(path))));
+                return Err(AppError::other(format!("{} ist ein Ordner.", quoted_name(path))));
             }
         };
         if offset > 0 {
-            smb::resource::SetLen::set_len(&*file.0, offset).await.map_err(|e| map_err(e, &quoted(path)))?;
+            smb::resource::SetLen::set_len(&*file.0, offset).await.map_err(|e| map_err(e, &quoted_name(path)))?;
         }
         let chunk = self.chunk_size().await as usize;
         let (w, mut r) = tokio::io::duplex(2 * chunk);
-        let what = quoted(path);
+        let what = quoted_name(path);
         let task = tokio::spawn(async move {
             let result = async {
                 let mut pending: VecDeque<tokio::task::JoinHandle<AppResult<()>>> = VecDeque::new();
@@ -875,14 +863,16 @@ pub fn test_params() -> Option<SmbParams> {
     })
 }
 
-/// Integration test against an SMB server: `BITCRANE_TEST_SMB=host:port/share/user/password`.
+/// Integration test against an SMB server (`cargo test -- --ignored`):
+/// `BITCRANE_TEST_SMB=host:port/share/user/password`.
 #[cfg(test)]
 mod integration {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_SMB"]
     async fn smb_round_trip() {
-        let Some(p) = super::test_params() else { return };
+        let p = super::test_params().expect("BITCRANE_TEST_SMB=host:port/share/user/password");
         let wrong = SmbConn::connect(SmbParams { password: Some("falsch".into()), ..p.clone() }).await;
         assert_eq!(wrong.err().map(|e| e.kind), Some(ErrorKind::AuthFailed));
         let conn = SmbConn::connect(p.clone()).await.unwrap();

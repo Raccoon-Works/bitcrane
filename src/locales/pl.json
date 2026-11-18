@@ -1057,7 +1057,6 @@
   "Datenverbindung": "Połączenie danych",
   "Ungültiger Servername für TLS.": "Nieprawidłowa nazwa serwera dla TLS.",
   "Datei konnte nicht abgeschlossen werden.": "Nie udało się sfinalizować pliku.",
-  "Diese Datei gibt es schon.": "Ten plik już istnieje.",
   "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.": "Klucz o tej nazwie już istnieje. Wybierz inną nazwę.",
   "Schlüssel konnte nicht erzeugt werden.": "Nie udało się wygenerować klucza.",
   "Öffentlicher Schlüssel fehlerhaft.": "Nieprawidłowy klucz publiczny.",

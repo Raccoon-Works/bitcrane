@@ -65,7 +65,6 @@ export {
   downloadNames,
   forcedLive,
   grep,
-  localRel,
   moveAcross,
   remoteRel,
   uploadNames,

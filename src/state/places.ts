@@ -181,6 +181,8 @@ export interface SyncAction {
   kind: 'upload' | 'download' | 'deleteRemote' | 'deleteLocal';
   /** Path relative to the two folders (in NFC form, see walkPlace). */
   rel: string;
+  /** The source's path below its folder with the names this computer stores: a new file here gets it. */
+  localRel: string;
   size: number;
   /** Real path of the source file (copies) or of the file to delete; may differ from `rel` in its Unicode form. */
   from?: string;
@@ -232,8 +234,8 @@ export function runSyncBetween(
     const toRight = a.kind === 'upload';
     const [from, to] = toRight ? [L, R] : [R, L];
     const source = a.from ?? paths.join(toRight ? t.localPath : t.remotePath, a.rel);
-    // A new file on this computer gets a name Windows can store; one on a server its real name back.
-    const rel = !to ? live.localRel(a.rel) : !from ? live.remoteRel(to, a.rel) : a.rel;
+    // A new file on this computer gets a name it can store (from the core); one on a server the server's name.
+    const rel = !to ? a.localRel : !from ? live.remoteRel(to, a.rel) : a.rel;
     const target = a.to ?? paths.join(toRight ? t.remotePath : t.localPath, rel);
     const base = {
       id: uid('t'),

@@ -1057,7 +1057,6 @@
   "Datenverbindung": "Connexion de données",
   "Ungültiger Servername für TLS.": "Nom de serveur non valide pour TLS.",
   "Datei konnte nicht abgeschlossen werden.": "Le fichier n’a pas pu être finalisé.",
-  "Diese Datei gibt es schon.": "Ce fichier existe déjà.",
   "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.": "Une clé portant ce nom existe déjà. Veuillez choisir un autre nom.",
   "Schlüssel konnte nicht erzeugt werden.": "La clé n’a pas pu être générée.",
   "Öffentlicher Schlüssel fehlerhaft.": "Clé publique non valide.",

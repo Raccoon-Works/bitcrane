@@ -1057,7 +1057,6 @@
   "Datenverbindung": "Connessione dati",
   "Ungültiger Servername für TLS.": "Nome del server non valido per TLS.",
   "Datei konnte nicht abgeschlossen werden.": "Impossibile completare il file.",
-  "Diese Datei gibt es schon.": "Questo file esiste già.",
   "Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.": "Esiste già una chiave con questo nome. Scegli un altro nome.",
   "Schlüssel konnte nicht erzeugt werden.": "Impossibile generare la chiave.",
   "Öffentlicher Schlüssel fehlerhaft.": "Chiave pubblica non valida.",

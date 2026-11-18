@@ -11,8 +11,7 @@ import * as fs from '../backend/mockFs';
 import type { WalkItem } from '../backend/api';
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { clockOffset } from './live';
-import { getState, LIVE, type SyncAction } from './store';
-import { winNameFromSafe } from '../util/paths';
+import { LIVE, type SyncAction } from './store';
 
 export type Direction = 'up' | 'down' | 'both';
 
@@ -20,6 +19,8 @@ export interface Side {
   size: number;
   mtime: number;
   path: string;
+  /** Path below the place's folder with the names this computer stores (see `WalkItem.localRelative`). */
+  localRel: string;
 }
 /** 'conflict': both sides changed since the last sync; the user decides (never done by itself). */
 export interface Line {
@@ -126,23 +127,26 @@ export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   if (LIVE)
     items = side === 'local' ? await backend.localWalk(place.dir) : await backend.remoteWalk(place.serverId, place.dir);
   else
-    items = fs.walkFiles(side, place.serverId, place.dir).map((f) => ({
-      path: f.path,
-      relative: f.path.slice(place.dir.length + 1),
-      size: f.entry.size,
-      mtime: f.entry.mtime,
-    }));
+    items = fs.walkFiles(side, place.serverId, place.dir).map((f) => {
+      const relative = f.path.slice(place.dir.length + 1);
+      return { path: f.path, relative, localRelative: relative, size: f.entry.size, mtime: f.entry.mtime };
+    });
   const offset = LIVE && place.serverId ? clockOffset(place.serverId) : 0;
   const map = new Map<string, Side>();
-  const winLocal = side === 'local' && getState().platform === 'win';
+  // Walk results start with the walked folder's own name; drop it.
+  const below = (rel: string) => (LIVE ? rel.split('/').slice(1).join('/') : rel);
   for (const it of items) {
-    // Walk results start with the walked folder's own name; drop it.
-    const rel = LIVE ? it.relative.split('/').slice(1).join('/') : it.relative;
-    // Keys in composed Unicode form (NFC): "ü" stored decomposed on one side (macOS)
-    // and composed on the other is the same file. `path` keeps the real name.
-    // On Windows, names stored as "a%3Ab.txt" meet their server counterpart "a:b.txt".
-    const key = winLocal ? rel.split('/').map(winNameFromSafe).join('/') : rel;
-    if (key) map.set(key.normalize('NFC'), { size: it.size, mtime: it.mtime - offset, path: it.path });
+    // Keys with the server's names, so a file stored on Windows as "a%3Ab.txt" meets "a:b.txt",
+    // and in composed Unicode form (NFC): "ü" stored decomposed on one side (macOS) and composed
+    // on the other is the same file. `path` keeps the real name.
+    const key = below(it.relative);
+    if (key)
+      map.set(key.normalize('NFC'), {
+        size: it.size,
+        mtime: it.mtime - offset,
+        path: it.path,
+        localRel: below(it.localRelative),
+      });
   }
   return map;
 }
@@ -248,6 +252,13 @@ export function actionsOf(lines: Line[]): SyncAction[] {
       const fromRight = l.action === 'download' || l.action === 'deleteRemote';
       const src = fromRight ? l.remote : l.local;
       const dst = fromRight ? l.local : l.remote;
-      return { kind: l.action as SyncAction['kind'], rel: l.rel, size: src?.size ?? 0, from: src?.path, to: dst?.path };
+      return {
+        kind: l.action as SyncAction['kind'],
+        rel: l.rel,
+        localRel: src?.localRel ?? l.rel,
+        size: src?.size ?? 0,
+        from: src?.path,
+        to: dst?.path,
+      };
     });
 }

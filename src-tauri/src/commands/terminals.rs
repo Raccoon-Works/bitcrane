@@ -1,6 +1,7 @@
 //! Terminals: the built-in terminal sessions, SSH tunnels and opening the system terminal.
 
 use crate::error::{AppError, AppResult};
+use crate::scp::quote as posix_quote;
 use crate::{forward, paths, terminal, AppState};
 use serde::Deserialize;
 use tauri::State;
@@ -26,19 +27,14 @@ pub(crate) struct TerminalTarget {
     app: Option<String>,
 }
 
-/// Single-quotes a value for a POSIX shell.
-fn sh_quote(v: &str) -> String {
-    format!("'{}'", v.replace('\'', "'\\''"))
-}
-
 /// Characters cmd.exe interprets even inside double quotes (or that end them).
 #[cfg(windows)]
 const CMD_UNSAFE: &[char] = &['"', '%', '!', '\r', '\n'];
 
-/// Builds the `ssh` command line for "Terminal öffnen". Every value is quoted
-/// for the local shell, and the folder once more for the shell on the server,
-/// so names from a server listing can never run as commands on this computer.
-fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String> {
+/// Builds the `ssh` command line for "Terminal öffnen". Every value is quoted for the local shell
+/// with `quote`, and the folder once more for the shell on the server, so names from a server
+/// listing can never run as commands on this computer.
+fn terminal_ssh_command(host: &str, target: &TerminalTarget, quote: fn(&str) -> String) -> AppResult<String> {
     let user = target.user.clone().unwrap_or_default();
     let plain = |v: &str| v.chars().all(|c| c.is_ascii_alphanumeric() || "._-:[]".contains(c));
     let plain_user = user.is_empty() || user.chars().all(|c| c.is_ascii_alphanumeric() || "._-@+".contains(c));
@@ -48,6 +44,7 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
     }
     let dir = target.remote_path.clone().unwrap_or_else(|| "~".into());
     let key = target.key_path.as_ref().filter(|k| !k.is_empty()).map(|k| paths::to_native(k).display().to_string());
+    // Checked for PowerShell as well, so both Windows launchers accept the same folders.
     #[cfg(windows)]
     if dir.contains(CMD_UNSAFE) || key.as_deref().is_some_and(|k| k.contains(CMD_UNSAFE)) {
         return Err(AppError::other(
@@ -55,10 +52,7 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
         ));
     }
     // "~" stays unquoted so the server shell expands it.
-    let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", sh_quote(&dir)) };
-    let remote = format!("{cd} && exec $SHELL -l");
-    // POSIX shells (macOS Terminal, Linux) get single quotes; cmd.exe double quotes.
-    let q = |v: &str| if cfg!(windows) { format!("\"{v}\"") } else { sh_quote(v) };
+    let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", posix_quote(&dir)) };
     let mut parts = vec!["ssh".to_string(), "-t".to_string()];
     if let Some(p) = target.port.filter(|p| *p != 22) {
         parts.push("-p".into());
@@ -66,39 +60,29 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
     }
     if let Some(k) = key {
         parts.push("-i".into());
-        parts.push(q(&k));
+        parts.push(quote(&k));
     }
     // "--" ends ssh's options, a second guard besides the check of host and user above.
     parts.push("--".into());
     parts.push(if user.is_empty() { host.to_string() } else { format!("{user}@{host}") });
-    parts.push(q(&remote));
+    parts.push(quote(&format!("{cd} && exec $SHELL -l")));
     Ok(parts.join(" "))
 }
 
-/// The `ssh` call for PowerShell: every value in single quotes ('' inside), so
-/// nothing in a name or folder can run as a command on this computer.
+/// Quoting for the shell the system terminal starts: single quotes for the POSIX shell of macOS,
+/// double quotes for cmd.exe (`CMD_UNSAFE` keeps out what would end them).
+fn system_shell_quote(v: &str) -> String {
+    if cfg!(windows) {
+        format!("\"{v}\"")
+    } else {
+        posix_quote(v)
+    }
+}
+
+/// Quoting for PowerShell: single quotes, '' inside.
 #[cfg(windows)]
-fn powershell_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String> {
-    // Same checks and remote command as for cmd.exe; only the local quoting differs.
-    terminal_ssh_command(host, target)?;
-    let q = |v: &str| format!("'{}'", v.replace('\'', "''"));
-    let dir = target.remote_path.clone().unwrap_or_else(|| "~".into());
-    let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", sh_quote(&dir)) };
-    let user = target.user.clone().unwrap_or_default();
-    let mut parts = vec!["ssh".to_string(), "-t".to_string()];
-    if let Some(p) = target.port.filter(|p| *p != 22) {
-        parts.push("-p".into());
-        parts.push(p.to_string());
-    }
-    if let Some(k) = target.key_path.as_ref().filter(|k| !k.is_empty()) {
-        parts.push("-i".into());
-        parts.push(q(&paths::to_native(k).display().to_string()));
-    }
-    // "--" ends ssh's options, a second guard besides the check of host and user above.
-    parts.push("--".into());
-    parts.push(if user.is_empty() { host.to_string() } else { format!("{user}@{host}") });
-    parts.push(q(&format!("{cd} && exec $SHELL -l")));
-    Ok(parts.join(" "))
+fn powershell_quote(v: &str) -> String {
+    format!("'{}'", v.replace('\'', "''"))
 }
 
 /// Opens the system terminal: in a local folder, or with an SSH session that
@@ -106,7 +90,7 @@ fn powershell_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<Stri
 #[tauri::command]
 pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
     let ssh_cmd = match target.host.as_ref() {
-        Some(host) => Some(terminal_ssh_command(host, &target)?),
+        Some(host) => Some(terminal_ssh_command(host, &target, system_shell_quote)?),
         None => None,
     };
     let local = target.local_path.as_deref().map(paths::to_native).unwrap_or_else(paths::home);
@@ -160,7 +144,7 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
             match target.host.as_ref() {
                 // Handed over encoded, so neither cmd.exe nor PowerShell reinterprets quotes or "$".
                 Some(host) => {
-                    let ps = powershell_ssh_command(host, &target)?;
+                    let ps = terminal_ssh_command(host, &target, powershell_quote)?;
                     let wide: Vec<u8> = ps.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
                     use base64::Engine;
                     let encoded = base64::engine::general_purpose::STANDARD.encode(wide);
@@ -191,14 +175,10 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
         };
         c.spawn().map(|_| ()).map_err(AppError::from)
     }
-    #[cfg(all(unix, not(target_os = "macos")))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
-        let mut c = std::process::Command::new("x-terminal-emulator");
-        c.current_dir(&local);
-        if let Some(cmd) = &ssh_cmd {
-            c.arg("-e").arg("sh").arg("-c").arg(cmd);
-        }
-        c.spawn().map(|_| ()).map_err(AppError::from)
+        let _ = (ssh_cmd, local);
+        Err(AppError::unsupported_system())
     }
 }
 
@@ -286,7 +266,8 @@ mod tests {
 
     #[test]
     fn server_folder_names_stay_quoted() {
-        let cmd = terminal_ssh_command("example.com", &target("/srv/$(touch pwned)", "deploy")).unwrap();
+        let cmd =
+            terminal_ssh_command("example.com", &target("/srv/$(touch pwned)", "deploy"), system_shell_quote).unwrap();
         assert_eq!(cmd, "ssh -t -p 2222 -- deploy@example.com 'cd '\\''/srv/$(touch pwned)'\\'' && exec $SHELL -l'");
         // The local shell must see exactly four plain words plus one quoted argument.
         let out = std::process::Command::new("sh")
@@ -296,16 +277,16 @@ mod tests {
             .unwrap();
         let args: Vec<_> = String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect();
         assert_eq!(args.last().unwrap(), "cd '/srv/$(touch pwned)' && exec $SHELL -l");
-        assert!(terminal_ssh_command("example.com", &target("/x", "a;b")).is_err());
-        assert!(terminal_ssh_command("ex$(x)", &target("/x", "a")).is_err());
+        assert!(terminal_ssh_command("example.com", &target("/x", "a;b"), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("ex$(x)", &target("/x", "a"), system_shell_quote).is_err());
     }
 
     #[test]
     fn hosts_and_users_cannot_become_ssh_options() {
-        assert!(terminal_ssh_command("-oProxyCommand", &target("/x", "")).is_err());
-        assert!(terminal_ssh_command("-F", &target("/x", "deploy")).is_err());
-        assert!(terminal_ssh_command("example.com", &target("/x", "-oProxyCommand")).is_err());
-        let cmd = terminal_ssh_command("example.com", &target("/x", "")).unwrap();
+        assert!(terminal_ssh_command("-oProxyCommand", &target("/x", ""), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("-F", &target("/x", "deploy"), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("example.com", &target("/x", "-oProxyCommand"), system_shell_quote).is_err());
+        let cmd = terminal_ssh_command("example.com", &target("/x", ""), system_shell_quote).unwrap();
         assert!(cmd.starts_with("ssh -t -p 2222 -- example.com "), "{cmd}");
         // The system ssh accepts "--" before the destination.
         let out = std::process::Command::new("ssh").args(["-G", "-p", "2222", "--", "example.com"]).output().unwrap();

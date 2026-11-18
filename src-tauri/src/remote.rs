@@ -10,7 +10,7 @@ use crate::dropbox::DropboxConn;
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::ftp::{FtpConn, FtpFinish, Io};
 use crate::gdrive::GDriveConn;
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::onedrive::OneDriveConn;
 use crate::paths::{remote_join, remote_name, remote_parent};
 use crate::scp::ScpConn;
@@ -38,16 +38,16 @@ where
     let base = remote_parent(path);
     let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
     let root = stat(path.to_string()).await?;
-    if root.kind != "dir" {
-        return Ok(vec![WalkItem { path: path.to_string(), relative: rel(path), size: root.size, mtime: root.mtime }]);
+    if root.kind != EntryKind::Dir {
+        return Ok(vec![WalkItem::with_real_names(path.to_string(), rel(path), root.size, root.mtime)]);
     }
     let mut out = Vec::new();
     let mut stack = vec![path.to_string()];
     while let Some(dir) = stack.pop() {
         for e in list(dir.clone()).await? {
             let p = remote_join(&dir, &e.name);
-            if e.kind != "dir" {
-                out.push(WalkItem { relative: rel(&p), path: p, size: e.size, mtime: e.mtime });
+            if e.kind != EntryKind::Dir {
+                out.push(WalkItem::with_real_names(p.clone(), rel(&p), e.size, e.mtime));
             } else if e.link.is_none() {
                 stack.push(p);
             }
@@ -379,8 +379,7 @@ impl Remote {
             Remote::Vault(c) => c.walk(path).await,
             Remote::S3(c) => c.walk(path).await,
         }?;
-        // Half-written files of interrupted uploads (".name.bitcrane-part") are never transferred.
-        items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
+        retain_transferable(&mut items);
         Ok(items)
     }
 
@@ -550,7 +549,7 @@ impl Remote {
 
     async fn copy_through(&self, from: &str, to: &str) -> AppResult<()> {
         let e = self.stat(from).await?;
-        if e.kind == "dir" {
+        if e.kind == EntryKind::Dir {
             self.mkdir(to).await?;
             for c in self.list(from).await? {
                 Box::pin(self.copy_through(&remote_join(from, &c.name), &remote_join(to, &c.name))).await?;
@@ -586,7 +585,7 @@ impl Remote {
                 mtime: a.mtime,
                 perms: a.permissions,
             }),
-            _ => self.stat(path).await.ok().filter(|e| e.kind == "file").map(|e| Meta {
+            _ => self.stat(path).await.ok().filter(|e| e.kind == EntryKind::File).map(|e| Meta {
                 size: e.size,
                 mtime: (e.mtime > 0).then_some((e.mtime / 1000) as u32),
                 perms: u32::from_str_radix(&e.perms, 8).ok(),
@@ -942,7 +941,10 @@ pub(crate) mod integration {
     }
 
     #[tokio::test]
+    #[ignore = "needs test servers: BITCRANE_TEST_FTP, _S3, _SMB and/or _DAV"]
     async fn transfers_over_ftp_and_dav() {
+        let names = ["BITCRANE_TEST_FTP", "BITCRANE_TEST_S3", "BITCRANE_TEST_SMB", "BITCRANE_TEST_DAV"];
+        assert!(names.iter().any(|n| std::env::var(n).is_ok()), "set at least one of {names:?}");
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
         if let Ok(v) = std::env::var("BITCRANE_TEST_FTP") {
@@ -1031,10 +1033,10 @@ pub(crate) mod integration {
 
     /// Server to server: FTP -> WebDAV and back, through this computer.
     #[tokio::test]
+    #[ignore = "needs test servers: BITCRANE_TEST_FTP and BITCRANE_TEST_DAV"]
     async fn copies_between_two_servers() {
-        let (Ok(ftp), Ok(dav)) = (std::env::var("BITCRANE_TEST_FTP"), std::env::var("BITCRANE_TEST_DAV")) else {
-            return;
-        };
+        let ftp = std::env::var("BITCRANE_TEST_FTP").expect("BITCRANE_TEST_FTP");
+        let dav = std::env::var("BITCRANE_TEST_DAV").expect("BITCRANE_TEST_DAV");
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
         let (host, ports) = ftp.split_once(':').unwrap();
@@ -1121,19 +1123,24 @@ pub(crate) mod integration {
     }
 }
 
-/// False for names a server must not be able to send: they would leave the
-/// target folder when a download writes them to this computer ("..", "a/../b",
-/// on Windows also "..\x" or "C:x").
+/// Keeps the walked files a transfer may write to this computer: no name that would leave the
+/// target folder, and no half-written file of an interrupted upload (".name.bitcrane-part").
+fn retain_transferable(items: &mut Vec<WalkItem>) {
+    items.retain(|i| i.relative.split('/').all(safe_name) && !i.relative.ends_with(".bitcrane-part"));
+}
+
+/// False for names a server must not be able to send: they would leave the target folder when a
+/// download writes them to this computer ("..", "a/../b"). What Windows would read as a path of
+/// its own ("..\x", "C:x") is no escape: every name is written there as `paths::storable_name`,
+/// which encodes '\' and ':', so such a file is downloaded under that name instead of left out.
 pub fn safe_name(name: &str) -> bool {
-    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\0']) {
-        return false;
-    }
-    !(cfg!(windows) && name.contains(['\\', ':']))
+    !(name.is_empty() || name == "." || name == ".." || name.contains(['/', '\0']))
 }
 
 #[cfg(test)]
 mod name_tests {
-    use super::safe_name;
+    use super::{retain_transferable, safe_name, walk_by_listing};
+    use crate::model::FileEntry;
 
     #[test]
     fn rejects_names_that_leave_the_folder() {
@@ -1144,6 +1151,35 @@ mod name_tests {
         assert!(!safe_name(".."));
         assert!(!safe_name("../../.ssh/authorized_keys"));
         assert!(!safe_name("a\0b"));
+        // Written as paths::storable_name on Windows, so kept on every system.
+        assert!(safe_name("2026-11-18 12:00.log"));
+        assert!(safe_name(r"..\x"));
+        assert!(safe_name("C:x"));
+    }
+
+    /// A folder download of "logs" with a name Windows cannot store keeps the file, and on
+    /// Windows writes it under the encoded name instead of leaving it out.
+    #[tokio::test]
+    async fn walk_keeps_names_windows_stores_encoded() {
+        let entry = |name: &str, dir: bool| FileEntry::plain(name.to_string(), dir, 3, 0);
+        let mut items = walk_by_listing(
+            "/srv/logs",
+            |_| async { Ok(entry("logs", true)) },
+            |dir| async move {
+                Ok(match dir.as_str() {
+                    "/srv/logs" => vec![entry("2026-11-18 12:00.log", false), entry(".a.bitcrane-part", false)],
+                    _ => Vec::new(),
+                })
+            },
+        )
+        .await
+        .unwrap();
+        retain_transferable(&mut items);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].path, "/srv/logs/2026-11-18 12:00.log");
+        assert_eq!(items[0].relative, "logs/2026-11-18 12:00.log");
+        let stored = if cfg!(windows) { "logs/2026-11-18 12%3A00.log" } else { "logs/2026-11-18 12:00.log" };
+        assert_eq!(items[0].local_relative, stored);
     }
 }
 

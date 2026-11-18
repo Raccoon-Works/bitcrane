@@ -7,8 +7,8 @@
 //! server settings can also ask for it directly.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
-use crate::paths::{remote_join, remote_name};
+use crate::model::{EntryKind, FileEntry, WalkItem};
+use crate::paths::{quoted_name, remote_join, remote_name};
 use crate::ssh::{Handler, Session};
 use chrono::{Datelike, Local, NaiveDate, TimeZone};
 use russh::client;
@@ -63,10 +63,6 @@ impl Output {
             err
         }))
     }
-}
-
-fn quoted(path: &str) -> String {
-    format!("„{}“", remote_name(path))
 }
 
 const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -140,7 +136,7 @@ pub fn parse_ls_line(line: &str, now: chrono::DateTime<Local>) -> Option<FileEnt
     let dir = perms.starts_with('d');
     Some(FileEntry {
         name,
-        kind: if dir { "dir" } else { "file" }.into(),
+        kind: if dir { EntryKind::Dir } else { EntryKind::File },
         size: if dir { 0 } else { size },
         mtime,
         perms: perms_octal(perms),
@@ -246,24 +242,20 @@ impl ScpConn {
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let out = self.ok(&ls_command(path, false), &quoted(path)).await?;
+        let out = self.ok(&ls_command(path, false), &quoted_name(path)).await?;
         let now = Local::now();
         let mut list: Vec<FileEntry> =
             String::from_utf8_lossy(&out).lines().filter_map(|l| parse_ls_line(l, now)).collect();
-        list.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut list);
         Ok(list)
     }
 
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
-        let out = self.ok(&ls_command(path, true), &quoted(path)).await?;
+        let out = self.ok(&ls_command(path, true), &quoted_name(path)).await?;
         let line = String::from_utf8_lossy(&out).lines().next().unwrap_or_default().to_string();
         // The name in the line is the path as given; the entry gets the plain name.
         let mut e = parse_ls_line(&line, Local::now())
-            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("{} gibt es nicht.", quoted(path))))?;
+            .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("{} gibt es nicht.", quoted_name(path))))?;
         e.name = remote_name(path);
         Ok(e)
     }
@@ -273,36 +265,39 @@ impl ScpConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        self.ok(&format!("mkdir -- {}", quote(path)), &quoted(path)).await.map(|_| ())
+        self.ok(&format!("mkdir -- {}", quote(path)), &quoted_name(path)).await.map(|_| ())
     }
 
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
-        self.ok(&format!("mkdir -p -- {}", quote(path)), &quoted(path)).await.map(|_| ())
+        self.ok(&format!("mkdir -p -- {}", quote(path)), &quoted_name(path)).await.map(|_| ())
     }
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
         if self.exists(to).await {
-            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted(to))));
+            return Err(AppError::new(ErrorKind::AlreadyExists, format!("{} gibt es hier schon.", quoted_name(to))));
         }
-        self.ok(&format!("mv -- {} {}", quote(from), quote(to)), &quoted(from)).await.map(|_| ())
+        self.ok(&format!("mv -- {} {}", quote(from), quote(to)), &quoted_name(from)).await.map(|_| ())
     }
 
     pub async fn replace(&self, from: &str, to: &str) -> AppResult<()> {
-        self.ok(&format!("mv -f -- {} {}", quote(from), quote(to)), &quoted(to)).await.map(|_| ())
+        self.ok(&format!("mv -f -- {} {}", quote(from), quote(to)), &quoted_name(to)).await.map(|_| ())
     }
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
-        self.ok(&format!("rm -rf -- {}", quote(path)), &quoted(path)).await.map(|_| ())
+        self.ok(&format!("rm -rf -- {}", quote(path)), &quoted_name(path)).await.map(|_| ())
     }
 
     pub async fn chmod(&self, path: &str, mode: u32, recursive: bool) -> AppResult<()> {
-        self.ok(&format!("chmod {}{:o} -- {}", if recursive { "-R " } else { "" }, mode, quote(path)), &quoted(path))
-            .await
-            .map(|_| ())
+        self.ok(
+            &format!("chmod {}{:o} -- {}", if recursive { "-R " } else { "" }, mode, quote(path)),
+            &quoted_name(path),
+        )
+        .await
+        .map(|_| ())
     }
 
     pub async fn symlink(&self, link: &str, target: &str) -> AppResult<()> {
-        self.ok(&format!("ln -s -- {} {}", quote(target), quote(link)), &quoted(link)).await.map(|_| ())
+        self.ok(&format!("ln -s -- {} {}", quote(target), quote(link)), &quoted_name(link)).await.map(|_| ())
     }
 
     pub async fn open_shell(&self, cols: u32, rows: u32, command: &str) -> AppResult<russh::Channel<client::Msg>> {
@@ -351,7 +346,7 @@ impl ScpConn {
                 return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
             let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from));
-            self.ok(&format!("cp -Rp -- {} {}", quote(from), quote(&remote_join(dest_dir, &name))), &quoted(from))
+            self.ok(&format!("cp -Rp -- {} {}", quote(from), quote(&remote_join(dest_dir, &name))), &quoted_name(from))
                 .await?;
             taken.insert(name.clone());
             out.push(name);
@@ -393,7 +388,7 @@ impl ScpConn {
         let mut channel = self.handle.channel_open_session().await?;
         channel.exec(true, command).await?;
         let (w, mut r) = tokio::io::duplex(512 * 1024);
-        let what = quoted(path);
+        let what = quoted_name(path);
         let task = tokio::spawn(async move {
             let mut buf = vec![0u8; 64 * 1024];
             loop {
@@ -437,11 +432,11 @@ mod tests {
     fn reads_gnu_listing_with_seconds() {
         let e = parse_ls_line("-rw-r--r-- 1 test test 1234 1793289000 name with  spaces.txt", now()).unwrap();
         assert_eq!(
-            (e.name.as_str(), e.size, e.mtime, e.perms.as_str(), e.kind.as_str()),
-            ("name with  spaces.txt", 1234, 1_793_289_000_000, "644", "file")
+            (e.name.as_str(), e.size, e.mtime, e.perms.as_str(), e.kind),
+            ("name with  spaces.txt", 1234, 1_793_289_000_000, "644", EntryKind::File)
         );
         let d = parse_ls_line("drwxr-sr-x 2 www-data www 4096 1793289000 html", now()).unwrap();
-        assert_eq!((d.kind.as_str(), d.perms.as_str(), d.size), ("dir", "2755", 0));
+        assert_eq!((d.kind, d.perms.as_str(), d.size), (EntryKind::Dir, "2755", 0));
     }
 
     #[test]
@@ -466,16 +461,16 @@ mod tests {
     }
 }
 
-/// Integration test against the test SSH server, forced into shell mode.
+/// Integration test against the test SSH server, forced into shell mode (`cargo test -- --ignored`).
 #[cfg(test)]
 mod integration {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_SSH and BITCRANE_TEST_KEY"]
     async fn scp_round_trip() {
-        let (Ok(target), Ok(key)) = (std::env::var("BITCRANE_TEST_SSH"), std::env::var("BITCRANE_TEST_KEY")) else {
-            return;
-        };
+        let target = std::env::var("BITCRANE_TEST_SSH").expect("BITCRANE_TEST_SSH=host:port");
+        let key = std::env::var("BITCRANE_TEST_KEY").expect("BITCRANE_TEST_KEY");
         let (host, port) = target.split_once(':').unwrap();
         let dir = tempfile::tempdir().unwrap();
         let known = std::sync::Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));

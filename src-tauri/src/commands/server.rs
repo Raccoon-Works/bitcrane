@@ -120,7 +120,7 @@ pub(crate) fn drag_out(window: tauri::WebviewWindow, paths: Vec<String>) -> AppR
     #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = window;
-        Err(AppError::other("Herausziehen gibt es auf diesem System nicht."))
+        Err(AppError::unsupported_system())
     }
 }
 

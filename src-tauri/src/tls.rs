@@ -9,6 +9,7 @@
 use crate::ssh::KnownHosts;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::client::WebPkiServerVerifier;
+use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use sha2::{Digest, Sha256};
@@ -29,6 +30,16 @@ struct Verifier {
     /// Fingerprint the user has just confirmed.
     trust: Option<String>,
     seen: Arc<Mutex<Option<SeenCert>>>,
+}
+
+impl Verifier {
+    fn new(known: Arc<KnownHosts>, host_id: String, trust: Option<String>, provider: Arc<CryptoProvider>) -> Self {
+        let mut roots = rustls::RootCertStore::empty();
+        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        let inner =
+            WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider).build().expect("root certificates");
+        Verifier { inner, known, host_id, trust, seen: Arc::new(Mutex::new(None)) }
+    }
 }
 
 pub fn fingerprint(cert: &CertificateDer<'_>) -> String {
@@ -107,13 +118,8 @@ pub fn client_config(
     min_tls13: bool,
 ) -> (Arc<rustls::ClientConfig>, Arc<Mutex<Option<SeenCert>>>) {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let mut roots = rustls::RootCertStore::empty();
-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let inner = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
-        .build()
-        .expect("root certificates");
-    let seen = Arc::new(Mutex::new(None));
-    let verifier = Arc::new(Verifier { inner, known, host_id, trust, seen: seen.clone() });
+    let verifier = Arc::new(Verifier::new(known, host_id, trust, provider.clone()));
+    let seen = verifier.seen.clone();
     let versions: &[&rustls::SupportedProtocolVersion] =
         if min_tls13 { &[&rustls::version::TLS13] } else { &[&rustls::version::TLS13, &rustls::version::TLS12] };
     let config = rustls::ClientConfig::builder_with_provider(provider)
@@ -142,4 +148,66 @@ pub fn public_client_config() -> Arc<rustls::ClientConfig> {
 /// Server name for the TLS handshake (host name or IP address).
 pub fn server_name(host: &str) -> Result<ServerName<'static>, rustls::pki_types::InvalidDnsNameError> {
     ServerName::try_from(host.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HOST_ID: &str = "ftps://files.example:21";
+    /// Bytes no public authority vouches for (not even a valid certificate), so the authority check
+    /// always fails and only the pinned fingerprint decides, as for a self-signed certificate.
+    const OWN_CERT: &[u8] = b"self-signed certificate of files.example";
+    const NEW_CERT: &[u8] = b"another certificate of files.example";
+
+    fn known_hosts(dir: &tempfile::TempDir) -> Arc<KnownHosts> {
+        Arc::new(KnownHosts::load(dir.path().join("known_hosts.json")))
+    }
+
+    fn verifier(known: &Arc<KnownHosts>, trust: Option<String>) -> Verifier {
+        Verifier::new(known.clone(), HOST_ID.into(), trust, Arc::new(rustls::crypto::ring::default_provider()))
+    }
+
+    fn accepts(v: &Verifier, cert: &[u8]) -> bool {
+        let name = server_name("files.example").unwrap();
+        v.verify_server_cert(&CertificateDer::from(cert), &[], &name, &[], UnixTime::now()).is_ok()
+    }
+
+    fn fp(cert: &[u8]) -> String {
+        fingerprint(&CertificateDer::from(cert))
+    }
+
+    #[test]
+    fn fingerprint_is_sha256_in_base64_like_ssh() {
+        assert_eq!(fp(b"abc"), "SHA256:ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0");
+    }
+
+    #[test]
+    fn an_unknown_certificate_is_refused_and_shown_for_confirmation() {
+        let dir = tempfile::tempdir().unwrap();
+        let v = verifier(&known_hosts(&dir), None);
+        assert!(!accepts(&v, OWN_CERT));
+        assert_eq!(v.seen.lock().unwrap().as_ref().map(|s| s.fingerprint.clone()), Some(fp(OWN_CERT)));
+    }
+
+    #[test]
+    fn a_confirmed_certificate_is_remembered() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_hosts(&dir);
+        assert!(accepts(&verifier(&known, Some(fp(OWN_CERT))), OWN_CERT));
+        assert_eq!(known.get(HOST_ID), Some(fp(OWN_CERT)));
+        // Later connections need no confirmation, also after a restart.
+        assert!(accepts(&verifier(&known_hosts(&dir), None), OWN_CERT));
+    }
+
+    #[test]
+    fn a_changed_certificate_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_hosts(&dir);
+        known.set(HOST_ID, &fp(OWN_CERT)).unwrap();
+        assert!(!accepts(&verifier(&known, None), NEW_CERT));
+        // Confirming one fingerprint does not let a different certificate through.
+        assert!(!accepts(&verifier(&known, Some(fp(OWN_CERT))), NEW_CERT));
+        assert_eq!(known.get(HOST_ID), Some(fp(OWN_CERT)));
+    }
 }

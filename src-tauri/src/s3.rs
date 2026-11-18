@@ -15,7 +15,7 @@
 //! convention rclone and others use too).
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
@@ -223,9 +223,7 @@ fn parse_listing(xml: &str) -> Listing {
     for c in root.children().filter(|c| c.is_element()) {
         match c.tag_name().name() {
             "Contents" => {
-                let mtime = chrono::DateTime::parse_from_rfc3339(&text(c, "LastModified"))
-                    .map(|d| d.timestamp_millis())
-                    .unwrap_or(0);
+                let mtime = crate::model::rfc3339_ms(Some(&text(c, "LastModified")));
                 out.files.push((text(c, "Key"), text(c, "Size").parse().unwrap_or(0), mtime));
             }
             "CommonPrefixes" => out.prefixes.push(text(c, "Prefix")),
@@ -244,14 +242,8 @@ fn parse_buckets(xml: &str) -> Vec<(String, i64)> {
         .filter(|n| n.tag_name().name() == "Bucket")
         .filter_map(|b| {
             let name = b.children().find(|c| c.tag_name().name() == "Name")?.text()?.to_string();
-            let created = b
-                .children()
-                .find(|c| c.tag_name().name() == "CreationDate")
-                .and_then(|c| c.text())
-                .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
-                .map(|d| d.timestamp_millis())
-                .unwrap_or(0);
-            Some((name, created))
+            let created = b.children().find(|c| c.tag_name().name() == "CreationDate").and_then(|c| c.text());
+            Some((name, crate::model::rfc3339_ms(created)))
         })
         .collect()
 }
@@ -506,11 +498,7 @@ impl S3Conn {
                 None => break,
             }
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -632,7 +620,7 @@ impl S3Conn {
             return Err(AppError::other("Buckets löschst du in der Verwaltung deines Speicherdienstes."));
         }
         let e = self.stat(path).await?;
-        if e.kind == "file" {
+        if e.kind == EntryKind::File {
             return self.delete_key(&bucket, &key).await;
         }
         let prefix = Self::dir_prefix(&key);
@@ -664,7 +652,7 @@ impl S3Conn {
             return Err(AppError::other("Verschieben geht nur innerhalb eines Buckets."));
         }
         let e = self.stat(from).await?;
-        if e.kind == "file" {
+        if e.kind == EntryKind::File {
             self.copy_key(&fb, &fk, &tk).await?;
             return self.delete_key(&fb, &fk).await;
         }
@@ -705,7 +693,7 @@ impl S3Conn {
             if fb != tb {
                 return Err(AppError::other("Kopieren auf dem Server geht nur innerhalb eines Buckets."));
             }
-            if self.stat(from).await?.kind == "file" {
+            if self.stat(from).await?.kind == EntryKind::File {
                 self.copy_key(&fb, &fk, &tk).await?;
             } else {
                 let (fp, tp) = (Self::dir_prefix(&fk), Self::dir_prefix(&tk));
@@ -724,13 +712,8 @@ impl S3Conn {
         let base = remote_parent(path);
         let rel = |p: &str| p.strip_prefix(&base).unwrap_or(p).trim_start_matches('/').to_string();
         let root = self.stat(path).await?;
-        if root.kind != "dir" {
-            return Ok(vec![WalkItem {
-                path: path.to_string(),
-                relative: rel(path),
-                size: root.size,
-                mtime: root.mtime,
-            }]);
+        if root.kind != EntryKind::Dir {
+            return Ok(vec![WalkItem::with_real_names(path.to_string(), rel(path), root.size, root.mtime)]);
         }
         let (bucket, key) = self.split(path);
         let Some(bucket) = bucket else { return Err(AppError::other("Bitte zuerst einen Bucket öffnen.")) };
@@ -743,7 +726,7 @@ impl S3Conn {
                 continue;
             }
             let p = format!("{top}/{rest}");
-            out.push(WalkItem { relative: rel(&p), path: p, size, mtime });
+            out.push(WalkItem::with_real_names(p.clone(), rel(&p), size, mtime));
         }
         Ok(out)
     }
@@ -1013,16 +996,17 @@ mod tests {
     }
 }
 
-/// Integration test against an S3-compatible server: `BITCRANE_TEST_S3=http://127.0.0.1:9000`
-/// (e.g. moto_server; any access key and secret).
+/// Integration test against an S3-compatible server (`cargo test -- --ignored`):
+/// `BITCRANE_TEST_S3=http://127.0.0.1:9000` (e.g. moto_server; any access key and secret).
 #[cfg(test)]
 mod integration {
     use super::*;
     use tokio::io::AsyncWriteExt;
 
     #[tokio::test]
+    #[ignore = "needs a test server: BITCRANE_TEST_S3"]
     async fn s3_round_trip() {
-        let Ok(endpoint) = std::env::var("BITCRANE_TEST_S3") else { return };
+        let endpoint = std::env::var("BITCRANE_TEST_S3").expect("BITCRANE_TEST_S3=http://host:port");
         let dir = tempfile::tempdir().unwrap();
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
         let params = |bucket: &str| S3Params {
@@ -1044,8 +1028,8 @@ mod integration {
         let conn = Arc::new(S3Conn::connect(params(&bucket), known.clone()).await.unwrap());
         conn.mkdir_all("/a b").await.unwrap();
         assert_eq!(
-            conn.list("/").await.unwrap().iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(),
-            vec![("a b", "dir")]
+            conn.list("/").await.unwrap().iter().map(|e| (e.name.as_str(), e.kind)).collect::<Vec<_>>(),
+            vec![("a b", EntryKind::Dir)]
         );
         // Small file with mtime.
         let file = "/a b/über.txt";

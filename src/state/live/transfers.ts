@@ -8,7 +8,7 @@ import { ruleFor } from '../tabs';
 import { isExcluded } from '../syncPlan';
 import { addLog } from '../log';
 import { $t } from '../../i18n';
-import { basename, insideArchive, join, parent, relFolder, winNameFromSafe, winSafeRel } from '../../util/paths';
+import { basename, insideArchive, join, parent, relFolder } from '../../util/paths';
 import { showError } from '../errors';
 import { type Transfer, type PaneSide, type FileEntry } from '../../backend/types';
 import { type WalkItem, toBackendError, type TransferOptions, type BackendError } from '../../backend/api';
@@ -111,20 +111,13 @@ export async function uploadNativePaths(serverId: string, nativePaths: string[],
 }
 
 /**
- * Path below an upload target folder as it is stored on the server: in the
- * composed Unicode form (NFC) unless the server keeps names as they are. macOS
+ * Path below an upload target folder (with the server's names, see `WalkItem.relative`) as it
+ * is stored on the server: in the composed Unicode form (NFC) unless the server keeps names as they are. macOS
  * hands out some names decomposed ("u" plus a combining diaeresis), which Linux
  * and Windows servers treat as a different name than the same word typed there.
  */
 export function remoteRel(serverId: string, rel: string): string {
-  // On Windows, names that were made storable on download ("a%3Ab.txt") get their real form back.
-  const real = getState().platform === 'win' ? rel.split('/').map(winNameFromSafe).join('/') : rel;
-  return serverById(serverId)?.keepNameForm ? real : real.normalize('NFC');
-}
-
-/** Path below a download target folder: on Windows with forbidden characters replaced (see winSafeName). */
-export function localRel(rel: string): string {
-  return getState().platform === 'win' ? winSafeRel(rel) : rel;
+  return serverById(serverId)?.keepNameForm ? rel : rel.normalize('NFC');
 }
 
 /** Downloads remote files or folders (names in `remoteDir`) into `localDir`. */
@@ -146,7 +139,7 @@ export async function downloadNames(serverId: string, remoteDir: string, localDi
         skipped++;
         continue;
       }
-      const target = join(localDir, localRel(f.relative));
+      const target = join(localDir, f.localRelative);
       items.push({
         id: uid('t'),
         name: basename(f.path),

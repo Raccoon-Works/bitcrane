@@ -17,7 +17,7 @@
 //!   nonce as associated data.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{remote_join, remote_name, remote_parent, to_native};
 use crate::remote::{Remote, RemoteWriter};
 use aes_gcm::aead::{Aead, Payload};
@@ -101,7 +101,7 @@ fn local_entry(name: String, meta: &std::fs::Metadata) -> FileEntry {
         .unwrap_or(0);
     FileEntry {
         name,
-        kind: if meta.is_dir() { "dir" } else { "file" }.into(),
+        kind: if meta.is_dir() { EntryKind::Dir } else { EntryKind::File },
         size: if meta.is_dir() { 0 } else { meta.len() },
         mtime,
         perms: String::new(),
@@ -591,7 +591,7 @@ impl VaultConn {
         let path = remote_join(&self.content_dir(dir_id), &storage);
         let Some(entry) = self.store.stat(&path).await else { return Ok(None) };
         if !shortened {
-            let kind = if entry.kind == "dir" { Kind::Dir } else { Kind::File };
+            let kind = if entry.kind == EntryKind::Dir { Kind::Dir } else { Kind::File };
             return Ok(Some(Node { path, shortened, kind, size: clear_size(entry.size), mtime: entry.mtime }));
         }
         Ok(Some(match self.store.stat(&remote_join(&path, "contents.c9r")).await {
@@ -642,12 +642,12 @@ impl VaultConn {
         for e in self.store.list(&dir).await? {
             let (name, kind, size, mtime) = if e.name.ends_with(".c9r") && e.name != "dirid.c9r" {
                 let Some(name) = self.keys.decrypt_name(&e.name, &dir_id) else { continue };
-                if e.kind == "dir" {
+                if e.kind == EntryKind::Dir {
                     (name, Kind::Dir, 0, e.mtime)
                 } else {
                     (name, Kind::File, clear_size(e.size), e.mtime)
                 }
-            } else if e.name.ends_with(".c9s") && e.kind == "dir" {
+            } else if e.name.ends_with(".c9s") && e.kind == EntryKind::Dir {
                 let node = remote_join(&dir, &e.name);
                 let Ok(long) = self.store.read_all(&remote_join(&node, "name.c9s")).await else { continue };
                 let Some(name) = self.keys.decrypt_name(String::from_utf8_lossy(&long).trim(), &dir_id) else {
@@ -662,7 +662,7 @@ impl VaultConn {
             };
             out.push(FileEntry {
                 name,
-                kind: if kind == Kind::Dir { "dir" } else { "file" }.into(),
+                kind: if kind == Kind::Dir { EntryKind::Dir } else { EntryKind::File },
                 size,
                 mtime,
                 perms: String::new(),
@@ -672,11 +672,7 @@ impl VaultConn {
                 hidden: 0,
             });
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -684,7 +680,7 @@ impl VaultConn {
         if path == "/" || path.is_empty() {
             return Ok(FileEntry {
                 name: "/".into(),
-                kind: "dir".into(),
+                kind: EntryKind::Dir,
                 size: 0,
                 mtime: 0,
                 perms: String::new(),
@@ -697,7 +693,7 @@ impl VaultConn {
         let n = self.node_of(path).await?;
         Ok(FileEntry {
             name: remote_name(path),
-            kind: if n.kind == Kind::Dir { "dir" } else { "file" }.into(),
+            kind: if n.kind == Kind::Dir { EntryKind::Dir } else { EntryKind::File },
             size: n.size,
             mtime: n.mtime,
             perms: String::new(),
@@ -739,7 +735,7 @@ impl VaultConn {
         for seg in path.split('/').filter(|s| !s.is_empty()) {
             current = remote_join(&current, seg);
             match self.stat(&current).await {
-                Ok(e) if e.kind == "dir" => {}
+                Ok(e) if e.kind == EntryKind::Dir => {}
                 Ok(_) => return Err(AppError::other(format!("„{seg}“ ist kein Ordner."))),
                 Err(_) => self.mkdir(&current).await?,
             }
@@ -1008,7 +1004,10 @@ mod interop {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "needs a vault of another Cryptomator client: BITCRANE_VAULT_OUT and/or BITCRANE_VAULT_IN"]
     async fn writes_and_reads_foreign_vaults() {
+        let names = ["BITCRANE_VAULT_OUT", "BITCRANE_VAULT_IN"];
+        assert!(names.iter().any(|n| std::env::var(n).is_ok()), "set at least one of {names:?}");
         if let Ok(out) = std::env::var("BITCRANE_VAULT_OUT") {
             VaultConn::create(Store::Local, &out, "geheim").await.unwrap();
             let v = Arc::new(VaultConn::open(Store::Local, &out, "geheim").await.unwrap());

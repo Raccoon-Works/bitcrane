@@ -25,13 +25,15 @@ pub(crate) fn key_info(path: String) -> KeyInfo {
     if !native.is_file() {
         return KeyInfo { exists: false, algorithm: String::new(), encrypted: false, invalid: false };
     }
-    if let Ok(text) = std::fs::read_to_string(&native) {
-        if text.starts_with("PuTTY-User-Key-File") {
-            let (algorithm, encrypted) = keys::ppk_info(&text);
-            return KeyInfo { exists: true, algorithm, encrypted, invalid: false };
-        }
+    // Keys are text files; anything else (unreadable, binary) is no key Bitcrane can use.
+    let Ok(text) = std::fs::read_to_string(&native) else {
+        return KeyInfo { exists: true, algorithm: String::new(), encrypted: false, invalid: true };
+    };
+    if text.starts_with("PuTTY-User-Key-File") {
+        let (algorithm, encrypted) = keys::ppk_info(&text);
+        return KeyInfo { exists: true, algorithm, encrypted, invalid: false };
     }
-    match std::fs::read_to_string(&native).ok().and_then(|t| russh::keys::PrivateKey::from_openssh(t.trim()).ok()) {
+    match russh::keys::PrivateKey::from_openssh(text.trim()).ok() {
         Some(k) => KeyInfo {
             exists: true,
             algorithm: match k.algorithm() {
@@ -44,7 +46,7 @@ pub(crate) fn key_info(path: String) -> KeyInfo {
             invalid: false,
         },
         // Older PEM keys ("BEGIN RSA PRIVATE KEY") are still usable for login.
-        None => match russh::keys::load_secret_key(&native, None) {
+        None => match russh::keys::decode_secret_key(&text, None) {
             Ok(_) => KeyInfo { exists: true, algorithm: "RSA".into(), encrypted: false, invalid: false },
             Err(russh::keys::Error::KeyIsEncrypted) => {
                 KeyInfo { exists: true, algorithm: String::new(), encrypted: true, invalid: false }

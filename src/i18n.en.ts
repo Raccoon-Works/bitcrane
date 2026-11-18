@@ -1151,6 +1151,7 @@ export const EN: Record<string, string> = {
   'Datei oder Ordner nicht gefunden.': 'File or folder not found.',
   'Keine Berechtigung.': 'No permission.',
   'Das gibt es dort schon.': 'That already exists there.',
+  'Das gibt es nur unter macOS und Windows.': 'This is only available on macOS and Windows.',
   'Der Server ist nicht erreichbar.': 'The server is not reachable.',
   'Der Server meldet einen Fehler.': 'The server reports an error.',
   'Der Server antwortet nicht.': 'The server is not responding.',
@@ -1172,7 +1173,6 @@ export const EN: Record<string, string> = {
   Datenverbindung: 'Data connection',
   'Ungültiger Servername für TLS.': 'Invalid server name for TLS.',
   'Datei konnte nicht abgeschlossen werden.': 'The file could not be finalized.',
-  'Diese Datei gibt es schon.': 'This file already exists.',
   'Ein Schlüssel mit diesem Namen existiert schon. Bitte einen anderen Namen wählen.':
     'A key with this name already exists. Please choose another name.',
   'Schlüssel konnte nicht erzeugt werden.': 'The key could not be generated.',
@@ -1348,6 +1348,8 @@ export const EN: Record<string, string> = {
   'Die bekannten Fingerabdrücke konnten nicht gespeichert werden.': 'The known fingerprints could not be saved.',
   'Die Datei kam nicht vollständig an.': 'The file did not arrive completely.',
   'Namen mit Zeilenumbrüchen gehen über FTP nicht.': 'Names with line breaks are not supported over FTP.',
+  'Das Zeichen „{0}“ gibt es im Zeichensatz Latin-1 nicht. Bitte den Namen ändern oder beim Server den Zeichensatz UTF-8 wählen.':
+    'The character “{0}” does not exist in the Latin-1 character set. Please rename the item or choose UTF-8 as the server’s character set.',
   'Für diesen Server kann kein Terminal geöffnet werden (ungewöhnliche Zeichen im Namen oder in der Adresse).':
     'A terminal cannot be opened for this server (unusual characters in the name or address).',
   'Dieser Ordner kann nicht im Terminal geöffnet werden (ungewöhnliche Zeichen im Namen).':

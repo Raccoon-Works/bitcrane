@@ -14,9 +14,9 @@
 //! - The modification time is kept as "fileSystemInfo.lastModifiedDateTime".
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth;
-use crate::paths::{remote_name, remote_parent};
+use crate::paths::{quoted_name, remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::Deserialize;
@@ -106,10 +106,6 @@ fn item_url(path: &str, suffix: &str) -> String {
     )
 }
 
-fn parse_time(s: Option<&str>) -> i64 {
-    s.and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map(|d| d.timestamp_millis()).unwrap_or(0)
-}
-
 fn rfc3339(secs: u32) -> Option<String> {
     chrono::DateTime::from_timestamp(secs as i64, 0).map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
@@ -122,7 +118,7 @@ fn entry_of(v: &Value) -> Option<FileEntry> {
         return None;
     }
     // The time the file was changed on the computer it came from, else the server's.
-    let mtime = parse_time(
+    let mtime = crate::model::rfc3339_ms(
         v.pointer("/fileSystemInfo/lastModifiedDateTime")
             .and_then(|t| t.as_str())
             .or_else(|| v.get("lastModifiedDateTime").and_then(|t| t.as_str())),
@@ -309,11 +305,7 @@ impl OneDriveConn {
                 None => break,
             }
         }
-        out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-            ("dir", "file") => std::cmp::Ordering::Less,
-            ("file", "dir") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        crate::model::sort_listing(&mut out);
         Ok(out)
     }
 
@@ -321,7 +313,7 @@ impl OneDriveConn {
         if norm(path) == "/" {
             return Ok(FileEntry {
                 name: "/".into(),
-                kind: "dir".into(),
+                kind: EntryKind::Dir,
                 size: 0,
                 mtime: 0,
                 perms: "755".into(),
@@ -331,7 +323,7 @@ impl OneDriveConn {
                 hidden: 0,
             });
         }
-        let v = self.call(reqwest::Method::GET, &item_url(path, ""), None, &format!("„{}“", remote_name(path))).await?;
+        let v = self.call(reqwest::Method::GET, &item_url(path, ""), None, &quoted_name(path)).await?;
         entry_of(&v)
             .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("„{}“ gibt es nicht.", remote_name(path))))
     }
@@ -643,8 +635,8 @@ mod tests {
         );
         assert_eq!(item_url("/Übersicht", ""), format!("{GRAPH}/me/drive/root:/%C3%9Cbersicht:"));
         let f = entry_of(&json!({ "name": "a.txt", "size": 42, "file": {}, "fileSystemInfo": { "lastModifiedDateTime": "2026-10-29T08:00:00Z" } })).unwrap();
-        assert_eq!((f.kind.as_str(), f.size, f.mtime), ("file", 42, 1793260800000));
-        assert_eq!(entry_of(&json!({ "name": "Fotos", "folder": { "childCount": 3 } })).unwrap().kind, "dir");
+        assert_eq!((f.kind, f.size, f.mtime), (EntryKind::File, 42, 1793260800000));
+        assert_eq!(entry_of(&json!({ "name": "Fotos", "folder": { "childCount": 3 } })).unwrap().kind, EntryKind::Dir);
         assert!(entry_of(&json!({ "name": "Notizbuch", "package": { "type": "oneNote" } })).is_none());
         assert_eq!(OneDriveConn::parent_ref("/"), json!({ "path": "/drive/root:" }));
         assert_eq!(OneDriveConn::parent_ref("/a/b"), json!({ "path": "/drive/root:/a/b" }));

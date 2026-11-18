@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
-    /// "dir" or "file".
-    pub kind: String,
+    pub kind: EntryKind,
     pub size: u64,
     /// Modification time in milliseconds since the Unix epoch.
     pub mtime: i64,
@@ -32,7 +31,7 @@ impl FileEntry {
     pub fn plain(name: String, dir: bool, size: u64, mtime: i64) -> Self {
         FileEntry {
             name,
-            kind: if dir { "dir".into() } else { "file".into() },
+            kind: if dir { EntryKind::Dir } else { EntryKind::File },
             size: if dir { 0 } else { size },
             mtime,
             perms: if dir { "755".into() } else { "644".into() },
@@ -42,6 +41,26 @@ impl FileEntry {
             hidden: 0,
         }
     }
+}
+
+/// Folder or file; a link is the kind of what it points to, with `FileEntry::link` set.
+/// Serialized as "dir" and "file", as the interface and saved data know them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EntryKind {
+    Dir,
+    File,
+}
+
+/// Milliseconds since the Unix epoch of an RFC 3339 time, as cloud services and S3 send it;
+/// 0 when the time is missing or unreadable, like a listing without times.
+pub fn rfc3339_ms(time: Option<&str>) -> i64 {
+    time.and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map_or(0, |d| d.timestamp_millis())
+}
+
+/// Sorts a listing as every pane shows it: folders first, then by name, ignoring case.
+pub fn sort_listing(list: &mut [FileEntry]) {
+    list.sort_by_key(|e| (e.kind, e.name.to_lowercase()));
 }
 
 fn is_zero(v: &u8) -> bool {
@@ -54,10 +73,27 @@ fn is_zero(v: &u8) -> bool {
 pub struct WalkItem {
     /// Full UI path of the file.
     pub path: String,
-    /// Path relative to the walked folder's parent, using "/" separators.
+    /// Path relative to the walked folder's parent, using "/" separators, with the names a server
+    /// uses: what an upload creates and what both sides of a comparison are matched by.
     pub relative: String,
+    /// The same path with the names this computer stores (`paths::storable_name`): what a
+    /// download creates. Differs from `relative` only on Windows, for names it cannot store.
+    pub local_relative: String,
     pub size: u64,
     pub mtime: i64,
+}
+
+impl WalkItem {
+    /// A file named as it really is: on a server, or an entry inside an archive.
+    pub fn with_real_names(path: String, relative: String, size: u64, mtime: i64) -> Self {
+        let local_relative = crate::paths::storable_rel(&relative);
+        WalkItem { path, relative, local_relative, size, mtime }
+    }
+
+    /// A file of this computer; `stored` is the relative path with the names it has here.
+    pub fn with_stored_names(path: String, stored: String, size: u64, mtime: i64) -> Self {
+        WalkItem { path, relative: crate::paths::real_rel(&stored), local_relative: stored, size, mtime }
+    }
 }
 
 /// A local place shown in the sidebar.

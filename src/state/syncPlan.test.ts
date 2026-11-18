@@ -15,8 +15,14 @@ import {
 const T = new Date(2026, 5, 15, 12).getTime();
 
 /** One side of a file: "l" files live below ~/site, "r" files below /srv/www. */
-const l = (rel: string, size: number, mtime = T): [string, Side] => [rel, { size, mtime, path: `~/site/${rel}` }];
-const r = (rel: string, size: number, mtime = T): [string, Side] => [rel, { size, mtime, path: `/srv/www/${rel}` }];
+const l = (rel: string, size: number, mtime = T): [string, Side] => [
+  rel,
+  { size, mtime, path: `~/site/${rel}`, localRel: rel },
+];
+const r = (rel: string, size: number, mtime = T): [string, Side] => [
+  rel,
+  { size, mtime, path: `/srv/www/${rel}`, localRel: rel },
+];
 
 function plan(
   local: Array<[string, Side]>,
@@ -153,8 +159,8 @@ describe('actionsOf', () => {
       excludes: [],
     });
     expect(actionsOf(lines)).toEqual([
-      { kind: 'download', rel: 'down', size: 4, from: '/srv/www/down', to: undefined },
-      { kind: 'upload', rel: 'up', size: 3, from: '~/site/up', to: undefined },
+      { kind: 'download', rel: 'down', localRel: 'down', size: 4, from: '/srv/www/down', to: undefined },
+      { kind: 'upload', rel: 'up', localRel: 'up', size: 3, from: '~/site/up', to: undefined },
     ]);
   });
 
@@ -166,7 +172,34 @@ describe('actionsOf', () => {
       days: 0,
       excludes: [],
     });
-    expect(actionsOf(lines)).toEqual([{ kind: 'upload', rel: 'a', size: 3, from: '~/site/a', to: '/srv/www/a' }]);
+    expect(actionsOf(lines)).toEqual([
+      { kind: 'upload', rel: 'a', localRel: 'a', size: 3, from: '~/site/a', to: '/srv/www/a' },
+    ]);
+  });
+
+  it('gives a new file on this computer the name the core made storable', () => {
+    // On Windows the core walks "logs/12:00.log" on a server with the local form "logs/12%3A00.log".
+    const server: [string, Side] = [
+      'logs/12:00.log',
+      { size: 4, mtime: T, path: '/srv/www/logs/12:00.log', localRel: 'logs/12%3A00.log' },
+    ];
+    const lines = planLines(new Map(), new Map([server]), {
+      direction: 'down',
+      bySize: false,
+      deletes: false,
+      days: 0,
+      excludes: [],
+    });
+    expect(actionsOf(lines)).toEqual([
+      {
+        kind: 'download',
+        rel: 'logs/12:00.log',
+        localRel: 'logs/12%3A00.log',
+        size: 4,
+        from: '/srv/www/logs/12:00.log',
+        to: undefined,
+      },
+    ]);
   });
 });
 

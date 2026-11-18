@@ -11,8 +11,16 @@ import { $t, tr } from '../i18n';
 export interface WalkItem {
   /** Full path (UI form). */
   path: string;
-  /** Path relative to the walked item's parent, starting with its own name. */
+  /**
+   * Path relative to the walked item's parent, starting with its own name, with the names a
+   * server uses: what an upload creates and what a comparison matches both sides by.
+   */
   relative: string;
+  /**
+   * The same path with the names this computer stores, which is what a download creates. Differs
+   * only on Windows, where the core writes names it cannot store as %XX ("a:b" as "a%3Ab").
+   */
+  localRelative: string;
   size: number;
   mtime: number;
 }
@@ -174,10 +182,18 @@ export interface BackendError {
 
 export interface WatchBatch {
   watchId: string;
-  changed: string[];
-  removed: string[];
+  changed: WatchedFile[];
+  removed: WatchedFile[];
   /** Renamed or moved inside the watched folder: [from, to]. */
-  renamed?: Array<[string, string]>;
+  renamed: Array<[WatchedFile, WatchedFile]>;
+}
+
+/** A file or folder of a watch batch. */
+export interface WatchedFile {
+  /** Path on this computer. */
+  path: string;
+  /** Path below the watched folder with the names a server uses (see `WalkItem.relative`). */
+  real: string;
 }
 
 /** A server found in FileZilla, WinSCP or the SSH configuration. */

@@ -102,6 +102,10 @@ mod windows_icon {
     pub fn lookup(ext: &str) -> Option<Vec<u8>> {
         // A made-up file name: with SHGFI_USEFILEATTRIBUTES the shell only looks at the extension.
         let name: Vec<u16> = format!("datei.{ext}").encode_utf16().chain(Some(0)).collect();
+        // SAFETY: every pointer handed to the shell points to a live local: `name` is NUL-terminated,
+        // `info`, `small` and `list` are out-parameters sized as the calls are told. `list` is used
+        // only after SHGetImageList succeeded with a non-null result, and `icon` is a handle owned
+        // here, given to `icon_to_png` while valid and destroyed exactly once afterwards.
         unsafe {
             // The shell's image lists want COM on this thread; a second call is harmless.
             let _ = CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32);
@@ -144,6 +148,10 @@ mod windows_icon {
     }
 
     /// Reads the colour and mask bitmaps of an icon as 32-bit top-down pixels.
+    ///
+    /// # Safety
+    /// `icon` must be a valid icon handle; it stays with the caller. The two bitmaps that
+    /// `GetIconInfo` creates for it are owned here and deleted before returning.
     unsafe fn icon_to_png(icon: HICON) -> Option<Vec<u8>> {
         let mut ii: ICONINFO = zeroed();
         if GetIconInfo(icon, &mut ii) == 0 {
@@ -186,6 +194,12 @@ mod windows_icon {
         result
     }
 
+    /// The pixels of a bitmap as 32-bit top-down rows.
+    ///
+    /// # Safety
+    /// `bitmap` must be a valid bitmap handle of `w` x `h` pixels (both positive). `buf` holds
+    /// exactly the `h` rows of `w` 32-bit pixels that `bmi` asks GetDIBits for, so it is never
+    /// written past its end.
     unsafe fn read_bits(bitmap: *mut core::ffi::c_void, w: i32, h: i32) -> Option<Vec<u8>> {
         let mut bmi: BITMAPINFO = zeroed();
         bmi.bmiHeader = BITMAPINFOHEADER {

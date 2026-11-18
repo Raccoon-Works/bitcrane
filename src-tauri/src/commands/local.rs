@@ -184,15 +184,15 @@ pub(crate) fn local_open(path: String, app: Option<String>) -> AppResult<()> {
             }
         }
     };
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut cmd = {
-        let mut c = std::process::Command::new(
-            app.as_deref().map(|a| a.as_os_str()).unwrap_or_else(|| std::ffi::OsStr::new("xdg-open")),
-        );
-        c.arg(&native);
-        c
-    };
-    cmd.spawn().map(|_| ()).map_err(AppError::from)
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        cmd.spawn().map(|_| ()).map_err(AppError::from)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (native, app);
+        Err(AppError::unsupported_system())
+    }
 }
 
 /// Converts a native path (from the folder dialog) into the UI form ("~/...").
@@ -242,13 +242,15 @@ pub(crate) fn local_reveal(path: String) -> AppResult<()> {
         c.raw_arg(format!("/select,\"{}\"", native.display()));
         c
     };
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut cmd = {
-        let mut c = std::process::Command::new("xdg-open");
-        c.arg(native.parent().unwrap_or(&native));
-        c
-    };
-    cmd.spawn().map(|_| ()).map_err(AppError::from)
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        cmd.spawn().map(|_| ()).map_err(AppError::from)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = native;
+        Err(AppError::unsupported_system())
+    }
 }
 
 /// "Inhalt durchsuchen" on this computer.

@@ -61,7 +61,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, Manager};
+#[cfg(any(target_os = "macos", windows))]
+use tauri::Emitter;
+use tauri::Manager;
 
 /// Shared state of the running app.
 pub struct AppState {
@@ -121,31 +123,28 @@ impl AppState {
 type PendingPrompts = Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Option<Vec<String>>>>>>;
 
 /// Entry point used by `main.rs`.
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let context = tauri::generate_context!();
     // Before any window exists, so the taskbar button gets the app ID of the shortcuts (see iconmenu).
     #[cfg(windows)]
     iconmenu::set_app_id(&context.config().identifier);
-    let mut builder = tauri::Builder::default();
-    #[cfg(desktop)]
-    {
-        // A second start only brings the running Bitcrane to the front; started from the
-        // Explorer menu ("--upload <path>") it passes the paths on to the window.
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            tray::show_main_window(app);
-            let paths = shell_integration::upload_args(&args);
-            if !paths.is_empty() {
-                let _ = app.emit("upload-files", paths);
-            }
-            if let Some(action) = iconmenu::action_arg(&args) {
-                tray::on_menu(app, &action);
-            }
-            if let Some(link) = links::link_arg(&args) {
-                let _ = app.emit("open-link", link);
-            }
-        }));
-    }
+    let builder = tauri::Builder::default();
+    // A second start only brings the running Bitcrane to the front; started from the
+    // Explorer menu ("--upload <path>") it passes the paths on to the window.
+    #[cfg(any(target_os = "macos", windows))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        tray::show_main_window(app);
+        let paths = shell_integration::upload_args(&args);
+        if !paths.is_empty() {
+            let _ = app.emit("upload-files", paths);
+        }
+        if let Some(action) = iconmenu::action_arg(&args) {
+            tray::on_menu(app, &action);
+        }
+        if let Some(link) = links::link_arg(&args) {
+            let _ = app.emit("open-link", link);
+        }
+    }));
     builder
         // sftp:// links (opt-in in the settings; on the Mac the scheme is declared in Info.plist).
         .plugin(tauri_plugin_deep_link::init())

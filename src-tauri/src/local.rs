@@ -1,7 +1,7 @@
 //! Local file system operations.
 
 use crate::error::{AppError, AppResult, ErrorKind};
-use crate::model::{FileEntry, GrepHit, Place, WalkItem};
+use crate::model::{EntryKind, FileEntry, GrepHit, Place, WalkItem};
 use crate::paths::{to_native, to_ui};
 use std::fs;
 use std::path::Path;
@@ -32,7 +32,7 @@ fn mode_of(meta: &fs::Metadata) -> String {
 fn entry_from(name: String, meta: &fs::Metadata) -> FileEntry {
     FileEntry {
         name,
-        kind: if meta.is_dir() { "dir".into() } else { "file".into() },
+        kind: if meta.is_dir() { EntryKind::Dir } else { EntryKind::File },
         size: if meta.is_dir() { 0 } else { meta.len() },
         mtime: mtime_ms(meta),
         perms: mode_of(meta),
@@ -103,11 +103,7 @@ pub fn list(path: &str) -> AppResult<Vec<FileEntry>> {
         }
         out.push(entry);
     }
-    out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-        ("dir", "file") => std::cmp::Ordering::Less,
-        ("file", "dir") => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
+    crate::model::sort_listing(&mut out);
     Ok(out)
 }
 
@@ -189,7 +185,7 @@ pub fn walk(path: &str) -> AppResult<Vec<WalkItem>> {
             .metadata()
             .map_err(|e| AppError::other("Datei konnte nicht gelesen werden.").with_detail(e.to_string()))?;
         let rel = entry.path().strip_prefix(&base).unwrap_or(entry.path()).to_string_lossy().replace('\\', "/");
-        out.push(WalkItem { path: to_ui(entry.path()), relative: rel, size: meta.len(), mtime: mtime_ms(&meta) });
+        out.push(WalkItem::with_stored_names(to_ui(entry.path()), rel, meta.len(), mtime_ms(&meta)));
     }
     Ok(out)
 }
@@ -669,26 +665,6 @@ fn drives_list() -> Vec<Place> {
         }
         out.sort_by(|a, b| (a.path != "/").cmp(&(b.path != "/")).then(a.name.cmp(&b.name)));
     }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        out.push(Place { name: "/".into(), path: "/".into(), network: false, free: None, label: None });
-        let user = std::env::var("USER").unwrap_or_default();
-        for base in [format!("/media/{user}"), format!("/run/media/{user}"), "/mnt".to_string()] {
-            if let Ok(rd) = fs::read_dir(&base) {
-                for e in rd.flatten() {
-                    if e.path().is_dir() {
-                        out.push(Place {
-                            name: e.file_name().to_string_lossy().into_owned(),
-                            path: to_ui(&e.path()),
-                            network: false,
-                            free: None,
-                            label: None,
-                        });
-                    }
-                }
-            }
-        }
-    }
     out
 }
 
@@ -931,7 +907,7 @@ mod tests {
 
         let l = list(&base).unwrap();
         assert_eq!(l[0].name, "sub");
-        assert_eq!(l[0].kind, "dir");
+        assert_eq!(l[0].kind, EntryKind::Dir);
         assert_eq!(l[1].size, 5);
 
         rename(&format!("{base}/b.txt"), "c.txt").unwrap();

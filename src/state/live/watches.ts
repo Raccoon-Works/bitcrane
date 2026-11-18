@@ -14,7 +14,7 @@ import { addLog } from '../log';
 import { isExcluded } from '../syncPlan';
 import { connected, connectNow, autoConnect, timeTolerance, connectServer } from './connections';
 import { invalidate, bump } from './listing';
-import { toBackendError, type WalkItem } from '../../backend/api';
+import { toBackendError, type WalkItem, type WatchBatch, type WatchedFile } from '../../backend/api';
 import { pendingCommand } from './transfers';
 import { enqueue } from '../transfers';
 
@@ -61,16 +61,16 @@ export function reconcileWatches(s: AppState) {
   }
 }
 
-function watchTransfer(w: Watch, source: string, size: number, existing?: string): Transfer {
+function watchTransfer(w: Watch, file: WatchedFile, size: number, existing?: string): Transfer {
   // An existing file on the server keeps its exact name (also its Unicode form).
-  const target = existing ?? remoteOf(w, source);
+  const target = existing ?? remoteOf(w, file);
   return {
     id: uid('t'),
-    name: basename(source),
+    name: basename(file.path),
     direction: 'up',
     serverId: w.serverId,
     folder: relFolder(w.remotePath, target),
-    source,
+    source: file.path,
     target,
     size,
     done: 0,
@@ -90,14 +90,16 @@ function relOf(w: Watch, localPath: string) {
   const base = w.localPath.replace(/\/+$/, '');
   return localPath.startsWith(`${base}/`) ? localPath.slice(base.length + 1) : basename(localPath);
 }
-const remoteOf = (w: Watch, localPath: string) => join(w.remotePath, remoteRel(w.serverId, relOf(w, localPath)));
+const remoteOf = (w: Watch, file: WatchedFile) => join(w.remotePath, remoteRel(w.serverId, file.real));
 
-async function onWatchBatch(b: {
-  watchId: string;
-  changed: string[];
-  removed: string[];
-  renamed?: Array<[string, string]>;
-}) {
+/** A walked file as a watched one: `real` is below `dir` (the walked folder), or below the watched folder. */
+function walked(f: WalkItem, dir?: WatchedFile): WatchedFile {
+  // Walk results start with the walked folder's own name.
+  const below = f.relative.slice(f.relative.indexOf('/') + 1);
+  return { path: f.path, real: dir ? `${dir.real}/${below}` : below };
+}
+
+async function onWatchBatch(b: WatchBatch) {
   const w = getState().watches.find((x) => x.id === b.watchId);
   if (!w || w.state === 'paused') return;
   addLog(
@@ -107,35 +109,35 @@ async function onWatchBatch(b: {
       w.name,
       b.changed.length,
       b.removed.length,
-      b.renamed?.length ?? 0,
+      b.renamed.length,
     ),
     w.serverId,
   );
   const items: Transfer[] = [];
-  const addFile = async (p: string) => {
-    if (!inSelection(w, relOf(w, p))) return;
+  const addFile = async (file: WatchedFile) => {
+    if (!inSelection(w, relOf(w, file.path))) return;
     // Skip files that are already waiting in the queue.
-    if (getState().transfers.some((x) => x.source === p && x.state === 'queued')) return;
+    if (getState().transfers.some((x) => x.source === file.path && x.state === 'queued')) return;
     try {
-      const st = await backend.localStat(p);
-      if (st.kind === 'file') items.push(watchTransfer(w, p, st.size));
+      const st = await backend.localStat(file.path);
+      if (st.kind === 'file') items.push(watchTransfer(w, file, st.size));
       else if (st.kind === 'dir') {
         // A whole folder appeared (moved in or renamed): upload its files.
-        for (const f of await backend.localWalk(p)) {
+        for (const f of await backend.localWalk(file.path)) {
           if (!isExcluded(relOf(w, f.path), watchExcludes(w)) && inSelection(w, relOf(w, f.path)))
-            items.push(watchTransfer(w, f.path, f.size));
+            items.push(watchTransfer(w, walked(f, file), f.size));
         }
       }
     } catch {
       // Deleted again before we got to it.
     }
   };
-  for (const p of b.changed) await addFile(p);
+  for (const file of b.changed) await addFile(file);
 
   // Renamed locally: rename on the server too when deleting is allowed for this
   // watch; otherwise upload under the new name and leave the old name alone.
-  for (const [from, to] of b.renamed ?? []) {
-    if (w.options.mirrorDeletes && connected.has(w.serverId) && inSelection(w, relOf(w, from))) {
+  for (const [from, to] of b.renamed) {
+    if (w.options.mirrorDeletes && connected.has(w.serverId) && inSelection(w, relOf(w, from.path))) {
       try {
         await backend.remoteMove(w.serverId, remoteOf(w, from), remoteOf(w, to));
         addLog('ok', $t('Umbenannt: {0} → {1}', remoteOf(w, from), remoteOf(w, to)), w.serverId);
@@ -167,9 +169,9 @@ async function onWatchBatch(b: {
     pendingCommand.add(w.id);
     enqueue(items);
   }
-  const removed = b.removed.filter((p) => inSelection(w, relOf(w, p)));
+  const removed = b.removed.filter((f) => inSelection(w, relOf(w, f.path)));
   if (w.options.mirrorDeletes && removed.length && connected.has(w.serverId)) {
-    const targets = removed.map((p) => remoteOf(w, p));
+    const targets = removed.map((f) => remoteOf(w, f));
     backend
       .remoteRemove(w.serverId, targets)
       .then(() => {
@@ -208,9 +210,10 @@ export async function initialSync(w: Watch, manual = false) {
     for (const f of local) {
       const rel = relOf(w, f.path);
       if (isExcluded(rel, watchExcludes(w)) || !inSelection(w, rel)) continue;
-      const r = remoteByRel.get(remoteRel(w.serverId, rel).normalize('NFC'));
+      const file = walked(f);
+      const r = remoteByRel.get(remoteRel(w.serverId, file.real).normalize('NFC'));
       if (!r && w.options.onlyExisting) continue;
-      if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, f.path, f.size, r?.path));
+      if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, file, f.size, r?.path));
     }
     if (items.length) {
       pendingCommand.add(w.id);

@@ -7,7 +7,7 @@
 //! the user interface, which receives one event per batch.
 
 use crate::error::{AppError, AppResult};
-use crate::paths::{to_native, to_ui};
+use crate::paths::{real_rel, to_native, to_ui};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::event::{ModifyKind, RenameMode};
 use notify::{EventKind, RecursiveMode};
@@ -23,12 +23,22 @@ use std::time::Duration;
 #[serde(rename_all = "camelCase")]
 pub struct WatchBatch {
     pub watch_id: String,
-    /// Changed or new files (UI paths).
-    pub changed: Vec<String>,
-    /// Deleted files or folders (UI paths).
-    pub removed: Vec<String>,
+    /// Changed or new files.
+    pub changed: Vec<WatchedFile>,
+    /// Deleted files or folders.
+    pub removed: Vec<WatchedFile>,
     /// Renamed or moved files and folders inside the watched folder: (from, to).
-    pub renamed: Vec<(String, String)>,
+    pub renamed: Vec<(WatchedFile, WatchedFile)>,
+}
+
+/// A file or folder of a batch.
+#[derive(Debug, Clone, Serialize)]
+pub struct WatchedFile {
+    /// UI path on this computer.
+    pub path: String,
+    /// Path below the watched folder with the names a server uses (`paths::real_rel`): where the
+    /// file belongs on the server, also for a deleted file that can no longer be looked at.
+    pub real: String,
 }
 
 type Handle = Debouncer<notify::RecommendedWatcher, RecommendedCache>;
@@ -132,11 +142,22 @@ impl Watches {
                     removed.remove(to);
                 }
                 if !changed.is_empty() || !removed.is_empty() || !renamed.is_empty() {
+                    let watched = |path: String| {
+                        let native = to_native(&path);
+                        // As relOf in watches.ts: a path reported outside the root (a root reached
+                        // through a link) counts by its name alone.
+                        let below = native
+                            .strip_prefix(&root_for_cb)
+                            .ok()
+                            .or(native.file_name().map(Path::new))
+                            .unwrap_or(&native);
+                        WatchedFile { real: real_rel(&below.to_string_lossy().replace('\\', "/")), path }
+                    };
                     emit(WatchBatch {
                         watch_id: id.clone(),
-                        changed: changed.into_iter().collect(),
-                        removed: removed.into_iter().collect(),
-                        renamed,
+                        changed: changed.into_iter().map(watched).collect(),
+                        removed: removed.into_iter().map(watched).collect(),
+                        renamed: renamed.into_iter().map(|(from, to)| (watched(from), watched(to))).collect(),
                     });
                 }
             })
@@ -187,8 +208,8 @@ mod tests {
         std::fs::create_dir(dir.path().join(".git")).unwrap();
         std::fs::write(dir.path().join(".git/HEAD"), "x").unwrap();
         let batch = rx.recv_timeout(Duration::from_secs(5)).expect("no batch");
-        assert!(batch.changed.iter().any(|p| p.ends_with("/bot.py")));
-        assert!(!batch.changed.iter().any(|p| p.contains("/.git/")));
+        assert!(batch.changed.iter().any(|f| f.path.ends_with("/bot.py") && f.real == "bot.py"));
+        assert!(!batch.changed.iter().any(|f| f.path.contains("/.git/")));
         w.stop("t");
     }
 
@@ -208,12 +229,14 @@ mod tests {
         let batch = rx.recv_timeout(Duration::from_secs(5)).expect("no batch");
         if batch.renamed.is_empty() && cfg!(target_os = "macos") {
             // FSEvents may report a rename as "gone" plus "new"; the upload is still right.
-            assert!(batch.changed.iter().any(|p| p.ends_with("/main.py")), "{batch:?}");
+            assert!(batch.changed.iter().any(|f| f.path.ends_with("/main.py")), "{batch:?}");
             w.stop("r");
             return;
         }
         assert_eq!(batch.renamed.len(), 1, "{batch:?}");
-        assert!(batch.renamed[0].0.ends_with("/bot.py") && batch.renamed[0].1.ends_with("/main.py"));
+        let (from, to) = &batch.renamed[0];
+        assert!(from.path.ends_with("/bot.py") && to.path.ends_with("/main.py"));
+        assert_eq!((from.real.as_str(), to.real.as_str()), ("bot.py", "main.py"));
         assert!(batch.removed.is_empty() && batch.changed.is_empty(), "{batch:?}");
         w.stop("r");
     }

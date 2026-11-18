@@ -34,7 +34,8 @@ uuid = { version = "1", features = ["v4"] }
 notify = "8"
 notify-debouncer-full = "0.7"
 globset = "0.4"
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+# Only the macOS and Windows stores: a Linux build (development, tests) has no keychain to use.
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 trash = "5"
 walkdir = "2"
@@ -76,11 +77,9 @@ mdns-sd = "0.21"
 [dev-dependencies]
 tempfile = "3"
 
-[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-
-# Dragging files out of the window into the Finder or Explorer (drag_out in lib.rs).
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# Dragging files out of the window into the Finder or Explorer (drag_out in lib.rs).
 drag = "2.1.1"
 
 [target."cfg(windows)".dependencies]

@@ -6,7 +6,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::local::copy_name;
-use crate::model::{FileEntry, WalkItem};
+use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{to_native, to_ui};
 use std::collections::BTreeMap;
 use std::fs;
@@ -168,7 +168,7 @@ fn items(archive: &Path) -> AppResult<Vec<Item>> {
 fn entry(name: &str, it: &Item) -> FileEntry {
     FileEntry {
         name: name.to_string(),
-        kind: if it.dir { "dir".into() } else { "file".into() },
+        kind: if it.dir { EntryKind::Dir } else { EntryKind::File },
         size: if it.dir { 0 } else { it.size },
         mtime: it.mtime,
         perms: if it.dir { "555".into() } else { "444".into() },
@@ -195,11 +195,7 @@ pub fn list(archive: &Path, inner: &str) -> AppResult<Vec<FileEntry>> {
         }
     }
     let mut out: Vec<FileEntry> = seen.into_values().collect();
-    out.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-        ("dir", "file") => std::cmp::Ordering::Less,
-        ("file", "dir") => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
+    crate::model::sort_listing(&mut out);
     Ok(out)
 }
 
@@ -209,7 +205,7 @@ pub fn stat(archive: &Path, inner: &str) -> AppResult<FileEntry> {
         let name = archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         return Ok(FileEntry {
             name,
-            kind: "dir".into(),
+            kind: EntryKind::Dir,
             size: 0,
             mtime: 0,
             perms: "555".into(),
@@ -298,7 +294,7 @@ pub fn extract(archive: &Path, inner: &str, dest_dir: &Path) -> AppResult<String
         base
     };
     let name = copy_name(|n| dest_dir.join(n).exists(), &base);
-    let is_dir = inner.is_empty() || stat(archive, inner)?.kind == "dir";
+    let is_dir = inner.is_empty() || stat(archive, inner)?.kind == EntryKind::Dir;
     let target_root = dest_dir.join(&name);
     if is_dir {
         fs::create_dir_all(&target_root).map_err(err)?;
@@ -335,20 +331,16 @@ pub fn walk(archive: &Path, inner: &str, ui_path: &str) -> AppResult<Vec<WalkIte
         .filter(|i| !i.dir && (inner.is_empty() || i.path.starts_with(&format!("{inner}/"))))
         .map(|i| {
             let rel_in = if inner.is_empty() { i.path.as_str() } else { &i.path[inner.len() + 1..] };
-            WalkItem {
-                path: format!("{base_ui}/{rel_in}"),
-                relative: if inner.is_empty() {
-                    format!(
-                        "{}/{}",
-                        archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-                        i.path
-                    )
-                } else {
-                    i.path[parent_len..].to_string()
-                },
-                size: i.size,
-                mtime: i.mtime,
-            }
+            let relative = if inner.is_empty() {
+                format!(
+                    "{}/{}",
+                    archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                    i.path
+                )
+            } else {
+                i.path[parent_len..].to_string()
+            };
+            WalkItem::with_real_names(format!("{base_ui}/{rel_in}"), relative, i.size, i.mtime)
         })
         .collect())
 }
@@ -386,8 +378,8 @@ mod tests {
         assert_eq!(top.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), vec!["site"]);
         let site = list(&zip, "site").unwrap();
         assert_eq!(
-            site.iter().map(|e| (e.name.as_str(), e.kind.as_str())).collect::<Vec<_>>(),
-            vec![("css", "dir"), ("index.html", "file")]
+            site.iter().map(|e| (e.name.as_str(), e.kind)).collect::<Vec<_>>(),
+            vec![("css", EntryKind::Dir), ("index.html", EntryKind::File)]
         );
         assert_eq!(read(&zip, "site/index.html", 100).unwrap(), b"<h1>Hallo</h1>");
         let out = base.join("out");

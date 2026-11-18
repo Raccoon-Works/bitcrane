@@ -67,6 +67,11 @@ pub fn remote_name(path: &str) -> String {
     path.trim_end_matches('/').rsplit('/').next().unwrap_or(path).to_string()
 }
 
+/// Last segment of a POSIX path in German quotation marks, for messages ("„bot.py“").
+pub fn quoted_name(path: &str) -> String {
+    format!("„{}“", remote_name(path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,8 +93,8 @@ mod tests {
     }
 }
 
-/// Windows Explorer folder of a mounted server (`mount_win.rs`): path below
-/// `root` as a server path below `remote_root`; `None` outside the folder.
+/// Windows Explorer folder of a mounted server (`mount_win.rs`): path below `root` as a server
+/// path below `remote_root`, with the server's names (`real_name`); `None` outside the folder.
 #[cfg(any(windows, test))]
 pub fn sync_root_to_remote(root: &Path, remote_root: &str, local: &Path) -> Option<String> {
     let root_s = root.to_string_lossy().trim_end_matches('\\').to_lowercase();
@@ -105,7 +110,7 @@ pub fn sync_root_to_remote(root: &Path, remote_root: &str, local: &Path) -> Opti
     }
     let mut out = remote_root.to_string();
     for seg in rest.split('\\').filter(|s| !s.is_empty()) {
-        out = remote_join(&out, seg);
+        out = remote_join(&out, &real_name(seg));
     }
     Some(out)
 }
@@ -131,52 +136,163 @@ mod sync_root_tests {
     }
 }
 
-/// A name from a server as a file name this system can store: on Windows,
-/// forbidden characters, a dot or space at the end and reserved names are
-/// written as %XX (same rule as the interface, see winSafeName in paths.ts).
+/// A name from a server as a file name this computer can store. On Windows, forbidden
+/// characters, a dot or space at the end and the first letter of reserved names are written as
+/// %XX, as WinSCP does ("a:b.txt" becomes "a%3Ab.txt"); elsewhere the name is kept.
+/// `real_name` reverses it. This pair is the only definition of the rule: the interface receives
+/// both forms with every walked file (`WalkItem`) and every watched change (`WatchedFile`).
 pub fn storable_name(name: &str) -> String {
-    if !cfg!(windows) {
-        return name.to_string();
+    if cfg!(windows) {
+        windows_name(name)
+    } else {
+        name.to_string()
     }
-    windows_name(name)
 }
 
-/// The Windows rule itself (kept separate so it is tested on every system).
-pub fn windows_name(name: &str) -> String {
-    let pct = |c: char| format!("%{:02X}", c as u32);
-    let mut out: String = name
-        .chars()
-        .map(|c| if "<>:\"|?*\\".contains(c) || (c as u32) < 32 { pct(c) } else { c.to_string() })
-        .collect();
-    if let Some(last) = out.chars().last().filter(|c| *c == '.' || *c == ' ') {
-        out.pop();
-        out.push_str(&pct(last));
+/// Reverses `storable_name`: a file of this computer under the name it has on a server.
+pub fn real_name(name: &str) -> String {
+    if cfg!(windows) {
+        name_from_windows(name)
+    } else {
+        name.to_string()
     }
-    let lower = out.to_ascii_lowercase();
-    let stem = lower.split('.').next().unwrap_or("");
-    let reserved = matches!(stem, "con" | "prn" | "aux" | "nul")
-        || ((stem.starts_with("com") || stem.starts_with("lpt"))
-            && stem.len() == 4
-            && stem.as_bytes()[3].is_ascii_digit()
-            && stem.as_bytes()[3] != b'0');
-    if reserved {
-        let first = out.chars().next().unwrap_or('_');
-        out = format!("{}{}", pct(first), &out[first.len_utf8()..]);
+}
+
+/// `storable_name` for every segment of a "/"-separated relative path.
+pub fn storable_rel(rel: &str) -> String {
+    rel.split('/').map(storable_name).collect::<Vec<_>>().join("/")
+}
+
+/// `real_name` for every segment of a "/"-separated relative path.
+pub fn real_rel(rel: &str) -> String {
+    rel.split('/').map(real_name).collect::<Vec<_>>().join("/")
+}
+
+fn windows_forbidden(c: char) -> bool {
+    "<>:\"|?*\\".contains(c) || c < ' '
+}
+
+fn percent(c: char) -> String {
+    format!("%{:02X}", c as u32)
+}
+
+/// The character of a "%XX" at the start of `s` (upper-case hex, as `percent` writes it).
+fn percent_decoded(s: &str) -> Option<char> {
+    let hex = s.strip_prefix('%')?.get(..2)?;
+    if !hex.bytes().all(|b| b.is_ascii_digit() || (b'A'..=b'F').contains(&b)) {
+        return None;
+    }
+    u8::from_str_radix(hex, 16).ok().map(char::from)
+}
+
+/// Device names Windows reserves, with or without an extension ("CON", "con.txt", "COM¹").
+fn windows_reserved(name: &str) -> bool {
+    let stem = name.split_once('.').map_or(name, |(stem, _)| stem).to_lowercase();
+    let numbered = |digits: &str| {
+        let mut chars = digits.chars();
+        matches!((chars.next(), chars.next()), (Some('1'..='9' | '¹' | '²' | '³'), None))
+    };
+    matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
+        || stem.strip_prefix("com").or_else(|| stem.strip_prefix("lpt")).is_some_and(numbered)
+}
+
+/// The Windows rule of `storable_name` itself (separate so it is tested on every system).
+fn windows_name(name: &str) -> String {
+    let mut out: String = name.chars().map(|c| if windows_forbidden(c) { percent(c) } else { c.to_string() }).collect();
+    if let Some(last) = out.chars().last().filter(|c| matches!(c, '.' | ' ')) {
+        out.pop();
+        out.push_str(&percent(last));
+    }
+    if windows_reserved(&out) {
+        // Reserved names start with an ASCII letter, so index 0 is a whole character.
+        let first = out.remove(0);
+        out.insert_str(0, &percent(first));
+    }
+    out
+}
+
+/// Reverses `windows_name` for exactly what it encodes; any other "%" stays, so a file named
+/// "100%41" on this computer keeps that name on the server.
+fn name_from_windows(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut rest = name;
+    while let Some(i) = rest.find('%') {
+        out.push_str(&rest[..i]);
+        let tail = &rest[i..];
+        match percent_decoded(tail).filter(|c| windows_forbidden(*c)) {
+            Some(c) => {
+                out.push(c);
+                rest = &tail[3..];
+            }
+            None => {
+                out.push('%');
+                rest = &tail[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    for (encoded, plain) in [("%2E", '.'), ("%20", ' ')] {
+        if let Some(stem) = out.strip_suffix(encoded) {
+            out = format!("{stem}{plain}");
+        }
+    }
+    if let Some(first) = percent_decoded(&out) {
+        let restored = format!("{first}{}", &out[3..]);
+        if windows_reserved(&restored) {
+            out = restored;
+        }
     }
     out
 }
 
 #[cfg(test)]
 mod windows_name_tests {
-    use super::windows_name;
+    use super::{name_from_windows, windows_name};
 
     #[test]
-    fn makes_names_storable() {
+    fn encodes_characters_windows_forbids() {
         assert_eq!(windows_name("a:b.txt"), "a%3Ab.txt");
+        assert_eq!(windows_name("2026-11-18 12:00.log"), "2026-11-18 12%3A00.log");
+        assert_eq!(windows_name("what?.txt"), "what%3F.txt");
+        assert_eq!(windows_name("tab\tname"), "tab%09name");
+        assert_eq!(windows_name(r"..\evil"), "..%5Cevil");
+        assert_eq!(windows_name("C:x"), "C%3Ax");
+        assert_eq!(windows_name("ok.txt"), "ok.txt");
+    }
+
+    #[test]
+    fn encodes_a_trailing_dot_or_space() {
+        assert_eq!(windows_name("Name."), "Name%2E");
+        assert_eq!(windows_name("name "), "name%20");
+    }
+
+    #[test]
+    fn encodes_the_first_letter_of_reserved_names() {
         assert_eq!(windows_name("CON"), "%43ON");
         assert_eq!(windows_name("con.txt"), "%63on.txt");
-        assert_eq!(windows_name("Name."), "Name%2E");
-        assert_eq!(windows_name("ok.txt"), "ok.txt");
+        assert_eq!(windows_name("lpt1"), "%6Cpt1");
         assert_eq!(windows_name("com1"), "%63om1");
+        assert_eq!(windows_name("COM¹.log"), "%43OM¹.log");
+        assert_eq!(windows_name("console.txt"), "console.txt");
+        assert_eq!(windows_name("com0"), "com0");
+        assert_eq!(windows_name("com10"), "com10");
+    }
+
+    #[test]
+    fn leaves_other_percent_signs_alone_in_both_directions() {
+        assert_eq!(windows_name("100%41"), "100%41");
+        assert_eq!(name_from_windows("100%41"), "100%41");
+        assert_eq!(name_from_windows("%41BC"), "%41BC");
+        assert_eq!(name_from_windows("a%2Eb"), "a%2Eb");
+        assert_eq!(name_from_windows("50%"), "50%");
+        assert_eq!(name_from_windows("%3a"), "%3a");
+    }
+
+    #[test]
+    fn round_trips_the_names_it_encodes() {
+        let names = ["a:b", "q?*<>|\"", "CON", "con.txt", "lpt1.log", "COM²", "x.", "a b ", r"back\slash", "plain.txt"];
+        for name in names {
+            assert_eq!(name_from_windows(&windows_name(name)), name);
+        }
     }
 }

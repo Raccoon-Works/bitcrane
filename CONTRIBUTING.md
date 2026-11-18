@@ -34,8 +34,10 @@ python3 website/build.py https://dev.bitcrane.de   # test build of the website
 
 Before a change is merged, formatting, lint, type check, tests and Clippy pass without errors or
 warnings. The workflow `.github/workflows/checks.yml` runs them on every push to `main` and to
-`native-check` (Clippy on Windows, where the platform code is compiled); push to `native-check`
-first to check a change before it reaches `main`. A warning is fixed, not silenced: a
+`native-check` (Clippy on Windows, where the platform code is compiled; on macOS for pull requests
+and runs started by hand); push to `native-check` first to check a change before it reaches `main`.
+Tests that need a test server are `#[ignore]`d; run them with `cargo test --lib -- --ignored` and
+the environment variables named in each test's ignore reason. A warning is fixed, not silenced: a
 suppression (`eslint-disable`, `#[allow]`) needs a reason next to it.
 
 Formatting is not discussed in review: Prettier and rustfmt decide it (120 columns, see
