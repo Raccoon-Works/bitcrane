@@ -370,15 +370,28 @@ fn encrypt_small(keys: &Keys, clear: &[u8]) -> Vec<u8> {
 
 /* ------------------------------------------------------------------ Masterkey */
 
-fn derive_kek(password: &str, salt: &[u8], n: u64, r: u32) -> AppResult<[u8; 32]> {
-    let log_n = (63 - n.leading_zeros()) as u8;
-    if n != 1u64 << log_n {
-        return Err(bad_vault("scrypt cost is no power of two"));
+/// Cryptomator writes N = 2^15 and r = 8. The file is untrusted, so the cost is bounded: N must be
+/// a power of two from 2^10 (below that the key derivation is too weak to be a real vault) and the
+/// memory scrypt needs (128 * r * N bytes) at most 1 GiB, which still allows N = 2^20 at r = 8.
+const SCRYPT_MIN_LOG_N: u32 = 10;
+const SCRYPT_MAX_MEMORY: u64 = 1 << 30;
+
+/// Checks the scrypt parameters read from masterkey.cryptomator.
+fn scrypt_params(n: u64, r: u64) -> AppResult<scrypt::Params> {
+    if !n.is_power_of_two() || n.trailing_zeros() < SCRYPT_MIN_LOG_N {
+        return Err(bad_vault(format!("scrypt cost {n} out of range")));
     }
-    let params = scrypt::Params::new(log_n, r, 1, 32).map_err(|e| bad_vault(e.to_string()))?;
+    if r == 0 || 128u64.saturating_mul(r).saturating_mul(n) > SCRYPT_MAX_MEMORY {
+        return Err(bad_vault(format!("scrypt cost {n} with block size {r} out of range")));
+    }
+    // Both fit after the checks above: log2(n) < 64 and r <= 2^30 / (128 * 2^10).
+    scrypt::Params::new(n.trailing_zeros() as u8, r as u32, 1, 32).map_err(|e| bad_vault(e.to_string()))
+}
+
+fn derive_kek(password: &str, salt: &[u8], params: &scrypt::Params) -> AppResult<[u8; 32]> {
     let mut kek = [0u8; 32];
     let nfc: String = password.nfc().collect();
-    scrypt::scrypt(nfc.as_bytes(), salt, &params, &mut kek).map_err(|e| bad_vault(e.to_string()))?;
+    scrypt::scrypt(nfc.as_bytes(), salt, params, &mut kek).map_err(|e| bad_vault(e.to_string()))?;
     Ok(kek)
 }
 
@@ -391,8 +404,8 @@ fn unlock(masterkey_json: &[u8], password: &str) -> AppResult<Keys> {
     };
     let salt = b64("scryptSalt")?;
     let n = v.get("scryptCostParam").and_then(Value::as_u64).unwrap_or(32768);
-    let r = v.get("scryptBlockSize").and_then(Value::as_u64).unwrap_or(8) as u32;
-    let kek = derive_kek(password, &salt, n, r)?;
+    let r = v.get("scryptBlockSize").and_then(Value::as_u64).unwrap_or(8);
+    let kek = derive_kek(password, &salt, &scrypt_params(n, r)?)?;
     let kw = KekAes256::from(kek);
     let wrong = || AppError::new(ErrorKind::AuthFailed, "Das Tresor-Passwort stimmt nicht.");
     let enc = kw.unwrap_vec(&b64("primaryMasterKey")?).map_err(|_| wrong())?;
@@ -409,7 +422,7 @@ fn unlock(masterkey_json: &[u8], password: &str) -> AppResult<Keys> {
 fn masterkey_file(keys: &Keys, password: &str) -> AppResult<Vec<u8>> {
     let salt: [u8; 32] = rand::rng().random();
     let n = 32768u64;
-    let kek = derive_kek(password, &salt, n, 8)?;
+    let kek = derive_kek(password, &salt, &scrypt_params(n, 8)?)?;
     let kw = KekAes256::from(kek);
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&keys.mac).expect("hmac");
     mac.update(&999u32.to_be_bytes());
@@ -922,6 +935,23 @@ impl VaultConn {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scrypt_parameters_from_the_vault_are_bounded() {
+        assert!(scrypt_params(32768, 8).is_ok());
+        assert!(scrypt_params(1 << 20, 8).is_ok());
+        for (n, r) in
+            [(0, 8), (1, 8), (1 << 9, 8), (32767, 8), (1 << 21, 8), (1 << 63, 8), (32768, 0), (32768, 1 << 32)]
+        {
+            assert!(scrypt_params(n, r).is_err(), "N={n} r={r} must be refused");
+        }
+    }
+
+    #[test]
+    fn a_masterkey_with_a_zero_cost_is_a_bad_vault() {
+        let file = br#"{"scryptSalt":"AAAA","scryptCostParam":0,"scryptBlockSize":8,"primaryMasterKey":"","hmacMasterKey":""}"#;
+        assert!(unlock(file, "pw").is_err());
+    }
 
     #[test]
     fn computes_clear_sizes() {

@@ -16,6 +16,7 @@
 //! the console it was started from.
 
 use crate::error::{AppError, AppResult, ErrorKind};
+use crate::ftp::FtpTls;
 use crate::paths::{remote_join, remote_name, to_ui};
 use crate::remote::Remote;
 use crate::ssh::KnownHosts;
@@ -232,6 +233,14 @@ fn ssh_params(ctx: &Ctx, s: &Value, depth: u8) -> AppResult<crate::ssh::ConnectP
     Ok(params)
 }
 
+/// A stored server setting with a fixed set of values; an unknown value is refused instead of
+/// silently becoming the default.
+fn setting<T: serde::de::DeserializeOwned + Default>(s: &Value, key: &str) -> AppResult<T> {
+    s.get(key).map_or(Ok(T::default()), |v| {
+        serde_json::from_value(v.clone()).map_err(|e| AppError::other(format!("Invalid {key}: {e}")))
+    })
+}
+
 fn proxy(s: &Value) -> Option<crate::proxy::ProxyParams> {
     let p = s.get("proxy")?;
     let host = str_of(p, "host");
@@ -269,11 +278,11 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
     let conn = match protocol {
         "ftp" | "ftps" => {
             let tls = if protocol == "ftp" {
-                "none"
+                FtpTls::None
             } else if s.get("implicitTls").and_then(Value::as_bool).unwrap_or(false) {
-                "implicit"
+                FtpTls::Implicit
             } else {
-                "explicit"
+                FtpTls::Explicit
             };
             let params = crate::ftp::FtpParams {
                 timeout: None,
@@ -281,11 +290,11 @@ async fn connect(ctx: &Ctx, s: &Value) -> AppResult<Remote> {
                 port,
                 user: user.clone(),
                 password: password(),
-                tls: tls.into(),
+                tls,
                 tls13_only: s.get("tls13Only").and_then(Value::as_bool).unwrap_or(false),
-                encoding: s.get("ftpEncoding").and_then(Value::as_str).unwrap_or("utf8").into(),
+                encoding: setting(s, "ftpEncoding")?,
                 tz_offset_min: s.get("ftpTimezone").and_then(Value::as_i64).unwrap_or(0) as i32,
-                mode: s.get("ftpMode").and_then(Value::as_str).unwrap_or("binary").into(),
+                mode: setting(s, "ftpMode")?,
                 trust: None,
                 proxy: proxy(s),
             };

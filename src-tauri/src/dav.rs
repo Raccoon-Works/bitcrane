@@ -15,7 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DavParams {
     /// Full address, e.g. "https://cloud.example/remote.php/dav/files/alex".

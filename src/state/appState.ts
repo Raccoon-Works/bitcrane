@@ -62,7 +62,7 @@ export type DialogState =
   | { type: 'secret'; serverId: string; kind: 'passphrase' | 'password'; wrong?: boolean }
   | { type: 'diff'; transferId: string }
   | { type: 'compareFiles'; a: CompareRef; b: CompareRef }
-  | { type: 'uploadTo'; paths: string[] }
+  | { type: 'uploadTo'; paths: string[]; external: boolean }
   | { type: 'vaultCreate'; side: PaneSide }
   | { type: 'log' }
   | { type: 'preview'; side: PaneSide }

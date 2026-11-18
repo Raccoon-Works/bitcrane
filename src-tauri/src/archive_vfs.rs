@@ -11,7 +11,7 @@ use crate::paths::{to_native, to_ui};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
@@ -72,6 +72,34 @@ struct Item {
 
 fn clean(name: &str) -> String {
     name.replace('\\', "/").trim_start_matches("./").trim_matches('/').to_string()
+}
+
+/// The relative path an archive entry is extracted to. Every extraction (here and in
+/// `archive::extract`) goes through this one rule, and an unsafe entry refuses the whole archive
+/// instead of being skipped, so nothing is unpacked from an archive built to escape its folder.
+/// Only plain names are accepted: no root, no "..", and no ':', which on Windows starts a drive
+/// prefix ("C:x") or an NTFS alternate data stream. ':' is refused on every platform so an archive
+/// is judged the same wherever it is opened.
+pub fn safe_entry_path(name: &str) -> AppResult<PathBuf> {
+    let unsafe_entry = || {
+        AppError::other("Das Archiv enthält einen ungültigen Pfad und wird nicht entpackt.")
+            .with_detail(name.to_string())
+    };
+    let unified = name.replace('\\', "/");
+    if unified.starts_with('/') {
+        return Err(unsafe_entry());
+    }
+    let mut out = PathBuf::new();
+    // Empty and "." segments ("./site/a", "a//b", "dir/") are harmless and common in tar files.
+    for segment in unified.split('/').filter(|s| !s.is_empty() && *s != ".") {
+        let mut parts = Path::new(segment).components();
+        let plain = matches!((parts.next(), parts.next()), (Some(Component::Normal(_)), None));
+        if !plain || segment.contains(':') {
+            return Err(unsafe_entry());
+        }
+        out.push(segment);
+    }
+    Ok(out)
 }
 
 fn tar_reader(archive: &Path, kind: Kind) -> AppResult<Box<dyn Read>> {
@@ -199,8 +227,13 @@ pub fn stat(archive: &Path, inner: &str) -> AppResult<FileEntry> {
     Ok(entry(inner.rsplit('/').next().unwrap_or(inner), it))
 }
 
-/// Calls `f` with the reader of each file whose path is `inner` or lies below it.
-fn each_file(archive: &Path, inner: &str, mut f: impl FnMut(&str, &mut dyn Read) -> AppResult<bool>) -> AppResult<()> {
+/// Calls `f` with the cleaned path, the raw entry name and the reader of each file whose path is
+/// `inner` or lies below it.
+fn each_file(
+    archive: &Path,
+    inner: &str,
+    mut f: impl FnMut(&str, &str, &mut dyn Read) -> AppResult<bool>,
+) -> AppResult<()> {
     let kind = kind_of(&archive.to_string_lossy()).ok_or_else(|| err("no archive"))?;
     let under = |p: &str| p == inner || inner.is_empty() || p.starts_with(&format!("{inner}/"));
     match kind {
@@ -209,11 +242,12 @@ fn each_file(archive: &Path, inner: &str, mut f: impl FnMut(&str, &mut dyn Read)
                 zip::ZipArchive::new(io::BufReader::new(fs::File::open(archive).map_err(err)?)).map_err(err)?;
             for i in 0..zip.len() {
                 let mut e = zip.by_index(i).map_err(err)?;
-                let p = clean(e.name());
+                let raw = e.name().to_string();
+                let p = clean(&raw);
                 if e.is_dir() || !under(&p) {
                     continue;
                 }
-                if !f(&p, &mut e)? {
+                if !f(&p, &raw, &mut e)? {
                     break;
                 }
             }
@@ -225,11 +259,12 @@ fn each_file(archive: &Path, inner: &str, mut f: impl FnMut(&str, &mut dyn Read)
                 if !e.header().entry_type().is_file() {
                     continue;
                 }
-                let p = clean(&e.path().map_err(err)?.to_string_lossy());
+                let raw = e.path().map_err(err)?.to_string_lossy().into_owned();
+                let p = clean(&raw);
                 if !under(&p) {
                     continue;
                 }
-                if !f(&p, &mut e)? {
+                if !f(&p, &raw, &mut e)? {
                     break;
                 }
             }
@@ -241,7 +276,7 @@ fn each_file(archive: &Path, inner: &str, mut f: impl FnMut(&str, &mut dyn Read)
 /// The start of one file (preview, text).
 pub fn read(archive: &Path, inner: &str, limit: usize) -> AppResult<Vec<u8>> {
     let mut out: Option<Vec<u8>> = None;
-    each_file(archive, inner, |p, r| {
+    each_file(archive, inner, |p, _, r| {
         if p != inner {
             return Ok(true);
         }
@@ -268,14 +303,11 @@ pub fn extract(archive: &Path, inner: &str, dest_dir: &Path) -> AppResult<String
     if is_dir {
         fs::create_dir_all(&target_root).map_err(err)?;
     }
-    each_file(archive, inner, |p, r| {
+    let result = each_file(archive, inner, |p, raw, r| {
+        // Checked on the raw name: `p` is cleaned for display and would hide a leading "/".
+        safe_entry_path(raw)?;
         let target = if is_dir {
-            let rel = if inner.is_empty() { p } else { &p[inner.len() + 1..] };
-            // Refuse "../" tricks.
-            if rel.split('/').any(|s| s == ".." || s.is_empty()) {
-                return Ok(true);
-            }
-            target_root.join(rel)
+            target_root.join(if inner.is_empty() { p } else { &p[inner.len() + 1..] })
         } else {
             target_root.clone()
         };
@@ -285,8 +317,12 @@ pub fn extract(archive: &Path, inner: &str, dest_dir: &Path) -> AppResult<String
         let mut out = fs::File::create(&target).map_err(err)?;
         io::copy(r, &mut out).map_err(err)?;
         Ok(true)
-    })?;
-    Ok(name)
+    });
+    if result.is_err() {
+        // Nothing half-extracted is left behind; `name` was free, so this only removes our own output.
+        let _ = if is_dir { fs::remove_dir_all(&target_root) } else { fs::remove_file(&target_root) };
+    }
+    result.map(|_| name)
 }
 
 /// All files below a folder of the archive (search, folder size).
@@ -373,6 +409,59 @@ mod tests {
         assert_eq!(list(&tgz, "").unwrap()[0].name, "docs");
         assert_eq!(read(&tgz, "docs/x.txt", 10).unwrap(), b"abc");
         assert!(split(&base.to_string_lossy()).is_none());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn only_plain_entry_paths_are_safe() {
+        assert_eq!(safe_entry_path("./site/css/a.css").unwrap(), Path::new("site").join("css").join("a.css"));
+        assert_eq!(safe_entry_path("site\\index.html").unwrap(), Path::new("site").join("index.html"));
+        assert_eq!(safe_entry_path("docs/").unwrap(), Path::new("docs"));
+        for bad in ["../x", "a/../../x", "/etc/passwd", "\\server\\share\\x", "C:/x", "C:x", "a/C:x", "file.txt:stream"]
+        {
+            assert!(safe_entry_path(bad).is_err(), "{bad} must be refused");
+        }
+    }
+
+    /// A tar whose single entry has a name the `tar` builder would refuse to write.
+    fn crafted_tar(path: &Path, entry: &str) {
+        let mut t = tar::Builder::new(fs::File::create(path).unwrap());
+        let mut h = tar::Header::new_gnu();
+        h.as_gnu_mut().unwrap().name[..entry.len()].copy_from_slice(entry.as_bytes());
+        h.set_size(3);
+        h.set_mode(0o644);
+        h.set_entry_type(tar::EntryType::Regular);
+        h.set_cksum();
+        t.append(&h, &b"bad"[..]).unwrap();
+        t.into_inner().unwrap();
+    }
+
+    #[test]
+    fn unsafe_entries_refuse_the_whole_archive() {
+        let base = std::env::temp_dir().join(format!("bitcrane-unsafe-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let out = base.join("out");
+        fs::create_dir_all(&out).unwrap();
+        for (i, entry) in ["../evil.txt", "/tmp/evil.txt", "C:/evil.txt"].iter().enumerate() {
+            let tar = base.join(format!("t{i}.tar"));
+            crafted_tar(&tar, entry);
+            assert!(extract(&tar, "", &out).is_err(), "tar entry {entry} must be refused");
+            let zip = base.join(format!("z{i}.zip"));
+            {
+                let mut w = zip::ZipWriter::new(fs::File::create(&zip).unwrap());
+                w.start_file("ok.txt", zip::write::SimpleFileOptions::default()).unwrap();
+                io::Write::write_all(&mut w, b"ok").unwrap();
+                w.start_file(*entry, zip::write::SimpleFileOptions::default()).unwrap();
+                io::Write::write_all(&mut w, b"bad").unwrap();
+                w.finish().unwrap();
+            }
+            assert!(crate::archive::extract(&zip.to_string_lossy()).is_err(), "zip entry {entry} must be refused");
+            assert!(extract(&zip, "", &out).is_err(), "zip entry {entry} must be refused");
+        }
+        // Nothing escaped, and no half-extracted folder is left behind.
+        assert!(!base.join("evil.txt").exists());
+        assert_eq!(fs::read_dir(&out).unwrap().count(), 0);
+        assert_eq!(fs::read_dir(&base).unwrap().filter(|e| e.as_ref().unwrap().path().is_dir()).count(), 1);
         let _ = fs::remove_dir_all(&base);
     }
 }

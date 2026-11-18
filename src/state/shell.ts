@@ -435,7 +435,7 @@ export async function startShell() {
   const open = (urls: string[]) => {
     for (const u of urls) {
       if (u.toLowerCase().startsWith('sftp:')) openSftpLink(u);
-      else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u));
+      else if (u.startsWith('bitcrane://upload')) receiveUploadPaths(uploadPathsFromLink(u), true);
     }
   };
   const whenConfigLoaded = (run: () => void) => {

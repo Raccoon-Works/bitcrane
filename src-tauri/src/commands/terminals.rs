@@ -41,7 +41,9 @@ const CMD_UNSAFE: &[char] = &['"', '%', '!', '\r', '\n'];
 fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String> {
     let user = target.user.clone().unwrap_or_default();
     let plain = |v: &str| v.chars().all(|c| c.is_ascii_alphanumeric() || "._-:[]".contains(c));
-    if !plain(host) || !(user.is_empty() || user.chars().all(|c| c.is_ascii_alphanumeric() || "._-@+".contains(c))) {
+    let plain_user = user.is_empty() || user.chars().all(|c| c.is_ascii_alphanumeric() || "._-@+".contains(c));
+    // A leading "-" would make ssh read the host or user as an option ("-oProxyCommand=…").
+    if !plain(host) || !plain_user || host.starts_with('-') || user.starts_with('-') {
         return Err(AppError::other("Für diesen Server kann kein Terminal geöffnet werden (ungewöhnliche Zeichen im Namen oder in der Adresse)."));
     }
     let dir = target.remote_path.clone().unwrap_or_else(|| "~".into());
@@ -66,6 +68,8 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<String
         parts.push("-i".into());
         parts.push(q(&k));
     }
+    // "--" ends ssh's options, a second guard besides the check of host and user above.
+    parts.push("--".into());
     parts.push(if user.is_empty() { host.to_string() } else { format!("{user}@{host}") });
     parts.push(q(&remote));
     Ok(parts.join(" "))
@@ -90,6 +94,8 @@ fn powershell_ssh_command(host: &str, target: &TerminalTarget) -> AppResult<Stri
         parts.push("-i".into());
         parts.push(q(&paths::to_native(k).display().to_string()));
     }
+    // "--" ends ssh's options, a second guard besides the check of host and user above.
+    parts.push("--".into());
     parts.push(if user.is_empty() { host.to_string() } else { format!("{user}@{host}") });
     parts.push(q(&format!("{cd} && exec $SHELL -l")));
     Ok(parts.join(" "))
@@ -281,7 +287,7 @@ mod tests {
     #[test]
     fn server_folder_names_stay_quoted() {
         let cmd = terminal_ssh_command("example.com", &target("/srv/$(touch pwned)", "deploy")).unwrap();
-        assert_eq!(cmd, "ssh -t -p 2222 deploy@example.com 'cd '\\''/srv/$(touch pwned)'\\'' && exec $SHELL -l'");
+        assert_eq!(cmd, "ssh -t -p 2222 -- deploy@example.com 'cd '\\''/srv/$(touch pwned)'\\'' && exec $SHELL -l'");
         // The local shell must see exactly four plain words plus one quoted argument.
         let out = std::process::Command::new("sh")
             .arg("-c")
@@ -292,5 +298,17 @@ mod tests {
         assert_eq!(args.last().unwrap(), "cd '/srv/$(touch pwned)' && exec $SHELL -l");
         assert!(terminal_ssh_command("example.com", &target("/x", "a;b")).is_err());
         assert!(terminal_ssh_command("ex$(x)", &target("/x", "a")).is_err());
+    }
+
+    #[test]
+    fn hosts_and_users_cannot_become_ssh_options() {
+        assert!(terminal_ssh_command("-oProxyCommand", &target("/x", "")).is_err());
+        assert!(terminal_ssh_command("-F", &target("/x", "deploy")).is_err());
+        assert!(terminal_ssh_command("example.com", &target("/x", "-oProxyCommand")).is_err());
+        let cmd = terminal_ssh_command("example.com", &target("/x", "")).unwrap();
+        assert!(cmd.starts_with("ssh -t -p 2222 -- example.com "), "{cmd}");
+        // The system ssh accepts "--" before the destination.
+        let out = std::process::Command::new("ssh").args(["-G", "-p", "2222", "--", "example.com"]).output().unwrap();
+        assert!(String::from_utf8_lossy(&out.stdout).lines().any(|l| l == "hostname example.com"));
     }
 }

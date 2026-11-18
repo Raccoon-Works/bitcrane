@@ -8,6 +8,7 @@ import type { KnownHost } from '../../../backend/api';
 import { LIVE, updateSettings, useStore } from '../../../state/store';
 import { Button, Switch } from '../../ui';
 import { $t } from '../../../i18n';
+import { showError } from '../../../state/errors';
 import { Group, Row } from './parts';
 
 /** Stored host key fingerprints with "Vergessen" (the next connection asks again). */
@@ -25,7 +26,11 @@ function KnownHostsList() {
   };
   useEffect(load, []);
   const forget = (host: string) => {
-    if (LIVE) void backend.knownHostsRemove(host).then(load);
+    if (LIVE)
+      void backend
+        .knownHostsRemove(host)
+        .catch((e) => showError(e))
+        .then(load);
     else setHosts((h) => (h ?? []).filter((x) => x.host !== host));
   };
   if (!hosts) return <Row label={$t('Wird geladen …')} />;

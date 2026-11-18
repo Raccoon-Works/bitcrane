@@ -600,6 +600,9 @@ export const EN: Record<string, string> = {
   'Zum Beispiel .py in einem anderen Programm als .md.': 'For example, .py in a different app than .md.',
   Dateiendung: 'File extension',
   'Programm wählen …': 'Choose app …',
+  'Server wählen …': 'Choose server …',
+  'Diese Auswahl kam über einen Link, etwa von der Schnellaktion im Finder oder von einer Webseite. Lade sie nur hoch, wenn du das selbst ausgelöst hast.':
+    'This selection arrived through a link, for example from the Finder Quick Action or from a web page. Only upload it if you started this yourself.',
   'Gleichzeitige Übertragungen': 'Simultaneous transfers',
   'Beim Hochladen, wenn die Datei auf dem Server schon existiert':
     'When uploading a file that already exists on the server',
@@ -1342,6 +1345,7 @@ export const EN: Record<string, string> = {
     "This watch's settings will be lost. Files on the server and on this computer stay as they are.",
   'Die Einstellungen waren beschädigt und wurden nicht geladen. Eine Kopie liegt als {0} im Einstellungsordner.':
     'The settings were corrupted and were not loaded. A copy was saved as {0} in the settings folder.',
+  'Die bekannten Fingerabdrücke konnten nicht gespeichert werden.': 'The known fingerprints could not be saved.',
   'Die Datei kam nicht vollständig an.': 'The file did not arrive completely.',
   'Namen mit Zeilenumbrüchen gehen über FTP nicht.': 'Names with line breaks are not supported over FTP.',
   'Für diesen Server kann kein Terminal geöffnet werden (ungewöhnliche Zeichen im Namen oder in der Adresse).':

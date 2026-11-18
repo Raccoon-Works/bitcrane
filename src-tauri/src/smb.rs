@@ -21,7 +21,8 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SmbParams {
     pub host: String,

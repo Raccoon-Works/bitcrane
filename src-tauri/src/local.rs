@@ -476,11 +476,16 @@ pub fn media_mime(name: &str) -> Option<&'static str> {
     })
 }
 
+/// Largest piece of a media file sent per request, so large videos stream instead of loading whole.
+const MEDIA_PIECE: u64 = 4 * 1024 * 1024;
+
 /// Answer of the "media" address scheme: a PDF, audio or video file of this
 /// computer, with HTTP ranges so players can seek. Other file types are refused.
 pub fn media_response(uri_path: &str, range: Option<&str>) -> tauri::http::Response<Vec<u8>> {
     use std::io::{Read, Seek, SeekFrom};
-    let not_found = || tauri::http::Response::builder().status(404).body(Vec::new()).unwrap();
+    // Only fixed status codes and ASCII header values are used below, so building cannot fail.
+    const VALID: &str = "fixed status and ASCII headers are valid";
+    let not_found = || tauri::http::Response::builder().status(404).body(Vec::new()).expect(VALID);
     let Some(decoded) = percent_encoding::percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8().ok()
     else {
         return not_found();
@@ -488,20 +493,22 @@ pub fn media_response(uri_path: &str, range: Option<&str>) -> tauri::http::Respo
     let Some(mime) = media_mime(&decoded) else { return not_found() };
     let native = to_native(&decoded);
     let Ok(mut file) = fs::File::open(&native) else { return not_found() };
-    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
-    // "bytes=start-end"; pieces of at most 4 MB so large videos stream.
-    let (start, end) = range
-        .and_then(|r| r.strip_prefix("bytes="))
-        .and_then(|r| {
-            let (a, b) = r.split_once('-')?;
-            let start: u64 = a.trim().parse().ok()?;
-            let end: u64 = if b.trim().is_empty() { len.saturating_sub(1) } else { b.trim().parse().ok()? };
-            Some((start, end.min(len.saturating_sub(1)).min(start + 4 * 1024 * 1024 - 1)))
-        })
-        .unwrap_or((0, len.saturating_sub(1).min(4 * 1024 * 1024 - 1)));
-    if len == 0 || start > end {
-        return tauri::http::Response::builder().status(200).header("Content-Type", mime).body(Vec::new()).unwrap();
+    let Ok(len) = file.metadata().map(|m| m.len()) else { return not_found() };
+    if len == 0 && range.is_none() {
+        return tauri::http::Response::builder()
+            .status(200)
+            .header("Content-Type", mime)
+            .body(Vec::new())
+            .expect(VALID);
     }
+    let Some((start, end)) = media_range(range, len) else {
+        return tauri::http::Response::builder()
+            .status(416)
+            .header("Content-Range", format!("bytes */{len}"))
+            .body(Vec::new())
+            .expect(VALID);
+    };
+    // At most MEDIA_PIECE bytes, so the length fits in memory and in usize.
     let mut buf = vec![0u8; (end - start + 1) as usize];
     if file.seek(SeekFrom::Start(start)).is_err() || file.read_exact(&mut buf).is_err() {
         return not_found();
@@ -513,7 +520,30 @@ pub fn media_response(uri_path: &str, range: Option<&str>) -> tauri::http::Respo
         .header("Content-Range", format!("bytes {start}-{end}/{len}"))
         .header("Content-Length", buf.len().to_string())
         .body(buf)
-        .unwrap()
+        .expect(VALID)
+}
+
+/// The inclusive byte range to send of a file of `len` bytes for a "Range" header ("bytes=a-b",
+/// "bytes=a-" or the suffix "bytes=-n"), cut to `MEDIA_PIECE`; without a header the start of the
+/// file. None when the range cannot be served (answered with 416).
+fn media_range(range: Option<&str>, len: u64) -> Option<(u64, u64)> {
+    let last = len.checked_sub(1)?;
+    let (start, end) = match range {
+        None => (0, last),
+        Some(r) => {
+            let (a, b) = r.trim().strip_prefix("bytes=")?.split_once('-')?;
+            let (a, b) = (a.trim(), b.trim());
+            if a.is_empty() {
+                let n: u64 = b.parse().ok().filter(|n| *n > 0)?;
+                (len.saturating_sub(n), last)
+            } else {
+                let start: u64 = a.parse().ok()?;
+                let end = if b.is_empty() { last } else { b.parse::<u64>().ok()?.min(last) };
+                (start, end)
+            }
+        }
+    };
+    (start <= end).then(|| (start, end.min(start.saturating_add(MEDIA_PIECE - 1))))
 }
 
 /// Standard places for the sidebar (only those that exist).
@@ -549,6 +579,7 @@ fn is_remote_drive(letter: char) -> bool {
     use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
     let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
     // DRIVE_REMOTE = 4.
+    // SAFETY: `root` is a NUL-terminated UTF-16 string that outlives the call; nothing is written.
     unsafe { GetDriveTypeW(root.as_ptr()) == 4 }
 }
 
@@ -558,6 +589,8 @@ fn volume_label(letter: char) -> Option<String> {
     use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationW;
     let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
     let mut name = [0u16; 261];
+    // SAFETY: `root` is NUL-terminated; `name` is writable for the length passed; the optional
+    // outputs are null, which the API allows.
     let ok = unsafe {
         GetVolumeInformationW(
             root.as_ptr(),
@@ -791,6 +824,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn media_ranges() {
+        let mb4 = MEDIA_PIECE;
+        assert_eq!(media_range(None, 10), Some((0, 9)));
+        assert_eq!(media_range(None, 10 * mb4), Some((0, mb4 - 1)));
+        assert_eq!(media_range(Some("bytes=2-5"), 10), Some((2, 5)));
+        assert_eq!(media_range(Some("bytes=2-"), 10), Some((2, 9)));
+        assert_eq!(media_range(Some("bytes=2-99"), 10), Some((2, 9)));
+        assert_eq!(media_range(Some("bytes=-3"), 10), Some((7, 9)));
+        assert_eq!(media_range(Some("bytes=5-"), 10 * mb4), Some((5, 5 + mb4 - 1)));
+        // No overflow near the end of the number range.
+        assert_eq!(media_range(Some("bytes=18446744073709551610-"), u64::MAX), Some((u64::MAX - 5, u64::MAX - 1)));
+        for bad in ["bytes=10-", "bytes=5-2", "bytes=abc", "items=0-1", "bytes=-0", "bytes=0-1,4-5"] {
+            assert_eq!(media_range(Some(bad), 10), None, "{bad}");
+        }
+        assert_eq!(media_range(Some("bytes=0-"), 0), None);
+    }
+
+    #[test]
     fn media_answers_ranges_and_refuses_other_files() {
         let dir = std::env::temp_dir().join(format!("bitcrane-media-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -805,6 +856,9 @@ mod tests {
         assert_eq!(r.body().as_slice(), b"2345");
         assert_eq!(r.headers()["content-range"], "bytes 2-5/10");
         assert_eq!(media_response(&uri, None).body().as_slice(), b"0123456789");
+        let r = media_response(&uri, Some("bytes=20-"));
+        assert_eq!((r.status().as_u16(), r.body().len()), (416, 0));
+        assert_eq!(r.headers()["content-range"], "bytes */10");
         fs::write(dir.join("secret.txt"), b"x").unwrap();
         let other = format!(
             "/{}",

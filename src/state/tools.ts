@@ -400,21 +400,37 @@ export function startAfterQueueWatch() {
 /* ------------------------------------------------------------------------ */
 
 let incoming: string[] = [];
+let incomingFromLink = false;
 let incomingTimer: number | undefined;
 
 /**
  * Paths handed over by the Explorer menu or the Finder Quick Action. Explorer
  * starts Bitcrane once per selected item, so they are collected for a moment
  * and then shown in one "Hochladen nach …" window.
+ *
+ * `fromLink`: the paths came in a bitcrane://upload link. The Finder Quick Action
+ * sends them that way, but any web page can open such a link too, so the window
+ * says where they came from and does not preselect a target.
  */
-export function receiveUploadPaths(paths: string[]) {
+export function receiveUploadPaths(paths: string[], fromLink = false) {
   incoming = [...new Set([...incoming, ...paths.filter(Boolean)])];
+  incomingFromLink ||= fromLink;
   window.clearTimeout(incomingTimer);
   incomingTimer = window.setTimeout(() => {
     const list = incoming;
+    const external = incomingFromLink;
     incoming = [];
-    if (list.length) openDialog({ type: 'uploadTo', paths: list });
+    incomingFromLink = false;
+    void existingPaths(list).then((found) => {
+      if (found.length) openDialog({ type: 'uploadTo', paths: found, external });
+    });
   }, 700);
+}
+
+/** The handed-over paths that are files or folders on this computer; anything else is dropped. */
+async function existingPaths(paths: string[]): Promise<string[]> {
+  const stats = await Promise.allSettled(paths.map((p) => backend.localStat(p)));
+  return paths.filter((_, i) => stats[i].status === 'fulfilled');
 }
 
 /** Decodes a "bitcrane://upload/<base64url>" link of the Finder Quick Action. */

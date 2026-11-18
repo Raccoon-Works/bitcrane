@@ -100,8 +100,8 @@ pub(crate) fn known_hosts_list(state: State<'_, AppState>) -> Vec<KnownHostEntry
 }
 
 #[tauri::command]
-pub(crate) fn known_hosts_remove(state: State<'_, AppState>, host: String) {
-    state.known_hosts.remove(&host);
+pub(crate) fn known_hosts_remove(state: State<'_, AppState>, host: String) -> AppResult<()> {
+    state.known_hosts.remove(&host)
 }
 
 #[tauri::command]

@@ -18,11 +18,10 @@ pub fn config_file(dir: &Path) -> PathBuf {
 
 /// Reads the stored configuration, or `null` on first start.
 pub fn load(dir: &Path) -> AppResult<Value> {
-    match std::fs::read_to_string(config_file(dir)) {
+    let path = config_file(dir);
+    match std::fs::read_to_string(&path) {
         Ok(s) => serde_json::from_str(&s).map_err(|e| {
-            // Keep the broken file: the next save would otherwise overwrite it.
-            let name = format!("config.damaged-{}.json", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S"));
-            let _ = std::fs::copy(config_file(dir), dir.join(&name));
+            let name = keep_damaged(&path);
             AppError::other(format!("Die Einstellungen waren beschädigt und wurden nicht geladen. Eine Kopie liegt als {name} im Einstellungsordner.")).with_detail(e.to_string())
         }),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Value::Null),
@@ -30,13 +29,33 @@ pub fn load(dir: &Path) -> AppResult<Value> {
     }
 }
 
-/// Writes the configuration atomically (temp file, then rename).
+/// Writes the configuration atomically.
 pub fn save(dir: &Path, value: &Value) -> AppResult<()> {
-    std::fs::create_dir_all(dir)?;
-    let tmp = dir.join("config.json.tmp");
-    std::fs::write(&tmp, serde_json::to_string_pretty(value).unwrap_or_default())?;
-    std::fs::rename(tmp, config_file(dir))?;
+    write_atomic(&config_file(dir), &serde_json::to_string_pretty(value).expect("a JSON value always serializes"))
+}
+
+/// Writes one of Bitcrane's own files through a temporary file and a rename, so a crash or a full
+/// disk leaves the previous version whole instead of a half-written file.
+pub fn write_atomic(path: &Path, contents: &str) -> AppResult<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    std::fs::write(&tmp, contents)?;
+    std::fs::rename(&tmp, path)?;
     Ok(())
+}
+
+/// Copies a file that could not be read aside ("<name>.damaged-<time>.json" next to it): the next
+/// save would otherwise overwrite what may still be rescued by hand. Returns the copy's name.
+pub fn keep_damaged(path: &Path) -> String {
+    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let name = format!("{stem}.damaged-{}.json", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S"));
+    if let Err(e) = std::fs::copy(path, path.with_file_name(&name)) {
+        log::warn!("could not keep a copy of the damaged {}: {e}", path.display());
+    }
+    name
 }
 
 fn entry(account: &str) -> AppResult<keyring::Entry> {
@@ -76,5 +95,19 @@ mod tests {
         let v = serde_json::json!({ "servers": [{ "id": "ob" }] });
         save(dir.path(), &v).unwrap();
         assert_eq!(load(dir.path()).unwrap(), v);
+    }
+
+    #[test]
+    fn a_damaged_file_is_kept_aside() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(config_file(dir.path()), "{ broken").unwrap();
+        assert!(load(dir.path()).is_err());
+        let copies: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with("config.damaged-"))
+            .collect();
+        assert_eq!(copies.len(), 1);
+        assert_eq!(std::fs::read_to_string(dir.path().join(&copies[0])).unwrap(), "{ broken");
     }
 }

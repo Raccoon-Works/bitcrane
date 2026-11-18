@@ -28,7 +28,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Params {
     /// Host of the service, optionally with scheme and port, e.g.

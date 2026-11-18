@@ -135,7 +135,14 @@ function Dialogs() {
     case 'importPassword':
       return <ImportPasswordDialog sealed={dialog.sealed} />;
     case 'uploadTo':
-      return <UploadToDialog paths={dialog.paths} />;
+      // A new request starts fresh, so a link never inherits the target picked for an earlier one.
+      return (
+        <UploadToDialog
+          key={`${dialog.external}:${dialog.paths.join('\n')}`}
+          paths={dialog.paths}
+          external={dialog.external}
+        />
+      );
     case 'vaultCreate':
       return <VaultCreateDialog side={dialog.side} />;
     case 'compareFiles':

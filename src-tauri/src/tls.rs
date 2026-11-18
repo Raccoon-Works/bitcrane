@@ -56,7 +56,10 @@ impl ServerCertVerifier for Verifier {
             return Ok(ServerCertVerified::assertion());
         }
         if self.trust.as_deref() == Some(fp.as_str()) {
-            self.known.set(&self.host_id, &fp);
+            // Confirmed by the user just now; a failed save only means the question comes again.
+            if let Err(e) = self.known.set(&self.host_id, &fp) {
+                log::warn!("{}: {}", e.message, e.detail.unwrap_or_default());
+            }
             return Ok(ServerCertVerified::assertion());
         }
         Err(rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer))

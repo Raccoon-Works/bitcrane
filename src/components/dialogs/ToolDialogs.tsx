@@ -308,17 +308,21 @@ export function CloudSignInDialog({ service, serverId }: { service: Protocol; se
   );
 }
 
+/** Full paths listed for an upload that came through a link, so nothing unexpected goes unseen. */
+const SHOWN_LINK_PATHS = 5;
+
 /**
  * "Mit Bitcrane hochladen" (Explorer / Finder): which server and which folder
  * the handed-over files go to. Remembers the last choice.
  */
-export function UploadToDialog({ paths }: { paths: string[] }) {
+export function UploadToDialog({ paths, external }: { paths: string[]; external: boolean }) {
   const servers = useStore((s) => s.servers).filter((x) => !x.temporary);
   const last = useStore((s) => s.settings.uploadToLast);
-  const first = servers.find((x) => x.id === last?.serverId) ?? servers[0];
+  // A link can come from any web page, so its upload waits for the user to pick a target.
+  const first = external ? undefined : (servers.find((x) => x.id === last?.serverId) ?? servers[0]);
   const [serverId, setServerId] = useState(first?.id ?? '');
   const startDir = (id: string) => (last?.serverId === id ? last.dir : serverById(id)?.remoteStart || '/');
-  const [dir, setDir] = useState(first ? startDir(first.id) : '/');
+  const [dir, setDir] = useState(first ? startDir(first.id) : '');
   const names = paths.map((p) => p.split(/[\\/]/).filter(Boolean).pop() ?? p);
   const title = names.length === 1 ? $t('„{0}“ hochladen', names[0]) : $t('{0} Objekte hochladen', names.length);
   const go = () => {
@@ -345,22 +349,47 @@ export function UploadToDialog({ paths }: { paths: string[] }) {
         </>
       }
     >
-      {servers.length ? (
-        <div className="form-stack">
-          <Select
-            label={$t('Server')}
-            value={serverId}
-            onChange={(v) => {
-              setServerId(v);
-              setDir(startDir(v));
-            }}
-            options={servers.map((x) => ({ value: x.id, label: x.name }))}
-          />
-          <TextField label={$t('Ordner auf dem Server')} value={dir} onChange={setDir} mono onEnter={go} />
-        </div>
-      ) : (
-        <p className="small muted">{$t('Noch kein Server gespeichert. Lege zuerst einen Server an.')}</p>
-      )}
+      <div className="form-stack">
+        {external && (
+          <div className="notice tone-warn-notice">
+            <AlertTriangle size={15} strokeWidth={1.75} className="tone-warn" aria-hidden="true" />
+            <div className="col-text">
+              <span>
+                {$t(
+                  'Diese Auswahl kam über einen Link, etwa von der Schnellaktion im Finder oder von einer Webseite. Lade sie nur hoch, wenn du das selbst ausgelöst hast.',
+                )}
+              </span>
+              {paths.slice(0, SHOWN_LINK_PATHS).map((p) => (
+                <span key={p} className="mono break">
+                  {p}
+                </span>
+              ))}
+              {paths.length > SHOWN_LINK_PATHS && (
+                <span className="small muted">{$t('und {0} weitere', paths.length - SHOWN_LINK_PATHS)}</span>
+              )}
+            </div>
+          </div>
+        )}
+        {servers.length ? (
+          <>
+            <Select
+              label={$t('Server')}
+              value={serverId}
+              onChange={(v) => {
+                setServerId(v);
+                setDir(startDir(v));
+              }}
+              options={[
+                ...(serverId ? [] : [{ value: '', label: $t('Server wählen …') }]),
+                ...servers.map((x) => ({ value: x.id, label: x.name })),
+              ]}
+            />
+            <TextField label={$t('Ordner auf dem Server')} value={dir} onChange={setDir} mono onEnter={go} />
+          </>
+        ) : (
+          <p className="small muted">{$t('Noch kein Server gespeichert. Lege zuerst einen Server an.')}</p>
+        )}
+      </div>
     </Dialog>
   );
 }

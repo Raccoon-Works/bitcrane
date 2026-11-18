@@ -6,7 +6,8 @@ use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyParams {
     /// "socks5" or "http".

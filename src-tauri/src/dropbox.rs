@@ -22,7 +22,8 @@ const TOKEN_URL: &str = "https://api.dropboxapi.com/oauth2/token";
 /// Size of one upload piece (Dropbox allows up to 150 MB; 8 MB keeps memory low).
 const CHUNK: usize = 8 * 1024 * 1024;
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DropboxParams {
     pub refresh_token: String,

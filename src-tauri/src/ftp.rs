@@ -28,7 +28,8 @@ pub trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type Io = Box<dyn Stream>;
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FtpParams {
     pub host: String,
@@ -37,21 +38,19 @@ pub struct FtpParams {
     pub user: String,
     #[serde(default)]
     pub password: Option<String>,
-    /// "none", "explicit" (AUTH TLS) or "implicit".
-    #[serde(default = "default_tls")]
-    pub tls: String,
+    #[serde(default)]
+    pub tls: FtpTls,
     /// Only TLS 1.3 (otherwise 1.2 and 1.3).
     #[serde(default)]
     pub tls13_only: bool,
-    /// File names: "utf8" or "latin1".
-    #[serde(default = "default_encoding")]
-    pub encoding: String,
+    /// Encoding of file names.
+    #[serde(default)]
+    pub encoding: FtpEncoding,
     /// Server time zone in minutes east of UTC; LIST shows local server times.
     #[serde(default)]
     pub tz_offset_min: i32,
-    /// "binary", "ascii" or "auto" (text files as text, everything else binary).
-    #[serde(default = "default_mode")]
-    pub mode: String,
+    #[serde(default)]
+    pub mode: TransferMode,
     /// Certificate fingerprint the user has just confirmed.
     #[serde(default)]
     pub trust: Option<String>,
@@ -62,14 +61,35 @@ pub struct FtpParams {
     pub timeout: Option<u64>,
 }
 
-fn default_tls() -> String {
-    "explicit".into()
+/// Encryption of the connection. Unknown values are refused when the parameters are read, so a
+/// typo can never end in a connection that sends the password in clear.
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FtpTls {
+    None,
+    /// Plain connect, then AUTH TLS before the login.
+    #[default]
+    Explicit,
+    /// TLS from the first byte (port 990).
+    Implicit,
 }
-fn default_encoding() -> String {
-    "utf8".into()
+
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FtpEncoding {
+    #[default]
+    Utf8,
+    Latin1,
 }
-fn default_mode() -> String {
-    "binary".into()
+
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TransferMode {
+    #[default]
+    Binary,
+    Ascii,
+    /// Text files (by extension) as text, everything else binary.
+    Auto,
 }
 
 /// Extensions sent in text mode with mode "auto".
@@ -153,7 +173,7 @@ fn reply_error(code: u32, text: &str, what: &str) -> AppError {
 
 impl Shared {
     fn encode(&self, s: &str) -> Vec<u8> {
-        if self.params.encoding == "latin1" {
+        if self.params.encoding == FtpEncoding::Latin1 {
             s.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }).collect()
         } else {
             s.as_bytes().to_vec()
@@ -161,7 +181,7 @@ impl Shared {
     }
 
     fn decode(&self, b: &[u8]) -> String {
-        if self.params.encoding == "latin1" {
+        if self.params.encoding == FtpEncoding::Latin1 {
             b.iter().map(|&c| c as char).collect()
         } else {
             String::from_utf8_lossy(b).into_owned()
@@ -323,29 +343,34 @@ impl Session {
             AppError::new(ErrorKind::Unreachable, "Der Server meldet sich nicht als FTP-Server.")
                 .with_detail(format!("{code} {text}"))
         };
-        let ctrl: BufReader<Io> = if p.tls == "implicit" {
-            let mut c = BufReader::new(shared.wrap(tls.clone().expect("TLS"), tcp).await?);
-            let (code, text) = read_reply(&mut c, &shared).await?;
-            if code != 220 {
-                return Err(not_ftp(code, text));
-            }
-            c
-        } else {
-            let mut plain = BufReader::new(tcp);
-            let (code, text) = read_reply(&mut plain, &shared).await?;
-            if code != 220 {
-                return Err(not_ftp(code, text));
-            }
-            if p.tls == "explicit" {
-                send_line(plain.get_mut(), &shared, "AUTH", Some("TLS")).await?;
-                let (code, text) = read_reply(&mut plain, &shared).await?;
-                if code != 234 {
-                    return Err(AppError::other("Der Server bietet kein verschlüsseltes FTP (FTPS) an.")
-                        .with_detail(format!("{code} {text}")));
+        // `tls` is set exactly when the connection is encrypted (see `FtpConn::connect`), so every
+        // encrypted connection that is not implicit sends AUTH TLS before the login.
+        let ctrl: BufReader<Io> = match &tls {
+            Some(config) if p.tls == FtpTls::Implicit => {
+                let mut c = BufReader::new(shared.wrap(config.clone(), tcp).await?);
+                let (code, text) = read_reply(&mut c, &shared).await?;
+                if code != 220 {
+                    return Err(not_ftp(code, text));
                 }
-                BufReader::new(shared.wrap(tls.clone().expect("TLS"), plain.into_inner()).await?)
-            } else {
-                BufReader::new(Box::new(plain.into_inner()) as Io)
+                c
+            }
+            _ => {
+                let mut plain = BufReader::new(tcp);
+                let (code, text) = read_reply(&mut plain, &shared).await?;
+                if code != 220 {
+                    return Err(not_ftp(code, text));
+                }
+                if let Some(config) = &tls {
+                    send_line(plain.get_mut(), &shared, "AUTH", Some("TLS")).await?;
+                    let (code, text) = read_reply(&mut plain, &shared).await?;
+                    if code != 234 {
+                        return Err(AppError::other("Der Server bietet kein verschlüsseltes FTP (FTPS) an.")
+                            .with_detail(format!("{code} {text}")));
+                    }
+                    BufReader::new(shared.wrap(config.clone(), plain.into_inner()).await?)
+                } else {
+                    BufReader::new(Box::new(plain.into_inner()) as Io)
+                }
             }
         };
         let mut s = Session { ctrl, shared: shared.clone(), tls, kind: ' ', last_used: Instant::now(), broken: false };
@@ -365,7 +390,7 @@ impl Session {
             }
             _ => return Err(reply_error(code, &text, "Anmeldung")),
         }
-        if p.tls != "none" {
+        if s.tls.is_some() {
             s.expect("PBSZ", Some("0"), &[200], "TLS").await.map_err(|e| {
                 AppError::other("Der Server lehnt verschlüsselte Datenverbindungen ab.")
                     .with_detail(e.detail.unwrap_or_default())
@@ -395,7 +420,7 @@ impl Session {
         if shared.feats.lock().unwrap().unix_mode {
             let _ = s.cmd("OPTS", Some("MLST type;size;modify;unix.mode;")).await?;
         }
-        if p.encoding == "utf8" && shared.feats.lock().unwrap().utf8 {
+        if p.encoding == FtpEncoding::Utf8 && shared.feats.lock().unwrap().utf8 {
             let _ = s.cmd("OPTS", Some("UTF8 ON")).await?;
         }
         s.set_type('I').await?;
@@ -412,9 +437,9 @@ impl Session {
 
     /// Text or binary for a file, by the server setting.
     fn kind_for(&self, path: &str) -> char {
-        match self.shared.params.mode.as_str() {
-            "ascii" => 'A',
-            "auto" => {
+        match self.shared.params.mode {
+            TransferMode::Ascii => 'A',
+            TransferMode::Auto => {
                 let name = remote_name(path).to_lowercase();
                 let ext = name.rsplit('.').next().unwrap_or("");
                 if name.contains('.') && TEXT_EXT.contains(&ext) {
@@ -423,7 +448,7 @@ impl Session {
                     'I'
                 }
             }
-            _ => 'I',
+            TransferMode::Binary => 'I',
         }
     }
 
@@ -909,7 +934,7 @@ macro_rules! with_session {
 impl FtpConn {
     pub async fn connect(params: FtpParams, known: Arc<KnownHosts>) -> AppResult<FtpConn> {
         let host_id = format!("ftps://{}:{}", params.host, params.port);
-        let (tls, seen) = if params.tls == "none" {
+        let (tls, seen) = if params.tls == FtpTls::None {
             (None, None)
         } else {
             let (config, seen) =
@@ -1056,14 +1081,14 @@ impl FtpConn {
 
     /// Text mode changes sizes, so resuming is only safe in binary mode.
     pub fn binary_for(&self, path: &str) -> bool {
-        match self.shared.params.mode.as_str() {
-            "ascii" => false,
-            "auto" => {
+        match self.shared.params.mode {
+            TransferMode::Ascii => false,
+            TransferMode::Auto => {
                 let name = remote_name(path).to_lowercase();
                 let ext = name.rsplit('.').next().unwrap_or("");
                 !(name.contains('.') && TEXT_EXT.contains(&ext))
             }
-            _ => true,
+            TransferMode::Binary => true,
         }
     }
 }
@@ -1114,6 +1139,36 @@ impl FtpFinish {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(json: serde_json::Value) -> Result<FtpParams, serde_json::Error> {
+        serde_json::from_value(json)
+    }
+
+    #[test]
+    fn settings_deserialize_from_the_stored_strings() {
+        let p = parse(serde_json::json!({
+            "host": "ftp.example.test", "port": 21,
+            "tls": "implicit", "encoding": "latin1", "mode": "auto"
+        }))
+        .unwrap();
+        assert_eq!((p.tls, p.encoding, p.mode), (FtpTls::Implicit, FtpEncoding::Latin1, TransferMode::Auto));
+        let p = parse(serde_json::json!({ "host": "ftp.example.test", "port": 21 })).unwrap();
+        assert_eq!((p.tls, p.encoding, p.mode), (FtpTls::Explicit, FtpEncoding::Utf8, TransferMode::Binary));
+        assert_eq!(parse(serde_json::json!({ "host": "h", "port": 21, "tls": "none" })).unwrap().tls, FtpTls::None);
+        assert_eq!(
+            parse(serde_json::json!({ "host": "h", "port": 21, "mode": "ascii" })).unwrap().mode,
+            TransferMode::Ascii
+        );
+    }
+
+    #[test]
+    fn unknown_settings_are_refused() {
+        for (key, value) in [("tls", "Explicit"), ("tls", "tls"), ("encoding", "utf-8"), ("mode", "text")] {
+            let mut json = serde_json::json!({ "host": "ftp.example.test", "port": 21 });
+            json[key] = value.into();
+            assert!(parse(json).is_err(), "{key}={value} must be refused");
+        }
+    }
 
     #[test]
     fn parses_unix_list_lines() {
@@ -1194,18 +1249,18 @@ mod integration {
         Some((host.to_string(), ports.split(',').filter_map(|p| p.parse().ok()).collect()))
     }
 
-    fn params(host: &str, port: u16, tls: &str, trust: Option<String>) -> FtpParams {
+    fn params(host: &str, port: u16, tls: FtpTls, trust: Option<String>) -> FtpParams {
         FtpParams {
             timeout: None,
             host: host.into(),
             port,
             user: "test".into(),
             password: Some("geheim123".into()),
-            tls: tls.into(),
+            tls,
             tls13_only: false,
-            encoding: "utf8".into(),
+            encoding: Default::default(),
             tz_offset_min: 0,
-            mode: "binary".into(),
+            mode: Default::default(),
             trust,
             proxy: None,
         }
@@ -1258,31 +1313,32 @@ mod integration {
         let known = Arc::new(KnownHosts::load(dir.path().join("known.json")));
 
         // Plain FTP; wrong password is reported as such.
-        let mut bad = params(&host, ports[0], "none", None);
+        let mut bad = params(&host, ports[0], FtpTls::None, None);
         bad.password = Some("falsch".into());
         assert_eq!(FtpConn::connect(bad, known.clone()).await.err().map(|e| e.kind), Some(ErrorKind::AuthFailed));
-        let conn =
-            Arc::new(FtpConn::connect(params(&host, ports[0], "none", None), known.clone()).await.expect("plain ftp"));
+        let conn = Arc::new(
+            FtpConn::connect(params(&host, ports[0], FtpTls::None, None), known.clone()).await.expect("plain ftp"),
+        );
         assert!(conn.home.starts_with('/'));
         round_trip(conn.clone()).await;
         // Explicit TLS demanded from a server: works; self-signed certificate must be confirmed first.
-        for (port, tls) in ports.iter().skip(1).copied().zip(["explicit", "implicit"]) {
+        for (port, tls) in ports.iter().skip(1).copied().zip([FtpTls::Explicit, FtpTls::Implicit]) {
             let err = FtpConn::connect(params(&host, port, tls, None), known.clone())
                 .await
                 .err()
                 .expect("unknown certificate");
-            assert_eq!(err.kind, ErrorKind::HostKeyUnknown, "{tls}: {err:?}");
+            assert_eq!(err.kind, ErrorKind::HostKeyUnknown, "{tls:?}: {err:?}");
             let fp = err.host_key.unwrap().fingerprint;
             let conn = Arc::new(
                 FtpConn::connect(params(&host, port, tls, Some(fp)), known.clone())
                     .await
-                    .unwrap_or_else(|e| panic!("{tls}: {e:?}")),
+                    .unwrap_or_else(|e| panic!("{tls:?}: {e:?}")),
             );
             round_trip(conn).await;
         }
         // Plain FTP to a server that insists on TLS fails with a clear message.
         if let Some(&p) = ports.get(1) {
-            assert!(FtpConn::connect(params(&host, p, "none", None), known.clone()).await.is_err());
+            assert!(FtpConn::connect(params(&host, p, FtpTls::None, None), known.clone()).await.is_err());
         }
     }
 }

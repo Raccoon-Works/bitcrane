@@ -52,7 +52,8 @@ const SEGMENT: &AsciiSet = &CONTROLS
     .add(b'\\')
     .add(b':');
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OneDriveParams {
     pub refresh_token: String,

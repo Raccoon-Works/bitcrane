@@ -83,8 +83,8 @@ fn write_zip(items: &[PathBuf], target: &Path) -> AppResult<()> {
 }
 
 /// Unpacks a zip into a new folder next to it (named like the archive) and
-/// returns the folder's name. Entries that would land outside that folder
-/// ("../" tricks) are refused.
+/// returns the folder's name. An archive with an entry that could land outside that folder is
+/// refused as a whole (see `archive_vfs::safe_entry_path`).
 pub fn extract(path: &str) -> AppResult<String> {
     let archive = to_native(path);
     // tar and tar.gz: through the archive reader (same "../" protection).
@@ -108,11 +108,7 @@ pub fn extract(path: &str) -> AppResult<String> {
             let mut entry = zip
                 .by_index(i)
                 .map_err(|e| AppError::other("Das Archiv ist beschädigt.").with_detail(e.to_string()))?;
-            let Some(rel) = entry.enclosed_name() else {
-                return Err(AppError::other("Das Archiv enthält einen ungültigen Pfad und wird nicht entpackt.")
-                    .with_detail(entry.name().to_string()));
-            };
-            let target = out.join(rel);
+            let target = out.join(crate::archive_vfs::safe_entry_path(entry.name())?);
             if entry.is_dir() {
                 fs::create_dir_all(&target).map_err(zip_error_read)?;
                 continue;

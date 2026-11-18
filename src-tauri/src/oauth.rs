@@ -61,12 +61,12 @@ fn random_token(len: usize) -> String {
     out
 }
 
-/// PKCE pair: the verifier stays here, the challenge goes into the sign-in address.
 /// Random value for the "state" check of the sign-in answer.
 pub fn state_token() -> String {
     random_token(32)
 }
 
+/// PKCE pair: the verifier stays here, the challenge goes into the sign-in address.
 pub fn pkce() -> (String, String) {
     let verifier = random_token(64);
     let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
@@ -111,32 +111,60 @@ pub async fn wait_for_code(auth_url: &str, state: &str, open: impl FnOnce(&str) 
                 let params: std::collections::HashMap<String, String> = reqwest::Url::parse(&format!("http://127.0.0.1/?{query}"))
                     .map(|u| u.query_pairs().into_owned().collect())
                     .unwrap_or_default();
-                // Browsers also ask for /favicon.ico; answer and keep waiting.
-                if params.is_empty() {
-                    let _ = sock.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
-                    continue;
-                }
-                let ok = params.get("state").map(|s| s == state).unwrap_or(false) && params.contains_key("code");
-                let page = if ok { PAGE_OK } else { PAGE_ERR };
+                let result = match answer_of(&params, state) {
+                    // Requests that do not carry our state (the browser's /favicon.ico, or any page
+                    // or program on this computer calling the port) are answered and ignored, so
+                    // they can neither end nor disturb the sign-in.
+                    Answer::Unrelated => {
+                        let _ = sock.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+                        continue;
+                    }
+                    Answer::Code(code) => Ok(code),
+                    Answer::Refused { error, description } => Err(AppError::new(if error == "access_denied" { ErrorKind::Cancelled } else { ErrorKind::AuthFailed }, "Der Dienst hat die Anmeldung nicht erlaubt.").with_detail(description.unwrap_or(error))),
+                    Answer::Incomplete => Err(AppError::new(ErrorKind::AuthFailed, "Die Antwort der Anmeldung passt nicht zu dieser Anfrage.").with_detail(query.to_string())),
+                };
+                let page = if result.is_ok() { PAGE_OK } else { PAGE_ERR };
                 let reply = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}", page.len());
                 let _ = sock.write_all(reply.as_bytes()).await;
                 let _ = sock.shutdown().await;
                 CANCEL.lock().unwrap().take();
-                if let Some(err) = params.get("error") {
-                    let text = params.get("error_description").cloned().unwrap_or_else(|| err.clone());
-                    return Err(AppError::new(if err == "access_denied" { ErrorKind::Cancelled } else { ErrorKind::AuthFailed }, "Der Dienst hat die Anmeldung nicht erlaubt.").with_detail(text));
-                }
-                if !ok {
-                    return Err(AppError::new(ErrorKind::AuthFailed, "Die Antwort der Anmeldung passt nicht zu dieser Anfrage.").with_detail(query.to_string()));
-                }
-                return Ok(params["code"].clone());
+                return result;
             }
         }
     }
 }
 
+/// What a request to the local sign-in server means.
+#[derive(Debug, PartialEq)]
+enum Answer {
+    /// Not the service's answer to this sign-in (wrong or missing state).
+    Unrelated,
+    Code(String),
+    /// The service (or the user there) declined.
+    Refused {
+        error: String,
+        description: Option<String>,
+    },
+    /// Our state, but neither a code nor an error.
+    Incomplete,
+}
+
+fn answer_of(params: &std::collections::HashMap<String, String>, state: &str) -> Answer {
+    if params.get("state").map(String::as_str) != Some(state) {
+        return Answer::Unrelated;
+    }
+    if let Some(error) = params.get("error") {
+        return Answer::Refused { error: error.clone(), description: params.get("error_description").cloned() };
+    }
+    match params.get("code") {
+        Some(code) => Answer::Code(code.clone()),
+        None => Answer::Incomplete,
+    }
+}
+
 /// Answer of a token endpoint.
-#[derive(Deserialize, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize)]
 pub struct TokenAnswer {
     pub access_token: String,
     #[serde(default)]
@@ -203,6 +231,25 @@ pub fn ascii_json(v: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn query(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    #[test]
+    fn only_answers_with_our_state_count() {
+        let st = "abc123";
+        assert_eq!(answer_of(&query(&[("code", "c0de"), ("state", st)]), st), Answer::Code("c0de".into()));
+        assert_eq!(answer_of(&query(&[("code", "c0de"), ("state", "other")]), st), Answer::Unrelated);
+        assert_eq!(answer_of(&query(&[("code", "c0de")]), st), Answer::Unrelated);
+        // A forged "access denied" from another page must not cancel the sign-in.
+        assert_eq!(answer_of(&query(&[("error", "access_denied")]), st), Answer::Unrelated);
+        assert_eq!(
+            answer_of(&query(&[("error", "access_denied"), ("state", st)]), st),
+            Answer::Refused { error: "access_denied".into(), description: None }
+        );
+        assert_eq!(answer_of(&query(&[("state", st)]), st), Answer::Incomplete);
+    }
 
     #[test]
     fn header_json_is_ascii() {

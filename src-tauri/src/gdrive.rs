@@ -36,7 +36,8 @@ const FIELDS: &str = "id,name,mimeType,size,modifiedTime";
 /// Size of one upload piece; Drive wants multiples of 256 KiB.
 const CHUNK: usize = 8 * 1024 * 1024;
 
-#[derive(Deserialize, Clone, Debug)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GDriveParams {
     pub refresh_token: String,

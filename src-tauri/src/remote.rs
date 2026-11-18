@@ -947,19 +947,22 @@ pub(crate) mod integration {
         let known = Arc::new(crate::ssh::KnownHosts::load(dir.path().join("known.json")));
         if let Ok(v) = std::env::var("BITCRANE_TEST_FTP") {
             let (host, ports) = v.split_once(':').unwrap();
-            for (port, tls) in ports.split(',').map(|p| p.parse::<u16>().unwrap()).zip(["none", "explicit", "implicit"])
-            {
+            for (port, tls) in ports.split(',').map(|p| p.parse::<u16>().unwrap()).zip([
+                crate::ftp::FtpTls::None,
+                crate::ftp::FtpTls::Explicit,
+                crate::ftp::FtpTls::Implicit,
+            ]) {
                 let mut p = crate::ftp::FtpParams {
                     timeout: None,
                     host: host.into(),
                     port,
                     user: "test".into(),
                     password: Some("geheim123".into()),
-                    tls: tls.into(),
+                    tls,
                     tls13_only: false,
-                    encoding: "utf8".into(),
+                    encoding: Default::default(),
                     tz_offset_min: 0,
-                    mode: "binary".into(),
+                    mode: Default::default(),
                     trust: None,
                     proxy: None,
                 };
@@ -1043,11 +1046,11 @@ pub(crate) mod integration {
                 port,
                 user: "test".into(),
                 password: Some("geheim123".into()),
-                tls: "none".into(),
+                tls: crate::ftp::FtpTls::None,
                 tls13_only: false,
-                encoding: "utf8".into(),
+                encoding: Default::default(),
                 tz_offset_min: 0,
-                mode: "binary".into(),
+                mode: Default::default(),
                 trust: None,
                 proxy: None,
             },

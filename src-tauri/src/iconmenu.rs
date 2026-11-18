@@ -104,6 +104,7 @@ mod platform {
     /// Gives the process the app ID of the installer's shortcuts, also when it was started
     /// directly (at login, from the command line), so its taskbar button and jump list match.
     pub fn set_app_id(identifier: &str) {
+        // SAFETY: the HSTRING is a valid, NUL-terminated string that lives for the whole call.
         if let Err(e) = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(identifier)) } {
             log::warn!("app user model id: {e}");
         }
@@ -113,12 +114,18 @@ mod platform {
         let app_id = HSTRING::from(app.config().identifier.as_str());
         // COM wants a thread of its own; the list is written in a few milliseconds.
         std::thread::spawn(move || {
+            // SAFETY: this new thread has no other COM use, as `write` requires.
             if let Err(e) = unsafe { write(&app_id, &content) } {
                 log::warn!("jump list: {e}");
             }
         });
     }
 
+    /// Writes the jump list through COM.
+    ///
+    /// # Safety
+    /// Must run on a thread without other COM use: it initialises COM there as single-threaded
+    /// apartment and calls COM interfaces directly.
     unsafe fn write(app_id: &HSTRING, content: &Content) -> windows::core::Result<()> {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         let exe = HSTRING::from(std::env::current_exe().unwrap_or_default().as_os_str());
@@ -139,6 +146,10 @@ mod platform {
         list.CommitList()
     }
 
+    /// The shell links for `entries`, for a jump list category or the tasks.
+    ///
+    /// # Safety
+    /// COM must be initialised on the calling thread (see `write`).
     unsafe fn collection<'a>(
         exe: &HSTRING,
         entries: impl Iterator<Item = &'a super::Entry>,
@@ -151,6 +162,8 @@ mod platform {
             link.SetIconLocation(exe, 0)?;
             let props: IPropertyStore = link.cast()?;
             let mut title = PROPVARIANT::default();
+            // The union is written as the VT_LPWSTR variant it is tagged with; the string comes from
+            // SHStrDupW (CoTaskMemAlloc), which PropVariantClear frees below.
             (*title.Anonymous.Anonymous).vt = VT_LPWSTR;
             (*title.Anonymous.Anonymous).Anonymous.pwszVal = SHStrDupW(&HSTRING::from(e.label.as_str()))?;
             let set = props.SetValue(&PKEY_Title, &title).and_then(|_| props.Commit());
@@ -185,15 +198,22 @@ mod platform {
         let first = APP.set(app.clone()).is_ok();
         let _ = app.run_on_main_thread(move || {
             let mtm = MainThreadMarker::new().expect("run_on_main_thread runs on the main thread");
+            // SAFETY: on the main thread (`mtm`), and `install` runs once (`first`).
             if first {
                 unsafe { install(mtm) };
             }
+            // SAFETY: on the main thread (`mtm`).
             let menu = unsafe { build(mtm, &content) };
             MENU.with(|m| *m.borrow_mut() = Some(menu));
         });
     }
 
     /// Adds the two methods to the class of Tauri's application delegate.
+    ///
+    /// # Safety
+    /// Main thread only, and once: it changes the delegate's class at runtime. The function pointers
+    /// are transmuted to `Imp`, so their signatures must match the type encodings given with them
+    /// ("@@:@": returns an object, takes self, _cmd and one object; "v@:@": the same returning void).
     unsafe fn install(mtm: MainThreadMarker) {
         let Some(delegate) = NSApplication::sharedApplication(mtm).delegate() else {
             log::warn!("dock menu: no application delegate");
@@ -221,6 +241,10 @@ mod platform {
         }
     }
 
+    /// The Dock menu with the servers and tasks.
+    ///
+    /// # Safety
+    /// Main thread only (AppKit); the items target the delegate that `install` gave `bitcraneDockItem:`.
     unsafe fn build(mtm: MainThreadMarker, content: &Content) -> Retained<NSMenu> {
         let menu = NSMenu::new(mtm);
         let delegate = NSApplication::sharedApplication(mtm).delegate();
@@ -247,10 +271,18 @@ mod platform {
         menu
     }
 
+    /// `applicationDockMenu:`, called by AppKit on the main thread.
+    ///
+    /// # Safety
+    /// Only for the Objective-C runtime: the returned menu stays alive in `MENU`.
     unsafe extern "C-unwind" fn dock_menu(_this: *mut AnyObject, _cmd: Sel, _sender: *mut AnyObject) -> *mut NSMenu {
         MENU.with(|m| m.borrow().as_ref().map_or(std::ptr::null_mut(), |menu| Retained::as_ptr(menu) as *mut NSMenu))
     }
 
+    /// `bitcraneDockItem:`, called by AppKit with the clicked item.
+    ///
+    /// # Safety
+    /// Only for the Objective-C runtime: `item` is null or a valid `NSMenuItem` for the call.
     unsafe extern "C-unwind" fn clicked(_this: *mut AnyObject, _cmd: Sel, item: *mut NSMenuItem) {
         let Some(item) = item.as_ref() else { return };
         let Some(id) = item.representedObject().and_then(|o| o.downcast::<NSString>().ok()) else { return };

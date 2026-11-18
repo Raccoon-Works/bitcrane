@@ -28,8 +28,21 @@ pub struct KnownHosts {
 }
 
 impl KnownHosts {
+    /// Reads the stored fingerprints. A damaged file is kept aside and the list starts empty: every
+    /// host is then asked about again, which is safe, while refusing to start would lock the user out.
     pub fn load(path: PathBuf) -> Self {
-        let map = std::fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        let map = match std::fs::read_to_string(&path) {
+            Ok(s) => serde_json::from_str(&s).unwrap_or_else(|e| {
+                let copy = crate::config::keep_damaged(&path);
+                log::warn!("known hosts damaged ({e}), kept as {copy}; starting with an empty list");
+                HashMap::new()
+            }),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+            Err(e) => {
+                log::warn!("known hosts not readable ({e}); starting with an empty list");
+                HashMap::new()
+            }
+        };
         Self { path, map: Mutex::new(map) }
     }
 
@@ -37,17 +50,22 @@ impl KnownHosts {
         self.map.lock().unwrap().get(id).cloned()
     }
 
-    pub fn set(&self, id: &str, fingerprint: &str) {
+    /// Trusts a fingerprint. It is in effect for this run even when saving fails; the error says
+    /// that it will be asked about again after a restart.
+    pub fn set(&self, id: &str, fingerprint: &str) -> AppResult<()> {
         let mut map = self.map.lock().unwrap();
         map.insert(id.to_string(), fingerprint.to_string());
-        self.save(&map);
+        self.save(&map)
     }
 
-    fn save(&self, map: &HashMap<String, String>) {
-        if let Some(dir) = self.path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let _ = std::fs::write(&self.path, serde_json::to_string_pretty(map).unwrap_or_default());
+    fn save(&self, map: &HashMap<String, String>) -> AppResult<()> {
+        crate::config::write_atomic(
+            &self.path,
+            &serde_json::to_string_pretty(map).expect("a map of strings always serializes"),
+        )
+        .map_err(|e| {
+            AppError::other("Die bekannten Fingerabdrücke konnten nicht gespeichert werden.").with_detail(e.message)
+        })
     }
 
     /// All stored fingerprints as ("host:port", fingerprint), sorted by host.
@@ -58,10 +76,10 @@ impl KnownHosts {
     }
 
     /// Forgets a fingerprint; the next connection asks again.
-    pub fn remove(&self, id: &str) {
+    pub fn remove(&self, id: &str) -> AppResult<()> {
         let mut map = self.map.lock().unwrap();
         map.remove(id);
-        self.save(&map);
+        self.save(&map)
     }
 }
 
@@ -69,7 +87,8 @@ impl KnownHosts {
 
 /// How to authenticate. Secrets are passed in by the frontend, which reads
 /// them from the system keychain (never stored in Bitcrane's own files).
-#[derive(Debug, Clone, Deserialize)]
+// Deliberately without Debug: it holds secrets that must never end up in a log.
+#[derive(Clone, Deserialize)]
 #[serde(tag = "method", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum AuthParams {
     Key {
@@ -118,7 +137,8 @@ pub type Prompter = Arc<
         + Sync,
 >;
 
-#[derive(Debug, Clone, Deserialize)]
+// Without Debug like `AuthParams`, which it holds.
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectParams {
     pub host: String,
@@ -221,7 +241,11 @@ impl client::Handler for Handler {
         match self.known.get(&self.host_id) {
             Some(stored) if stored == fingerprint => Ok(true),
             _ if trusted_now => {
-                self.known.set(&self.host_id, &fingerprint);
+                // The user has just confirmed this key, so the connection goes ahead; a failed save
+                // only means the question comes again next time.
+                if let Err(e) = self.known.set(&self.host_id, &fingerprint) {
+                    log::warn!("{}: {}", e.message, e.detail.unwrap_or_default());
+                }
                 Ok(true)
             }
             _ => Ok(false),
@@ -1690,7 +1714,7 @@ mod integration {
         }
 
         // 8. A changed host key is detected.
-        known.set(&format!("{}:{}", e.host, e.port), "SHA256:anders");
+        known.set(&format!("{}:{}", e.host, e.port), "SHA256:anders").unwrap();
         let err = connect_with(&params(&e, key(), None), known.clone(), None).await.err().unwrap();
         assert_eq!(err.kind, ErrorKind::HostKeyChanged);
         assert_eq!(err.host_key.unwrap().previous.as_deref(), Some("SHA256:anders"));
@@ -1714,6 +1738,35 @@ mod params_tests {
         }
         assert!(p.keepalive, "keepalive defaults to on");
         assert!(p.jump.is_some());
+    }
+
+    #[test]
+    fn known_hosts_survive_a_restart_and_a_damaged_file_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sub/known_hosts.json");
+        let known = KnownHosts::load(path.clone());
+        known.set("shop.example:22", "SHA256:eins").unwrap();
+        known.set("portfolio.example:22", "SHA256:zwei").unwrap();
+        known.remove("portfolio.example:22").unwrap();
+        assert!(!dir.path().join("sub/known_hosts.json.tmp").exists());
+        assert_eq!(KnownHosts::load(path.clone()).list(), vec![("shop.example:22".into(), "SHA256:eins".into())]);
+
+        std::fs::write(&path, "{ damaged").unwrap();
+        assert!(KnownHosts::load(path.clone()).list().is_empty());
+        let kept = std::fs::read_dir(dir.path().join("sub"))
+            .unwrap()
+            .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().starts_with("known_hosts.damaged-"))
+            .count();
+        assert_eq!(kept, 1);
+    }
+
+    #[test]
+    fn saving_known_hosts_reports_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder where the file should be makes the rename fail.
+        let path = dir.path().join("known_hosts.json");
+        std::fs::create_dir(&path).unwrap();
+        assert!(KnownHosts::load(path).set("shop.example:22", "SHA256:eins").is_err());
     }
 }
 

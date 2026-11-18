@@ -5,6 +5,10 @@
 //! operations report progress through events:
 //! - `transfer-progress` `{ id, done, total }`
 //! - `watch-batch` `{ watchId, changed, removed }`
+//!
+//! Mutexes are locked with `.lock().unwrap()` throughout. A lock is only poisoned when a thread
+//! panicked while holding it, which is a bug; the data behind it may then be half-changed, so
+//! continuing with it is worse than passing the panic on. No lock site recovers from poisoning.
 
 mod archive;
 mod archive_vfs;
