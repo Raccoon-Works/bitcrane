@@ -186,6 +186,18 @@
     "kind": "npm"
   },
   {
+    "name": "@fontsource/inter",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "kind": "npm"
+  },
+  {
+    "name": "@fontsource/jetbrains-mono",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "kind": "npm"
+  },
+  {
     "name": "@lezer/common",
     "version": "1.5.5",
     "license": "MIT",
@@ -1021,6 +1033,12 @@
   },
   {
     "name": "core-graphics",
+    "version": "0.24.0",
+    "license": "MIT OR Apache-2.0",
+    "kind": "rust"
+  },
+  {
+    "name": "core-graphics",
     "version": "0.25.0",
     "license": "MIT OR Apache-2.0",
     "kind": "rust"
@@ -1402,6 +1420,12 @@
     "version": "",
     "license": "MIT",
     "kind": "other"
+  },
+  {
+    "name": "drag",
+    "version": "2.1.1",
+    "license": "Apache-2.0 OR MIT",
+    "kind": "rust"
   },
   {
     "name": "dtoa",
@@ -2481,6 +2505,12 @@
     "name": "maybe-async",
     "version": "0.2.11",
     "license": "MIT",
+    "kind": "rust"
+  },
+  {
+    "name": "md-5",
+    "version": "0.10.6",
+    "license": "MIT OR Apache-2.0",
     "kind": "rust"
   },
   {
@@ -5059,6 +5089,12 @@
   },
   {
     "name": "windows-implement",
+    "version": "0.52.0",
+    "license": "MIT OR Apache-2.0",
+    "kind": "rust"
+  },
+  {
+    "name": "windows-implement",
     "version": "0.58.0",
     "license": "MIT OR Apache-2.0",
     "kind": "rust"
@@ -5066,6 +5102,12 @@
   {
     "name": "windows-implement",
     "version": "0.60.2",
+    "license": "MIT OR Apache-2.0",
+    "kind": "rust"
+  },
+  {
+    "name": "windows-interface",
+    "version": "0.52.0",
     "license": "MIT OR Apache-2.0",
     "kind": "rust"
   },

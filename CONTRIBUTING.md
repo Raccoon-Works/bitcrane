@@ -69,6 +69,32 @@ Formatting is not discussed in review: Prettier and rustfmt decide it (120 colum
 10. **Secrets never go into the repository.** Keys and passwords live in the system keychain or in
    local files that are ignored by git.
 
+## Security
+
+The interface runs under a Content Security Policy (`app.security.csp` in
+`src-tauri/tauri.conf.json`). JSON has no comments, so the reasons are kept here; change the
+policy and this list together.
+
+- `default-src 'self'`, `script-src 'self'`: only the app's own bundled code runs. No outside
+  hosts, no inline scripts, no `eval`. Fonts are bundled (`@fontsource`), not loaded from Google.
+- `style-src 'self' 'unsafe-inline'`: xterm.js and CodeMirror write `<style>` elements at run
+  time. `dangerousDisableAssetCspModification: ["style-src"]` keeps
+  Tauri from adding style nonces, because a nonce would make browsers ignore `'unsafe-inline'`.
+- `font-src 'self' data:`: Vite inlines font files smaller than 4 KB as `data:` URLs.
+- `img-src 'self' data: blob:` plus `fileicon:`, `itemicon:`, `thumb:`, `rthumb:`: image previews
+  arrive as `data:` URLs, a picture chosen for a server is read through a `blob:` URL, and the four
+  URI schemes registered in `lib.rs` serve system icons and thumbnails. Every custom scheme is
+  listed twice: `scheme:` is how macOS addresses it, `http://scheme.localhost` how Windows does.
+- `media-src` and `frame-src` `media:`: audio, video and the PDF frame of the preview window.
+- `connect-src ipc: http://ipc.localhost`: the calls into the Rust core. The interface itself
+  makes no network requests; everything else goes through Rust.
+- `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`: nothing uses plugins, a `<base>`
+  element or form submission.
+
+A new URI scheme, a new kind of embedded content or a library that needs more has to be added to
+the policy and to this list. `npm run tauri dev` loads the Vite server directly and does not apply
+the policy, so check such changes in a build (`npm run tauri build`).
+
 ## Refactoring
 
 Many small changes over weeks leave duplicates and leftovers behind, however careful each one is.
