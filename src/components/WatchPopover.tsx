@@ -20,18 +20,34 @@ import { Button, Switch } from './ui';
 import { $t } from '../i18n';
 
 /** Pause or resume, edit and delete one watch. */
-export function WatchActions({ w }: { w: Watch }) {
+export function WatchActions({ w, apart }: { w: Watch; apart?: boolean }) {
+  const remove = (
+    <Button small variant={apart ? 'ghost' : 'secondary'} onClick={() => askDeleteWatch(w)}>
+      {$t('Löschen')}
+    </Button>
+  );
   return (
     <>
-      <Button small onClick={() => toggleWatch(w.id)}>
+      {/* `apart` (the narrow popover card): Löschen on the left, away from the everyday buttons. */}
+      {apart && remove}
+      {apart && <span className="flex-1" />}
+      <Button
+        small
+        title={
+          w.state === 'paused'
+            ? $t(
+                'Beobachtet den Ordner wieder. Mit „Beim Start abgleichen“ wird hochgeladen, was sich inzwischen geändert hat.',
+              )
+            : $t('Lädt nichts mehr hoch, bis du fortsetzt. Die Einstellungen bleiben erhalten.')
+        }
+        onClick={() => toggleWatch(w.id)}
+      >
         {w.state === 'paused' ? $t('Fortsetzen') : $t('Pausieren')}
       </Button>
       <Button small onClick={() => openDialog({ type: 'watchSetup', editId: w.id })}>
         {$t('Bearbeiten')}
       </Button>
-      <Button small onClick={() => askDeleteWatch(w)}>
-        {$t('Löschen')}
-      </Button>
+      {!apart && remove}
     </>
   );
 }
@@ -96,8 +112,7 @@ export function WatchPopover() {
               {w.lastFile ? `${w.lastFile} · ${formatAgo(w.lastTime, now)}` : $t('noch nichts hochgeladen')}
             </span>
             <div className="watch-card-foot">
-              <span className="flex-1" />
-              <WatchActions w={w} />
+              <WatchActions w={w} apart />
             </div>
           </div>
         );
