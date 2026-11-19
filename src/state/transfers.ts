@@ -20,8 +20,9 @@ import {
   listEntries,
   isDirEntry,
   getState,
+  placeOf,
 } from './core';
-import { placeOf, selectedNames } from './fileOps';
+import { selectedNames } from './fileOps';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
 import { pushUndo } from './undo';

@@ -20,11 +20,13 @@ import {
   panePath,
   uid,
   getState,
+  placeOf,
 } from './core';
 import type { AppState } from './appState';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
-import { editPath, placeOf } from './fileOps';
+
+import { editPath } from './navigation';
 import { navigate, setLeftServer, setRightLocal } from './tabs';
 import { chooseFolder } from '../backend/dialogs';
 import { relFolder } from '../util/paths';
@@ -312,4 +314,16 @@ export function openLocalIn(side: PaneSide, path: string) {
   if (side === 'local') openPlace(path);
   else if (t?.rightLocal && !t.serverId) navigate('remote', path);
   else setRightLocal(path);
+}
+
+/** Takes a folder off "Zuletzt verwendet" (the folder itself stays). */
+export function removeRecent(path: string) {
+  updateSettings({ recentDirs: (getState().settings.recentDirs ?? []).filter((p) => p !== path) });
+  setState({ contextMenu: null });
+}
+
+/** Empties "Zuletzt verwendet". */
+export function clearRecent() {
+  updateSettings({ recentDirs: [] });
+  setState({ contextMenu: null });
 }

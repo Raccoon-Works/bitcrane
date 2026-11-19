@@ -379,3 +379,9 @@ export function showToast(
   const ms = tone === 'error' ? Math.min(12000, Math.max(6000, (text.length + (hint?.length ?? 0)) * 70)) : 2600;
   toastTimer = window.setTimeout(() => setState({ toast: null }), ms);
 }
+
+/** Where a pane's files are for copying: '' for this computer, otherwise the server id. */
+export function placeOf(side: PaneSide, t: Tab | undefined = activeTab()): string {
+  const [ls, sid] = paneLoc(side, t);
+  return ls === 'remote' ? sid : '';
+}

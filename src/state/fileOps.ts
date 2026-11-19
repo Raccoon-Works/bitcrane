@@ -4,7 +4,7 @@
 
 import * as fs from '../backend/mockFs';
 import * as live from './live';
-import type { PaneSide, Tab } from '../backend/types';
+import type { PaneSide } from '../backend/types';
 
 import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
@@ -21,17 +21,17 @@ import {
   paneOnServer,
   serverById,
   paneShowsServers,
-  isDirEntry,
   getState,
   emptySelection,
+  placeOf,
 } from './core';
+import { askMoveAcross } from './clipboard';
 import { paneEntries } from './rows';
 import type { AppState } from './appState';
 import { openDialog } from './panels';
 import { pushUndo, renameAt } from './undo';
-import { navigate } from './tabs';
+
 import { transferNames, copyOrMoveLocal } from './transfers';
-import { updateSettings } from './settings';
 
 /** Names selected in a pane, or the entry under the cursor. */
 export function selectedNames(side: PaneSide): string[] {
@@ -201,52 +201,8 @@ export function editorFor(name: string, s: AppState = getState()): string {
   return (ext && s.settings.editorByExt[ext]) || s.settings.editorApp;
 }
 
-/** Web address of a server file, from the server's "Web-Adresse" setting. */
-export function webUrlFor(serverId: string, remotePath: string): string | undefined {
-  const srv = serverById(serverId);
-  if (!srv?.webUrl) return undefined;
-  const root = (srv.webRoot || '/').replace(/\/+$/, '') || '';
-  if (root && remotePath !== root && !remotePath.startsWith(root + '/')) return undefined;
-  const rest = remotePath.slice(root.length).split('/').map(encodeURIComponent).join('/');
-  return srv.webUrl.replace(/\/+$/, '') + (rest.startsWith('/') ? rest : `/${rest}`);
-}
-
-export function copyWebUrl(serverId: string, remotePath: string) {
-  const url = webUrlFor(serverId, remotePath);
-  if (!url) return;
-  void navigator.clipboard.writeText(url).then(
-    () => showToast($t('Kopiert: {0}', url), 'ok'),
-    () => showToast(url),
-  );
-}
-
-export function openWebUrl(serverId: string, remotePath: string) {
-  const url = webUrlFor(serverId, remotePath);
-  if (url) openExternal(url);
-}
-
-/** Opens a web address in the default browser. */
-export function openExternal(url: string) {
-  if (LIVE) void live.openUrl(url);
-  else window.open(url, '_blank', 'noopener');
-}
-
 export const folderSizeKey = (side: PaneSide, serverId: string, path: string) =>
   `${side}|${side === 'local' ? '' : serverId}|${path}`;
-
-/** "Link kopieren": sharing link of a file or folder on a cloud service. */
-export function copyShareLink(side: PaneSide, name: string) {
-  const t = activeTab();
-  if (!t) return;
-  setState({ contextMenu: null });
-  const [, serverId] = paneLoc(side, t);
-  if (!LIVE) {
-    void navigator.clipboard.writeText('https://www.dropbox.com/scl/fi/beispiel');
-    showToast($t('Link kopiert.'), 'ok');
-    return;
-  }
-  void live.copyShareLink(serverId, paths.join(panePath(side), name));
-}
 
 /** "Im Finder/Explorer zeigen" (this computer only). */
 export function revealEntry(side: PaneSide, name: string) {
@@ -446,167 +402,6 @@ export async function newFolderWithSelection(side: PaneSide = getState().focusSi
       selection: { ...s.selection, [side]: { names: [name], cursor: -1, anchor: -1 } },
       renaming: { side, name },
     }));
-}
-
-/** ⌘L: turns the path above a file list into an input field. */
-export function editPath(side: PaneSide) {
-  if (!activeTab()) return;
-  setState({ pathEdit: side, focusSide: side });
-}
-
-/** Navigates to a typed path ("~" stands for the home folder on this computer). */
-export function submitPath(side: PaneSide, typed: string) {
-  setState({ pathEdit: null });
-  let p = typed.trim().replace(/\\/g, '/');
-  if (!p) return;
-  if (p.length > 1 && p.endsWith('/') && !/^[A-Za-z]:\/$/.test(p)) p = p.slice(0, -1);
-  // A bare drive ("C:") would mean the current folder on that drive; use its root.
-  const onServer = paneOnServer(side);
-  if (!onServer && /^[A-Za-z]:$/.test(p)) p += '/';
-  if (onServer && !p.startsWith('/')) p = paths.join(panePath(side), p);
-  navigate(side, p);
-}
-
-/** Where a pane's files are for copying: '' for this computer, otherwise the server id. */
-export function placeOf(side: PaneSide, t: Tab | undefined = activeTab()): string {
-  const [ls, sid] = paneLoc(side, t);
-  return ls === 'remote' ? sid : '';
-}
-
-/** ⌘C on files: remembers them; ⌘V elsewhere copies or transfers them. */
-export function copySelection(side: PaneSide) {
-  const t = activeTab();
-  const names = selectedNames(side);
-  if (!t || !names.length) return;
-  const from = placeOf(side, t);
-  setState({ clipboard: { side, serverId: from, dir: panePath(side), names } });
-  const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
-  const other = placeOf(side === 'local' ? 'remote' : 'local', t);
-  showToast(
-    !from
-      ? $t('{0} kopiert. In der anderen Hälfte einfügen, um hochzuladen.', what)
-      : !other
-        ? $t('{0} kopiert. In der anderen Hälfte einfügen, um herunterzuladen.', what)
-        : $t('{0} kopiert. In der anderen Hälfte einfügen, um es dorthin zu übertragen.', what),
-  );
-}
-
-/** ⌘X / Strg+X on files: remembered for moving; pasting in a folder of the same computer or server moves them. */
-export function cutSelection(side: PaneSide) {
-  const t = activeTab();
-  const names = selectedNames(side);
-  if (!t || !names.length) return;
-  setState({ clipboard: { side, serverId: placeOf(side, t), dir: panePath(side), names, cut: true } });
-  const what = names.length === 1 ? `„${names[0]}“` : $t('{0} Objekte', names.length);
-  showToast($t('{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.', what));
-}
-
-export function pasteClipboard(side: PaneSide) {
-  const c = getState().clipboard;
-  const t = activeTab();
-  if (!c || !t) return;
-  const to = placeOf(side, t);
-  const toDir = panePath(side);
-  if (c.cut && c.serverId === to) {
-    // Moving within one computer or server; the clipboard is used up.
-    if (toDir === c.dir) {
-      showToast($t('Die Objekte liegen schon in diesem Ordner.'));
-      return;
-    }
-    setState({ clipboard: null });
-    moveIntoFolder(side, c.names, toDir, c.dir);
-    return;
-  }
-  if (c.cut) {
-    // Between computer and server: a move with a question first (transfer, then remove the originals).
-    setState({ clipboard: null });
-    askMoveAcross(c.serverId, c.dir, c.names, to, toDir);
-    return;
-  }
-  if (c.serverId === to) {
-    // Same computer or same server: a plain copy there.
-    if (!LIVE) {
-      showToast($t('In der anderen Hälfte einfügen, um zu übertragen.'));
-      return;
-    }
-    if (to) void live.copyOnServer(to, c.dir, c.names, toDir);
-    else void live.copyLocal(c.dir, c.names, toDir);
-    return;
-  }
-  transferNames(c.serverId, c.dir, c.names, to, toDir);
-}
-
-/**
- * Moving between this computer and a server (or two servers), after a question:
- * the files are transferred, then the originals are removed once all arrived.
- */
-function askMoveAcross(from: string, fromDir: string, names: string[], to: string, toDir: string) {
-  if (!names.length) return;
-  const what = names.length === 1 ? `„${paths.basename(names[0])}“` : $t('{0} Objekte', names.length);
-  openDialog({
-    type: 'confirm',
-    title: $t('{0} verschieben?', what),
-    confirm: $t('Verschieben'),
-    text: `${$t('Bitcrane überträgt die Dateien und löscht sie danach an der alten Stelle.')} ${
-      !from
-        ? $t(
-            'Auf diesem Computer kommen die Originale in den Papierkorb. Gelöscht wird nur, wenn alle Dateien angekommen sind.',
-          )
-        : $t('Gelöscht wird nur, wenn alle Dateien angekommen sind.')
-    }`,
-    run: () => {
-      setState({ dialog: null });
-      if (LIVE) void live.moveAcross(from, fromDir, names, to, toDir);
-      else showToast($t('{0} wird verschoben (Prototyp).', what));
-    },
-  });
-}
-
-/** Takes a folder off "Zuletzt verwendet" (the folder itself stays). */
-export function removeRecent(path: string) {
-  updateSettings({ recentDirs: (getState().settings.recentDirs ?? []).filter((p) => p !== path) });
-  setState({ contextMenu: null });
-}
-
-/** Empties "Zuletzt verwendet". */
-export function clearRecent() {
-  updateSettings({ recentDirs: [] });
-  setState({ contextMenu: null });
-}
-
-/** ⌥⌘V (Finder "Objekt hierher bewegen"): what ⌘C remembered is moved here instead of copied. */
-export function pasteMove(side: PaneSide = getState().focusSide) {
-  const c = getState().clipboard;
-  if (!c) return;
-  setState({ clipboard: { ...c, cut: true } });
-  pasteClipboard(side);
-}
-
-/** "Gehe zu > Schreibtisch, Downloads …": a folder of this computer, in the focused half when it shows this computer. */
-export function goLocal(path: string) {
-  const t = activeTab();
-  if (!t) return;
-  const sides: PaneSide[] = getState().focusSide === 'local' ? ['local', 'remote'] : ['remote', 'local'];
-  const side = sides.find((x) => !placeOf(x, t) && !paneShowsServers(x, t));
-  if (!side) {
-    showToast($t('Keine Hälfte zeigt gerade diesen Computer.'));
-    return;
-  }
-  setState({ focusSide: side });
-  navigate(side, path);
-}
-
-/** "In der anderen Hälfte öffnen" (ForkLift): the selected folder, or this folder, in the other half of the same place. */
-export function openInOtherHalf(side: PaneSide = getState().focusSide) {
-  const t = activeTab();
-  if (!t) return;
-  const other: PaneSide = side === 'local' ? 'remote' : 'local';
-  if (placeOf(side, t) !== placeOf(other, t) || paneShowsServers(other, t)) {
-    showToast($t('Das geht, wenn beide Hälften denselben Computer oder Server zeigen.'));
-    return;
-  }
-  const pick = selectedNames(side).find((n) => isDirEntry(...paneLoc(side, t), paths.join(panePath(side), n)));
-  navigate(other, pick ? paths.join(panePath(side), pick) : panePath(side));
 }
 
 /** "Im Finder / Explorer zeigen" from the menu: the selected entry, or the folder itself. */
