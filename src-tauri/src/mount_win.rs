@@ -33,7 +33,6 @@ use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, Recom
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicU8;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -405,7 +404,7 @@ impl Uploader {
                     &remote_path,
                     &Default::default(),
                     &|_, _| {},
-                    Arc::new(AtomicU8::new(crate::transfer::RUN)),
+                    crate::transfer::Control::new(),
                 )
                 .await
                 .map(|_| ConvertOptions::default().mark_in_sync())
