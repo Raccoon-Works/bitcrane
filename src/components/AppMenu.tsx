@@ -15,38 +15,19 @@ import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../state/appW
 import { formatTime } from '../util/format';
 import { BMark } from './icons';
 import { Tooltip } from './ui';
-import { $t, LOCALE, menuText } from '../i18n';
+import { $t, LOCALE } from '../i18n';
 import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { menuDefs, sc, sep, type MenuItem } from '../state/menus';
+import { MenuRows, type MenuRow } from './MenuRows';
 
+/** The entries of an application menu; separators split them into groups. */
 function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () => void }) {
   const platform = useStore((s) => s.platform);
-  return (
-    <>
-      {items.map((it, i) =>
-        it.sep ? (
-          <div key={`sep${i}`} className="menu-sep" role="separator" />
-        ) : (
-          <button
-            key={it.label}
-            type="button"
-            role="menuitem"
-            className={`menu-item${it.danger ? ' is-danger' : ''}`}
-            disabled={!it.run}
-            onClick={() => {
-              onClose();
-              it.run?.();
-            }}
-          >
-            <span className="flex-1">{menuText(it.label)}</span>
-            {(platform === 'mac' ? it.mac : it.win) && (
-              <span className="menu-key">{platform === 'mac' ? it.mac : it.win}</span>
-            )}
-          </button>
-        ),
-      )}
-    </>
-  );
+  const groups: MenuRow[][] = [[]];
+  for (const it of items)
+    if (it.sep) groups.push([]);
+    else groups[groups.length - 1].push({ ...it, key: platform === 'mac' ? it.mac : it.win });
+  return <MenuRows groups={groups} onChoose={onClose} />;
 }
 
 /** Simulated macOS menu bar above the window. */
