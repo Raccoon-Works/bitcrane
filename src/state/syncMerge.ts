@@ -191,16 +191,3 @@ export function heldForReview(
     held,
   };
 }
-
-/** A server entry from the shared file has the fields every part of Bitcrane relies on (it is outside input). */
-export function isServerEntry(x: unknown): x is Server {
-  if (!x || typeof x !== 'object') return false;
-  const v = x as Record<string, unknown>;
-  return (
-    ['id', 'name', 'host', 'user', 'keyPath', 'auth'].every((k) => typeof v[k] === 'string') &&
-    typeof v.port === 'number' &&
-    Number.isInteger(v.port) &&
-    (v.port as number) > 0 &&
-    (v.port as number) < 65536
-  );
-}

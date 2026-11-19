@@ -13,6 +13,7 @@ export * from './defaults';
 export * from './tabs';
 export * from './places';
 export * from './undo';
+export * from './configFile';
 export * from './selection';
 export * from './panels';
 export * from './fileOps';

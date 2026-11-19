@@ -20,11 +20,15 @@ import {
   panePath,
   uid,
   getState,
+  setLeftServer,
+  setRightLocal,
 } from './core';
 import type { AppState } from './appState';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
-import { placeOf } from './fileOps';
+import { editPath, placeOf } from './fileOps';
+import { navigate } from './tabs';
+import { chooseFolder } from '../backend/dialogs';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
 import { DEMO_DRIVES } from './demoData';
@@ -277,3 +281,37 @@ export function runSyncBetween(
 }
 
 /** Renames several entries at once (from the "Mehrere umbenennen" window). */
+
+/**
+ * "Anderer Ordner …" in the location menu: any folder of this computer, chosen
+ * in the system's folder dialog (in the prototype the path field opens instead).
+ */
+export async function pickLocalFolder(side: PaneSide = 'local') {
+  setState({ contextMenu: null });
+  if (!LIVE) {
+    editPath(side);
+    return;
+  }
+  const path = await chooseFolder($t('Ordner öffnen'));
+  if (!path) return;
+  if (side === 'local' && activeTab()?.leftServerId) setLeftServer('');
+  navigate(side, path);
+}
+
+/** Opens a local place from the sidebar ("Projekte", "Downloads"). */
+export function openPlace(path: string) {
+  // Places are on this computer: leave server-to-server mode first.
+  if (activeTab()?.leftServerId) setLeftServer('');
+  navigate('local', path);
+}
+
+/**
+ * Opens a folder of this computer in a half (sidebar, location menu). The
+ * right half switches from its server to this computer if needed.
+ */
+export function openLocalIn(side: PaneSide, path: string) {
+  const t = activeTab();
+  if (side === 'local') openPlace(path);
+  else if (t?.rightLocal && !t.serverId) navigate('remote', path);
+  else setRightLocal(path);
+}

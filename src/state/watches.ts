@@ -25,7 +25,7 @@ import { relFolder } from '../util/paths';
 import { defaultWatchOptions } from './defaults';
 import { openDialog } from './panels';
 import { enqueue } from './transfers';
-import { updateTab } from './tabs';
+import { clearSelection, openServer, updateTab } from './tabs';
 import { addLog } from './log';
 
 /** Options a new watch (and a template taken over from a built-in one) starts with: the defaults of the settings. */
@@ -309,4 +309,14 @@ export function closePaneServer(side: PaneSide) {
     }));
   }
   if (!serverStillUsed(sid)) disconnect(sid);
+}
+
+/** Opens a watch's folders in the current tab. */
+export function openWatchFolders(watchId: string) {
+  const w = getState().watches.find((x) => x.id === watchId);
+  if (!w) return;
+  const t = activeTab();
+  if (t && t.serverId !== w.serverId) openServer(w.serverId, true);
+  updateTab({ leftServerId: undefined, localPath: w.localPath, remotePath: w.remotePath });
+  setState({ selection: clearSelection(), popoverOpen: false });
 }

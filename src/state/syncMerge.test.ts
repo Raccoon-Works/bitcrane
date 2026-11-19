@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Server } from '../backend/types';
-import { hashServer, heldForReview, isServerEntry, mergeServers, pick, profileChanges } from './syncMerge';
+import { hashServer, heldForReview, mergeServers, pick, profileChanges } from './syncMerge';
 
 const srv = (id: string, patch: Partial<Server> = {}): Server => ({
   id,
@@ -109,15 +109,5 @@ describe('heldForReview', () => {
     const fresh = srv('n', { auth: 'key', keyPath: '\\\\nas\\keys\\id' });
     const { merged, taken } = mergeServers([], [fresh], {});
     expect(heldForReview([], merged, taken).held.length).toBe(1);
-  });
-});
-
-describe('isServerEntry', () => {
-  it('accepts a complete entry and refuses broken ones', () => {
-    expect(isServerEntry(srv('a'))).toBe(true);
-    expect(isServerEntry({ ...srv('a'), port: '22' })).toBe(false);
-    expect(isServerEntry({ ...srv('a'), port: 70000 })).toBe(false);
-    expect(isServerEntry({ id: 'a' })).toBe(false);
-    expect(isServerEntry(null)).toBe(false);
   });
 });

@@ -34,7 +34,6 @@ import { toBackendError, type Sealed } from '../backend/api';
 import {
   hashServer,
   heldForReview,
-  isServerEntry,
   mergeServers,
   pick,
   sharedServer,
@@ -42,6 +41,7 @@ import {
   type HeldServer,
   type SyncBase,
 } from './syncMerge';
+import { isServerEntry } from './entries';
 
 export type { SyncBase } from './syncMerge';
 
