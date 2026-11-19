@@ -28,5 +28,6 @@ export * from './watchTemplates';
 export * from './servers';
 export * from './serverConnections';
 export * from './settings';
+export * from './fileTools';
 export * from './rules';
 export * from './simulation';

@@ -4,10 +4,18 @@
  */
 import { useEffect, useState } from 'react';
 import { tauriBackend as backend } from '../../../backend/tauriBackend';
-import { chooseFolder, chooseProgram } from '../../../backend/dialogs';
+import { chooseFolder } from '../../../backend/dialogs';
 import { EDITOR_DEFAULTS } from '../../../state/editor';
 import { checkForUpdates, startUpdateChecks } from '../../../state/updates';
-import { LIVE, offerCloudPlaces, openExternal, updateSettings, useStore } from '../../../state/store';
+import {
+  LIVE,
+  offerCloudPlaces,
+  openExternal,
+  pickProgram,
+  programName,
+  updateSettings,
+  useStore,
+} from '../../../state/store';
 import { Button, Select, Switch, TextField } from '../../ui';
 import { $t, LANGUAGES } from '../../../i18n';
 import { MacPermissions } from './MacPermissions';
@@ -46,22 +54,14 @@ function CliRow() {
   );
 }
 
-/** Program name without folder and extension, e.g. "Visual Studio Code". */
-const appName = (p: string) => p.slice(p.lastIndexOf('/') + 1).replace(/\.(app|exe)$/i, '');
-
 export function GeneralSettings() {
   const s = useStore((st) => st.settings);
   const mac = useStore((st) => st.platform) === 'mac';
   const servers = useStore((st) => st.servers);
   const prefs = { ...EDITOR_DEFAULTS, ...s.editorPrefs };
 
-  /** Picks a program (an .app on the Mac, an .exe on Windows). */
-  const pickProgram = async (): Promise<string | null> => {
-    if (!LIVE) return mac ? '/Applications/Visual Studio Code.app' : $t('C:/Program Files/Microsoft VS Code/Code.exe');
-    return chooseProgram($t('Editor wählen'), mac);
-  };
   const chooseEditor = async () => {
-    const app = await pickProgram();
+    const app = await pickProgram($t('Editor wählen'), mac);
     if (app) updateSettings({ editorApp: app });
   };
   const [extDraft, setExtDraft] = useState('');
@@ -71,7 +71,7 @@ export function GeneralSettings() {
       .replace(/^\*?\./, '')
       .toLowerCase()}`;
     if (ext === '.') return;
-    const app = await pickProgram();
+    const app = await pickProgram($t('Editor wählen'), mac);
     if (app) {
       updateSettings({ editorByExt: { ...s.editorByExt, [ext]: app } });
       setExtDraft('');
@@ -311,7 +311,7 @@ export function GeneralSettings() {
         {Object.entries(s.editorByExt).map(([ext, app]) => (
           <Row key={ext} label={$t('Dateien {0}', ext)} note={app}>
             <span className="row-inline">
-              <span className="small muted">{appName(app)}</span>
+              <span className="small muted">{programName(app)}</span>
               <Button
                 small
                 variant="ghost"

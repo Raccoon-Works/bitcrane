@@ -341,7 +341,6 @@
   "Beide Dateien haben denselben Inhalt.": "Beide bestanden hebben dezelfde inhoud.",
   "Die Inhalte unterscheiden sich.": "De inhoud verschilt.",
   "{0} Link": "{0}-koppeling",
-  "Verknüpfung „{0}“ angelegt (Prototyp).": "Koppeling “{0}” aangemaakt (prototype).",
   "Verknüpfung „{0}“ zeigt auf {1}.": "Koppeling “{0}” verwijst naar {1}.",
   "Symbolischen Link erstellen": "Symbolische koppeling maken",
   "Im Ordner {0} auf dem Server. Der Link verweist auf eine andere Datei oder einen Ordner.": "In de map {0} op de server. De koppeling verwijst naar een ander bestand of een andere map.",

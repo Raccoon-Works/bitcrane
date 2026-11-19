@@ -341,7 +341,6 @@
   "Beide Dateien haben denselben Inhalt.": "Les deux fichiers ont le même contenu.",
   "Die Inhalte unterscheiden sich.": "Les contenus diffèrent.",
   "{0} Link": "Lien {0}",
-  "Verknüpfung „{0}“ angelegt (Prototyp).": "Lien « {0} » créé (prototype).",
   "Verknüpfung „{0}“ zeigt auf {1}.": "Le lien « {0} » pointe vers {1}.",
   "Symbolischen Link erstellen": "Créer un lien symbolique",
   "Im Ordner {0} auf dem Server. Der Link verweist auf eine andere Datei oder einen Ordner.": "Dans le dossier {0} sur le serveur. Le lien pointe vers un autre fichier ou dossier.",

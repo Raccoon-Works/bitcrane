@@ -22,13 +22,11 @@ import { QuickConnect } from './components/dialogs/QuickConnect';
 import { Shortcuts } from './components/dialogs/Shortcuts';
 import { UpdateDialog } from './components/dialogs/UpdateDialog';
 import { DiffDialog, CompareFilesDialog } from './components/dialogs/DiffDialog';
-import {
-  ChecksumDialog,
-  PresignDialog,
-  EditWithDialog,
-  EditsDialog,
-  SymlinkDialog,
-} from './components/dialogs/FileTools';
+import { ChecksumDialog } from './components/dialogs/ChecksumDialog';
+import { PresignDialog } from './components/dialogs/PresignDialog';
+import { SymlinkDialog } from './components/dialogs/SymlinkDialog';
+import { EditsDialog } from './components/dialogs/EditsDialog';
+import { EditWithDialog } from './components/dialogs/EditWithDialog';
 import { Palette } from './components/dialogs/Palette';
 import { ExportDialog, ImportPasswordDialog } from './components/dialogs/ExportDialogs';
 import { LogDialog } from './components/dialogs/LogDialog';

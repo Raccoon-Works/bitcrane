@@ -341,7 +341,6 @@
   "Beide Dateien haben denselben Inhalt.": "I due file hanno lo stesso contenuto.",
   "Die Inhalte unterscheiden sich.": "I contenuti sono diversi.",
   "{0} Link": "Link {0}",
-  "Verknüpfung „{0}“ angelegt (Prototyp).": "Link “{0}” creato (prototipo).",
   "Verknüpfung „{0}“ zeigt auf {1}.": "Il link “{0}” punta a {1}.",
   "Symbolischen Link erstellen": "Crea link simbolico",
   "Im Ordner {0} auf dem Server. Der Link verweist auf eine andere Datei oder einen Ordner.": "Nella cartella {0} sul server. Il link punta a un altro file o cartella.",

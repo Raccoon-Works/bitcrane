@@ -341,7 +341,6 @@
   "Beide Dateien haben denselben Inhalt.": "Ambos archivos tienen el mismo contenido.",
   "Die Inhalte unterscheiden sich.": "El contenido es distinto.",
   "{0} Link": "Enlace {0}",
-  "Verknüpfung „{0}“ angelegt (Prototyp).": "Enlace “{0}” creado (prototipo).",
   "Verknüpfung „{0}“ zeigt auf {1}.": "El enlace “{0}” apunta a {1}.",
   "Symbolischen Link erstellen": "Crear enlace simbólico",
   "Im Ordner {0} auf dem Server. Der Link verweist auf eine andere Datei oder einen Ordner.": "En la carpeta {0} del servidor. El enlace apunta a otro archivo o carpeta.",

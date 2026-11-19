@@ -354,7 +354,6 @@ export const EN: Record<string, string> = {
   'Beide Dateien haben denselben Inhalt.': 'Both files have the same content.',
   'Die Inhalte unterscheiden sich.': 'The contents differ.',
   '{0} Link': '{0} link',
-  'Verknüpfung „{0}“ angelegt (Prototyp).': 'Link “{0}” created (prototype).',
   'Verknüpfung „{0}“ zeigt auf {1}.': 'Link “{0}” points to {1}.',
   'Symbolischen Link erstellen': 'Create symbolic link',
   'Im Ordner {0} auf dem Server. Der Link verweist auf eine andere Datei oder einen Ordner.':
@@ -1783,7 +1782,6 @@ export const EN: Record<string, string> = {
   Agent: 'Agent',
   Proxy: 'Proxy',
   Filter: 'Filter',
-  'C:/Program Files/Microsoft VS Code/Code.exe': 'C:/Program Files/Microsoft VS Code/Code.exe',
   Esc: 'Esc',
   Stylesheet: 'Stylesheet',
   'TLS-Version': 'TLS version',
