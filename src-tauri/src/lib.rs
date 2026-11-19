@@ -99,6 +99,10 @@ pub struct AppState {
     known_hosts: Arc<KnownHosts>,
     watches: watcher::Watches,
     cancels: Mutex<HashMap<String, Arc<transfer::Control>>>,
+    /// Per server, the latest connect or disconnect. A login can wait minutes for the user's answers;
+    /// one that was overtaken meanwhile (a newer connect, a disconnect) does not install its
+    /// connection (commands/connect.rs).
+    conn_turns: Mutex<HashMap<String, u64>>,
     /// Open questions of servers during login, waiting for the user's answers.
     prompts: PendingPrompts,
     config_dir: PathBuf,
@@ -115,9 +119,22 @@ impl AppState {
             #[cfg(windows)]
             mounts: Default::default(),
             cancels: Default::default(),
+            conn_turns: Default::default(),
             prompts: Default::default(),
             config_dir,
         }
+    }
+
+    /// Starts a new turn for the server's connection and returns its number (see `conn_turns`).
+    fn next_conn_turn(&self, server_id: &str) -> u64 {
+        let mut turns = self.conn_turns.locked();
+        let turn = turns.entry(server_id.to_string()).or_insert(0);
+        *turn += 1;
+        *turn
+    }
+
+    fn is_conn_turn(&self, server_id: &str, turn: u64) -> bool {
+        self.conn_turns.locked().get(server_id) == Some(&turn)
     }
 
     async fn conn(&self, server_id: &str) -> AppResult<Arc<remote::Remote>> {

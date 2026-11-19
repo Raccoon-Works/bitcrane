@@ -12,7 +12,7 @@ import { basename, insideArchive, join, parent, relFolder } from '../../util/pat
 import { showError } from '../errors';
 import { type Transfer, type PaneSide, type FileEntry } from '../../backend/types';
 import { type WalkItem, toBackendError, type TransferOptions, type BackendError } from '../../backend/api';
-import { enqueue } from '../transfers';
+import { enqueue, skippedText } from '../transfers';
 import {
   handleRemoteError,
   connected,
@@ -229,8 +229,10 @@ export async function moveAcross(from: string, fromDir: string, names: string[],
   const arrived = new Set<string>();
   const stop = subscribeStore(() => {
     const mine = getState().transfers.filter((t) => ids.has(t.id));
-    for (const t of mine) if (t.state === 'done' && !t.error) arrived.add(t.id);
-    const failed = mine.some((t) => t.state === 'error' || (t.state === 'done' && t.error));
+    // A file left out because the target was the same counts as arrived; one left out because a
+    // different file is there does not, and its original stays.
+    for (const t of mine) if (t.state === 'done' && (!t.skipped || t.skipped === 'unchanged')) arrived.add(t.id);
+    const failed = mine.some((t) => t.state === 'error' || (t.skipped && t.skipped !== 'unchanged'));
     // A transfer removed from the list before it arrived was cancelled.
     const gone = [...ids].some((id) => !arrived.has(id) && !mine.some((t) => t.id === id));
     if (failed || gone) {
@@ -433,7 +435,10 @@ function verb(tr: Transfer) {
       : $t('Heruntergeladen');
 }
 
-async function start(tr: Transfer) {
+async function start(queued: Transfer) {
+  // The checks below may change the transfer (another name when both are kept): from then on the
+  // current entry is used.
+  let tr = queued;
   active.add(tr.id);
   lastDone.set(tr.id, tr.done);
   patchTransfer(tr.id, { state: 'running', error: undefined, errorDetail: undefined, hold: undefined });
@@ -464,6 +469,7 @@ async function start(tr: Transfer) {
       addLog('info', now ? $t('Pausiert: {0}', tr.target) : $t('Abgebrochen: {0}', tr.target), tr.serverId);
       return;
     }
+    tr = now;
     addLog(
       'debug',
       `${tr.direction === 'up' ? $t('Lade hoch') : tr.direction === 'cross' ? $t('Übertrage von {0}', serverById(tr.sourceServerId ?? '')?.name ?? '') : $t('Lade herunter')}: ${tr.source} → ${tr.target}`,
@@ -631,9 +637,9 @@ async function preflight(tr: Transfer): Promise<boolean> {
   if (!target || target.kind === 'dir') return false;
   const source = await statOrNull(sourceSide, sourceServer, tr.source);
   if (!source) return false;
-  const skip = (why: string) => {
-    patchTransfer(tr.id, { state: 'done', done: 0, finishedAt: Date.now(), error: why });
-    addLog('info', $t('Übersprungen ({0}): {1}', why, tr.target), tr.serverId);
+  const skip = (skipped: NonNullable<Transfer['skipped']>) => {
+    patchTransfer(tr.id, { state: 'done', done: 0, finishedAt: Date.now(), skipped });
+    addLog('info', $t('Übersprungen ({0}): {1}', skippedText(skipped), tr.target), tr.serverId);
     return true;
   };
   // Same size and modification time: the file is already there.
@@ -642,9 +648,9 @@ async function preflight(tr: Transfer): Promise<boolean> {
     source.size === target.size &&
     Math.abs(source.mtime - target.mtime) <= timeTolerance(tr.serverId)
   )
-    return skip($t('unverändert'));
+    return skip('unchanged');
   if (rule === 'overwrite') return false;
-  if (rule === 'skip') return skip($t('gibt es schon'));
+  if (rule === 'skip') return skip('exists');
   if (rule === 'keepBoth') {
     // Keep the existing file and store this one next to it under a free name.
     const names = new Set(
@@ -662,15 +668,10 @@ async function preflight(tr: Transfer): Promise<boolean> {
     let free = `${stem} ${n}${ext}`;
     while (names.has(free)) free = `${stem} ${++n}${ext}`;
     patchTransfer(tr.id, { name: free, target: join(parent(tr.target), free), decided: true });
-    tr.name = free;
-    tr.target = join(parent(tr.target), free);
     addLog('info', $t('Gibt es schon, wird als „{0}“ daneben gespeichert', free), tr.serverId);
     return false;
   }
-  if (rule === 'newer')
-    return source.mtime - target.mtime > timeTolerance(tr.serverId)
-      ? false
-      : skip($t('Ziel ist gleich alt oder neuer'));
+  if (rule === 'newer') return source.mtime - target.mtime > timeTolerance(tr.serverId) ? false : skip('notNewer');
   const local = tr.direction === 'down' ? target : source;
   const remote = tr.direction === 'down' ? source : target;
   askConflict(
@@ -726,7 +727,7 @@ function afterTransfer(tr: Transfer) {
   const w = s.watches.find((x) => x.id === tr.watchId);
   if (!w) return;
   const cur = s.transfers.find((x) => x.id === tr.id);
-  if (cur?.state === 'done' && tr.direction === 'up' && !cur.error) {
+  if (cur?.state === 'done' && tr.direction === 'up' && !cur.skipped) {
     setState((st) => ({
       watches: st.watches.map((x) =>
         x.id === w.id ? { ...x, lastFile: cur.name, lastTime: cur.finishedAt ?? Date.now() } : x,

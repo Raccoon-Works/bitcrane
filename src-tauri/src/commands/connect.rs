@@ -1,6 +1,6 @@
 //! Connecting to servers and vaults, including the questions a server asks during login.
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, ErrorKind};
 use crate::login::{Env, Login, Opened};
 use crate::secrets::Keychain;
 use crate::serverconfig::{Config, Protocol, Server};
@@ -104,6 +104,7 @@ pub(crate) async fn server_connect(
     server_id: String,
     request: ConnectRequest,
 ) -> AppResult<ConnectResult> {
+    let turn = state.next_conn_turn(&server_id);
     // Take it out first: closing can take a while and must not hold the lock. Its tunnels end with
     // it; the interface starts them again on the new connection.
     let old = state.connections.lock().await.remove(&server_id);
@@ -114,7 +115,15 @@ pub(crate) async fn server_connect(
     let Opened { remote: conn, warning } = request.open(app, &state, server_id.clone()).await?;
     let home = conn.home().to_string();
     let clock_offset_ms = conn.clock_offset_ms().await;
-    state.connections.lock().await.insert(server_id, Arc::new(conn));
+    // Checked and installed under the connections lock, so no newer connect or disconnect can come
+    // in between.
+    let mut connections = state.connections.lock().await;
+    if !state.is_conn_turn(&server_id, turn) {
+        drop(connections);
+        conn.close().await;
+        return Err(AppError::new(ErrorKind::Cancelled, "Abgebrochen."));
+    }
+    connections.insert(server_id, Arc::new(conn));
     Ok(ConnectResult { home, clock_offset_ms, warning })
 }
 
@@ -150,6 +159,8 @@ pub(crate) async fn vault_create(
 
 #[tauri::command]
 pub(crate) async fn ssh_disconnect(state: State<'_, AppState>, server_id: String) -> AppResult<()> {
+    // A login still running for this server does not install its connection afterwards.
+    state.next_conn_turn(&server_id);
     state.forwards.stop_server(&server_id).await;
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(c) = old {

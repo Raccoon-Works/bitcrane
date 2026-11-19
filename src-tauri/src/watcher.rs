@@ -6,7 +6,7 @@
 //! (".git", "*.log", ...) are filtered here; the upload queue itself lives in
 //! the user interface, which receives one event per batch.
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, ErrorKind};
 use crate::paths::{real_rel, to_native, to_ui};
 use crate::LockExt;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -30,6 +30,15 @@ pub struct WatchBatch {
     pub removed: Vec<WatchedFile>,
     /// Renamed or moved files and folders inside the watched folder: (from, to).
     pub renamed: Vec<(WatchedFile, WatchedFile)>,
+    /// The watch cannot go on (the folder is gone, the system stopped reporting); the lists are empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<AppError>,
+}
+
+impl WatchBatch {
+    fn failed(watch_id: &str, error: AppError) -> Self {
+        Self { watch_id: watch_id.to_string(), changed: vec![], removed: vec![], renamed: vec![], error: Some(error) }
+    }
 }
 
 /// A file or folder of a batch.
@@ -106,7 +115,24 @@ impl Watches {
         let id = watch_id.clone();
         let mut debouncer =
             new_debouncer(Duration::from_millis(delay_ms.max(200)), None, move |result: DebounceEventResult| {
-                let Ok(events) = result else { return };
+                let events = match result {
+                    Ok(events) => events,
+                    Err(errors) => {
+                        let detail = errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("; ");
+                        emit(WatchBatch::failed(
+                            &id,
+                            AppError::other("Die Überwachung meldet einen Fehler.").with_detail(detail),
+                        ));
+                        return;
+                    }
+                };
+                if !root_for_cb.is_dir() {
+                    emit(WatchBatch::failed(
+                        &id,
+                        AppError::new(ErrorKind::NotFound, "Der lokale Ordner existiert nicht."),
+                    ));
+                    return;
+                }
                 let mut changed = BTreeSet::new();
                 let mut removed = BTreeSet::new();
                 let mut renamed: Vec<(String, String)> = Vec::new();
@@ -181,6 +207,7 @@ impl Watches {
                         changed: changed.into_iter().map(watched).collect(),
                         removed: removed.into_iter().map(watched).collect(),
                         renamed: renamed.into_iter().map(|(from, to)| (watched(from), watched(to))).collect(),
+                        error: None,
                     });
                 }
             })

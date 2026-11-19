@@ -421,6 +421,8 @@ pub async fn download(
     tokio::fs::rename(&tmp, &native).await?;
     if opts.keep_mtime {
         if let Some(m) = meta.mtime {
+            // The file is complete; a time the file system refuses (some network drives) does not
+            // make the download fail.
             let _ = filetime::set_file_mtime(&native, filetime::FileTime::from_unix_time(m as i64, 0));
         }
     }

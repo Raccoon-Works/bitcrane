@@ -996,6 +996,7 @@ export const EN: Record<string, string> = {
   'Überwachung „{0}“ nach einem Fehler angehalten.': 'Watch “{0}” stopped after an error.',
   'Nicht hochgeladen (nur vorhandene Dateien): {0}': 'Not uploaded (only existing files): {0}',
   'Übersprungen ({0}): {1}': 'Skipped ({0}): {1}',
+  'Übersprungen ({0})': 'Skipped ({0})',
   unverändert: 'unchanged',
   'Gibt es schon, wird als „{0}“ daneben gespeichert': 'Already exists; saving alongside as “{0}”',
   'Ziel ist gleich alt oder neuer': 'Destination is the same age or newer',
@@ -1871,6 +1872,10 @@ export const EN: Record<string, string> = {
   'Die Datei ist in Latin-1 gespeichert; „{0}“ lässt sich darin nicht speichern.':
     'The file is stored in Latin-1; “{0}” cannot be saved in it.',
   'LF/CRLF gemischt': 'LF/CRLF mixed',
+  'Überwachung „{0}“ angehalten': 'Watch “{0}” stopped',
+  'Die Überwachung meldet einen Fehler.': 'The folder watch reports an error.',
+  'Ersetzen fehlgeschlagen; die bisherige Datei liegt jetzt unter „{0}“.':
+    'Replacing failed; the previous file is now named “{0}”.',
   'Befehl nach dem Hochladen übersprungen, {0} Dateien sind fehlgeschlagen: {1}':
     'Command after uploading skipped, {0} files failed: {1}',
   'Der Befehl lief nach {0} Minuten noch; Bitcrane wartet nicht länger auf ihn.':

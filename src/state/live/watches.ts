@@ -37,7 +37,10 @@ export function reconcileWatches(s: AppState) {
   }
   for (const [id, w] of wanted) {
     if (runningWatches.has(id)) continue;
-    runningWatches.set(id, signature(w));
+    const sig = signature(w);
+    runningWatches.set(id, sig);
+    // A start answered after the watch was changed, restarted or deleted is out of date.
+    const current = () => runningWatches.get(id) === sig;
     backend
       .watchStart(
         id,
@@ -48,12 +51,13 @@ export function reconcileWatches(s: AppState) {
         onWatchBatch,
       )
       .then(() => {
-        if (w.options.syncOnStart) {
+        if (current() && w.options.syncOnStart) {
           synced.delete(id);
           void initialSync(w);
         }
       })
       .catch((e) => {
+        if (!current()) return;
         runningWatches.delete(id);
         showError(e, { prefix: $t('Überwachung „{0}“', w.name), serverId: w.serverId });
         setState((st) => ({ watches: st.watches.map((x) => (x.id === id ? { ...x, state: 'paused' } : x)) }));
@@ -102,6 +106,12 @@ function walked(f: WalkItem, dir?: WatchedFile): WatchedFile {
 async function onWatchBatch(b: WatchBatch) {
   const w = getState().watches.find((x) => x.id === b.watchId);
   if (!w || w.state === 'paused') return;
+  if (b.error) {
+    // Paused rather than left looking active while nothing is reported any more.
+    showError(b.error, { prefix: $t('Überwachung „{0}“ angehalten', w.name), serverId: w.serverId });
+    setState((st) => ({ watches: st.watches.map((x) => (x.id === w.id ? { ...x, state: 'paused' } : x)) }));
+    return;
+  }
   addLog(
     'debug',
     $t(
@@ -220,14 +230,17 @@ export async function initialSync(w: Watch, manual = false) {
     else autoConnect(w.serverId);
     return;
   }
-  if (synced.has(w.id) && !manual) return;
-  synced.add(w.id);
+  if ((synced.has(w.id) || syncing.has(w.id)) && !manual) return;
+  syncing.add(w.id);
   try {
     const [local, remote] = await Promise.all([
       backend.localWalk(w.localPath),
-      // A server folder that is missing or unreadable counts as empty: the local files go up, and a lost
-      // connection shows in those transfers.
-      backend.remoteWalk(w.serverId, w.remotePath).catch(() => [] as WalkItem[]),
+      // A server folder that does not exist yet counts as empty: the local files go up. Any other
+      // error (no answer, no access) stops the comparison, which would else upload everything.
+      backend.remoteWalk(w.serverId, w.remotePath).catch((e) => {
+        if (toBackendError(e).kind === 'notFound') return [] as WalkItem[];
+        throw e;
+      }),
     ]);
     // Compared in NFC form, so a name decomposed on one side still meets its counterpart.
     const remoteByRel = new Map(
@@ -252,8 +265,12 @@ export async function initialSync(w: Watch, manual = false) {
     } else if (manual) {
       showToast($t('„{0}“ ist auf dem Server aktuell.', w.name), 'ok');
     }
+    // Only a comparison that ran counts; after a failure the next connect tries again.
+    synced.add(w.id);
   } catch (e) {
     showError(e, { prefix: $t('Abgleich „{0}“', w.name), serverId: w.serverId });
+  } finally {
+    syncing.delete(w.id);
   }
 }
 
@@ -265,6 +282,8 @@ export function syncWatch(watchId: string) {
 
 /** Watches whose start comparison already ran in this session. */
 export const synced = new Set<string>();
+/** Watches whose start comparison is running now. */
+const syncing = new Set<string>();
 
 /** Runs the post-upload command of a watch right away. */
 export function runCommandNow(watchId: string) {

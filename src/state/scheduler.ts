@@ -32,36 +32,26 @@ import {
 } from './syncPlan';
 import { $t } from '../i18n';
 import { toBackendError } from '../backend/api';
+import { DEFAULT_RUN_TIME, isDue } from './schedule';
 
-const HOUR_MS = 3600 * 1000;
 /** Comparisons running right now (a slow run is not started a second time). */
 const running = new Set<string>();
 
-/** Start time of today's run of a daily schedule ("03:00"). */
-function todayAt(time: string | undefined, now: Date): number {
-  const [h, m] = (time ?? '03:00').split(':').map((x) => Number(x) || 0);
-  const d = new Date(now);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
-}
-
-/**
- * True when a comparison should run now. A daily run that was missed (computer
- * off at that time) is made up as soon as Bitcrane runs later that day.
- */
-function isDue(f: SyncFavorite, now: number, atStart: boolean): boolean {
-  const s = f.schedule;
-  if (!s) return false;
-  if (s.mode === 'startup') return atStart;
-  if (s.mode === 'hourly') return !f.lastRun || now - f.lastRun >= HOUR_MS - 30_000;
-  const target = todayAt(s.time, new Date(now));
-  return now >= target && (f.lastRun ?? 0) < target;
-}
-
+/** Records a run that went through. */
 function saveResult(id: string, result: string) {
   const list = getState().settings.syncFavorites;
   updateSettings({
-    syncFavorites: list.map((x) => (x.id === id ? { ...x, lastRun: Date.now(), lastResult: result } : x)),
+    syncFavorites: list.map((x) =>
+      x.id === id ? { ...x, lastRun: Date.now(), lastResult: result, failedAt: undefined } : x,
+    ),
+  });
+}
+
+/** Records a failed run: it stays due (isDue tries again after a pause). */
+function saveFailure(id: string, result: string) {
+  const list = getState().settings.syncFavorites;
+  updateSettings({
+    syncFavorites: list.map((x) => (x.id === id ? { ...x, lastResult: result, failedAt: Date.now() } : x)),
   });
 }
 
@@ -132,13 +122,14 @@ async function runScheduled(f: SyncFavorite): Promise<void> {
     if (n || deleteCount || notDeleted || conflicts) void notify($t('Abgleich „{0}“', f.name), result);
   } catch (e) {
     const msg = toBackendError(e).message;
-    saveResult(f.id, $t('Fehler: {0}', msg));
+    saveFailure(f.id, $t('Fehler: {0}', msg));
     addLog(
       'error',
       $t('Geplanter Abgleich „{0}“ fehlgeschlagen: {1}', f.name, msg),
       rightServer || leftServer || undefined,
     );
-    void notify($t('Abgleich „{0}“ fehlgeschlagen', f.name), msg);
+    // Said once: the tries after it fail the same way until the cause is gone.
+    if (f.failedAt === undefined) void notify($t('Abgleich „{0}“ fehlgeschlagen', f.name), msg);
   } finally {
     running.delete(f.id);
   }
@@ -164,7 +155,7 @@ export function scheduleLabel(f: SyncFavorite): string {
   const s = f.schedule;
   if (!s) return '';
   return s.mode === 'daily'
-    ? $t('täglich {0}', s.time ?? '03:00')
+    ? $t('täglich {0}', s.time ?? DEFAULT_RUN_TIME)
     : s.mode === 'hourly'
       ? $t('stündlich')
       : $t('beim Start');

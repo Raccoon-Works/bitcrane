@@ -373,6 +373,8 @@ export interface SyncFavorite {
   /** Last scheduled run: time and a short result for the server list and the log. */
   lastRun?: number;
   lastResult?: string;
+  /** When the last scheduled run failed; the run stays due and is tried again after a pause. */
+  failedAt?: number;
   local: string;
   remote: string;
   direction: 'up' | 'down' | 'both';

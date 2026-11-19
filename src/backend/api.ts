@@ -160,6 +160,8 @@ export interface WatchBatch {
   removed: WatchedFile[];
   /** Renamed or moved inside the watched folder: [from, to]. */
   renamed: Array<[WatchedFile, WatchedFile]>;
+  /** The watch cannot go on (folder gone, the system stopped reporting); the lists are empty. */
+  error?: unknown;
 }
 
 /** A file or folder of a watch batch. */

@@ -15,6 +15,7 @@ import {
   reorderTransfer,
   retryTransfer,
   skipTransfer,
+  skippedText,
   toggleTransferPause,
   useStore,
 } from '../../state/store';
@@ -94,8 +95,8 @@ export function TransfersDialog() {
         <span className={`small tr-info ${t.state === 'error' ? 'tone-danger' : 'muted'}`}>
           {t.state === 'error'
             ? t.error
-            : t.state === 'done' && t.error
-              ? t.error
+            : t.state === 'done' && t.skipped
+              ? $t('Übersprungen ({0})', skippedText(t.skipped))
               : t.state === 'done'
                 ? t.direction === 'command'
                   ? $t('Befehl · {0}', t.finishedAt ? formatTime(t.finishedAt) : '')

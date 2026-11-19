@@ -1213,7 +1213,11 @@ impl Connection {
                     .with_detail(e.to_string())
             })?;
             use tokio::io::AsyncWriteExt;
-            let _ = dst.shutdown().await;
+            // Closing writes what is still buffered: a full disk shows here.
+            dst.shutdown().await.map_err(|e| {
+                AppError::new(ErrorKind::ConnectionLost, "Kopieren auf dem Server fehlgeschlagen.")
+                    .with_detail(e.to_string())
+            })?;
         }
         let keep = russh_sftp::protocol::FileAttributes {
             permissions: attrs.permissions.map(|p| p & 0o7777),

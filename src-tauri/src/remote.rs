@@ -292,7 +292,12 @@ impl Remote {
         }
         self.rename(to, &aside).await?;
         if let Err(e) = self.rename(from, to).await {
-            let _ = self.rename(&aside, to).await;
+            if let Err(back) = self.rename(&aside, to).await {
+                // The original is only under the side name now; the user must know where it is.
+                return Err(AppError::other("Ersetzen fehlgeschlagen; die bisherige Datei liegt jetzt unter „{0}“.")
+                    .param(remote_name(&aside))
+                    .with_detail(format!("{} / {}", e.detail.unwrap_or_default(), back)));
+            }
             return Err(e);
         }
         let _ = self.remove_file(&aside).await;

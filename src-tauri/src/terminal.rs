@@ -77,7 +77,8 @@ impl Terminals {
                             let _ = app.emit("term-data", TermData { id: id.clone(), data: b64.encode(&data) });
                         }
                         Some(russh::ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status),
-                        Some(russh::ChannelMsg::Eof) | Some(russh::ChannelMsg::Close) | None => break,
+                        // OpenSSH sends the end of output before the exit code: only the closed channel ends the session.
+                        Some(russh::ChannelMsg::Close) | None => break,
                         _ => {}
                     },
                     cmd = rx.recv() => match cmd {

@@ -28,6 +28,15 @@ import { pushUndo } from './undo';
 import { relFolder } from '../util/paths';
 import { mergeIntoQueue } from './queue';
 
+/** Why a transfer was left out without copying, for the list and the log. */
+export function skippedText(skipped: NonNullable<Transfer['skipped']>): string {
+  return skipped === 'unchanged'
+    ? $t('unverändert')
+    : skipped === 'exists'
+      ? $t('gibt es schon')
+      : $t('Ziel ist gleich alt oder neuer');
+}
+
 /**
  * Adds transfers to the end of the queue, without a second entry for a file already waiting for the
  * same target (queue.ts): a scheduled comparison, a watch and its start comparison can all find the

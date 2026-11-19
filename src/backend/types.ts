@@ -310,6 +310,11 @@ export interface Transfer {
   state: TransferState;
   error?: string;
   errorDetail?: string;
+  /**
+   * Done without copying: the target was the same already (`unchanged`), or the rule says to leave
+   * the file that is there (`exists`, `notNewer`); then a move keeps its original.
+   */
+  skipped?: 'unchanged' | 'exists' | 'notNewer';
   watchId?: string;
   finishedAt?: number;
   /** Output of a post-upload command. */

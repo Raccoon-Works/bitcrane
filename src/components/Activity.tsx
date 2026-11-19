@@ -124,7 +124,7 @@ function ActivityRow({ t }: { t: Transfer }) {
           <Progress value={t.state === 'done' ? 1 : pct} tone={t.state === 'done' ? 'ok' : 'accent'} />
           <span className="small muted act-right">
             {t.state === 'done'
-              ? t.error
+              ? t.skipped
                 ? $t('Übersprungen')
                 : $t('Fertig {0}', t.finishedAt ? formatTime(t.finishedAt) : '')
               : t.state === 'queued'

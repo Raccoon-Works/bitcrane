@@ -47,6 +47,7 @@ import { formatDate, formatSize } from '../../util/format';
 import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
+import { DEFAULT_RUN_TIME } from '../../state/schedule';
 
 export function CompareDialog({ favoriteId }: { favoriteId?: string }) {
   // The right half must show files (a server or this computer), not the server list.
@@ -92,7 +93,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
   const [days, setDays] = useState<number>(fav?.days ?? 0);
   // Schedule of a saved comparison: 'off' or when it runs by itself.
   const [schedMode, setSchedMode] = useState<'off' | SyncSchedule['mode']>(fav?.schedule?.mode ?? 'off');
-  const [schedTime, setSchedTime] = useState(fav?.schedule?.time ?? '03:00');
+  const [schedTime, setSchedTime] = useState(fav?.schedule?.time ?? DEFAULT_RUN_TIME);
   const [schedDelete, setSchedDelete] = useState(!!fav?.schedule?.allowDelete);
   const [differs, setDiffers] = useState<Map<string, boolean> | null>(null);
   const [checking, setChecking] = useState(false);
@@ -395,7 +396,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
               className="field time-field"
               value={schedTime}
               aria-label={$t('Uhrzeit')}
-              onChange={(e) => setSchedTime(e.target.value || '03:00')}
+              onChange={(e) => setSchedTime(e.target.value || DEFAULT_RUN_TIME)}
             />
           )}
           {schedMode !== 'off' && deletes && (

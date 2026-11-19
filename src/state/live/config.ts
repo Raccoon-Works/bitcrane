@@ -82,10 +82,16 @@ function snapshot(s: AppState): string {
   return JSON.stringify(cfg);
 }
 
+/**
+ * Writes a snapshot; only a written one counts as saved, so a failed write is tried again with the
+ * next change (or on quitting).
+ */
 function writeConfig(snap: string): Promise<void> {
-  return backend
-    .configSave(JSON.parse(snap))
-    .catch(() => showToast($t('Einstellungen konnten nicht gespeichert werden.'), 'error'));
+  lastSaved = snap;
+  return backend.configSave(JSON.parse(snap)).catch(() => {
+    if (lastSaved === snap) lastSaved = '';
+    showToast($t('Einstellungen konnten nicht gespeichert werden.'), 'error');
+  });
 }
 
 export function scheduleSave(s: AppState) {
@@ -94,10 +100,7 @@ export function scheduleSave(s: AppState) {
   // Cancel first: a change that was undone again must not be written later.
   window.clearTimeout(saveTimer);
   if (snap === lastSaved) return;
-  saveTimer = window.setTimeout(() => {
-    lastSaved = snap;
-    void writeConfig(snap);
-  }, 400);
+  saveTimer = window.setTimeout(() => void writeConfig(snap), 400);
 }
 
 /** Reads the drives and volumes of this computer for the sidebar. */
@@ -123,7 +126,6 @@ export async function saveNow() {
   window.clearTimeout(saveTimer);
   const snap = snapshot(getState());
   if (snap === lastSaved) return;
-  lastSaved = snap;
   await writeConfig(snap);
 }
 

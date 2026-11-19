@@ -6,6 +6,7 @@ import { listen } from '@tauri-apps/api/event';
 
 import { subscribeStore, getState, setState } from '../core';
 import type { AppState } from '../appState';
+import type { Transfer } from '../../backend/types';
 import { addLog } from '../log';
 import { $t } from '../../i18n';
 import { openDialog } from '../panels';
@@ -20,6 +21,11 @@ let started = false;
 let prev: AppState | null = null;
 
 /** Starts live mode once: loads the config and wires the store to the backend. */
+/** The parts of the transfer list that matter for starting and saving: which transfers, in which state. */
+function queueShape(list: Transfer[]): string {
+  return list.map((t) => `${t.id}:${t.state}`).join(',');
+}
+
 export function startLive() {
   if (started) return;
   started = true;
@@ -46,7 +52,9 @@ export function startLive() {
     prev = s;
     ensureVisible(s);
     if (p && p.transfers !== s.transfers) discardRemoved(p.transfers, s.transfers);
-    if (!p || p.transfers !== s.transfers || p.settings.parallel !== s.settings.parallel) pump();
+    // A progress step only changes `done`: neither the queue's order nor the saved file changes.
+    const queueChanged = !p || (p.transfers !== s.transfers && queueShape(p.transfers) !== queueShape(s.transfers));
+    if (queueChanged || p.settings.parallel !== s.settings.parallel) pump();
     if (!p || p.watches !== s.watches) reconcileWatches(s);
     // Questions from background work wait until no other dialog is open, so they never replace one.
     if (!s.dialog && s.serverDeletes.length) openDialog({ type: 'serverDeletes' });
@@ -60,7 +68,7 @@ export function startLive() {
       p.toolbarLabels !== s.toolbarLabels ||
       p.tabs !== s.tabs ||
       p.activeTabId !== s.activeTabId ||
-      p.transfers !== s.transfers
+      queueChanged
     )
       scheduleSave(s);
   });
