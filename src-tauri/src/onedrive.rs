@@ -392,47 +392,31 @@ impl OneDriveConn {
         }
     }
 
-    /// Copy inside the OneDrive, with "Kopie" names on clashes. Graph copies in
+    /// Copies a file or folder to `to` inside the OneDrive. Graph copies in
     /// the background; Bitcrane waits until it is done (at most two minutes per item).
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            let what = Message::new("„{0}“ kopieren").param(remote_name(from));
-            let token = self.access().await?;
-            let body = json!({ "parentReference": Self::parent_ref(dest_dir), "name": name });
-            let resp = self
-                .client
-                .post(item_url(from, "copy"))
-                .bearer_auth(token)
-                .header("Content-Type", "application/json")
-                .body(body.to_string())
-                .send()
-                .await
-                .map_err(net)?;
-            let status = resp.status();
-            let monitor = resp.headers().get("location").and_then(|l| l.to_str().ok()).map(String::from);
-            if !status.is_success() {
-                let text = resp.text().await.unwrap_or_default();
-                return Err(api_err(status, &text, &what));
-            }
-            if let Some(m) = monitor {
-                self.wait_for_copy(&m, &what).await?;
-            }
-            taken.insert(name.clone());
-            out.push(name);
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        let what = Message::new("„{0}“ kopieren").param(remote_name(from));
+        let token = self.access().await?;
+        let body = json!({ "parentReference": Self::parent_ref(&remote_parent(to)), "name": remote_name(to) });
+        let resp = self
+            .client
+            .post(item_url(from, "copy"))
+            .bearer_auth(token)
+            .header("Content-Type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .map_err(net)?;
+        let status = resp.status();
+        let monitor = resp.headers().get("location").and_then(|l| l.to_str().ok()).map(String::from);
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(api_err(status, &text, &what));
         }
-        Ok(out)
+        if let Some(m) = monitor {
+            self.wait_for_copy(&m, &what).await?;
+        }
+        Ok(())
     }
 
     /// Polls the status address of a background copy (no sign-in needed there).

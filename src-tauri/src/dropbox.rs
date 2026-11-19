@@ -9,11 +9,11 @@
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::oauth::{self, ascii_json};
-use crate::paths::{quoted_name, remote_join, remote_name, remote_parent};
+use crate::paths::{quoted_name, remote_name, remote_parent};
 use futures_util::TryStreamExt;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 const API: &str = "https://api.dropboxapi.com/2";
 const CONTENT: &str = "https://content.dropboxapi.com/2";
@@ -417,26 +417,15 @@ impl DropboxConn {
         }
     }
 
-    /// Copy inside the Dropbox, with "Kopie" names on clashes.
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            self.rpc("files/copy_v2", json!({ "from_path": dbx_path(from), "to_path": dbx_path(&remote_join(dest_dir, &name)), "autorename": false }), &Message::new("„{0}“ kopieren").param(remote_name(from))).await?;
-            taken.insert(name.clone());
-            out.push(name);
-        }
-        Ok(out)
+    /// Copies a file or folder to `to` inside the Dropbox.
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        self.rpc(
+            "files/copy_v2",
+            json!({ "from_path": dbx_path(from), "to_path": dbx_path(to), "autorename": false }),
+            &Message::new("„{0}“ kopieren").param(remote_name(from)),
+        )
+        .await?;
+        Ok(())
     }
 
     /// All files below a folder in one listing (recursive list_folder).
@@ -534,17 +523,7 @@ impl DropboxConn {
             let mut offset: u64 = 0;
             loop {
                 // Fill one piece (or less at the end of the file).
-                let mut buf = Vec::with_capacity(CHUNK);
-                while buf.len() < CHUNK {
-                    let mut part = vec![0u8; (CHUNK - buf.len()).min(256 * 1024)];
-                    let n = r.read(&mut part).await.map_err(|e| {
-                        AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
-                    })?;
-                    if n == 0 {
-                        break;
-                    }
-                    buf.extend_from_slice(&part[..n]);
-                }
+                let buf = crate::remote::read_piece(&mut r, CHUNK as u64).await?;
                 let last = buf.len() < CHUNK;
                 match (&session, last) {
                     // Small file: one request.

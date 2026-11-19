@@ -62,41 +62,14 @@ export async function uploadNames(serverId: string, localDir: string, remoteDir:
       return { ids: [] as string[], skipped: 0 };
     }
   }
-  const items: Transfer[] = [];
-  let skipped = 0;
-  for (const n of names) {
-    let walk: WalkItem[];
-    try {
-      walk = await backend.localWalk(join(localDir, n));
-    } catch (e) {
-      showError(e);
-      continue;
-    }
-    for (const f of walk) {
-      if (skippedByRules(f.relative, f.size, serverId)) {
-        skipped++;
-        continue;
-      }
-      const target = join(remoteDir, remoteRel(serverId, f.relative));
-      items.push({
-        id: uid('t'),
-        name: basename(f.path),
-        direction: 'up',
-        serverId,
-        folder: relFolder(remoteDir, target),
-        source: f.path,
-        target,
-        size: f.size,
-        done: 0,
-        state: 'queued',
-        manual: true,
-      });
-    }
-  }
-  enqueue(items);
-  if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
-  reportSkipped(skipped, serverId);
-  return { ids: items.map((x) => x.id), skipped };
+  return queueNames(names, {
+    direction: 'up',
+    serverId,
+    walk: (n) => backend.localWalk(join(localDir, n)),
+    walkFailed: showError,
+    targetDir: remoteDir,
+    target: (f) => join(remoteDir, remoteRel(serverId, f.relative)),
+  });
 }
 
 /** Uploads files and folders given as native paths (dropped from the Finder / Explorer). */
@@ -121,79 +94,76 @@ export function remoteRel(serverId: string, rel: string): string {
 }
 
 /** Downloads remote files or folders (names in `remoteDir`) into `localDir`. */
-export async function downloadNames(serverId: string, remoteDir: string, localDir: string, names: string[]) {
-  const items: Transfer[] = [];
-  let skipped = 0;
-  for (const n of names) {
-    let walk: WalkItem[];
-    try {
-      walk = await backend.remoteWalk(serverId, join(remoteDir, n));
-    } catch (e) {
-      const err = toBackendError(e);
-      handleRemoteError(serverId, err);
-      showError(err);
-      continue;
-    }
-    for (const f of walk) {
-      if (skippedByRules(f.relative, f.size, serverId)) {
-        skipped++;
-        continue;
-      }
-      const target = join(localDir, f.localRelative);
-      items.push({
-        id: uid('t'),
-        name: basename(f.path),
-        direction: 'down',
-        serverId,
-        folder: relFolder(localDir, target),
-        source: f.path,
-        target,
-        size: f.size,
-        done: 0,
-        state: 'queued',
-        manual: true,
-      });
-    }
-  }
-  enqueue(items);
-  if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
-  reportSkipped(skipped, serverId);
-  return { ids: items.map((x) => x.id), skipped };
+export function downloadNames(serverId: string, remoteDir: string, localDir: string, names: string[]) {
+  return queueNames(names, {
+    direction: 'down',
+    serverId,
+    walk: (n) => backend.remoteWalk(serverId, join(remoteDir, n)),
+    walkFailed: (e) => remoteFailed(serverId, e),
+    targetDir: localDir,
+    target: (f) => join(localDir, f.localRelative),
+  });
 }
 
 /** Server to server: copies files or folders (names in `fromDir` on one server) into `toDir` on another. */
-export async function crossNames(
-  fromServerId: string,
-  fromDir: string,
-  serverId: string,
-  toDir: string,
+export function crossNames(fromServerId: string, fromDir: string, serverId: string, toDir: string, names: string[]) {
+  return queueNames(names, {
+    direction: 'cross',
+    serverId,
+    sourceServerId: fromServerId,
+    walk: (n) => backend.remoteWalk(fromServerId, join(fromDir, n)),
+    walkFailed: (e) => remoteFailed(fromServerId, e),
+    targetDir: toDir,
+    target: (f) => join(toDir, remoteRel(serverId, f.relative)),
+  });
+}
+
+function remoteFailed(serverId: string, e: unknown) {
+  const err = toBackendError(e);
+  handleRemoteError(serverId, err);
+  showError(err);
+}
+
+/**
+ * Walks each of `names` and queues one transfer per file, leaving out what the rules of the target
+ * server exclude. Returns the queue entries and how many files were left out.
+ */
+async function queueNames(
   names: string[],
+  how: {
+    direction: 'up' | 'down' | 'cross';
+    /** The server the files go to or come from (its rules apply). */
+    serverId: string;
+    sourceServerId?: string;
+    walk: (name: string) => Promise<WalkItem[]>;
+    walkFailed: (e: unknown) => void;
+    targetDir: string;
+    target: (f: WalkItem) => string;
+  },
 ) {
   const items: Transfer[] = [];
   let skipped = 0;
   for (const n of names) {
     let walk: WalkItem[];
     try {
-      walk = await backend.remoteWalk(fromServerId, join(fromDir, n));
+      walk = await how.walk(n);
     } catch (e) {
-      const err = toBackendError(e);
-      handleRemoteError(fromServerId, err);
-      showError(err);
+      how.walkFailed(e);
       continue;
     }
     for (const f of walk) {
-      if (skippedByRules(f.relative, f.size, serverId)) {
+      if (skippedByRules(f.relative, f.size, how.serverId)) {
         skipped++;
         continue;
       }
-      const target = join(toDir, remoteRel(serverId, f.relative));
+      const target = how.target(f);
       items.push({
         id: uid('t'),
         name: basename(f.path),
-        direction: 'cross',
-        sourceServerId: fromServerId,
-        serverId,
-        folder: relFolder(toDir, target),
+        direction: how.direction,
+        ...(how.sourceServerId ? { sourceServerId: how.sourceServerId } : {}),
+        serverId: how.serverId,
+        folder: relFolder(how.targetDir, target),
         source: f.path,
         target,
         size: f.size,
@@ -203,10 +173,10 @@ export async function crossNames(
       });
     }
   }
-  enqueue(items);
+  const queued = enqueue(items);
   if (items.length > 1) showToast($t('{0} Dateien in der Warteschlange.', items.length));
-  reportSkipped(skipped, serverId);
-  return { ids: items.map((x) => x.id), skipped };
+  reportSkipped(skipped, how.serverId);
+  return { ids: queued.map((x) => x.id), skipped };
 }
 
 /**

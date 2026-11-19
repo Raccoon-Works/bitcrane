@@ -1037,23 +1037,21 @@ impl Connection {
 
     /// Creates all missing folders of `path`, optionally with the given permissions.
     pub async fn mkdir_all_with(&self, path: &str, perms: Option<u32>) -> AppResult<()> {
-        let mut current = String::new();
-        for seg in path.split('/').filter(|s| !s.is_empty()) {
-            current.push('/');
-            current.push_str(seg);
-            if !self.exists(&current).await {
-                if let Err(e) = self.sftp.create_dir(current.clone()).await {
-                    // A parallel transfer may have created it in the meantime.
-                    if !self.exists(&current).await {
-                        return Err(e.into());
-                    }
-                } else if let Some(p) = perms {
-                    let attrs = russh_sftp::protocol::FileAttributes { permissions: Some(p), ..Default::default() };
-                    let _ = self.sftp.set_metadata(current.clone(), attrs).await;
+        crate::remote::mkdir_levels(
+            "",
+            path,
+            |p| async move { self.exists(&p).await },
+            |p| async move {
+                self.sftp.create_dir(p.clone()).await?;
+                if let Some(perms) = perms {
+                    // The folder exists; permissions the server refuses do not undo that.
+                    let attrs = russh_sftp::protocol::FileAttributes { permissions: Some(perms), ..Default::default() };
+                    let _ = self.sftp.set_metadata(p, attrs).await;
                 }
-            }
-        }
-        Ok(())
+                Ok(())
+            },
+        )
+        .await
     }
 
     pub async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
@@ -1125,7 +1123,7 @@ impl Connection {
     /// Checksum of a server file as hex: computed on the server when commands
     /// are allowed, otherwise read through this connection.
     pub async fn checksum_with(&self, path: &str, algo: crate::local::Algo) -> AppResult<String> {
-        let quoted = format!("'{}'", path.replace('\'', "'\\''"));
+        let quoted = crate::scp::quote(path);
         for cmd in algo.commands(&quoted) {
             if let Ok((0, out)) = self.exec(&cmd).await {
                 if let Some(hex) = out
@@ -1153,46 +1151,30 @@ impl Connection {
         Ok(crate::local::hex(&h.finalize()))
     }
 
-    /// Copies files or folders into `dest_dir` on the same server. Uses `cp`
-    /// when the server allows commands (fast, the data stays on the server),
-    /// otherwise copies through this connection. Returns the new names.
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
+    /// Copies a file or folder to `to` on the same server. Uses `cp` when the server allows
+    /// commands (fast, the data stays on the server), otherwise copies through this connection.
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        let via_cp = match run_command(
+            &self.handle,
+            &format!("cp -Rp -- {} {}", crate::scp::quote(from), crate::scp::quote(to)),
+            EXEC_LIMIT,
+        )
+        .await
+        {
+            Ok(o) if o.code == 0 => true,
+            // A real cp error (no space, no permission); another exit code means no cp there.
+            Ok(o) if String::from_utf8_lossy(&o.all).trim_start().starts_with("cp:") => {
+                return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.")
+                    .with_detail(String::from_utf8_lossy(&o.all).trim().to_string()));
             }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            let to = remote_join(dest_dir, &name);
-            let quoted = |p: &str| format!("'{}'", p.replace('\'', "'\\''"));
-            let via_cp =
-                match run_command(&self.handle, &format!("cp -Rp -- {} {}", quoted(from), quoted(&to)), EXEC_LIMIT)
-                    .await
-                {
-                    Ok(o) if o.code == 0 => true,
-                    // A real cp error (no space, no permission); another exit code means no cp there.
-                    Ok(o) if String::from_utf8_lossy(&o.all).trim_start().starts_with("cp:") => {
-                        return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.")
-                            .with_detail(String::from_utf8_lossy(&o.all).trim().to_string()));
-                    }
-                    Ok(_) | Err(ExecFailure::Refused(_)) => false,
-                    // cp may still be copying: copying again through this connection would make a second copy.
-                    Err(ExecFailure::Unfinished(e)) => return Err(e),
-                };
-            if !via_cp {
-                Box::pin(self.copy_stream(from, &to)).await?;
-            }
-            taken.insert(name.clone());
-            out.push(name);
+            Ok(_) | Err(ExecFailure::Refused(_)) => false,
+            // cp may still be copying: copying again through this connection would make a second copy.
+            Err(ExecFailure::Unfinished(e)) => return Err(e),
+        };
+        if !via_cp {
+            Box::pin(self.copy_stream(from, to)).await?;
         }
-        Ok(out)
+        Ok(())
     }
 
     /// Copies through this connection (servers that only allow SFTP).

@@ -8,7 +8,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
-use crate::paths::{quoted_name, remote_join, remote_name};
+use crate::paths::{quoted_name, remote_name};
 use crate::ssh::{run_command, Handler, Session};
 use chrono::{Datelike, Local, NaiveDate, TimeZone};
 use russh::client;
@@ -339,27 +339,10 @@ impl ScpConn {
         .await
     }
 
-    /// Copies on the server with `cp`, with "Kopie" names on clashes.
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            self.ok(&format!("cp -Rp -- {} {}", quote(from), quote(&remote_join(dest_dir, &name))), &quoted_name(from))
-                .await?;
-            taken.insert(name.clone());
-            out.push(name);
-        }
-        Ok(out)
+    /// Copies a file or folder to `to` on the server with `cp`.
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        self.ok(&format!("cp -Rp -- {} {}", quote(from), quote(to)), &quoted_name(from)).await?;
+        Ok(())
     }
 
     /// Reads a file from `offset` (`cat`, or `tail -c +N` to start further in).

@@ -4,7 +4,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
-use crate::paths::{quoted_name, remote_join, remote_name};
+use crate::paths::{quoted_name, remote_name};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
 use crate::LockExt;
@@ -330,19 +330,13 @@ impl DavConn {
     }
 
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
-        let mut current = String::new();
-        for seg in path.split('/').filter(|s| !s.is_empty()) {
-            current.push('/');
-            current.push_str(seg);
-            if !self.exists(&current).await {
-                if let Err(e) = self.mkdir(&current).await {
-                    if !self.exists(&current).await {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        Ok(())
+        crate::remote::mkdir_levels(
+            "",
+            path,
+            |p| async move { self.exists(&p).await },
+            |p| async move { self.mkdir(&p).await },
+        )
+        .await
     }
 
     async fn move_or_copy(
@@ -378,33 +372,10 @@ impl DavConn {
         self.move_or_copy(b"MOVE", from, to, true, &Message::new("„{0}“ ersetzen").param(remote_name(to))).await
     }
 
-    /// Server-side copy (WebDAV COPY), with "Kopie" names on clashes.
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            self.move_or_copy(
-                b"COPY",
-                from,
-                &remote_join(dest_dir, &name),
-                false,
-                &Message::new("„{0}“ kopieren").param(remote_name(from)),
-            )
-            .await?;
-            taken.insert(name.clone());
-            out.push(name);
-        }
-        Ok(out)
+    /// Server-side copy of a file or folder to `to` (WebDAV COPY).
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        self.move_or_copy(b"COPY", from, to, false, &Message::new("„{0}“ kopieren").param(remote_name(from))).await?;
+        Ok(())
     }
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
@@ -554,16 +525,8 @@ mod integration {
             let names: Vec<String> =
                 conn.list(&format!("{base}/a b")).await.unwrap().into_iter().map(|e| e.name).collect();
             assert_eq!(names, vec!["über.txt".to_string()]);
-            assert_eq!(
-                conn.copy_within(
-                    std::slice::from_ref(&file),
-                    &format!("{base}/a b"),
-                    &crate::local::NameWords::german()
-                )
-                .await
-                .unwrap(),
-                vec!["über Kopie.txt".to_string()]
-            );
+            conn.copy_to(&file, &format!("{base}/a b/über Kopie.txt")).await.unwrap();
+            assert!(conn.exists(&format!("{base}/a b/über Kopie.txt")).await);
             conn.rename(&file, &format!("{base}/neu.txt")).await.unwrap();
             assert_eq!(conn.walk(&base).await.unwrap().len(), 2);
             assert_eq!(conn.stat(&format!("{base}/fehlt")).await.err().map(|e| e.kind), Some(ErrorKind::NotFound));

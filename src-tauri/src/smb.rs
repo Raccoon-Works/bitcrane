@@ -401,19 +401,15 @@ impl SmbConn {
     }
 
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
-        let Some((share, rest)) = split(path) else { return Ok(()) };
-        let mut current = format!("/{share}");
-        for seg in rest.split('/').filter(|s| !s.is_empty()) {
-            current = remote_join(&current, seg);
-            if !self.exists(&current).await {
-                if let Err(e) = self.mkdir(&current).await {
-                    if !self.exists(&current).await {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        Ok(())
+        // The share itself is never made.
+        let Some((share, _)) = split(path) else { return Ok(()) };
+        crate::remote::mkdir_levels(
+            &format!("/{share}"),
+            path,
+            |p| async move { self.exists(&p).await },
+            |p| async move { self.mkdir(&p).await },
+        )
+        .await
     }
 
     async fn move_to(&self, from: &str, to: &str, replace: bool) -> AppResult<()> {
@@ -571,25 +567,10 @@ impl SmbConn {
         Ok(())
     }
 
-    /// Copies on the server, with "Kopie" names on clashes.
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: HashSet<String> = self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            self.copy_tree(from, &remote_join(dest_dir, &name)).await?;
-            taken.insert(name.clone());
-            out.push(name);
-        }
-        Ok(out)
+    /// Copies a file or folder to `to` on the server.
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        self.copy_tree(from, to).await?;
+        Ok(())
     }
 
     /// Bytes per request, within what the server allows for reads and writes.
@@ -887,12 +868,8 @@ mod integration {
         let mut got = String::new();
         r.read_to_string(&mut got).await.unwrap();
         assert_eq!(got, "welt!");
-        assert_eq!(
-            conn.copy_within(std::slice::from_ref(&file), &format!("{base}/a b"), &crate::local::NameWords::german())
-                .await
-                .unwrap(),
-            vec!["über Kopie.txt".to_string()]
-        );
+        conn.copy_to(&file, &format!("{base}/a b/über Kopie.txt")).await.unwrap();
+        assert!(conn.exists(&format!("{base}/a b/über Kopie.txt")).await);
         assert_eq!(
             conn.rename(&file, &format!("{base}/a b/über Kopie.txt")).await.err().map(|e| e.kind),
             Some(ErrorKind::AlreadyExists)

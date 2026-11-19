@@ -23,6 +23,46 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
+/// Reads up to `size` bytes for one piece of an upload in parts (cloud services, S3); shorter only
+/// at the end of the data.
+pub async fn read_piece(r: &mut (impl tokio::io::AsyncRead + Unpin), size: u64) -> AppResult<Vec<u8>> {
+    use tokio::io::AsyncReadExt;
+    let mut buf = Vec::with_capacity(size.min(64 * 1024 * 1024) as usize);
+    r.take(size)
+        .read_to_end(&mut buf)
+        .await
+        .map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string()))?;
+    Ok(buf)
+}
+
+/// Creates the missing folders of `path` one level at a time, from `start` on ("" or an SMB share
+/// "/share"), for protocols without "make all levels" of their own. A folder that a parallel
+/// transfer made in the meantime counts as made.
+pub async fn mkdir_levels<E, M>(
+    start: &str,
+    path: &str,
+    exists: impl Fn(String) -> E,
+    mkdir: impl Fn(String) -> M,
+) -> AppResult<()>
+where
+    E: Future<Output = bool>,
+    M: Future<Output = AppResult<()>>,
+{
+    let mut current = start.to_string();
+    let rest = path.strip_prefix(start).unwrap_or(path);
+    for seg in rest.split('/').filter(|s| !s.is_empty()) {
+        current = remote_join(&current, seg);
+        if !exists(current.clone()).await {
+            if let Err(e) = mkdir(current.clone()).await {
+                if !exists(current.clone()).await {
+                    return Err(e);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Files below `path` (or `path` itself when it is a file), found by listing folder after
 /// folder, for protocols without a recursive listing of their own. Linked folders are not
 /// entered: a link back up would never end.
@@ -521,38 +561,42 @@ impl Remote {
         }
     }
 
-    /// Copies on the server: `cp` over SSH, COPY over WebDAV, through this
-    /// computer over FTP (FTP has no copy command).
+    /// Copies files or folders into `dest_dir` on the same server, each under a free name ("Kopie"
+    /// on a clash). Returns the new names.
     pub async fn copy_within(
         &self,
         paths: &[String],
         dest_dir: &str,
         words: &crate::local::NameWords,
     ) -> AppResult<Vec<String>> {
-        match self {
-            Remote::Sftp(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::Dav(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::S3(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::Dropbox(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::GDrive(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::OneDrive(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::Smb(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::Scp(c) => c.copy_within(paths, dest_dir, words).await,
-            Remote::Ftp(_) | Remote::Vault(_) => {
-                let mut taken: std::collections::HashSet<String> =
-                    self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-                let mut out = Vec::new();
-                for from in paths {
-                    if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                        return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-                    }
-                    let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-                    Box::pin(self.copy_through(from, &remote_join(dest_dir, &name))).await?;
-                    taken.insert(name.clone());
-                    out.push(name);
-                }
-                Ok(out)
+        let mut taken: std::collections::HashSet<String> =
+            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
+        let mut out = Vec::new();
+        for from in paths {
+            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
+                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
             }
+            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
+            self.copy_to(from, &remote_join(dest_dir, &name)).await?;
+            taken.insert(name.clone());
+            out.push(name);
+        }
+        Ok(out)
+    }
+
+    /// One copy on the server: `cp` over SSH, COPY over WebDAV, the services' own copy, through
+    /// this computer over FTP (FTP has no copy command) and for a vault.
+    async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        match self {
+            Remote::Sftp(c) => c.copy_to(from, to).await,
+            Remote::Dav(c) => c.copy_to(from, to).await,
+            Remote::S3(c) => c.copy_to(from, to).await,
+            Remote::Dropbox(c) => c.copy_to(from, to).await,
+            Remote::GDrive(c) => c.copy_to(from, to).await,
+            Remote::OneDrive(c) => c.copy_to(from, to).await,
+            Remote::Smb(c) => c.copy_to(from, to).await,
+            Remote::Scp(c) => c.copy_to(from, to).await,
+            Remote::Ftp(_) | Remote::Vault(_) => Box::pin(self.copy_through(from, to)).await,
         }
     }
 
@@ -1243,5 +1287,44 @@ mod grep_line_tests {
         assert_eq!(super::split_grep_line("/var/www/a.php:12:echo 'x:1';"), Some(("/var/www/a.php", "12:echo 'x:1';")));
         assert_eq!(super::split_grep_line("/a:b/c.txt:3:hi"), Some(("/a:b/c.txt", "3:hi")));
         assert_eq!(super::split_grep_line("kein treffer"), None);
+    }
+}
+
+#[cfg(test)]
+mod mkdir_tests {
+    use super::mkdir_levels;
+    use crate::error::AppError;
+    use std::collections::BTreeSet;
+    use std::sync::Mutex;
+
+    #[tokio::test]
+    async fn makes_only_the_missing_levels_below_the_start() {
+        let made = Mutex::new(BTreeSet::from(["/share".to_string(), "/share/a".to_string()]));
+        let exists = |p: String| {
+            let found = made.lock().unwrap().contains(&p);
+            async move { found }
+        };
+        let mkdir = |p: String| {
+            made.lock().unwrap().insert(p);
+            async { Ok(()) }
+        };
+        mkdir_levels("/share", "/share/a/b/c", exists, mkdir).await.unwrap();
+        let all: Vec<String> = made.lock().unwrap().iter().cloned().collect();
+        assert_eq!(all, ["/share", "/share/a", "/share/a/b", "/share/a/b/c"]);
+    }
+
+    #[tokio::test]
+    async fn a_folder_made_meanwhile_counts_and_other_failures_do_not() {
+        let refused = || async { Err(AppError::other("nein")) };
+        // Made by someone else between the check and the attempt: the second check finds it.
+        let seen = Mutex::new(0);
+        let exists = |_: String| {
+            let mut n = seen.lock().unwrap();
+            *n += 1;
+            let found = *n % 2 == 0;
+            async move { found }
+        };
+        assert!(mkdir_levels("", "/x/y", exists, |_| refused()).await.is_ok());
+        assert!(mkdir_levels("", "/x", |_| async { false }, |_| refused()).await.is_err());
     }
 }

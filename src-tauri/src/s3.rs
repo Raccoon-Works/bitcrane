@@ -16,7 +16,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
-use crate::paths::{remote_join, remote_name, remote_parent};
+use crate::paths::{remote_name, remote_parent};
 use crate::proxy::ProxyParams;
 use crate::ssh::KnownHosts;
 use futures_util::TryStreamExt;
@@ -25,7 +25,7 @@ use reqwest::{Method, StatusCode};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 // Deliberately without Debug: it holds secrets that must never end up in a log.
 #[derive(Clone)]
@@ -666,42 +666,26 @@ impl S3Conn {
         self.move_path(from, to).await
     }
 
-    pub async fn copy_within(
-        &self,
-        paths: &[String],
-        dest_dir: &str,
-        words: &crate::local::NameWords,
-    ) -> AppResult<Vec<String>> {
-        let mut taken: std::collections::HashSet<String> =
-            self.list(dest_dir).await?.into_iter().map(|e| e.name).collect();
-        let mut out = Vec::new();
-        for from in paths {
-            if dest_dir == from.as_str() || dest_dir.starts_with(&format!("{from}/")) {
-                return Err(AppError::other("Ein Ordner kann nicht in sich selbst kopiert werden."));
-            }
-            let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
-            let to = remote_join(dest_dir, &name);
-            let (fb, fk) = self.split(from);
-            let (tb, tk) = self.split(&to);
-            let (Some(fb), Some(tb)) = (fb, tb) else {
-                return Err(AppError::other("Buckets lassen sich nicht kopieren."));
-            };
-            if fb != tb {
-                return Err(AppError::other("Kopieren auf dem Server geht nur innerhalb eines Buckets."));
-            }
-            if self.stat(from).await?.kind == EntryKind::File {
-                self.copy_key(&fb, &fk, &tk).await?;
-            } else {
-                let (fp, tp) = (Self::dir_prefix(&fk), Self::dir_prefix(&tk));
-                for (k, _, _) in self.list_all(&fb, &fp).await? {
-                    let rest = k.strip_prefix(&fp).unwrap_or(&k);
-                    self.copy_key(&fb, &k, &format!("{tp}{rest}")).await?;
-                }
-            }
-            taken.insert(name.clone());
-            out.push(name);
+    /// Copies a file or folder (all keys below it) to `to`, inside one bucket.
+    pub async fn copy_to(&self, from: &str, to: &str) -> AppResult<()> {
+        let (fb, fk) = self.split(from);
+        let (tb, tk) = self.split(to);
+        let (Some(fb), Some(tb)) = (fb, tb) else {
+            return Err(AppError::other("Buckets lassen sich nicht kopieren."));
+        };
+        if fb != tb {
+            return Err(AppError::other("Kopieren auf dem Server geht nur innerhalb eines Buckets."));
         }
-        Ok(out)
+        if self.stat(from).await?.kind == EntryKind::File {
+            self.copy_key(&fb, &fk, &tk).await?;
+        } else {
+            let (fp, tp) = (Self::dir_prefix(&fk), Self::dir_prefix(&tk));
+            for (k, _, _) in self.list_all(&fb, &fp).await? {
+                let rest = k.strip_prefix(&fp).unwrap_or(&k);
+                self.copy_key(&fb, &k, &format!("{tp}{rest}")).await?;
+            }
+        }
+        Ok(())
     }
 
     pub async fn walk(&self, path: &str) -> AppResult<Vec<WalkItem>> {
@@ -768,14 +752,6 @@ impl S3Conn {
         (Box::new(w), task)
     }
 
-    async fn read_part(r: &mut (impl AsyncRead + Unpin), size: u64) -> AppResult<Vec<u8>> {
-        let mut buf = Vec::with_capacity(size.min(64 * 1024 * 1024) as usize);
-        (&mut *r).take(size).read_to_end(&mut buf).await.map_err(|e| {
-            AppError::new(ErrorKind::ConnectionLost, "Hochladen abgebrochen.").with_detail(e.to_string())
-        })?;
-        Ok(buf)
-    }
-
     async fn upload(
         self: &Arc<Self>,
         mut r: tokio::io::DuplexStream,
@@ -788,7 +764,7 @@ impl S3Conn {
         let what = Message::new("„{0}“ schreiben").param(remote_name(path));
         let meta: Vec<(String, String)> =
             mtime.map(|m| vec![("x-amz-meta-mtime".to_string(), m.to_string())]).unwrap_or_default();
-        let first = Self::read_part(&mut r, part_size).await?;
+        let first = crate::remote::read_piece(&mut r, part_size).await?;
         if (first.len() as u64) < part_size {
             // Everything fits into one request.
             let mut req = self.req(Method::PUT, Some(&bucket), &key);
@@ -848,7 +824,7 @@ impl S3Conn {
                 }
                 let etag = resp.headers().get("etag").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
                 etags.push(etag);
-                part = Self::read_part(&mut r, part_size).await?;
+                part = crate::remote::read_piece(&mut r, part_size).await?;
                 if part.is_empty() {
                     break;
                 }
@@ -1026,7 +1002,7 @@ mod tests {
 #[cfg(test)]
 mod integration {
     use super::*;
-    use tokio::io::AsyncWriteExt;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test]
     #[ignore = "needs a test server: BITCRANE_TEST_S3"]
@@ -1080,10 +1056,8 @@ mod integration {
         conn.reader("/a b/gross.bin", 0).await.unwrap().read_to_end(&mut back).await.unwrap();
         assert!(back == big, "multipart content");
         // Copy, rename (folder), walk, remove.
-        assert_eq!(
-            conn.copy_within(&[file.to_string()], "/a b", &crate::local::NameWords::german()).await.unwrap(),
-            vec!["über Kopie.txt".to_string()]
-        );
+        conn.copy_to(file, "/a b/über Kopie.txt").await.unwrap();
+        assert!(conn.exists("/a b/über Kopie.txt").await);
         conn.rename("/a b", "/neu").await.unwrap();
         assert!(!conn.exists("/a b").await);
         assert_eq!(conn.walk("/neu").await.unwrap().len(), 3);

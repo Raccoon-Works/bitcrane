@@ -651,6 +651,7 @@ impl Session {
             .map(|_| ())
     }
 
+    /// As `remote::mkdir_levels`, written out here: the steps run on this one session (`&mut self`).
     async fn mkdir_all(&mut self, path: &str) -> AppResult<()> {
         let mut current = String::new();
         for seg in path.split('/').filter(|s| !s.is_empty()) {
