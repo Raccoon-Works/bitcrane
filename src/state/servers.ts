@@ -11,7 +11,8 @@ import type { AppState } from './appState';
 import { openServer, openServerIn } from './tabs';
 import { openDialog } from './panels';
 import { updateSettings } from './settings';
-import { closePaneServer, simulateLocalChange } from './watches';
+import { simulateLocalChange } from './watches';
+import { closePaneServer } from './serverConnections';
 import { normalizeSshAddress, splitAddress } from '../util/serverAddress';
 import { isSftp } from '../util/protocols';
 

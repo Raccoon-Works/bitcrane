@@ -63,7 +63,7 @@ import {
   LIVE,
   pasteClipboard,
   setState,
-  startSimulation,
+  startApp,
   useStore,
   currentZoom,
 } from './state/store';
@@ -368,7 +368,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    startSimulation();
+    startApp();
     if (LIVE) {
       void import('./state/shell').then((m) => m.startShell());
       void import('./util/dragDrop').then((m) => m.startNativeDrop());

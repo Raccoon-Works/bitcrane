@@ -26,5 +26,7 @@ export * from './transfers';
 export * from './watches';
 export * from './watchTemplates';
 export * from './servers';
+export * from './serverConnections';
 export * from './settings';
+export * from './rules';
 export * from './simulation';

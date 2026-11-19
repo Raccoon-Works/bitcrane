@@ -3,7 +3,7 @@
  */
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Watch, type Transfer } from '../../backend/types';
-import { watchExcludes } from '../tabs';
+import { watchExcludes } from '../rules';
 import { setState, uid, getState, showToast } from '../core';
 import type { AppState, ServerDeletes } from '../appState';
 import { showError } from '../errors';

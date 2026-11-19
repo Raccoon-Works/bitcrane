@@ -4,7 +4,7 @@
  */
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { getState, showToast, uid, serverById, subscribeStore, setState } from '../core';
-import { ruleFor } from '../tabs';
+import { ruleFor } from '../rules';
 import { isExcluded } from '../syncPlan';
 import { addLog } from '../log';
 import { $t } from '../../i18n';

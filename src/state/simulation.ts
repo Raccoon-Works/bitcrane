@@ -388,8 +388,12 @@ export function demoWalk(side: 'local' | 'remote', serverId: string, dir: string
 
 let started = false;
 
-/** Starts the simulation timer once; in the app, the live backend instead. */
-export function startSimulation() {
+/**
+ * Starts what runs in the background: in the app the live backend (Rust core, events), in the
+ * browser prototype the simulation timer and its log lines. Both follow the system's light or
+ * dark mode and take settings sent by the website that embeds the demo.
+ */
+export function startApp() {
   if (started) return;
   started = true;
   if (LIVE) live.startLive();
