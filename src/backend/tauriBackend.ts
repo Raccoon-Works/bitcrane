@@ -18,17 +18,28 @@ const words = { copy: $t('Kopie'), archive: $t('Archiv') };
 
 const progressHandlers = new Map<string, (done: number, total: number) => void>();
 const watchHandlers = new Map<string, (b: WatchBatch) => void>();
-let listening = false;
+let listening: Promise<void> | undefined;
 
-async function ensureListeners() {
-  if (listening) return;
-  listening = true;
-  await listen<{ id: string; done: number; total: number }>('transfer-progress', (e) => {
-    progressHandlers.get(e.payload.id)?.(e.payload.done, e.payload.total);
-  });
-  await listen<WatchBatch>('watch-batch', (e) => {
-    watchHandlers.get(e.payload.watchId)?.(e.payload);
-  });
+/**
+ * Registers the event listeners once. Every caller waits until both are in place, so no early
+ * progress event is missed; a failed registration is tried again by the next caller.
+ */
+function ensureListeners(): Promise<void> {
+  listening ??= Promise.all([
+    listen<{ id: string; done: number; total: number }>('transfer-progress', (e) => {
+      progressHandlers.get(e.payload.id)?.(e.payload.done, e.payload.total);
+    }),
+    listen<WatchBatch>('watch-batch', (e) => {
+      watchHandlers.get(e.payload.watchId)?.(e.payload);
+    }),
+  ]).then(
+    () => undefined,
+    (e: unknown) => {
+      listening = undefined;
+      throw e;
+    },
+  );
+  return listening;
 }
 
 export const tauriBackend: Backend = {

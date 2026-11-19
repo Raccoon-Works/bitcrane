@@ -254,8 +254,18 @@ const active = new Set<string>();
 const cancelling = new Set<string>();
 /** Transfers that already passed the "server copy is newer" / "exists" check. */
 export const forcedLive = new Set<string>();
-/** Watches whose post-upload command runs once their batch is done. */
-export const pendingCommand = new Set<string>();
+/**
+ * Watches whose post-upload command runs once their batch is done, with the uploads of that batch:
+ * only those decide, so an old failed upload still in the list does not hold the command back.
+ */
+const pendingCommand = new Map<string, Set<string>>();
+
+/** Queues the uploads of a watch and runs its command once they are through. */
+export function enqueueForCommand(watchId: string, items: Transfer[]) {
+  const ids = pendingCommand.get(watchId) ?? new Set<string>();
+  enqueue(items).forEach((t) => ids.add(t.id));
+  pendingCommand.set(watchId, ids);
+}
 let bytesThisSecond = 0;
 const lastDone = new Map<string, number>();
 
@@ -365,11 +375,21 @@ export function pump() {
       const max = serverById(id, s)?.maxTransfers;
       return !!max && (perServer.get(id) ?? 0) >= max;
     };
+    // A file changed again while its upload runs is queued anew; it starts once that upload is
+    // through, as both would write the same temporary file.
+    const target = (t: Transfer) => `${t.direction === 'down' ? '' : t.serverId}\u0000${t.target}`;
+    const busyTargets = new Set(
+      [...active].flatMap((id) => {
+        const t = s.transfers.find((x) => x.id === id);
+        return t && t.direction !== 'command' ? [target(t)] : [];
+      }),
+    );
     for (const tr of s.transfers) {
       if (slots <= 0) break;
       if (tr.state !== 'queued' || s.offline[tr.serverId] || (tr.sourceServerId && s.offline[tr.sourceServerId]))
         continue;
       if (full(tr.serverId) || (tr.sourceServerId && full(tr.sourceServerId))) continue;
+      if (tr.direction !== 'command' && busyTargets.has(target(tr))) continue;
       // Server to server needs both connections.
       const needed = tr.sourceServerId ? [tr.serverId, tr.sourceServerId] : [tr.serverId];
       const missing = needed.filter((id) => !connected.has(id));
@@ -378,6 +398,7 @@ export function pump() {
         continue;
       }
       slots--;
+      if (tr.direction !== 'command') busyTargets.add(target(tr));
       count(tr.serverId);
       if (tr.sourceServerId) count(tr.sourceServerId);
       void start(tr);
@@ -712,16 +733,26 @@ function afterTransfer(tr: Transfer) {
       ),
     }));
   }
-  const batch = s.transfers.filter((x) => x.watchId === w.id && x.direction === 'up');
+  const ids = pendingCommand.get(w.id);
+  if (!ids) return;
+  // Uploads removed from the list count as through.
+  const batch = s.transfers.filter((x) => ids.has(x.id));
   const busy = batch.some((x) => x.state === 'running' || x.state === 'queued' || x.state === 'paused');
-  if (!busy && pendingCommand.has(w.id)) {
+  if (!busy) {
     pendingCommand.delete(w.id);
-    const hadError = batch.some((x) => x.state === 'error');
-    if (w.options.commandEnabled && w.options.command.trim() && !hadError) {
+    const failed = batch.filter((x) => x.state === 'error').length;
+    const command = w.options.commandEnabled ? w.options.command.trim() : '';
+    if (command && failed) {
+      addLog(
+        'warn',
+        $t('Befehl nach dem Hochladen übersprungen, {0} Dateien sind fehlgeschlagen: {1}', failed, command),
+        w.serverId,
+      );
+    } else if (command) {
       enqueue([
         {
           id: uid('t'),
-          name: w.options.command.trim(),
+          name: command,
           direction: 'command',
           serverId: w.serverId,
           folder: '',

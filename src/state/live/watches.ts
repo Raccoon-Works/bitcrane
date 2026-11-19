@@ -15,7 +15,7 @@ import { isExcluded } from '../syncPlan';
 import { connected, connectNow, autoConnect, timeTolerance, connectServer } from './connections';
 import { invalidate, bump } from './listing';
 import { toBackendError, type WalkItem, type WatchBatch, type WatchedFile } from '../../backend/api';
-import { pendingCommand } from './transfers';
+import { enqueueForCommand } from './transfers';
 import { enqueue } from '../transfers';
 
 /** Watchers running in the backend: watch id -> configuration signature. */
@@ -166,8 +166,7 @@ async function onWatchBatch(b: WatchBatch) {
         : $t('{0} Änderungen erkannt', items.length),
       w.serverId,
     );
-    pendingCommand.add(w.id);
-    enqueue(items);
+    enqueueForCommand(w.id, items);
   }
   const removed = b.removed.filter((f) => inSelection(w, relOf(w, f.path)));
   if (w.options.mirrorDeletes && removed.length && connected.has(w.serverId)) {
@@ -244,8 +243,7 @@ export async function initialSync(w: Watch, manual = false) {
       if (!r || f.mtime - r.mtime > timeTolerance(w.serverId)) items.push(watchTransfer(w, file, f.size, r?.path));
     }
     if (items.length) {
-      pendingCommand.add(w.id);
-      enqueue(items);
+      enqueueForCommand(w.id, items);
       showToast(
         items.length === 1
           ? $t('„{0}“: 1 Datei ist neuer als auf dem Server und wird hochgeladen.', w.name)

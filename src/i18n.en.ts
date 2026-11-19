@@ -1871,6 +1871,8 @@ export const EN: Record<string, string> = {
   'Die Datei ist in Latin-1 gespeichert; „{0}“ lässt sich darin nicht speichern.':
     'The file is stored in Latin-1; “{0}” cannot be saved in it.',
   'LF/CRLF gemischt': 'LF/CRLF mixed',
+  'Befehl nach dem Hochladen übersprungen, {0} Dateien sind fehlgeschlagen: {1}':
+    'Command after uploading skipped, {0} files failed: {1}',
   'Der Befehl lief nach {0} Minuten noch; Bitcrane wartet nicht länger auf ihn.':
     'The command was still running after {0} minutes; Bitcrane stopped waiting for it.',
   'Die Verbindung endete, bevor der Befehl fertig war.': 'The connection ended before the command finished.',

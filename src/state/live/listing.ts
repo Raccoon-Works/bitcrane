@@ -62,11 +62,17 @@ export function requestListing(side: PaneSide, serverId: string, path: string) {
 async function load(side: PaneSide, serverId: string, path: string) {
   const k = key(side, serverId, path);
   const prev = listings.get(k);
-  listings.set(k, { entries: prev?.entries ?? [], loading: true });
+  // This read's own entry: only while it is still the one in the cache does the answer go in. A
+  // folder invalidated meanwhile (a file deleted, the server disconnected) was read again or
+  // dropped, and the older answer must not come back over it.
+  const mine: Listing = { entries: prev?.entries ?? [], loading: true };
+  listings.set(k, mine);
   bump();
+  const current = () => listings.get(k) === mine;
   try {
     const t0 = Date.now();
     const entries = side === 'local' ? await backend.localList(path) : await backend.remoteList(serverId, path);
+    if (!current()) return;
     listings.set(k, { entries, loading: false });
     if (side === 'remote')
       addLog(
@@ -76,10 +82,11 @@ async function load(side: PaneSide, serverId: string, path: string) {
       );
   } catch (e) {
     const err = toBackendError(e);
+    if (side === 'remote') handleRemoteError(serverId, err);
+    if (!current()) return;
     // Same wording as the error messages: what happened, then what to do.
     const { text, hint } = explainError(err);
     listings.set(k, { entries: [], loading: false, error: text, hint, missing: err.kind === 'notFound' });
-    if (side === 'remote') handleRemoteError(serverId, err);
   }
   bump();
 }

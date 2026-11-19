@@ -597,29 +597,39 @@ export function handleRemoteError(serverId: string, err: BackendError) {
   if (err.kind === 'connectionLost' || err.kind === 'notConnected') markOffline(serverId);
 }
 
-/** Background reconnect with growing pauses (5 s, 10 s, … up to 60 s). */
+let retrying = false;
+
+/**
+ * Background reconnect with growing pauses (5 s, 10 s, … up to 60 s). Runs once at a time (it is
+ * called every second), and checks each server again right before connecting: an earlier server
+ * may have taken long, and connecting a server that is back would cut its running transfers.
+ */
 export async function retryOffline(now: number) {
-  const s = getState();
-  for (const [id, info] of Object.entries(s.offline)) {
-    if (now < info.nextRetry || connecting.has(id)) continue;
-    const ok = await connectServer(id, { silent: true });
-    if (!ok) {
-      setState((st) =>
-        st.offline[id]
-          ? {
-              offline: {
-                ...st.offline,
-                [id]: {
-                  attempt: info.attempt + 1,
-                  nextRetry: Date.now() + Math.min(60, 5 * (info.attempt + 1)) * 1000,
-                },
-              },
-            }
-          : {},
-      );
-    } else {
-      for (const k of [...listings.keys()]) if (k.startsWith(`R|${id}|`)) listings.delete(k);
-      bump();
-    }
+  if (retrying) return;
+  retrying = true;
+  try {
+    for (const id of Object.keys(getState().offline)) await retryOne(id, now);
+  } finally {
+    retrying = false;
   }
+}
+
+async function retryOne(id: string, now: number) {
+  const info = getState().offline[id];
+  if (!info || now < info.nextRetry || connecting.has(id) || connected.has(id)) return;
+  if (await connectServer(id, { silent: true })) {
+    for (const k of [...listings.keys()]) if (k.startsWith(`R|${id}|`)) listings.delete(k);
+    bump();
+    return;
+  }
+  setState((st) =>
+    st.offline[id]
+      ? {
+          offline: {
+            ...st.offline,
+            [id]: { attempt: info.attempt + 1, nextRetry: Date.now() + Math.min(60, 5 * (info.attempt + 1)) * 1000 },
+          },
+        }
+      : {},
+  );
 }

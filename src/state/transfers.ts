@@ -26,11 +26,18 @@ import { updateSettings } from './settings';
 import { openDialog } from './panels';
 import { pushUndo } from './undo';
 import { relFolder } from '../util/paths';
+import { mergeIntoQueue } from './queue';
 
-/** Adds transfers to the end of the queue. */
-export function enqueue(items: Transfer[]) {
-  if (!items.length) return;
-  setState((s) => ({ transfers: [...s.transfers, ...items] }));
+/**
+ * Adds transfers to the end of the queue, without a second entry for a file already waiting for the
+ * same target (queue.ts): a scheduled comparison, a watch and its start comparison can all find the
+ * same changed file. Returns the queue entries that stand for `items`.
+ */
+export function enqueue(items: Transfer[]): Transfer[] {
+  if (!items.length) return [];
+  const { added, standing } = mergeIntoQueue(getState().transfers, items);
+  if (added.length) setState((s) => ({ transfers: [...s.transfers, ...added] }));
+  return standing;
 }
 
 /**

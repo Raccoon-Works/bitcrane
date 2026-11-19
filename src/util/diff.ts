@@ -1,6 +1,6 @@
 /**
- * Line-based difference of two texts (Myers algorithm), used by the
- * "Unterschiede zeigen" view of the conflict dialog.
+ * Line-based difference of two texts (Myers algorithm), used by "Unterschiede
+ * zeigen" in the conflict dialog and by "Dateien vergleichen" (DiffDialog.tsx).
  */
 
 type DiffOp = 'same' | 'add' | 'del';
@@ -28,19 +28,68 @@ function splitLines(text: string): string[] {
   return lines;
 }
 
+/**
+ * Most edits the exact comparison looks for. Its memory grows with the square of the edits (about
+ * 16 MB here); beyond it the changed middle shows as removed and added as a whole, which is still
+ * correct, only not the shortest way.
+ */
+const MAX_EDITS = 2000;
+
 /** Computes the line operations that turn `oldText` into `newText`. */
 export function diffLines(oldText: string, newText: string): DiffLine[] {
   const a = splitLines(oldText);
   const b = splitLines(newText);
+  // Equal lines at the start and the end need no search.
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let end = 0;
+  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  const same = (from: number, to: number): DiffLine[] =>
+    a
+      .slice(from, to)
+      .map((text, i) => ({ op: 'same', text, oldNo: from + i + 1, newNo: from + i + 1 + b.length - a.length }));
+  const head = a.slice(0, start).map((text, i): DiffLine => ({ op: 'same', text, oldNo: i + 1, newNo: i + 1 }));
+  const tail = same(a.length - end, a.length);
+  const middle =
+    myers(a.slice(start, a.length - end), b.slice(start, b.length - end)) ??
+    wholesale(a.length - start - end, b.length - start - end);
+  return [
+    ...head,
+    ...middle.map(({ op, i, j }): DiffLine => {
+      if (op === 'add') return { op, text: b[start + j], newNo: start + j + 1 };
+      if (op === 'del') return { op, text: a[start + i], oldNo: start + i + 1 };
+      return { op, text: a[start + i], oldNo: start + i + 1, newNo: start + j + 1 };
+    }),
+    ...tail,
+  ];
+}
+
+/** One step of an edit script: index `i` in the old lines, `j` in the new ones. */
+interface Step {
+  op: DiffOp;
+  i: number;
+  j: number;
+}
+
+/** Everything old removed, then everything new added. */
+function wholesale(n: number, m: number): Step[] {
+  return [
+    ...Array.from({ length: n }, (_, i): Step => ({ op: 'del', i, j: 0 })),
+    ...Array.from({ length: m }, (_, j): Step => ({ op: 'add', i: 0, j })),
+  ];
+}
+
+/** Shortest edit script (Myers); null when it needs more than MAX_EDITS edits. */
+function myers(a: string[], b: string[]): Step[] | null {
   const n = a.length;
   const m = b.length;
-  const max = n + m;
-  const offset = max;
-  const v = new Int32Array(2 * max + 2);
+  const max = Math.min(n + m, MAX_EDITS);
+  const offset = max + 1;
+  const v = new Int32Array(2 * max + 3);
+  // Only the diagonals step d can reach are kept for the way back (-d-1 … d+1).
   const trace: Int32Array[] = [];
-  let found = false;
-  for (let d = 0; d <= max && !found; d++) {
-    trace.push(v.slice());
+  for (let d = 0; d <= max; d++) {
+    trace.push(v.slice(offset - d - 1, offset + d + 2));
     for (let k = -d; k <= d; k += 2) {
       let x =
         k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
@@ -50,30 +99,32 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
         y++;
       }
       v[offset + k] = x;
-      if (x >= n && y >= m) {
-        found = true;
-        break;
-      }
+      if (x >= n && y >= m) return backtrack(trace, n, m);
     }
   }
-  // Walk the trace backwards to recover the edit script.
-  const out: DiffLine[] = [];
+  return null;
+}
+
+/** Walks the kept diagonals backwards to the edit script. */
+function backtrack(trace: Int32Array[], n: number, m: number): Step[] {
+  const out: Step[] = [];
   let x = n;
   let y = m;
   for (let d = trace.length - 1; d >= 0; d--) {
     const vd = trace[d];
+    const at = (k: number) => vd[k + d + 1];
     const k = x - y;
-    const prevK = k === -d || (k !== d && vd[offset + k - 1] < vd[offset + k + 1]) ? k + 1 : k - 1;
-    const prevX = vd[offset + prevK];
+    const prevK = k === -d || (k !== d && at(k - 1) < at(k + 1)) ? k + 1 : k - 1;
+    const prevX = at(prevK);
     const prevY = prevX - prevK;
     while (x > prevX && y > prevY) {
-      out.push({ op: 'same', text: a[x - 1], oldNo: x, newNo: y });
+      out.push({ op: 'same', i: x - 1, j: y - 1 });
       x--;
       y--;
     }
     if (d > 0) {
-      if (x === prevX) out.push({ op: 'add', text: b[y - 1], newNo: y });
-      else out.push({ op: 'del', text: a[x - 1], oldNo: x });
+      if (x === prevX) out.push({ op: 'add', i: x, j: y - 1 });
+      else out.push({ op: 'del', i: x - 1, j: y });
     }
     x = prevX;
     y = prevY;
