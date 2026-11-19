@@ -33,6 +33,7 @@ import { editPath } from './fileOps';
  * and new files and folders can be taken back with ⌘Z / Ctrl+Z, the last one
  * first. Deleting is not on the list: on this computer it goes to the trash
  * (put back from there), on a server it is final and asked for beforehand.
+ * So undoing a new folder or file removes it only while it is still empty.
  */
 interface UndoEntry {
   label: string;

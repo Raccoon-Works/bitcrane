@@ -49,6 +49,7 @@ export {
   openLocal,
   openUrl,
   removeEntries,
+  removeIfEmpty,
   renameEntry,
   revealLocal,
   serverTrash,

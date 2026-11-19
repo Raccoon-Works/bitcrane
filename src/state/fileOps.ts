@@ -99,7 +99,7 @@ export function newFolder(side: PaneSide = getState().focusSide) {
   if (LIVE) {
     const dir = panePath(side);
     void live.makeFolder(...loc, dir, name).then((ok) => {
-      if (ok) pushUndo({ label: $t('Neuer Ordner „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
+      if (ok) pushUndo({ label: $t('Neuer Ordner „{0}“', name), run: () => live.removeIfEmpty(...loc, dir, name) });
       if (ok && getState().activeTabId === t.id && panePath(side) === dir)
         setState((s) => ({
           focusSide: side,
@@ -160,7 +160,7 @@ export function newFile(side: PaneSide = getState().focusSide) {
   setState({ contextMenu: null });
   if (LIVE) {
     void live.makeFile(...loc, dir, name).then((ok) => {
-      if (ok) pushUndo({ label: $t('Neue Datei „{0}“', name), run: () => live.removeEntries(...loc, dir, [name]) });
+      if (ok) pushUndo({ label: $t('Neue Datei „{0}“', name), run: () => live.removeIfEmpty(...loc, dir, name) });
       if (ok && getState().activeTabId === t.id && panePath(side) === dir) select();
     });
     return;

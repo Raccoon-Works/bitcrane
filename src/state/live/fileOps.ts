@@ -154,6 +154,29 @@ export function removeEntries(side: PaneSide, serverId: string, dir: string, nam
   });
 }
 
+/**
+ * Undo of "Neuer Ordner" and "Neue Datei": removes the entry only while it is still empty. What was
+ * put into it since is never taken away by undo (on a server deleting is final).
+ */
+export async function removeIfEmpty(side: PaneSide, serverId: string, dir: string, name: string): Promise<boolean> {
+  const path = join(dir, name);
+  try {
+    const entry = side === 'local' ? await backend.localStat(path) : await backend.remoteStat(serverId, path);
+    const empty =
+      entry.kind === 'dir'
+        ? (side === 'local' ? await backend.localList(path) : await backend.remoteList(serverId, path)).length === 0
+        : entry.size === 0;
+    if (!empty) {
+      showToast($t('„{0}“ ist nicht mehr leer und bleibt erhalten.', name));
+      return false;
+    }
+  } catch {
+    showToast($t('„{0}“ gibt es nicht mehr.', name));
+    return false;
+  }
+  return removeEntries(side, serverId, dir, [name]);
+}
+
 const copiedText = (names: string[]) =>
   names.length === 1 ? $t('Kopiert als „{0}“.', names[0]) : $t('{0} Objekte kopiert.', names.length);
 

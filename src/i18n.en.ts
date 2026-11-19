@@ -1014,6 +1014,8 @@ export const EN: Record<string, string> = {
   'Auf diesem Computer im Ordner der Überwachung „{0}“ gelöscht. Auf dem Server „{1}“ lässt sich das Löschen nicht rückgängig machen.':
     'Deleted on this computer in the folder of the watch “{0}”. On the server “{1}” deleting cannot be undone.',
   'Auf dem Server löschen': 'Delete on the server',
+  '„{0}“ ist nicht mehr leer und bleibt erhalten.': '“{0}” is no longer empty and is kept.',
+  '„{0}“ gibt es nicht mehr.': '“{0}” no longer exists.',
   'Beobachtet den Ordner wieder. Mit „Beim Start abgleichen“ wird hochgeladen, was sich inzwischen geändert hat.':
     'Watches the folder again. With “Compare on start” whatever changed in the meantime is uploaded.',
   'Lädt nichts mehr hoch, bis du fortsetzt. Die Einstellungen bleiben erhalten.':
