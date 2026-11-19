@@ -20,7 +20,7 @@ import type {
 import type { Sealed } from '../backend/api';
 import type { Lang } from '../i18n';
 import type { CompareRef } from './fileOps';
-import type { SyncBase } from './sync';
+import type { HeldServer, SyncBase } from './syncMerge';
 import type { Snippet, TermSession, TerminalSettings } from './terminal';
 import type { UpdateState } from './updates';
 
@@ -70,6 +70,8 @@ export type DialogState =
   | { type: 'log' }
   /** "Auch auf dem Server löschen?" for the first entry of `serverDeletes`. */
   | { type: 'serverDeletes' }
+  /** Changes from the sync to how servers are reached (`syncReview`). */
+  | { type: 'syncReview' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
   | { type: 'selectMask'; side: PaneSide; mode?: 'add' | 'remove' }
@@ -561,6 +563,8 @@ export interface AppState {
   expanded: Record<PaneSide, string[]>;
   /** Server copies of files deleted on this computer, waiting for "Auch auf dem Server löschen?". */
   serverDeletes: ServerDeletes[];
+  /** Servers the sync took from the other computer whose way of connecting changed; wait for a yes. */
+  syncReview: HeldServer[];
 }
 
 /** Server files of one watch that are deleted only once the user agrees. */

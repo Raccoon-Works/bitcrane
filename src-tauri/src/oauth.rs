@@ -187,8 +187,10 @@ pub async fn token_request(client: &reqwest::Client, url: &str, form: &[(&str, &
         return Err(AppError::new(kind, "Die Anmeldung beim Dienst ist nicht mehr gültig. Bitte neu anmelden.")
             .with_detail(format!("{status}: {text}")));
     }
+    // Only the parser's message goes into the detail: a successful answer carries the tokens, and the
+    // detail is shown and can be written to the log file.
     serde_json::from_str(&text)
-        .map_err(|e| AppError::other("Unerwartete Antwort des Anmeldedienstes.").with_detail(format!("{e}: {text}")))
+        .map_err(|e| AppError::other("Unerwartete Antwort des Anmeldedienstes.").with_detail(e.to_string()))
 }
 
 /// HTTP client for the cloud services (public certificates only).

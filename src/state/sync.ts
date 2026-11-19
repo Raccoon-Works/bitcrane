@@ -15,6 +15,10 @@
  * Machine-specific things stay local: folder watches, the local start folder
  * of a server, places of this computer, window sizes, workspaces.
  *
+ * Changes to how a server is reached wait for the user's yes (syncMerge.ts
+ * heldForReview, dialog "syncReview"): anyone who can write to the cloud
+ * folder could otherwise lead a stored password elsewhere.
+ *
  * Passwords travel only when the user sets a sync password (the same on every
  * computer); the core then encrypts them (AES-GCM, see src-tauri/src/secrets.rs),
  * and they never pass through the interface. The sync password itself stays in
@@ -27,6 +31,19 @@ import { showError } from './errors';
 import { addLog } from './log';
 import { getState, LIVE, setState, showToast, subscribeStore, type Settings } from './store';
 import { toBackendError, type Sealed } from '../backend/api';
+import {
+  hashServer,
+  heldForReview,
+  isServerEntry,
+  mergeServers,
+  pick,
+  sharedServer,
+  stable,
+  type HeldServer,
+  type SyncBase,
+} from './syncMerge';
+
+export type { SyncBase } from './syncMerge';
 
 /** Settings that are the same on every computer. */
 const SHARED_SETTINGS = [
@@ -60,92 +77,6 @@ interface SyncData {
   settings: Partial<Pick<Settings, SharedKey>>;
   /** Keychain entries (account -> secret), encrypted with the sync password. */
   secrets?: Sealed;
-}
-
-/** What both sides looked like after the last sync (hashes), see the file comment. */
-export interface SyncBase {
-  servers: Record<string, string>;
-  settings: Record<string, string>;
-}
-
-/** JSON with sorted keys, so equal data gives equal text. */
-function stable(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
-  if (v && typeof v === 'object') {
-    return `{${Object.keys(v as object)
-      .sort()
-      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
-      .map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(v ?? null);
-}
-
-/** The shared part of a server (without local start folder, online state, last use). */
-function sharedServer(x: Server): Server {
-  const copy: Server = { ...x, online: false, localStart: '' };
-  delete copy.lastUsed;
-  delete copy.temporary;
-  return copy;
-}
-
-const hashServer = (x: Server) => stable(sharedServer(x));
-
-/** Three-way merge of one value; returns which side wins. */
-function pick(ours: string | undefined, theirs: string | undefined, base: string | undefined): 'ours' | 'theirs' {
-  if (ours === theirs) return 'ours';
-  if (ours === base) return 'theirs';
-  return 'ours';
-}
-
-/**
- * Three-way merge of the server lists (see the file comment). `theirs` null:
- * no shared file yet, everything here is kept. Returns the merged list (our
- * order first) and the servers taken over from the other computer.
- */
-function mergeServers(
-  ours: Server[],
-  theirs: Server[] | null,
-  base: Record<string, string>,
-): { merged: Server[]; taken: Server[] } {
-  const theirServers = new Map((theirs ?? []).map((x) => [x.id, x]));
-  const ourServers = new Map(ours.map((x) => [x.id, x]));
-  const merged: Server[] = [];
-  const taken: Server[] = [];
-  for (const id of new Set([...ourServers.keys(), ...theirServers.keys()])) {
-    const o = ourServers.get(id);
-    const t = theirServers.get(id);
-    const ho = o && hashServer(o);
-    const ht = t && hashServer(t);
-    const hb = base[id];
-    if (o && t) {
-      if (pick(ho, ht, hb) === 'theirs') {
-        const next = { ...t, online: o.online, lastUsed: o.lastUsed, localStart: o.localStart };
-        merged.push(next);
-        taken.push(next);
-      } else merged.push(o);
-    } else if (o) {
-      // Only here: new (keep), or deleted there since the last sync (drop, unless changed here meanwhile).
-      if (hb === undefined || ho !== hb || !theirs) merged.push(o);
-    } else if (t) {
-      // Only there: new there (take), or deleted here since the last sync (stay deleted, unless changed there).
-      if (hb === undefined || ht !== hb) {
-        // A start folder from the other kind of computer (C:\…) does not fit here.
-        const next = {
-          ...t,
-          online: false,
-          localStart:
-            t.localStart && !t.localStart.includes('\\') && !/^[A-Za-z]:/.test(t.localStart) ? t.localStart : '~',
-        };
-        merged.push(next);
-        taken.push(next);
-      }
-    }
-  }
-  // Keep the order: ours first, then new ones from the other computer.
-  const order = new Map(ours.map((x, i) => [x.id, i]));
-  merged.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
-  return { merged, taken };
 }
 
 let applying = false;
@@ -201,15 +132,22 @@ async function syncOnce() {
   let theirs: SyncData | null = null;
   if (file) {
     const parsed = JSON.parse(file.text) as SyncData;
-    if (parsed.format !== 'bitcrane-sync')
+    if (parsed.format !== 'bitcrane-sync' || !Array.isArray(parsed.servers))
       throw new Error($t('Die Datei im Abgleich-Ordner gehört nicht zu Bitcrane.'));
-    theirs = parsed;
+    const servers = parsed.servers.filter(isServerEntry);
+    if (servers.length < parsed.servers.length)
+      addLog(
+        'warn',
+        $t('Abgleich: {0} unvollständige Servereinträge übergangen.', parsed.servers.length - servers.length),
+      );
+    theirs = { ...parsed, servers, settings: parsed.settings ?? {} };
   }
   const base: SyncBase = st.settings.syncBase ?? { servers: {}, settings: {} };
   const ours = st.servers.filter((x) => !x.temporary);
 
-  // Servers.
-  const { merged, taken } = mergeServers(ours, theirs ? theirs.servers : null, base.servers);
+  // Servers; changes to how a server is reached wait for the user (see the file comment).
+  const all = mergeServers(ours, theirs ? theirs.servers : null, base.servers);
+  const { merged, taken, held } = heldForReview(ours, all.merged, all.taken);
 
   // Shared settings.
   const settingsPatch: Partial<Settings> = {};
@@ -233,6 +171,14 @@ async function syncOnce() {
     // the rest of the sync still applies.
     const refused = await backend.syncSecretsUnseal(theirs.secrets);
     if (refused) showError(refused);
+  }
+
+  // Servers or shared settings changed here while the file and the keychain were read: start over
+  // with them, so nothing saved meanwhile is replaced by the older snapshot.
+  const now = getState();
+  if (now.servers !== st.servers || SHARED_SETTINGS.some((k) => now.settings[k] !== st.settings[k])) {
+    again = true;
+    return;
   }
 
   // Apply here.
@@ -261,13 +207,19 @@ async function syncOnce() {
     applying = false;
   }
 
+  // Held servers keep the file's version until the user decides, so the other computer's change is
+  // neither applied here nor undone there.
+  setState({ syncReview: held });
+  const heldIds = new Set(held.map((h) => h.theirs.id));
+  const written = [...merged.filter((x) => !heldIds.has(x.id)), ...held.map((h) => h.theirs)];
+
   // Write back when the file differs from the merged result.
   const data: SyncData = {
     format: 'bitcrane-sync',
     version: 1,
     updatedAt: Date.now(),
     from: getState().platform,
-    servers: merged.map(sharedServer).map((x, i) => ({ ...x, localStart: merged[i].localStart })),
+    servers: written.map((x) => ({ ...sharedServer(x), localStart: x.localStart })),
     settings: mergedSettings as SyncData['settings'],
   };
   const sameAsFile =
@@ -283,7 +235,10 @@ async function syncOnce() {
   }
   patchSettings({
     syncBase: {
-      servers: Object.fromEntries(merged.map((x) => [x.id, hashServer(x)])),
+      servers: Object.fromEntries([
+        ...merged.filter((x) => !heldIds.has(x.id)).map((x) => [x.id, hashServer(x)]),
+        ...held.flatMap((h) => (base.servers[h.theirs.id] ? [[h.theirs.id, base.servers[h.theirs.id]]] : [])),
+      ]),
       settings: Object.fromEntries(SHARED_SETTINGS.map((k) => [k, stable(mergedSettings[k])])),
     },
     syncAt: Date.now(),
@@ -349,6 +304,37 @@ export async function setSyncPassword(password: string | null) {
   } else {
     if (LIVE) await backend.secretForget(SYNC_PASSWORD).catch((e) => showError(e));
     patchSettings({ syncPasswords: false });
+  }
+  void runSync();
+}
+
+/**
+ * Answer to the dialog "syncReview". Taking over replaces our entries with the other computer's;
+ * keeping them records the other version as seen, so the next run writes ours back to the file.
+ */
+export function answerSyncReview(take: boolean) {
+  const held: HeldServer[] = getState().syncReview;
+  setState({ syncReview: [], dialog: null });
+  if (take) {
+    setState((s) => {
+      const byId = new Map(held.map((h) => [h.theirs.id, h.theirs]));
+      const replaced = s.servers.map((x) => {
+        const t = byId.get(x.id);
+        return t ? { ...t, online: x.online, lastUsed: x.lastUsed, localStart: x.localStart } : x;
+      });
+      const added = held.filter((h) => !s.servers.some((x) => x.id === h.theirs.id)).map((h) => h.theirs);
+      return { servers: [...replaced, ...added] };
+    });
+    addLog('ok', $t('Abgleich: Änderungen vom anderen Rechner übernommen.'));
+  } else {
+    const base = getState().settings.syncBase ?? { servers: {}, settings: {} };
+    patchSettings({
+      syncBase: {
+        ...base,
+        servers: { ...base.servers, ...Object.fromEntries(held.map((h) => [h.theirs.id, hashServer(h.theirs)])) },
+      },
+    });
+    addLog('info', $t('Abgleich: Änderungen vom anderen Rechner nicht übernommen.'));
   }
   void runSync();
 }

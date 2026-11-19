@@ -1014,6 +1014,22 @@ export const EN: Record<string, string> = {
   'Auf diesem Computer im Ordner der Überwachung „{0}“ gelöscht. Auf dem Server „{1}“ lässt sich das Löschen nicht rückgängig machen.':
     'Deleted on this computer in the folder of the watch “{0}”. On the server “{1}” deleting cannot be undone.',
   'Auf dem Server löschen': 'Delete on the server',
+  Schlüsseldatei: 'Key file',
+  'Implizites TLS': 'Implicit TLS',
+  'WebDAV über HTTPS': 'WebDAV over HTTPS',
+  'S3 über HTTP': 'S3 over HTTP',
+  'SMB-Verschlüsselung': 'SMB encryption',
+  'Befehl nach dem Verbinden': 'Command after connecting',
+  'SSH-Agent weiterreichen': 'Forward the SSH agent',
+  an: 'on',
+  aus: 'off',
+  'Änderungen vom Abgleich prüfen': 'Check changes from the sync',
+  'Auf einem anderen Rechner wurde geändert, wie diese Server erreicht werden. Übernimm das nur, wenn du es selbst geändert hast: Wer den Abgleich-Ordner ändern kann, könnte gespeicherte Passwörter sonst umleiten.':
+    'On another computer, the way these servers are reached was changed. Only take this over if you changed it yourself: anyone who can change the sync folder could otherwise redirect stored passwords.',
+  'Neu: „{0}“ mit der Anmeldung von „{1}“': 'New: “{0}” with the login of “{1}”',
+  'Abgleich: Änderungen vom anderen Rechner übernommen.': 'Sync: changes from the other computer taken over.',
+  'Abgleich: Änderungen vom anderen Rechner nicht übernommen.': 'Sync: changes from the other computer not taken over.',
+  'Abgleich: {0} unvollständige Servereinträge übergangen.': 'Sync: {0} incomplete server entries skipped.',
   '„{0}“ ist nicht mehr leer und bleibt erhalten.': '“{0}” is no longer empty and is kept.',
   '„{0}“ gibt es nicht mehr.': '“{0}” no longer exists.',
   'Beobachtet den Ordner wieder. Mit „Beim Start abgleichen“ wird hochgeladen, was sich inzwischen geändert hat.':
@@ -1853,6 +1869,7 @@ export const EN: Record<string, string> = {
   'Die Anmeldung beim Dienst ist nicht mehr gültig. Bitte neu anmelden.':
     'The sign-in to the service is no longer valid. Please sign in again.',
   'Unerwartete Antwort des Anmeldedienstes.': 'Unexpected response from the sign-in service.',
+  'OpenSSH ist auf diesem Computer nicht installiert.': 'OpenSSH is not installed on this computer.',
   'Die Verbindung konnte nicht vorbereitet werden.': 'The connection could not be prepared.',
   'Diesen Cloud-Dienst kennt Bitcrane noch nicht.': 'Bitcrane does not support this cloud service yet.',
   'Cloud-Dienst': 'Cloud service',

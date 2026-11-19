@@ -100,8 +100,9 @@ fn ppk_public(text: &str) -> AppResult<String> {
         }
         if let Some(n) = line.strip_prefix("Public-Lines: ") {
             let n: usize = n.trim().parse().unwrap_or(0);
-            for _ in 0..n {
-                blob.push_str(lines.next().unwrap_or("").trim());
+            // A damaged file may name more lines than it has.
+            for line in lines.by_ref().take(n) {
+                blob.push_str(line.trim());
             }
         }
     }
@@ -130,6 +131,12 @@ pub fn ppk_info(text: &str) -> (String, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_ppk_naming_more_lines_than_it_has_ends() {
+        let text = "PuTTY-User-Key-File-3: ssh-ed25519\nComment: x\nPublic-Lines: 18446744073709551615\nAAAA\n";
+        let _ = ppk_public(text);
+    }
 
     #[test]
     fn generates_usable_keys() {

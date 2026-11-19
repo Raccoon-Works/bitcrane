@@ -187,31 +187,35 @@ pub struct Sealed {
 }
 
 const KDF: &str = "PBKDF2-SHA256";
-/// PBKDF2 rounds for new files (OWASP's recommendation for PBKDF2-HMAC-SHA256 when it was chosen).
-const ITERATIONS: u32 = 310_000;
-/// Files name their own number of rounds. Every version has written [`ITERATIONS`]; this leaves
-/// room for a later increase while a manipulated file cannot keep the core busy for minutes.
+/// PBKDF2 rounds for new files (OWASP's recommendation for PBKDF2-HMAC-SHA256). Older files carry
+/// their own number (310 000) and still open.
+const ITERATIONS: u32 = 600_000;
+/// Files name their own number of rounds; this leaves room for a later increase while a
+/// manipulated file cannot keep the core busy for minutes.
 const MAX_ITERATIONS: u32 = 1_000_000;
 
 fn key_for(password: &str, salt: &[u8], iterations: u32) -> Aes256Gcm {
     let mut key = [0u8; 32];
     pbkdf2::pbkdf2_hmac::<sha2::Sha256>(password.as_bytes(), salt, iterations, &mut key);
-    Aes256Gcm::new(&key.into())
+    let cipher = Aes256Gcm::new(&key.into());
+    // Cleared like the vault keys (vault.rs); the cipher keeps its own expanded copy.
+    key.fill(0);
+    cipher
 }
 
 /// Encrypts `text` with a key derived from `password`, with a new random salt and nonce.
 pub fn seal(text: &str, password: &str) -> Sealed {
     let mut rng = rand::rng();
-    seal_with(text, password, &rng.random(), &rng.random())
+    seal_with(text, password, &rng.random(), &rng.random(), ITERATIONS)
 }
 
-fn seal_with(text: &str, password: &str, salt: &[u8; 16], nonce: &[u8; 12]) -> Sealed {
-    let data = key_for(password, salt, ITERATIONS)
+fn seal_with(text: &str, password: &str, salt: &[u8; 16], nonce: &[u8; 12], iterations: u32) -> Sealed {
+    let data = key_for(password, salt, iterations)
         .encrypt(Nonce::from_slice(nonce), text.as_bytes())
         .expect("AES-GCM encrypts any text that fits in memory");
     Sealed {
         kdf: KDF.into(),
-        iterations: ITERATIONS,
+        iterations,
         salt: BASE64.encode(salt),
         iv: BASE64.encode(nonce),
         data: BASE64.encode(data),
@@ -354,11 +358,11 @@ pub mod tests {
 
     #[test]
     fn sealing_writes_exactly_what_web_crypto_wrote() {
-        // Same password, salt, nonce and text give the same bytes: files written now open in older
-        // versions on other computers.
+        // Same password, salt, nonce, rounds and text give the same bytes: the format is unchanged,
+        // and the file names its rounds, so files written now open in older versions too.
         let salt: [u8; 16] = std::array::from_fn(|i| i as u8);
         let nonce: [u8; 12] = std::array::from_fn(|i| 100 + i as u8);
-        let sealed = seal_with(FIXED_TEXT, FIXED_PASSWORD, &salt, &nonce);
+        let sealed = seal_with(FIXED_TEXT, FIXED_PASSWORD, &salt, &nonce, 310_000);
         assert_eq!(sealed, serde_json::from_str::<Sealed>(WEB_CRYPTO_FIXED).unwrap());
         assert_eq!(serde_json::to_string(&sealed).unwrap(), WEB_CRYPTO_FIXED);
     }

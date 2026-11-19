@@ -59,6 +59,7 @@ export function initialState(): AppState {
     activeTabId: LIVE ? '' : 'tab1',
     watches: LIVE ? [] : sampleWatches(),
     serverDeletes: [],
+    syncReview: [],
     transfers: LIVE ? [] : sampleTransfers(),
     selection: LIVE
       ? { local: { names: [], cursor: -1, anchor: -1 }, remote: { names: [], cursor: -1, anchor: -1 } }

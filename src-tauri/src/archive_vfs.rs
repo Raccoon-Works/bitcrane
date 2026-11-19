@@ -79,7 +79,8 @@ fn clean(name: &str) -> String {
 /// instead of being skipped, so nothing is unpacked from an archive built to escape its folder.
 /// Only plain names are accepted: no root, no "..", and no ':', which on Windows starts a drive
 /// prefix ("C:x") or an NTFS alternate data stream. ':' is refused on every platform so an archive
-/// is judged the same wherever it is opened.
+/// is judged the same wherever it is opened. Windows drops dots and spaces at the end of a name,
+/// so a segment that would then read "." or ".." (".. ", "...") is refused as well.
 pub fn safe_entry_path(name: &str) -> AppResult<PathBuf> {
     let unsafe_entry = || {
         AppError::other("Das Archiv enthält einen ungültigen Pfad und wird nicht entpackt.")
@@ -94,7 +95,8 @@ pub fn safe_entry_path(name: &str) -> AppResult<PathBuf> {
     for segment in unified.split('/').filter(|s| !s.is_empty() && *s != ".") {
         let mut parts = Path::new(segment).components();
         let plain = matches!((parts.next(), parts.next()), (Some(Component::Normal(_)), None));
-        if !plain || segment.contains(':') {
+        let trimmed = segment.trim_end_matches(['.', ' ']);
+        if !plain || segment.contains(':') || trimmed.is_empty() || trimmed == "." {
             return Err(unsafe_entry());
         }
         out.push(segment);
@@ -301,10 +303,14 @@ pub fn extract(archive: &Path, inner: &str, dest_dir: &Path, words: &NameWords) 
     let result = each_file(archive, inner, |p, raw, r| {
         // Checked on the raw name: `p` is cleaned for display and would hide a leading "/".
         safe_entry_path(raw)?;
-        let target = if is_dir {
-            target_root.join(if inner.is_empty() { p } else { &p[inner.len() + 1..] })
-        } else {
-            target_root.clone()
+        let target = match (is_dir, inner.is_empty()) {
+            (false, _) => target_root.clone(),
+            (true, true) => target_root.join(p),
+            // A file named like the folder being extracted ("a" beside "a/") is not part of it.
+            (true, false) => match p.strip_prefix(inner).and_then(|rest| rest.strip_prefix('/')) {
+                Some(rest) => target_root.join(rest),
+                None => return Ok(true),
+            },
         };
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(err)?;
@@ -408,8 +414,20 @@ mod tests {
         assert_eq!(safe_entry_path("./site/css/a.css").unwrap(), Path::new("site").join("css").join("a.css"));
         assert_eq!(safe_entry_path("site\\index.html").unwrap(), Path::new("site").join("index.html"));
         assert_eq!(safe_entry_path("docs/").unwrap(), Path::new("docs"));
-        for bad in ["../x", "a/../../x", "/etc/passwd", "\\server\\share\\x", "C:/x", "C:x", "a/C:x", "file.txt:stream"]
-        {
+        for bad in [
+            "../x",
+            "a/../../x",
+            "/etc/passwd",
+            "\\server\\share\\x",
+            "C:/x",
+            "C:x",
+            "a/C:x",
+            "file.txt:stream",
+            // Windows drops dots and spaces at the end of a name: these would become "..".
+            ".. /x",
+            ".../x",
+            "a/. ./x",
+        ] {
             assert!(safe_entry_path(bad).is_err(), "{bad} must be refused");
         }
     }

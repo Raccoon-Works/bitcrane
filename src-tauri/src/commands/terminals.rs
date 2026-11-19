@@ -27,14 +27,35 @@ pub(crate) struct TerminalTarget {
     app: Option<String>,
 }
 
-/// Characters cmd.exe interprets even inside double quotes (or that end them).
+/// Characters cmd.exe interprets even inside double quotes (or that end them), and ";", which
+/// Windows Terminal reads as the start of another of its commands even inside an argument.
 #[cfg(windows)]
-const CMD_UNSAFE: &[char] = &['"', '%', '!', '\r', '\n'];
+const CMD_UNSAFE: &[char] = &['"', '%', '!', ';', '\r', '\n'];
+
+/// Full path of OpenSSH's ssh.exe. cmd.exe looks for a bare "ssh" in its current folder first, and
+/// that is the folder shown in Bitcrane, where a downloaded "ssh.bat" could lie. Relative PATH
+/// entries would point there too, so only absolute ones count.
+#[cfg(windows)]
+fn windows_ssh() -> AppResult<String> {
+    std::env::var_os("PATH")
+        .iter()
+        .flat_map(std::env::split_paths)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join("ssh.exe"))
+        .find(|exe| exe.is_file())
+        .map(|exe| exe.display().to_string())
+        .ok_or_else(|| AppError::other("OpenSSH ist auf diesem Computer nicht installiert."))
+}
 
 /// Builds the `ssh` command line for "Terminal öffnen". Every value is quoted for the local shell
 /// with `quote`, and the folder once more for the shell on the server, so names from a server
 /// listing can never run as commands on this computer.
-fn terminal_ssh_command(host: &str, target: &TerminalTarget, quote: fn(&str) -> String) -> AppResult<String> {
+fn terminal_ssh_command(
+    program: &str,
+    host: &str,
+    target: &TerminalTarget,
+    quote: fn(&str) -> String,
+) -> AppResult<String> {
     let user = target.user.clone().unwrap_or_default();
     let plain = |v: &str| v.chars().all(|c| c.is_ascii_alphanumeric() || "._-:[]".contains(c));
     let plain_user = user.is_empty() || user.chars().all(|c| c.is_ascii_alphanumeric() || "._-@+".contains(c));
@@ -53,7 +74,7 @@ fn terminal_ssh_command(host: &str, target: &TerminalTarget, quote: fn(&str) -> 
     }
     // "~" stays unquoted so the server shell expands it.
     let cd = if dir == "~" { "cd".to_string() } else { format!("cd {}", posix_quote(&dir)) };
-    let mut parts = vec!["ssh".to_string(), "-t".to_string()];
+    let mut parts = vec![program.to_string(), "-t".to_string()];
     if let Some(p) = target.port.filter(|p| *p != 22) {
         parts.push("-p".into());
         parts.push(p.to_string());
@@ -89,8 +110,13 @@ fn powershell_quote(v: &str) -> String {
 /// starts in the server folder shown in Bitcrane.
 #[tauri::command]
 pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
+    // PowerShell (below) and the Mac shells never run programs from the current folder.
+    #[cfg(windows)]
+    let program = &system_shell_quote(&windows_ssh()?);
+    #[cfg(not(windows))]
+    let program = "ssh";
     let ssh_cmd = match target.host.as_ref() {
-        Some(host) => Some(terminal_ssh_command(host, &target, system_shell_quote)?),
+        Some(host) => Some(terminal_ssh_command(program, host, &target, system_shell_quote)?),
         None => None,
     };
     let local = target.local_path.as_deref().map(paths::to_native).unwrap_or_else(paths::home);
@@ -144,7 +170,7 @@ pub(crate) fn open_terminal(target: TerminalTarget) -> AppResult<()> {
             match target.host.as_ref() {
                 // Handed over encoded, so neither cmd.exe nor PowerShell reinterprets quotes or "$".
                 Some(host) => {
-                    let ps = terminal_ssh_command(host, &target, powershell_quote)?;
+                    let ps = terminal_ssh_command("ssh", host, &target, powershell_quote)?;
                     let wide: Vec<u8> = ps.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
                     use base64::Engine;
                     let encoded = base64::engine::general_purpose::STANDARD.encode(wide);
@@ -267,7 +293,8 @@ mod tests {
     #[test]
     fn server_folder_names_stay_quoted() {
         let cmd =
-            terminal_ssh_command("example.com", &target("/srv/$(touch pwned)", "deploy"), system_shell_quote).unwrap();
+            terminal_ssh_command("ssh", "example.com", &target("/srv/$(touch pwned)", "deploy"), system_shell_quote)
+                .unwrap();
         assert_eq!(cmd, "ssh -t -p 2222 -- deploy@example.com 'cd '\\''/srv/$(touch pwned)'\\'' && exec $SHELL -l'");
         // The local shell must see exactly four plain words plus one quoted argument.
         let out = std::process::Command::new("sh")
@@ -277,19 +304,48 @@ mod tests {
             .unwrap();
         let args: Vec<_> = String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect();
         assert_eq!(args.last().unwrap(), "cd '/srv/$(touch pwned)' && exec $SHELL -l");
-        assert!(terminal_ssh_command("example.com", &target("/x", "a;b"), system_shell_quote).is_err());
-        assert!(terminal_ssh_command("ex$(x)", &target("/x", "a"), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("ssh", "example.com", &target("/x", "a;b"), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("ssh", "ex$(x)", &target("/x", "a"), system_shell_quote).is_err());
     }
 
     #[test]
     fn hosts_and_users_cannot_become_ssh_options() {
-        assert!(terminal_ssh_command("-oProxyCommand", &target("/x", ""), system_shell_quote).is_err());
-        assert!(terminal_ssh_command("-F", &target("/x", "deploy"), system_shell_quote).is_err());
-        assert!(terminal_ssh_command("example.com", &target("/x", "-oProxyCommand"), system_shell_quote).is_err());
-        let cmd = terminal_ssh_command("example.com", &target("/x", ""), system_shell_quote).unwrap();
+        assert!(terminal_ssh_command("ssh", "-oProxyCommand", &target("/x", ""), system_shell_quote).is_err());
+        assert!(terminal_ssh_command("ssh", "-F", &target("/x", "deploy"), system_shell_quote).is_err());
+        assert!(
+            terminal_ssh_command("ssh", "example.com", &target("/x", "-oProxyCommand"), system_shell_quote).is_err()
+        );
+        let cmd = terminal_ssh_command("ssh", "example.com", &target("/x", ""), system_shell_quote).unwrap();
         assert!(cmd.starts_with("ssh -t -p 2222 -- example.com "), "{cmd}");
         // The system ssh accepts "--" before the destination.
         let out = std::process::Command::new("ssh").args(["-G", "-p", "2222", "--", "example.com"]).output().unwrap();
         assert!(String::from_utf8_lossy(&out.stdout).lines().any(|l| l == "hostname example.com"));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    #[test]
+    fn ssh_comes_from_an_absolute_path() {
+        // GitHub's Windows runners have OpenSSH; elsewhere the error is the expected outcome.
+        if let Ok(exe) = windows_ssh() {
+            assert!(std::path::Path::new(&exe).is_absolute(), "{exe}");
+        }
+    }
+
+    #[test]
+    fn a_semicolon_in_the_folder_is_refused() {
+        let target = TerminalTarget {
+            host: Some("example.com".into()),
+            port: None,
+            user: Some("deploy".into()),
+            key_path: None,
+            remote_path: Some("/srv/x; new-tab cmd".into()),
+            local_path: None,
+            app: None,
+        };
+        assert!(terminal_ssh_command("ssh", "example.com", &target, system_shell_quote).is_err());
     }
 }

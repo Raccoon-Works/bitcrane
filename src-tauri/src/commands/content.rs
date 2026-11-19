@@ -260,7 +260,7 @@ const MEDIA_LIMIT: u64 = 500 * 1024 * 1024;
 /// (kept until Bitcrane ends) and returns its path for the "media" scheme.
 #[tauri::command]
 pub(crate) async fn remote_media(state: State<'_, AppState>, server_id: String, path: String) -> AppResult<String> {
-    use tokio::io::AsyncWriteExt;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let entry = remote!(state, server_id, |c| c.stat(&path))?;
     if entry.size > MEDIA_LIMIT {
         return Err(AppError::other("Die Datei ist für eine Vorschau zu groß (über 500 MB). Bitte herunterladen."));
@@ -272,9 +272,14 @@ pub(crate) async fn remote_media(state: State<'_, AppState>, server_id: String, 
     let conn = state.conn(&server_id).await?;
     let mut reader = conn.reader(&path, 0).await?;
     let mut file = tokio::fs::File::create(&target).await?;
-    let copied = tokio::io::copy(&mut reader, &mut file).await;
+    // The size above is the server's word; the copy keeps to the limit itself.
+    let copied = tokio::io::copy(&mut (&mut reader).take(MEDIA_LIMIT + 1), &mut file).await;
     reader.close(copied.is_ok()).await?;
-    copied?;
+    if copied? > MEDIA_LIMIT {
+        drop(file);
+        let _ = tokio::fs::remove_file(&target).await;
+        return Err(AppError::other("Die Datei ist für eine Vorschau zu groß (über 500 MB). Bitte herunterladen."));
+    }
     file.flush().await?;
     Ok(paths::to_ui(&target))
 }

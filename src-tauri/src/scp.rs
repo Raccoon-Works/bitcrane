@@ -111,7 +111,7 @@ pub fn parse_ls_line(line: &str, now: chrono::DateTime<Local>) -> Option<FileEnt
         }
     }
     let perms = tokens.first()?.1;
-    if perms.len() < 10 || !"-dlcbps".contains(&perms[..1]) {
+    if perms.len() < 10 || !perms.starts_with(|c| "-dlcbps".contains(c)) {
         return None;
     }
     let (owner, group) = (tokens.get(2)?.1, tokens.get(3)?.1);
@@ -427,6 +427,11 @@ mod tests {
 
     fn now() -> chrono::DateTime<Local> {
         Local.with_ymd_and_hms(2026, 10, 29, 18, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn a_line_starting_with_a_wide_character_is_no_entry() {
+        assert!(parse_ls_line("äöüäöüäöüä 1 test test 1 1793289000 x", now()).is_none());
     }
 
     #[test]
