@@ -6,9 +6,12 @@
 //! - dynamic: a SOCKS5 proxy on this computer; every connection goes out
 //!   from the server.
 //!
-//! The tunnels use the server's open SSH connection and end with it. Which
-//! tunnels a server has is stored in its settings (frontend); this module
-//! only runs them.
+//! The tunnels use the server's open SSH connection and end with it: a new
+//! connection to the server stops the old ones (server_connect), a local port
+//! closes when it is used after its connection ended, and `active` no longer
+//! lists tunnels of a closed connection, so the interface starts them again.
+//! Which tunnels a server has is stored in its settings (frontend); this
+//! module only runs them.
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::remote::Remote;
@@ -36,9 +39,11 @@ pub struct ForwardSpec {
 
 struct Running {
     server_id: String,
+    /// The connection the tunnel runs on.
+    conn: Arc<Remote>,
     task: Option<JoinHandle<()>>,
-    /// Remote forward: connection and port to cancel on the server.
-    remote: Option<(Arc<Remote>, String, u32)>,
+    /// Remote forward: address and port to cancel on the server.
+    remote: Option<(String, u32)>,
 }
 
 #[derive(Default)]
@@ -138,6 +143,11 @@ impl Forwards {
                 let c = conn.clone();
                 let task = tokio::spawn(async move {
                     while let Ok((tcp, _)) = listener.accept().await {
+                        // The connection ended: the port closes instead of taking connections it
+                        // can only drop.
+                        if c.is_closed() {
+                            break;
+                        }
                         let c = c.clone();
                         let host = host.clone();
                         tokio::spawn(async move {
@@ -149,7 +159,7 @@ impl Forwards {
                         });
                     }
                 });
-                Running { server_id: server_id.into(), task: Some(task), remote: None }
+                Running { server_id: server_id.into(), conn: conn.clone(), task: Some(task), remote: None }
             }
             "remote" => {
                 let (handle, map) = conn.tunnel()?;
@@ -163,8 +173,9 @@ impl Forwards {
                 map.locked().insert(port, (spec.dest_host.clone(), spec.dest_port));
                 Running {
                     server_id: server_id.into(),
+                    conn: conn.clone(),
                     task: None,
-                    remote: Some((conn.clone(), spec.bind_host.clone(), port)),
+                    remote: Some((spec.bind_host.clone(), port)),
                 }
             }
             other => return Err(AppError::other("Unbekannte Art der Weiterleitung: {0}").param(other)),
@@ -180,8 +191,8 @@ impl Forwards {
         if let Some(t) = r.task {
             t.abort();
         }
-        if let Some((conn, host, port)) = r.remote {
-            if let Ok((handle, map)) = conn.tunnel() {
+        if let Some((host, port)) = r.remote {
+            if let Ok((handle, map)) = r.conn.tunnel() {
                 map.locked().remove(&port);
                 let _ = handle.cancel_tcpip_forward(host, port).await;
             }
@@ -200,8 +211,8 @@ impl Forwards {
     /// Ids of the running tunnels (all servers).
     pub fn active(&self) -> Vec<String> {
         let mut map = self.0.locked();
-        // A tunnel whose listener ended (connection gone) is no longer running.
-        map.retain(|_, r| r.task.as_ref().map(|t| !t.is_finished()).unwrap_or(true));
+        // A tunnel whose connection is closed, or whose listener ended, is no longer running.
+        map.retain(|_, r| !r.conn.is_closed() && r.task.as_ref().map(|t| !t.is_finished()).unwrap_or(true));
         map.keys().cloned().collect()
     }
 }

@@ -590,6 +590,14 @@ impl Session {
             }
         }
         out.retain(|e| e.name != "." && e.name != "..");
+        // LIST and MLSD describe a link, not what it points to. One that can be entered is a folder,
+        // as SFTP reports it (the link stays noted, so walking a folder does not follow it).
+        for e in out.iter_mut().filter(|e| e.link.is_some() && e.kind == EntryKind::File) {
+            if matches!(self.cmd("CWD", Some(&remote_join(path, &e.name))).await?, (250, _)) {
+                e.kind = EntryKind::Dir;
+                e.size = 0;
+            }
+        }
         crate::model::sort_listing(&mut out);
         Ok(out)
     }
@@ -912,6 +920,19 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
 
 /* ------------------------------------------------------------------ Connection */
 
+/// Runs an operation on an idle session without trying again: for changes (rename, delete, new
+/// folder), where a lost answer may hide a change that was made, and a second try would then fail.
+macro_rules! once_on_session {
+    ($self:ident, |$s:ident| $body:expr) => {{
+        let mut $s = $self.take().await?;
+        let result = $body.await;
+        if !matches!(&result, Err(e) if e.kind == ErrorKind::ConnectionLost) {
+            $self.put($s).await;
+        }
+        result
+    }};
+}
+
 /// Runs a browse operation on an idle session; a broken session is replaced once.
 macro_rules! with_session {
     ($self:ident, |$s:ident| $body:expr) => {{
@@ -1010,7 +1031,7 @@ impl FtpConn {
     }
 
     pub async fn mkdir(&self, path: &str) -> AppResult<()> {
-        with_session!(self, |s| s.mkdir(path))
+        once_on_session!(self, |s| s.mkdir(path))
     }
 
     pub async fn mkdir_all(&self, path: &str) -> AppResult<()> {
@@ -1021,15 +1042,15 @@ impl FtpConn {
         if self.exists(to).await {
             return Err(AppError::new(ErrorKind::AlreadyExists, "„{0}“ gibt es hier schon.").param(remote_name(to)));
         }
-        with_session!(self, |s| s.rename(from, to))
+        once_on_session!(self, |s| s.rename(from, to))
     }
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
-        with_session!(self, |s| s.remove(path))
+        once_on_session!(self, |s| s.remove(path))
     }
 
     pub async fn remove_file(&self, path: &str) -> AppResult<()> {
-        with_session!(self, |s| s.delete_file(path))
+        once_on_session!(self, |s| s.delete_file(path))
     }
 
     pub async fn chmod(&self, path: &str, mode: u32, recursive: bool) -> AppResult<()> {

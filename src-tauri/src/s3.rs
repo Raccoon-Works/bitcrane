@@ -777,7 +777,7 @@ impl S3Conn {
     }
 
     async fn upload(
-        &self,
+        self: &Arc<Self>,
         mut r: tokio::io::DuplexStream,
         path: &str,
         part_size: u64,
@@ -817,6 +817,13 @@ impl S3Conn {
         });
         let Some(upload_id) = upload_id else {
             return Err(AppError::other("{0} fehlgeschlagen.").param(what).with_detail(body));
+        };
+        let mut open = OpenUpload {
+            conn: self.clone(),
+            bucket: bucket.clone(),
+            key: key.clone(),
+            upload_id: upload_id.clone(),
+            completed: false,
         };
         let result: AppResult<()> = async {
             let mut etags: Vec<String> = Vec::new();
@@ -878,12 +885,34 @@ impl S3Conn {
             }
         }
         .await;
-        if result.is_err() {
-            let mut abort = self.req(Method::DELETE, Some(&bucket), &key);
-            abort.query.push(("uploadId".into(), upload_id));
-            let _ = self.build(&abort, EMPTY_SHA256).send().await;
-        }
+        open.completed = result.is_ok();
         result
+    }
+}
+
+/// A started multipart upload. Unless it completed, dropping it ends the upload on the server: also
+/// when its task is aborted (pause, remove), which stops the code above at an `.await` before any
+/// error handling runs. The parts sent so far would otherwise stay in the bucket and cost storage.
+struct OpenUpload {
+    conn: Arc<S3Conn>,
+    bucket: String,
+    key: String,
+    upload_id: String,
+    completed: bool,
+}
+
+impl Drop for OpenUpload {
+    fn drop(&mut self) {
+        if self.completed {
+            return;
+        }
+        let Ok(rt) = tokio::runtime::Handle::try_current() else { return };
+        let mut abort = self.conn.req(Method::DELETE, Some(&self.bucket), &self.key);
+        abort.query.push(("uploadId".into(), std::mem::take(&mut self.upload_id)));
+        let conn = self.conn.clone();
+        rt.spawn(async move {
+            let _ = conn.build(&abort, EMPTY_SHA256).send().await;
+        });
     }
 }
 

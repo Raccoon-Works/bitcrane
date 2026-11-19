@@ -112,9 +112,12 @@ fn status_err(status: StatusCode, what: &Message) -> AppError {
 
 const PROPFIND_BODY: &str = r#"<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/></d:prop></d:propfind>"#;
 
-/// Parses a PROPFIND answer into (path below the base, entry).
-fn parse_multistatus(xml: &str, base_path: &str) -> Vec<(String, FileEntry)> {
-    let Ok(doc) = roxmltree::Document::parse(xml) else { return vec![] };
+/// Parses a PROPFIND answer into (path below the base, entry). An answer that is no XML (cut off by
+/// a proxy, an error page) is an error: read as an empty folder it would make a comparison offer
+/// to upload everything.
+fn parse_multistatus(xml: &str, base_path: &str) -> AppResult<Vec<(String, FileEntry)>> {
+    let doc = roxmltree::Document::parse(xml)
+        .map_err(|e| AppError::new(ErrorKind::ConnectionLost, "Antwort unvollständig.").with_detail(e.to_string()))?;
     let mut out = Vec::new();
     for resp in doc.descendants().filter(|n| n.tag_name().name() == "response") {
         let Some(href) = resp.descendants().find(|n| n.tag_name().name() == "href").and_then(|n| n.text()) else {
@@ -179,7 +182,7 @@ fn parse_multistatus(xml: &str, base_path: &str) -> Vec<(String, FileEntry)> {
             },
         ));
     }
-    out
+    Ok(out)
 }
 
 impl DavConn {
@@ -291,7 +294,7 @@ impl DavConn {
         let xml = resp.text().await.map_err(|e| {
             AppError::new(ErrorKind::ConnectionLost, "Antwort unvollständig.").with_detail(e.to_string())
         })?;
-        Ok(parse_multistatus(&xml, &self.base_path))
+        parse_multistatus(&xml, &self.base_path)
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
@@ -485,12 +488,13 @@ mod tests {
           <d:response><d:href>https://x.example/dav/files/c/%C3%BCber.txt</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>42</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
             <d:propstat><d:prop><d:getetag/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>
         </d:multistatus>"#;
-        let r = parse_multistatus(xml, "/dav/files/c");
+        let r = parse_multistatus(xml, "/dav/files/c").unwrap();
         assert_eq!(r.len(), 3);
         assert_eq!(r[0].0, "/");
         assert_eq!((r[1].0.as_str(), r[1].1.kind), ("/Neuer Ordner", EntryKind::Dir));
         assert_eq!(r[1].1.mtime, 1793102400000);
         assert_eq!((r[2].1.name.as_str(), r[2].1.size), ("über.txt", 42));
+        assert!(parse_multistatus(r#"<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:resp"#, "/").is_err());
     }
 }
 

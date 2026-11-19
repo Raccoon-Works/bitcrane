@@ -615,9 +615,12 @@ impl Remote {
     /// Whether a partial upload can be continued (append) for this file.
     pub fn can_append(&self, path: &str) -> bool {
         match self {
-            Remote::Sftp(_) | Remote::Smb(_) | Remote::Scp(_) => true,
+            Remote::Sftp(_) | Remote::Scp(_) => true,
             Remote::Ftp(c) => c.binary_for(path),
-            Remote::Dav(_)
+            // SMB writes several blocks at once and in any order (smb.rs writer): after a stop, the
+            // size of the partial file does not say up to where it is complete.
+            Remote::Smb(_)
+            | Remote::Dav(_)
             | Remote::Dropbox(_)
             | Remote::GDrive(_)
             | Remote::OneDrive(_)

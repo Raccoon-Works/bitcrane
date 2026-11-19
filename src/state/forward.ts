@@ -58,8 +58,13 @@ export async function stopForward(f: PortForward) {
   await refreshForwards();
 }
 
-/** After connecting: the tunnels marked "beim Verbinden starten". */
+/**
+ * After connecting: the tunnels marked "beim Verbinden starten". The list of running tunnels is
+ * read first: those of an earlier connection ended with it and start again.
+ */
 export async function startAutoForwards(serverId: string) {
   const list = serverById(serverId)?.forwards?.filter((f) => f.auto) ?? [];
+  if (!list.length) return;
+  await refreshForwards();
   for (const f of list) if (!getState().tunnels.includes(f.id)) await startForward(serverId, f);
 }

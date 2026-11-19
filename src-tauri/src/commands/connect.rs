@@ -104,9 +104,11 @@ pub(crate) async fn server_connect(
     server_id: String,
     request: ConnectRequest,
 ) -> AppResult<ConnectResult> {
-    // Take it out first: closing can take a while and must not hold the lock.
+    // Take it out first: closing can take a while and must not hold the lock. Its tunnels end with
+    // it; the interface starts them again on the new connection.
     let old = state.connections.lock().await.remove(&server_id);
     if let Some(old) = old {
+        state.forwards.stop_server(&server_id).await;
         old.close().await;
     }
     let Opened { remote: conn, warning } = request.open(app, &state, server_id.clone()).await?;

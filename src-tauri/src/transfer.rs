@@ -271,6 +271,11 @@ pub async fn upload(
     if offset > 0 {
         src.seek(std::io::SeekFrom::Start(offset)).await?;
     }
+    // Written straight to the file (object stores, or no temp name chosen): the older version is set
+    // aside now, as afterwards it would be overwritten.
+    if !use_temp && opts.keep_versions > 0 {
+        keep_old_version(conn, remote_path, opts.keep_versions).await?;
+    }
     let mut dst = conn.writer(&target, offset, Some(total), keep_mtime).await?;
 
     let mut buf = vec![0u8; CHUNK];
@@ -452,6 +457,10 @@ pub async fn cross(
     };
     let use_temp = opts.temp_name && !dst.atomic_upload();
     let target = if use_temp { temp_name(dst_path) } else { dst_path.to_string() };
+    // As in `upload`: without a temp name the older version is set aside before it is overwritten.
+    if !use_temp && opts.keep_versions > 0 {
+        keep_old_version(dst, dst_path, opts.keep_versions).await?;
+    }
     let mut reader = src.reader(src_path, 0).await?;
     let mut writer = match dst.writer(&target, 0, Some(total), keep_mtime).await {
         Ok(w) => w,
