@@ -15,6 +15,7 @@ export function ConfirmDialog({
   danger,
   run,
   detail,
+  onCancel = closeDialog,
 }: {
   title: string;
   text: string;
@@ -22,6 +23,8 @@ export function ConfirmDialog({
   danger?: boolean;
   run: () => void;
   detail?: string;
+  /** Abbrechen, Escape and the close button; the dialog slot is cleared by default. */
+  onCancel?: () => void;
 }) {
   return (
     <Dialog
@@ -29,6 +32,7 @@ export function ConfirmDialog({
       title={title}
       subtitle={text}
       width={480}
+      onClose={onCancel}
       icon={
         danger ? (
           <span className="icon-tile tone-danger">
@@ -43,7 +47,7 @@ export function ConfirmDialog({
       footer={
         <>
           <span className="flex-1" />
-          <Button autoFocus={danger} onClick={closeDialog}>
+          <Button autoFocus={danger} onClick={onCancel}>
             {$t('Abbrechen')}
           </Button>
           <Button

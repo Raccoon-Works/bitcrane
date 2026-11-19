@@ -151,10 +151,7 @@ async function decideStartWindow() {
   try {
     const atLogin = await backend.startInfo();
     if (atLogin && getState().settings.startHidden) setState({ startedHidden: true });
-    else if (atLogin) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().show();
-    }
+    else if (atLogin) await (await import('../../util/appWindow')).showWindow();
     await backend.startDecided();
   } catch {
     // Rust shows the window by itself after a while.

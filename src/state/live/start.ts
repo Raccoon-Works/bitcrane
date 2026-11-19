@@ -48,6 +48,8 @@ export function startLive() {
     if (p && p.transfers !== s.transfers) discardRemoved(p.transfers, s.transfers);
     if (!p || p.transfers !== s.transfers || p.settings.parallel !== s.settings.parallel) pump();
     if (!p || p.watches !== s.watches) reconcileWatches(s);
+    // "Auch auf dem Server löschen?" waits until no other dialog is open, so it never replaces one.
+    if (!s.dialog && s.serverDeletes.length) openDialog({ type: 'serverDeletes' });
     if (
       !p ||
       p.servers !== s.servers ||

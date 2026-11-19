@@ -775,7 +775,6 @@
   "Statt des ganzen Ordners nur bestimmte Unterordner überwachen.": "Surveiller uniquement certains sous-dossiers au lieu du dossier entier.",
   "Rechte nach dem Hochladen setzen": "Définir les autorisations après l’envoi",
   "Zum Beispiel rw-r--r-- für Dateien und rwxr-xr-x für Ordner.": "Par exemple rw-r--r-- pour les fichiers et rwxr-xr-x pour les dossiers.",
-  "Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.": "Attention : cela supprime des fichiers du serveur. Désactivé par défaut.",
   "Ältere Version auf dem Server behalten": "Conserver l’ancienne version sur le serveur",
   "Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.": "Avant d’écraser, l’ancien fichier est placé dans le dossier caché .bitcrane-versions à côté ; les 5 dernières versions sont conservées.",
   "Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt": "Les commandes post-envoi ne sont disponibles que pour les serveurs SFTP (via SSH). Ce serveur utilise",

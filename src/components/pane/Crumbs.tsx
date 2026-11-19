@@ -70,7 +70,7 @@ export function Crumbs({ side, path }: { side: PaneSide; path: string }) {
         </span>
       )}
       {crumbs.map((c, i) => (
-        <span key={c.path} className="crumb-wrap">
+        <span key={c.path} className={crumbs.length === 1 ? 'crumb-wrap is-only' : 'crumb-wrap'}>
           {i === crumbs.length - 1 ? (
             // The folder shown, in the accent colour with a menu of the folders above it (Transmit).
             <button
@@ -86,7 +86,7 @@ export function Crumbs({ side, path }: { side: PaneSide; path: string }) {
                 });
               }}
             >
-              {c.name}
+              <span className="crumb-name">{c.name}</span>
               {allCrumbs.length > 1 && <CaretDown size={11} weight="bold" aria-hidden="true" />}
             </button>
           ) : (

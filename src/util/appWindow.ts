@@ -18,6 +18,14 @@ export function toggleMaximizeWindow() {
   if (LIVE) void win().toggleMaximize();
 }
 
+/** Brings the window forward, also when it was closed to the notification area or minimised. */
+export async function showWindow() {
+  const w = win();
+  await w.unminimize();
+  await w.show();
+  await w.setFocus();
+}
+
 export function closeWindow() {
   if (LIVE) void win().close();
   else showToast($t('Im Prototyp lässt sich das Fenster nicht schließen.'));

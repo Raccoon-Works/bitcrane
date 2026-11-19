@@ -775,7 +775,6 @@
   "Statt des ganzen Ordners nur bestimmte Unterordner überwachen.": "Alleen bepaalde submappen bewaken in plaats van de hele map.",
   "Rechte nach dem Hochladen setzen": "Rechten instellen na uploaden",
   "Zum Beispiel rw-r--r-- für Dateien und rwxr-xr-x für Ordner.": "Bijvoorbeeld rw-r--r-- voor bestanden en rwxr-xr-x voor mappen.",
-  "Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.": "Let op: dit verwijdert bestanden van de server. Standaard uit.",
   "Ältere Version auf dem Server behalten": "Oudere versie op de server behouden",
   "Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.": "Vóór het overschrijven gaat het oude bestand naar de verborgen map .bitcrane-versions ernaast; de laatste 5 versies worden bewaard.",
   "Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt": "Opdrachten na uploaden zijn alleen beschikbaar voor SFTP-servers (via SSH). Deze server gebruikt",

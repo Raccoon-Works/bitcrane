@@ -70,6 +70,7 @@ export {
 } from './live/transfers';
 export {
   copyLocalFiles,
+  removeOnServer,
   runCommandNow,
   runRemoteCommand,
   syncDeletes,

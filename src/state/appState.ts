@@ -68,6 +68,8 @@ export type DialogState =
   | { type: 'uploadTo'; paths: string[]; external: boolean }
   | { type: 'vaultCreate'; side: PaneSide }
   | { type: 'log' }
+  /** "Auch auf dem Server löschen?" for the first entry of `serverDeletes`. */
+  | { type: 'serverDeletes' }
   | { type: 'preview'; side: PaneSide }
   | { type: 'batchRename'; side: PaneSide; names: string[] }
   | { type: 'selectMask'; side: PaneSide; mode?: 'add' | 'remove' }
@@ -557,6 +559,17 @@ export interface AppState {
   dropHint: { side: PaneSide; name: string; place?: string; addPlace?: boolean; sidebar?: boolean } | null;
   /** Folders opened in place (triangle in the list), as paths relative to the folder shown. */
   expanded: Record<PaneSide, string[]>;
+  /** Server copies of files deleted on this computer, waiting for "Auch auf dem Server löschen?". */
+  serverDeletes: ServerDeletes[];
+}
+
+/** Server files of one watch that are deleted only once the user agrees. */
+export interface ServerDeletes {
+  watchId: string;
+  watchName: string;
+  serverId: string;
+  /** Paths on the server. */
+  targets: string[];
 }
 
 /** How a half shows its files. */

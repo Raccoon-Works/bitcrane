@@ -4263,15 +4263,6 @@ body.is-dragging-place * {
     width: 52px;
     margin: 0 var(--space-1);
   }
-  /* With the size slider (icon view) the connection state stays as the coloured dot; the word goes. */
-  .pane-head:has(.icon-size) .pane-state-text {
-    display: none;
-  }
-}
-@container pane (max-width: 420px) {
-  .pane-state-text {
-    display: none;
-  }
 }
 .pane {
   container: pane / inline-size;
@@ -5319,6 +5310,17 @@ button.disclosure {
   width: 7px;
   height: 7px;
 }
+/* In narrower halves the folder path keeps the room: the state shrinks to its coloured dot, the word
+   stays in the tooltip. */
+@container pane (max-width: 600px) {
+  .pane-state {
+    padding: 0;
+    background: none;
+  }
+  .pane-state-text {
+    display: none;
+  }
+}
 
 /* Resize handles. */
 .resize-handle {
@@ -5516,6 +5518,22 @@ body.is-resizing-h * {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+}
+/* The levels above fold into "…" while space runs out; once only the folder shown is left, its name is cut
+   with an ellipsis. */
+.crumb-wrap {
+  flex-shrink: 0;
+}
+.crumb-wrap.is-only {
+  flex-shrink: 1;
+}
+.crumb.is-last svg {
+  flex-shrink: 0;
+}
+.crumb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .crumb.is-last:disabled {
   opacity: 1;

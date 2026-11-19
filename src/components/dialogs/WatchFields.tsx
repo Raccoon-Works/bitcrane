@@ -197,7 +197,9 @@ export function WatchMoreOptions({
               checked={opts.mirrorDeletes}
               onChange={(v) => set('mirrorDeletes', v)}
               label={$t('Lokal Gelöschtes auch auf dem Server löschen')}
-              note={$t('Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.')}
+              note={$t(
+                'Bitcrane fragt jedes Mal nach, bevor es auf dem Server löscht; dort lässt sich das nicht rückgängig machen. Standardmäßig aus.',
+              )}
             />
             <Checkbox
               checked={opts.keepOldVersion}

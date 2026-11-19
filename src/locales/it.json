@@ -775,7 +775,6 @@
   "Statt des ganzen Ordners nur bestimmte Unterordner überwachen.": "Monitora solo alcune sottocartelle invece dell'intera cartella.",
   "Rechte nach dem Hochladen setzen": "Imposta permessi dopo il caricamento",
   "Zum Beispiel rw-r--r-- für Dateien und rwxr-xr-x für Ordner.": "Ad esempio rw-r--r-- per i file e rwxr-xr-x per le cartelle.",
-  "Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.": "Attenzione: rimuove file dal server. Disattivato per impostazione predefinita.",
   "Ältere Version auf dem Server behalten": "Mantieni la versione precedente sul server",
   "Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.": "Prima di sovrascrivere, il vecchio file finisce nella cartella nascosta .bitcrane-versions accanto; vengono conservate le ultime 5 versioni.",
   "Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt": "I comandi post-caricamento sono disponibili solo per i server SFTP (via SSH). Questo server usa",

@@ -877,8 +877,8 @@ export const EN: Record<string, string> = {
   'Rechte nach dem Hochladen setzen': 'Set permissions after uploading',
   'Zum Beispiel rw-r--r-- für Dateien und rwxr-xr-x für Ordner.':
     'For example rw-r--r-- for files and rwxr-xr-x for folders.',
-  'Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.':
-    'Caution: this removes files from the server. Off by default.',
+  'Bitcrane fragt jedes Mal nach, bevor es auf dem Server löscht; dort lässt sich das nicht rückgängig machen. Standardmäßig aus.':
+    'Bitcrane asks every time before it deletes on the server, where it cannot be undone. Off by default.',
   'Ältere Version auf dem Server behalten': 'Keep the older version on the server',
   'Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.':
     'Before overwriting, the old file goes into the hidden folder .bitcrane-versions next to it; the last 5 versions are kept.',
@@ -1008,6 +1008,12 @@ export const EN: Record<string, string> = {
   '{0} Änderungen erkannt': '{0} changes detected',
   'Auf dem Server gelöscht: {0}': 'Deleted on the server: {0}',
   'Löschen auf dem Server fehlgeschlagen': 'Could not delete on the server',
+  'Auf dem Server behalten: {0}': 'Kept on the server: {0}',
+  '„{0}“ auch auf dem Server löschen?': 'Also delete “{0}” on the server?',
+  '{0} Dateien auch auf dem Server löschen?': 'Also delete {0} files on the server?',
+  'Auf diesem Computer im Ordner der Überwachung „{0}“ gelöscht. Auf dem Server „{1}“ lässt sich das Löschen nicht rückgängig machen.':
+    'Deleted on this computer in the folder of the watch “{0}”. On the server “{1}” deleting cannot be undone.',
+  'Auf dem Server löschen': 'Delete on the server',
   '„{0}“ ist auf dem Server aktuell.': '“{0}” is up to date on the server.',
   'Abgleich „{0}“: {1}': 'Comparison “{0}”: {1}',
   'Für diese Überwachung ist kein Befehl eingetragen.': 'No command is set for this watch.',

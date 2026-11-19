@@ -26,6 +26,7 @@ import { defaultWatchOptions } from './defaults';
 import { openDialog } from './panels';
 import { enqueue } from './transfers';
 import { updateTab } from './tabs';
+import { addLog } from './log';
 
 /** Options a new watch (and a template taken over from a built-in one) starts with: the defaults of the settings. */
 export function newWatchOptions(): WatchOptions {
@@ -82,6 +83,15 @@ export function saveWatch(w: Omit<Watch, 'id' | 'state' | 'lastFile' | 'lastTime
 
 export function deleteWatch(id: string) {
   setState((s) => ({ watches: s.watches.filter((w) => w.id !== id), dialog: null }));
+}
+
+/** Answer to "Auch auf dem Server löschen?": `remove` deletes the server copies, otherwise they stay. */
+export function answerServerDeletes(watchId: string, remove: boolean) {
+  const d = getState().serverDeletes.find((x) => x.watchId === watchId);
+  if (!d) return;
+  setState((s) => ({ serverDeletes: s.serverDeletes.filter((x) => x !== d), dialog: null }));
+  if (!remove) d.targets.forEach((t) => addLog('info', $t('Auf dem Server behalten: {0}', t), d.serverId));
+  else if (LIVE) live.removeOnServer(d);
 }
 
 /** Asks before deleting a watch (watch dialog, watch popover, Settings › Überwachung). */

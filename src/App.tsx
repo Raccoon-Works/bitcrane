@@ -12,6 +12,7 @@ import { About, Licenses } from './components/dialogs/About';
 import { CloudPlacesDialog } from './components/dialogs/CloudPlacesDialog';
 import { ConfirmDelete } from './components/dialogs/ConfirmDelete';
 import { ConfirmDialog } from './components/dialogs/ConfirmDialog';
+import { ServerDeletesPrompt } from './components/dialogs/ServerDeletesPrompt';
 import { ConflictDialog } from './components/dialogs/ConflictDialog';
 import { Fingerprint } from './components/dialogs/Fingerprint';
 import { AuthPrompt, SecretPrompt } from './components/dialogs/LoginPrompts';
@@ -193,6 +194,8 @@ function Dialogs() {
       return <ImportDialog />;
     case 'cloudPlaces':
       return <CloudPlacesDialog found={dialog.found} />;
+    case 'serverDeletes':
+      return <ServerDeletesPrompt />;
     case 'authPrompt':
       return (
         <AuthPrompt

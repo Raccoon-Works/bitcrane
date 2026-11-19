@@ -5,7 +5,7 @@ import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Watch, type Transfer } from '../../backend/types';
 import { watchExcludes } from '../tabs';
 import { setState, uid, getState, showToast } from '../core';
-import type { AppState } from '../appState';
+import type { AppState, ServerDeletes } from '../appState';
 import { showError } from '../errors';
 import { $t } from '../../i18n';
 import { basename, join, parent, relFolder } from '../../util/paths';
@@ -171,18 +171,46 @@ async function onWatchBatch(b: WatchBatch) {
   }
   const removed = b.removed.filter((f) => inSelection(w, relOf(w, f.path)));
   if (w.options.mirrorDeletes && removed.length && connected.has(w.serverId)) {
-    const targets = removed.map((f) => remoteOf(w, f));
-    backend
-      .remoteRemove(w.serverId, targets)
-      .then(() => {
-        targets.forEach((t) => {
-          invalidate('remote', w.serverId, parent(t));
-          addLog('ok', $t('Auf dem Server gelöscht: {0}', t), w.serverId);
-        });
-        bump();
-      })
-      .catch((e) => addLog('warn', $t('Löschen auf dem Server fehlgeschlagen'), w.serverId, toBackendError(e).message));
+    askServerDeletes(
+      w,
+      removed.map((f) => remoteOf(w, f)),
+    );
   }
+}
+
+/**
+ * Deleting on the server cannot be undone, so it waits for a yes (dialog "serverDeletes", opened in
+ * live/start.ts). Files deleted while the question is open join it; a window closed to the notification
+ * area opens for it.
+ */
+function askServerDeletes(w: Watch, targets: string[]) {
+  setState((s) => {
+    const open = s.serverDeletes.find((d) => d.watchId === w.id);
+    if (!open) {
+      return {
+        serverDeletes: [...s.serverDeletes, { watchId: w.id, watchName: w.name, serverId: w.serverId, targets }],
+      };
+    }
+    const added = targets.filter((t) => !open.targets.includes(t));
+    return {
+      serverDeletes: s.serverDeletes.map((d) => (d === open ? { ...d, targets: [...d.targets, ...added] } : d)),
+    };
+  });
+  void import('../../util/appWindow').then((m) => m.showWindow());
+}
+
+/** "Auf dem Server löschen" in the question for files deleted on this computer. */
+export function removeOnServer(d: ServerDeletes) {
+  backend
+    .remoteRemove(d.serverId, d.targets)
+    .then(() => {
+      d.targets.forEach((t) => {
+        invalidate('remote', d.serverId, parent(t));
+        addLog('ok', $t('Auf dem Server gelöscht: {0}', t), d.serverId);
+      });
+      bump();
+    })
+    .catch((e) => addLog('warn', $t('Löschen auf dem Server fehlgeschlagen'), d.serverId, toBackendError(e).message));
 }
 
 /** "Beim Start abgleichen": uploads files that are newer locally or missing on the server. */
