@@ -36,6 +36,7 @@ import { releaseServers } from './watches';
 import { updateSettings } from './settings';
 import { openWithDefaultApp, editorFor } from './fileOps';
 import { upload, download } from './transfers';
+import { isSftp } from '../util/protocols';
 
 export function clearSelection(): Record<PaneSide, PaneSelection> {
   return { local: emptySelection(), remote: emptySelection() };
@@ -62,7 +63,7 @@ export function selectTab(id: string) {
 export function openServerInNewTab(serverId: string) {
   const srv = serverById(serverId);
   if (!srv) return;
-  if (srv.openAs === 'terminal' && (!srv.protocol || srv.protocol === 'sftp')) {
+  if (srv.openAs === 'terminal' && isSftp(srv)) {
     void import('./terminal').then((m) => m.openServerTerminal(serverId));
     return;
   }
@@ -119,7 +120,7 @@ export function askRemoveServer(id: string) {
 export function openServer(serverId: string, files = false) {
   // Servers set to open as a terminal (SSH only): a terminal tab instead of the files.
   const target = serverById(serverId);
-  if (!files && target?.openAs === 'terminal' && (!target.protocol || target.protocol === 'sftp')) {
+  if (!files && target?.openAs === 'terminal' && isSftp(target)) {
     void import('./terminal').then((m) => m.openServerTerminal(serverId));
     return;
   }

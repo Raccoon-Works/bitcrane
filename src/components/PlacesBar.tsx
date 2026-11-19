@@ -8,33 +8,13 @@
  * - Places can be reordered by dragging; dragging one out of the bar and letting
  *   go removes it (also in the context menu, which is the way on Windows).
  */
-import { CaretDoubleRight, Cloud, Desktop, DownloadSimple, FileText, FolderSimple, House } from '@phosphor-icons/react';
-import { BrandLogo } from './BrandLogo';
-import { isBrandService } from './brands';
+import { CaretDoubleRight } from '@phosphor-icons/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PaneSide, Place } from '../backend/types';
 import { activeTab, movePlace, navigate, placesFor, removePlace, setState, useStore } from '../state/store';
 import { $t } from '../i18n';
 import { placeLabel } from '../util/placeLabel';
-
-/** Icon of a place, guessed from its folder (home, desktop, downloads, documents). */
-function PlaceIcon({ place }: { place: Place }) {
-  const last =
-    place.path
-      .replace(/[\\/]+$/, '')
-      .split(/[\\/]/)
-      .pop()
-      ?.toLowerCase() ?? '';
-  const props = { size: 17, weight: 'duotone', 'aria-hidden': true } as const;
-  // Cloud folders show the service's own logo (single-colour, like the Finder sidebar).
-  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={16} />;
-  if (place.cloud) return <Cloud {...props} />;
-  if (place.path === '~') return <House {...props} />;
-  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...props} />;
-  if (last === 'downloads') return <DownloadSimple {...props} />;
-  if (last === 'documents' || last === 'dokumente') return <FileText {...props} />;
-  return <FolderSimple {...props} />;
-}
+import { PlaceIcon } from './placeIcons';
 
 /** Tooltip of a place: the folder, and for cloud folders the account it belongs to. */
 function placeTitle(place: Place): string {
@@ -158,7 +138,7 @@ export function PlacesBar({ side }: { side: PaneSide }) {
               tabIndex={-1}
               aria-hidden="true"
             >
-              <PlaceIcon place={p} />
+              <PlaceIcon place={p} big />
               <span>{placeLabel(p)}</span>
             </button>
           );
@@ -185,7 +165,7 @@ export function PlacesBar({ side }: { side: PaneSide }) {
               setState({ contextMenu: { x: e.clientX, y: e.clientY, side, names: [], kind: 'place', place: p.path } });
             }}
           >
-            <PlaceIcon place={p} />
+            <PlaceIcon place={p} big />
             <span className="ellipsis">{placeLabel(p)}</span>
           </button>
         );

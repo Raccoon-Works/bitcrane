@@ -1,6 +1,7 @@
 # Code checks without building installers or publishing anything. Every warning
 # fails a check, so the code base stays at zero warnings:
-# - interface: Prettier, ESLint, the TypeScript compiler and the unit tests (Vitest),
+# - interface: Prettier, ESLint, the TypeScript compiler, the production build and the unit
+#   tests (Vitest); html-validate on the pages of the website,
 # - Rust: rustfmt, Clippy and the tests on Windows, where the platform code (e.g. the
 #   jump list in iconmenu.rs) is compiled, and Clippy and the tests on macOS (see rust-macos).
 name: Checks
@@ -31,8 +32,10 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint
-      - run: npx tsc -b
+      # Type check and production build, so a build-only error (an import Vite cannot resolve) shows here.
+      - run: npm run build
       - run: npm test
+      - run: npm run validate:website
 
   rust:
     runs-on: windows-latest

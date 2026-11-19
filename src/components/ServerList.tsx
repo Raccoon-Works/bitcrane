@@ -49,7 +49,8 @@ import { CloudServicesIcon, CloudTile, LocalTile, ServerTile, type CloudService 
 import { ResizeHandle } from './ResizeHandle';
 import { Button, IconButton, Select, TextField, WithWordmark } from './ui';
 import { $t } from '../i18n';
-import { addressOf, hostOf } from '../util/serverAddress';
+import { addressOf, hostOf, parseQuickAddress, QUICK_SCHEMES, schemeProtocol } from '../util/serverAddress';
+import { isSftp } from '../util/protocols';
 
 /**
  * Reordering servers by dragging. Dropping on the upper half of a server puts
@@ -245,7 +246,7 @@ function Servers({ side, onQuick }: { side: PaneSide; onQuick: () => void }) {
   // Servers set to open as a terminal (SSH only) get their terminal tab; the files stay in the context menu.
   const open = (id: string) => {
     const srv = getState().servers.find((x) => x.id === id);
-    if (srv?.openAs === 'terminal' && (!srv.protocol || srv.protocol === 'sftp'))
+    if (srv?.openAs === 'terminal' && isSftp(srv))
       void import('../state/terminal').then((m) => m.openServerTerminal(id));
     else openServerIn(side, id);
   };
@@ -598,16 +599,7 @@ function Welcome({ onQuick }: { onQuick: () => void }) {
   );
 }
 
-type QuickProtocol = 'sftp' | 'ftp' | 'ftpes' | 'ftps' | 'davs' | 'dav' | 'smb';
-const DEFAULT_PORT: Record<QuickProtocol, number> = {
-  sftp: 22,
-  ftp: 21,
-  ftpes: 21,
-  ftps: 990,
-  davs: 443,
-  dav: 80,
-  smb: 445,
-};
+type QuickProtocol = (typeof QUICK_SCHEMES)[number];
 
 /**
  * "Schnell verbinden" (Transmit's Quick Connect): protocol, address, user,
@@ -625,7 +617,7 @@ function QuickForm({ side }: { side: PaneSide }) {
   const address = () => {
     const h = host.trim();
     if (!h) return '';
-    const p = port.trim() && Number(port) !== DEFAULT_PORT[protocol] ? `:${port.trim()}` : '';
+    const p = port.trim() && Number(port) !== schemeProtocol(protocol).defaultPort ? `:${port.trim()}` : '';
     const dir = path.trim() ? (path.trim().startsWith('/') ? path.trim() : `/${path.trim()}`) : '';
     return `${protocol}://${user.trim() ? `${user.trim()}@` : ''}${h}${p}${dir}`;
   };
@@ -634,16 +626,15 @@ function QuickForm({ side }: { side: PaneSide }) {
     if (!a) return;
     quickConnect(a, save, 'auto', side, password || undefined, terminal ? 'terminal' : undefined);
   };
-  // A recent address fills the form again.
+  // A recent address fills the form again (read like any typed address: the last "@" ends the user).
   const fill = (a: string) => {
-    const m = a.match(/^(?:([a-z]+):\/\/)?(?:([^@]+)@)?([^:/]+)(?::(\d+))?(\/.*)?$/i);
-    if (!m) return;
-    const scheme = (m[1]?.toLowerCase() ?? 'sftp') as QuickProtocol;
-    setProtocol(scheme in DEFAULT_PORT ? scheme : 'sftp');
-    setUser(m[2] ?? '');
-    setHost(m[3] ?? '');
-    setPort(m[4] ?? '');
-    setPath(m[5] ?? '');
+    const q = parseQuickAddress(a);
+    if (!q) return;
+    setProtocol((QUICK_SCHEMES as readonly string[]).includes(q.scheme) ? (q.scheme as QuickProtocol) : 'sftp');
+    setUser(q.user ?? '');
+    setHost(q.host.includes(':') ? `[${q.host}]` : q.host);
+    setPort(q.port ? String(q.port) : '');
+    setPath(q.path ?? '');
   };
   return (
     <form
@@ -664,7 +655,7 @@ function QuickForm({ side }: { side: PaneSide }) {
           value={protocol}
           onChange={(v) => setProtocol(v as QuickProtocol)}
           label={$t('Protokoll#protocol')}
-          options={(Object.keys(DEFAULT_PORT) as QuickProtocol[]).map((p) => ({ value: p, label: protocolLabel(p) }))}
+          options={QUICK_SCHEMES.map((p) => ({ value: p, label: protocolLabel(p) }))}
         />
         <label htmlFor="q-host">{$t('Adresse')}</label>
         <span className="quick-host">
@@ -672,7 +663,7 @@ function QuickForm({ side }: { side: PaneSide }) {
           <TextField
             value={port}
             onChange={(v) => setPort(v.replace(/\D/g, ''))}
-            placeholder={String(DEFAULT_PORT[protocol])}
+            placeholder={String(schemeProtocol(protocol).defaultPort)}
             mono
             className="quick-port"
             label={$t('Port')}

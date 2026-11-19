@@ -2,6 +2,7 @@
  * Overview of all folder watches, opened from the watch button in the
  * toolbar. Scales in from the button (origin-aware, 150 ms ease-out).
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { useEffect, useRef } from 'react';
 import type { Watch } from '../backend/types';
 import {
@@ -52,6 +53,8 @@ export function WatchActions({ w, apart }: { w: Watch; apart?: boolean }) {
   );
 }
 
+const closePopover = () => setState({ popoverOpen: false });
+
 export function WatchPopover() {
   const watches = useStore((s) => s.watches);
   const servers = useStore((s) => s.servers);
@@ -59,20 +62,10 @@ export function WatchPopover() {
   const background = useStore((s) => s.settings.runInBackground);
   const ref = useRef<HTMLDivElement>(null);
 
+  // The button the popover hangs on (its parent) counts as inside, so it can close it itself.
+  useCloseOnOutside(true, ref, closePopover, (t) => !!ref.current?.parentElement?.contains(t));
   useEffect(() => {
-    // Close when clicking outside the popover or pressing Escape.
-    const onDown = (e: MouseEvent) => {
-      const anchor = ref.current?.parentElement;
-      if (anchor && !anchor.contains(e.target as Node)) setState({ popoverOpen: false });
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setState({ popoverOpen: false });
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
     ref.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
   }, []);
 
   return (

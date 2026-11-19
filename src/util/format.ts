@@ -17,7 +17,8 @@ export function formatSize(bytes: number): string {
   return `${v.toLocaleString(LOCALE, { maximumFractionDigits: digits, minimumFractionDigits: 0 })} ${units[i]}`;
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
+/** Two digits, for dates and times ("07"). */
+export const pad = (n: number) => String(n).padStart(2, '0');
 
 /** "Heute, 17:04", "Gestern, 21:10" or "12.10.2026". */
 export function formatDate(ms: number): string {

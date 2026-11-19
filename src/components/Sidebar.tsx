@@ -18,7 +18,8 @@ import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { NetworkHost } from '../backend/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
-import { $t, LOCALE } from '../i18n';
+import { $t } from '../i18n';
+import { formatFree } from './pane/useFreeSpace';
 import {
   LIVE,
   removeRecent,
@@ -67,15 +68,6 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
     return true;
   });
   return favoriteLabels(unique);
-}
-
-/** Free space in a short form ("86 GB", "512 MB"). */
-function shortSize(bytes: number): string {
-  const gb = bytes / 1e9;
-  if (gb >= 1000) return `${(gb / 1000).toLocaleString(LOCALE, { maximumFractionDigits: 1 })} TB`;
-  if (gb >= 10) return `${Math.round(gb).toLocaleString(LOCALE)} GB`;
-  if (gb >= 1) return `${gb.toLocaleString(LOCALE, { maximumFractionDigits: 1 })} GB`;
-  return `${Math.round(bytes / 1e6).toLocaleString(LOCALE)} MB`;
 }
 
 /** Computers in the network with file shares (Bonjour), searched when the sidebar opens and every two minutes. */
@@ -380,8 +372,8 @@ export function Sidebar() {
           () => open(d.path),
           {},
           d.free !== undefined ? (
-            <span className="side-free" title={$t('{0} frei', shortSize(d.free))}>
-              {shortSize(d.free)}
+            <span className="side-free" title={$t('{0} frei', formatFree(d.free))}>
+              {formatFree(d.free)}
             </span>
           ) : undefined,
         ),

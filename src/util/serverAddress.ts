@@ -3,6 +3,7 @@
  * how an address typed into "Schnell verbinden" is read.
  */
 import { isCloudProtocol, type Protocol, type Server } from '../backend/types';
+import { defaultPort } from './protocols';
 
 /**
  * A port number as typed into a field: digits only, at most 65535 (the core reads ports as 16-bit
@@ -15,7 +16,7 @@ export function portInput(text: string, fallback: number): number {
 /** Address of a WebDAV server, shown in the server dialog; the core logs in with the same one (login.rs). */
 export function davUrl(srv: Server): string {
   const https = srv.davHttps !== false;
-  const port = srv.port && srv.port !== (https ? 443 : 80) ? `:${srv.port}` : '';
+  const port = srv.port && srv.port !== defaultPort('webdav', { https }) ? `:${srv.port}` : '';
   const path = (srv.davPath || '/').startsWith('/') ? srv.davPath || '/' : `/${srv.davPath}`;
   return `${https ? 'https' : 'http'}://${srv.host}${port}${path}`;
 }
@@ -26,13 +27,8 @@ export function addressOf(x: Server): string {
   if (isCloudProtocol(x.protocol)) return x.user || x.host;
   // S3: bucket and service; the access key is no user name worth showing.
   if (x.protocol === 's3') return `${x.s3Bucket ? `${x.s3Bucket} · ` : ''}${x.host}`;
-  const defaults: Record<string, number> = {
-    sftp: 22,
-    ftp: 21,
-    ftps: x.implicitTls ? 990 : 21,
-    webdav: x.davHttps === false ? 80 : 443,
-  };
-  const port = x.port !== defaults[x.protocol ?? 'sftp'] ? `:${x.port}` : '';
+  const standard = defaultPort(x.protocol, { implicitTls: x.implicitTls, https: x.davHttps !== false });
+  const port = x.port !== standard ? `:${x.port}` : '';
   return `${x.user ? `${x.user}@` : ''}${x.host}${port}`;
 }
 
@@ -110,6 +106,14 @@ export function parseQuickAddress(address: string): QuickAddress | null {
   const scheme = typed.match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase() ?? 'sftp';
   const parts = splitAddress(typed.replace(/^[a-z]+:\/\//i, ''));
   if (!parts) return null;
+  return { ...parts, scheme, ...schemeProtocol(scheme) };
+}
+
+/** The schemes "Schnell verbinden" offers, in the order of its menu. */
+export const QUICK_SCHEMES = ['sftp', 'ftp', 'ftpes', 'ftps', 'davs', 'dav', 'smb'] as const;
+
+/** Protocol and standard port of a scheme of `parseQuickAddress`; an unknown one counts as SFTP. */
+export function schemeProtocol(scheme: string): { protocol: Protocol; defaultPort: number } {
   const protocol: Protocol =
     scheme === 'ftp'
       ? 'ftp'
@@ -120,19 +124,5 @@ export function parseQuickAddress(address: string): QuickAddress | null {
           : scheme === 'smb'
             ? 'smb'
             : 'sftp';
-  const defaultPort =
-    protocol === 'ftp'
-      ? 21
-      : protocol === 'ftps'
-        ? scheme === 'ftps'
-          ? 990
-          : 21
-        : protocol === 'webdav'
-          ? scheme === 'dav'
-            ? 80
-            : 443
-          : protocol === 'smb'
-            ? 445
-            : 22;
-  return { ...parts, scheme, protocol, defaultPort };
+  return { protocol, defaultPort: defaultPort(protocol, { implicitTls: scheme === 'ftps', https: scheme !== 'dav' }) };
 }

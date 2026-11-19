@@ -33,6 +33,7 @@ import { IconButton } from '../ui';
 import { $t } from '../../i18n';
 import { Crumbs } from './Crumbs';
 import { PathInput } from './PathInput';
+import { isSftp } from '../../util/protocols';
 
 export function PaneHead({
   side,
@@ -65,7 +66,7 @@ export function PaneHead({
   const watched = useStore((s) => !onServer && !!watchForLocal(path, s));
   const icons = viewMode === 'icons';
   // SSH servers get a button for the built-in terminal next to "Trennen".
-  const sshPane = !server?.protocol || server.protocol === 'sftp';
+  const sshPane = !server || isSftp(server);
 
   const stateLabel = !onServer
     ? watched

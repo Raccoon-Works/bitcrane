@@ -27,7 +27,7 @@ const KEY_SITES = [
 
 /** Test modules start with `#[cfg(test)]` and end with the first unindented `}` (rustfmt). */
 function withoutTests(source: string): string {
-  return source.replace(/#\[cfg\(test\)\]\n(?:pub )?mod \w+ \{\n[\s\S]*?\n\}\n?/g, '');
+  return source.replace(/#\[cfg\(test\)\]\r?\n(?:pub )?mod \w+ \{\r?\n[\s\S]*?\r?\n\}\r?\n?/g, '');
 }
 
 function unescape(literal: string): string {

@@ -21,7 +21,7 @@ import { usePreview } from './usePreview';
 import { join } from '../util/paths';
 import { describeFile, extLabel, formatDate, formatSize } from '../util/format';
 import { FolderGlyph } from './icons';
-import { Button } from './ui';
+import { Button, PermToggle } from './ui';
 import { $t } from '../i18n';
 
 const who = [$t('Besitzer'), $t('Gruppe'), $t('Andere')];
@@ -143,33 +143,16 @@ export function Inspector() {
         </div>
         <div className="perm-grid" role="group" aria-label={$t('Rechte')}>
           <span />
-          <span className="muted center">L</span>
-          <span className="muted center">S</span>
-          <span className="muted center">A</span>
+          <span className="muted center">{$t('L#lesen')}</span>
+          <span className="muted center">{$t('S#schreiben')}</span>
+          <span className="muted center">{$t('A#ausführen')}</span>
           {who.map((w, r) => (
             <span key={w} className="contents">
               <span className="text-2">{w}</span>
               {what.map((x, c) => {
                 const on = (bits[r] & [4, 2, 1][c]) !== 0;
                 return (
-                  <button
-                    key={x}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={on}
-                    aria-label={`${w} ${x}`}
-                    className="perm-hit"
-                    disabled={multi}
-                    onClick={() => toggleBit(r, c)}
-                  >
-                    <span className={`checkbox-box${on ? ' is-on' : ''}`}>
-                      {on && (
-                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.6">
-                          <path d="m3.5 8.5 3 3 6-7" />
-                        </svg>
-                      )}
-                    </span>
-                  </button>
+                  <PermToggle key={x} on={on} label={`${w} ${x}`} disabled={multi} onToggle={() => toggleBit(r, c)} />
                 );
               })}
             </span>

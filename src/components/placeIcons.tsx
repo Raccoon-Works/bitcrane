@@ -20,20 +20,25 @@ import { isBrandService } from './brands';
 /** Size and weight of the place symbols. */
 export const PLACE_ICON = { size: 16, weight: 'regular', 'aria-hidden': true } as const;
 
-export function PlaceIcon({ place }: { place: Place }) {
+/**
+ * Icon of a place, guessed from its folder (home, desktop, downloads, documents); cloud folders show
+ * the service's own logo (single-colour, like the Finder sidebar). `big`: the places bar's look.
+ */
+export function PlaceIcon({ place, big }: { place: Place; big?: boolean }) {
   const last =
     place.path
       .replace(/[\\/]+$/, '')
       .split(/[\\/]/)
       .pop()
       ?.toLowerCase() ?? '';
-  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={14} />;
-  if (place.cloud) return <Cloud {...PLACE_ICON} />;
-  if (place.path === '~') return <House {...PLACE_ICON} />;
-  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...PLACE_ICON} />;
-  if (last === 'downloads') return <DownloadSimple {...PLACE_ICON} />;
-  if (last === 'documents' || last === 'dokumente') return <FileText {...PLACE_ICON} />;
-  return <FolderSimple {...PLACE_ICON} />;
+  const props = big ? ({ size: 17, weight: 'duotone', 'aria-hidden': true } as const) : PLACE_ICON;
+  if (isBrandService(place.cloud)) return <BrandLogo service={place.cloud} size={big ? 16 : 14} />;
+  if (place.cloud) return <Cloud {...props} />;
+  if (place.path === '~') return <House {...props} />;
+  if (last === 'desktop' || last === 'schreibtisch') return <Desktop {...props} />;
+  if (last === 'downloads') return <DownloadSimple {...props} />;
+  if (last === 'documents' || last === 'dokumente') return <FileText {...props} />;
+  return <FolderSimple {...props} />;
 }
 
 /** Start disk, other disks and removable drives look different (Finder). */

@@ -4,6 +4,7 @@
  * "+" for another one, the snippets, search, and the switch between panel
  * and whole tab.
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import {
@@ -55,6 +56,8 @@ function TerminalView({ id }: { id: string }) {
   return <div ref={ref} className="term-view" />;
 }
 
+const inAnchor = (t: HTMLElement) => !!t.closest('.term-snippets-anchor');
+
 function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
   const snippets = useStore((s) => s.settings.snippets) ?? NO_SNIPPETS;
   const order = useStore((s) => s.settings.snippetGroups);
@@ -66,15 +69,11 @@ function SnippetMenu({ id, onClose }: { id: string; onClose: () => void }) {
     ['', shown.filter((x) => !x.group)] as [string, Snippet[]],
     ...groupNames.map((g) => [g, shown.filter((x) => x.group === g)] as [string, Snippet[]]),
   ].filter(([, l]) => l.length);
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.term-snippets')) onClose();
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [onClose]);
+  const ref = useRef<HTMLDivElement>(null);
+  // The button it hangs on counts as inside, so a second click closes it there.
+  useCloseOnOutside(true, ref, onClose, inAnchor);
   return (
-    <div className="term-snippets menu" role="menu">
+    <div ref={ref} className="term-snippets menu" role="menu">
       {shown.length === 0 && (
         <span className="small muted term-snippets-empty">
           {$t('Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.')}

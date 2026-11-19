@@ -240,16 +240,14 @@ function tick() {
         // The preview runs a command for 1.5 seconds; done counts the milliseconds of that.
         const done = tr.done + TICK;
         if (done >= 1500) {
+          const app = tr.name.split(' ').pop();
           return {
             ...tr,
             done: tr.size,
             state: 'done' as const,
             finishedAt: now,
-            output: $t(
-              '[PM2] Applying action restartProcessId on app [{0}]\n[PM2] [{1}](0) ✓',
-              tr.name.split(' ').pop(),
-              tr.name.split(' ').pop(),
-            ),
+            // What PM2 itself prints, in its own language.
+            output: `[PM2] Applying action restartProcessId on app [${app}]\n[PM2] [${app}](0) ✓`,
           };
         }
         return { ...tr, done, size: 1500 };

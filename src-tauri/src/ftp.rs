@@ -264,7 +264,8 @@ async fn read_reply<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R, shared: &Shar
     let code: u32 = std::str::from_utf8(first.get(..3).unwrap_or(b""))
         .ok()
         .and_then(|c| c.parse().ok())
-        .ok_or_else(|| lost(format!("Unerwartete Antwort: {}", String::from_utf8_lossy(&first))))?;
+        // The detail is the server's line as it came; it explains the break in any language.
+        .ok_or_else(|| lost(String::from_utf8_lossy(&first)))?;
     let mut text = shared.decode(first.get(4..).unwrap_or(b""));
     if first.get(3) == Some(&b'-') {
         let end = format!("{code} ");

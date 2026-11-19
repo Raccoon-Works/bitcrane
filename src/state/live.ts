@@ -28,7 +28,6 @@ export {
   installPublicKey,
   isConnected,
   isConnecting,
-  isSftp,
   passphraseRef,
   presetPassword,
   proxyRef,

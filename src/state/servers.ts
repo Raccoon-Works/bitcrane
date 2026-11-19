@@ -24,6 +24,7 @@ import { openDialog } from './panels';
 import { updateSettings } from './settings';
 import { closePaneServer, simulateLocalChange } from './watches';
 import { normalizeSshAddress, splitAddress } from '../util/serverAddress';
+import { isSftp } from '../util/protocols';
 
 export function saveServer(server: Server, connect: boolean) {
   const exists = getState().servers.some((x) => x.id === server.id);
@@ -237,7 +238,7 @@ export function quickConnect(
   if (LIVE) {
     void live.quickConnect(address, save, password ? 'password' : auth).then((server) => {
       if (!server) return;
-      if (openAs && (!server.protocol || server.protocol === 'sftp')) server = { ...server, openAs };
+      if (openAs && isSftp(server)) server = { ...server, openAs };
       setState((s) => ({ servers: [...s.servers, server], dialog: null }));
       if (password) live.presetPassword(server.id, password, save);
       // From the "Schnell verbinden" tab of a half: connect right there.

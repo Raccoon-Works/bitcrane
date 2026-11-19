@@ -28,12 +28,13 @@ npm run format          # Prettier (interface); `npm run format:check` only repo
 npm run lint            # ESLint, fails on any warning
 npm test                # unit tests (Vitest, `*.test.ts` next to the code)
 npm run build           # type check and production build of the UI
+npm run validate:website # html-validate on the website's pages (.htmlvalidate.json)
 cd src-tauri && cargo fmt && cargo test --lib && cargo clippy --all-targets -- -D warnings
 python3 website/build.py https://dev.bitcrane.de   # test build of the website
 ```
 
-Before a change is merged, formatting, lint, type check, tests and Clippy pass without errors or
-warnings. The workflow `.github/workflows/checks.yml` runs them on every push to `main` and to
+Before a change is merged, formatting, lint, type check, build, tests, Clippy and (for the website)
+html-validate pass without errors or warnings. The workflow `.github/workflows/checks.yml` runs them on every push to `main` and to
 `native-check` (Clippy on Windows, where the platform code is compiled; on macOS for pull requests
 and runs started by hand); push to `native-check` first to check a change before it reaches `main`.
 Tests that need a test server are `#[ignore]`d; run them with `cargo test --lib -- --ignored` and

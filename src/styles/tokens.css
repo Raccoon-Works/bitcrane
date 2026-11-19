@@ -13,6 +13,18 @@
   --accent-hover: #3a7bea;
   --accent-pressed: #1b4fb8;
   --on-accent: #ffffff;
+  /* Windows' own red of the close button in the title bar (the same in both themes). */
+  --win-close: #c42b1c;
+  /* Tints of the settings icons (system colours, as in the macOS System Settings). */
+  --tint-gray: #8e8e93;
+  --tint-blue: #2a6de0;
+  --tint-yellow: #e8a600;
+  --tint-teal: #3fbfaa;
+  --tint-green: #30b158;
+  --tint-purple: #af52de;
+  --tint-cyan: #30b0c7;
+  --tint-sky: #5ac8fa;
+  --tint-orange: #ff7a3d;
 
   /* Spacing scale (4px grid). */
   --space-1: 4px;

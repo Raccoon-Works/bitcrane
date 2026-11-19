@@ -12,6 +12,7 @@ import { ServerTile } from '../ServerTile';
 import { Button, Checkbox, Segmented, Select, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
+import { isSftp } from '../../util/protocols';
 
 export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
   const [address, setAddress] = useState(LIVE ? '' : 'deploy@shop.example:22');
@@ -47,8 +48,7 @@ export function QuickConnect({ terminal = false }: { terminal?: boolean }) {
       when: formatAgo(x.lastUsed!, now),
       run: () => {
         closeDialog();
-        if (as === 'terminal' && (!x.protocol || x.protocol === 'sftp'))
-          void import('../../state/terminal').then((m) => m.openServerTerminal(x.id));
+        if (as === 'terminal' && isSftp(x)) void import('../../state/terminal').then((m) => m.openServerTerminal(x.id));
         else openServer(x.id);
       },
     })),

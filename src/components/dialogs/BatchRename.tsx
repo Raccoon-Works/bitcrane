@@ -12,10 +12,10 @@ import { activeTab, closeDialog, listEntries, panePath, renameMany, paneLoc } fr
 import { Button, Checkbox, Segmented, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
+import { pad } from '../../util/format';
 
 type Mode = 'replace' | 'regex' | 'number' | 'affix' | 'case';
 
-const pad = (n: number) => String(n).padStart(2, '0');
 const isoDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 /** Fills {date}, {time} (modification time of the file) and {today}. */
 function fillDates(text: string, mtime: number): string {

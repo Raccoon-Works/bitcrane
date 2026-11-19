@@ -64,7 +64,6 @@ export const EN: Record<string, string> = {
   Vor: 'Forward',
   'Übergeordneter Ordner': 'Parent folder',
   'Pfad eingeben …': 'Enter path …',
-  'Lesezeichen hinzufügen': 'Add bookmark',
   'Server hinzufügen …': 'Add server …',
   'Server importieren …': 'Import servers …',
   'Diesen Server bearbeiten …': 'Edit this server …',
@@ -108,7 +107,6 @@ export const EN: Record<string, string> = {
   'Im Browser öffnen': 'Open in browser',
   Umbenennen: 'Rename',
   '{0} Objekte umbenennen …': 'Rename {0} items …',
-  'Prüfsumme (SHA-256) …': 'Checksum (SHA-256) …',
   'Größe berechnen': 'Calculate size',
   'Symbolischen Link erstellen …': 'Create symbolic link …',
   'Informationen und Rechte …': 'Info and permissions …',
@@ -119,7 +117,6 @@ export const EN: Record<string, string> = {
   'Hier einfügen (hochladen)': 'Paste here (upload)',
   'Hier einfügen (herunterladen)': 'Paste here (download)',
   'Pfad dieses Ordners kopieren': "Copy this folder's path",
-  'Terminal hier öffnen (SSH)': 'Open terminal here (SSH)',
   'Terminal hier öffnen': 'Open terminal here',
   'Diesen Ordner überwachen …': 'Watch this folder …',
   Kontextmenü: 'Context menu',
@@ -242,27 +239,15 @@ export const EN: Record<string, string> = {
   Hell: 'Light',
   Ausprobieren: 'Try it out',
   Kürzel: 'Shortcuts',
-  'Breite der Seitenleiste': 'Sidebar width',
-  'Ziehen, um die Breite zu ändern. Doppelklick: Standardbreite.':
-    'Drag to change the width. Double-click: default width.',
   Seitenleiste: 'Sidebar',
   'Server suchen': 'Search servers',
-  'Kein Server passt zu „': 'No server matches “',
-  Schnellverbindungen: 'Quick connections',
   'nicht gespeichert': 'not saved',
-  '{0} als Server speichern': 'Save {0} as server',
   '1 Fehler, bitte ansehen': '1 error, please check',
   '{0} Fehler, bitte ansehen': '{0} errors, please check',
   'wartet auf Verbindung': 'waiting for connection',
-  'aktiv · {0}': 'active · {0}',
   Abgleiche: 'Comparisons',
   'Server fehlt': 'Server missing',
-  'beide Richtungen': 'both directions',
   'Abgleich {0} entfernen': 'Remove comparison {0}',
-  Lesezeichen: 'Bookmarks',
-  '{0}{1}\nDateien hierher ziehen, um sie in diesen Ordner zu übertragen.':
-    '{0}{1}\nDrag files here to transfer them into this folder.',
-  'Lesezeichen {0} entfernen': 'Remove bookmark {0}',
   Orte: 'Places',
   'Server hinzufügen': 'Add server',
   'Keine Überwachung': 'No watches',
@@ -302,9 +287,6 @@ export const EN: Record<string, string> = {
   Vorne: 'At start',
   'Hinten (vor der Endung)': 'At end (before the extension)',
   Schreibweise: 'Case',
-  'Abgleich „{0}“ gesichert. Er steht in der Seitenleiste.': 'Comparison “{0}” saved. You can find it in the sidebar.',
-  '{0} auf dem Server löschen': 'delete {0} on the server',
-  '{0} lokal löschen': 'delete {0} locally',
   'Abgleich „{0}“': 'Comparison “{0}”',
   'Name des Abgleichs': 'Comparison name',
   Sichern: 'Save',
@@ -317,8 +299,6 @@ export const EN: Record<string, string> = {
   'Beide Richtungen': 'Both directions',
   'Nur nach Größe vergleichen': 'Compare by size only',
   'Inhalt prüfen (Prüfsumme)': 'Check content (checksum)',
-  'Was nur auf dem Server liegt, löschen': 'Delete items that exist only on the server',
-  'Was nur lokal liegt, löschen': 'Delete items that exist only locally',
   'Ausgelassen wird:': 'Skipped:',
   ' (wie bei der Überwachung „{0}“)': ' (as in the watch “{0}”)',
   '{0} {1} schon gleich.': '{0} {1} already identical.',
@@ -371,7 +351,6 @@ export const EN: Record<string, string> = {
   'Dieser Computer': 'This computer',
   Prüfsumme: 'Checksum',
   'Prüfsumme von „{0}“': 'Checksum of “{0}”',
-  'SHA-256. Gleiche Prüfsumme heißt gleicher Inhalt.': 'SHA-256. Identical checksums mean identical content.',
   'Beide Dateien haben denselben Inhalt.': 'Both files have the same content.',
   'Die Inhalte unterscheiden sich.': 'The contents differ.',
   '{0} Link': '{0} link',
@@ -394,13 +373,11 @@ export const EN: Record<string, string> = {
   Beenden: 'Stop',
   'FTPS (implizit)': 'FTPS (implicit)',
   'Server importieren': 'Import servers',
-  'Aus FileZilla, WinSCP und der SSH-Konfiguration. Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.':
-    'From FileZilla, WinSCP and the SSH configuration. Passwords are not imported; Bitcrane asks for them the first time you connect.',
   '{0} ausgewählt': '{0} selected',
-  Übernehmen: 'Import',
+  'Übernehmen#importieren': 'Import',
+  'Übernehmen#anwenden': 'Apply',
+  'Übernehmen#Änderung': 'Take over',
   'Wird gesucht …': 'Searching …',
-  'Keine gespeicherten Server gefunden. Gesucht wurde in: FileZilla (sitemanager.xml), WinSCP (Registry bzw. WinSCP.ini) und ~/.ssh/config.':
-    'No saved servers found. Searched in: FileZilla (sitemanager.xml), WinSCP (registry or WinSCP.ini) and ~/.ssh/config.',
   Schlüssel: 'Key',
   'schon vorhanden': 'already present',
   Einzelschritt: 'Debug',
@@ -418,7 +395,6 @@ export const EN: Record<string, string> = {
   'Noch keine Einträge.': 'No entries yet.',
   '{0} öffnen': 'Open {0}',
   'Überwachung „{0}“ zeigen': 'Show watch “{0}”',
-  'Befehl, Server oder Lesezeichen suchen': 'Search for a command, server or bookmark',
   'Befehl suchen': 'Search commands',
   'Nichts gefunden.': 'Nothing found.',
   'Ordner haben keine Vorschau.': 'Folders have no preview.',
@@ -470,7 +446,6 @@ export const EN: Record<string, string> = {
     'First the SSH agent, then the key below and the usual keys from ~/.ssh, and finally the password. If the server asks for a one-time code, Bitcrane prompts you.',
   'Auswählen …': 'Choose …',
   'Neu …': 'New …',
-  'ED25519 · Passphrase': 'ED25519 · passphrase',
   'Datei nicht gefunden': 'File not found',
   'Das ist kein privater SSH-Schlüssel': 'This is not a private SSH key',
   'Passphrase {0} gespeichert': 'Passphrase saved {0}',
@@ -488,9 +463,6 @@ export const EN: Record<string, string> = {
     'For servers that can only be reached through another server (like ProxyJump in the SSH configuration).',
   'Weitere Einstellungen': 'More settings',
   Notiz: 'Note',
-  'Proxy, TLS-Version, Dateinamen, Zeitzone, Übertragungsart, Notiz':
-    'Proxy, TLS version, file names, time zone, transfer mode, note',
-  'Proxy, Web-Adresse, Notiz': 'Proxy, web address, note',
   'Kein Proxy': 'No proxy',
   'Benutzer (falls nötig)': 'User (if needed)',
   'Mit Sprungserver gilt dessen Proxy-Einstellung.': 'With a jump server, its proxy setting applies.',
@@ -550,8 +522,6 @@ export const EN: Record<string, string> = {
   'Überwachungen laufen weiter, wenn das Fenster geschlossen ist.': 'Watches keep running when the window is closed.',
   'Symbol in der Menüleiste zeigen': 'Show icon in the menu bar',
   'Symbol im Infobereich zeigen': 'Show icon in the notification area',
-  'Zeigt Zustand und letzte Uploads, auch ohne geöffnetes Fenster.':
-    'Shows status and recent uploads, even without an open window.',
   'Symbol zeigen': 'Show icon',
   'Beim Anmelden am Mac starten': 'Open at login',
   'Mit Windows starten': 'Start with Windows',
@@ -586,11 +556,7 @@ export const EN: Record<string, string> = {
   'Tastenkürzel …': 'Keyboard shortcuts …',
   Sprache: 'Language',
   'Beim Start öffnen': 'Open at launch',
-  'Zuletzt geöffnete Tabs': 'Previously open tabs',
-  'Nur den ersten Server': 'Only the first server',
   'Vor dem Löschen nachfragen': 'Ask before deleting',
-  'Auf dem Server wird immer nachgefragt, dort gibt es keinen Papierkorb.':
-    'On the server, Bitcrane always asks, since there is no trash there.',
   'Editor für „Im Editor öffnen“': 'Editor for “Open in editor”',
   'Das Programm, das das System für die Dateiart vorsieht.': 'The app the system assigns to the file type.',
   'Ändern …': 'Change …',
@@ -618,8 +584,6 @@ export const EN: Record<string, string> = {
   'Bis zu drei Versuche im Abstand von 5 Sekunden, nicht bei fehlenden Rechten.':
     'Up to three attempts, 5 seconds apart; not for missing permissions.',
   'Automatisch erneut versuchen': 'Retry automatically',
-  'Geschwindigkeit begrenzen': 'Limit speed',
-  'Gilt für alle Übertragungen zusammen.': 'Applies to all transfers together.',
   Unbegrenzt: 'Unlimited',
   'Beim Übertragen von Hand auslassen': 'Skip when transferring manually',
   'Namen und Muster': 'Names and patterns',
@@ -673,11 +637,8 @@ export const EN: Record<string, string> = {
   'SSH-Konfiguration lesen': 'Read SSH configuration',
   'Kurznamen aus ~/.ssh/config funktionieren in „Schnell verbinden“, und neue Server lassen sich von dort übernehmen.':
     'Short names from ~/.ssh/config work in “Quick connect”, and new servers can be imported from there.',
-  'Überwachungen pro Ordner': 'Watches per folder',
   Adresse: 'Address',
   'Schnell verbinden': 'Quick connect',
-  'Ohne den Server zu speichern. Adresse wie im Terminal eingeben; für FTP oder WebDAV mit ftp://, ftps:// oder davs:// davor.':
-    'Without saving the server. Enter the address as in a terminal; for FTP or WebDAV, prefix it with ftp://, ftps:// or davs://.',
   'Automatisch (Agent, Schlüssel, Passwort)': 'Automatic (agent, key, password)',
   'Nach dem Verbinden als Server speichern': 'Save as server after connecting',
   'Zuletzt verwendet': 'Recently used',
@@ -775,7 +736,6 @@ export const EN: Record<string, string> = {
   'Endgültig löschen': 'Delete permanently',
   'In den Papierkorb': 'Move to trash',
   '… und': '… and',
-  '0.1.0 (Prototyp)': '0.1.0 (prototype)',
   'Dateien per SFTP übertragen und Ordner überwachen. Jede Änderung wird automatisch hochgeladen.':
     'Transfer files via SFTP and watch folders. Every change is uploaded automatically.',
   Webseite: 'Website',
@@ -786,7 +746,6 @@ export const EN: Record<string, string> = {
     'Drag icons into or out of the toolbar, or click them. The default toolbar covers everyday work; you can add anything else you need.',
   'Anzeigen als': 'Show as',
   'Nur Symbole': 'Icons only',
-  'Symbole und Text': 'Icons and text',
   'Standard wiederherstellen': 'Restore default',
   'Deine Leiste': 'Your toolbar',
   '{0} aus der Leiste entfernen': 'Remove {0} from the toolbar',
@@ -896,20 +855,9 @@ export const EN: Record<string, string> = {
     'Collects changes so that no half-saved files are uploaded.',
   'Wartezeit in Sekunden': 'Delay in seconds',
   'Sek.': 's',
-  'der SSH-Konfiguration': 'the SSH configuration',
-  'Willkommen bei Bitcrane': 'Welcome to Bitcrane',
   'Verbinde dich mit einem Server. Danach kannst du einen Ordner überwachen lassen.':
     'Connect to a server. Then you can set up a watch for a folder.',
-  'Adresse, Benutzer und SSH-Schlüssel eintragen und dauerhaft speichern.':
-    'Enter address, user and SSH key and save them permanently.',
-  'Einmalig verbinden mit ubuntu@server:22, ohne zu speichern.': 'Connect once to ubuntu@server:22 without saving.',
   'Aus anderen Programmen': 'From other apps',
-  'Server aus der SSH-Konfiguration, FileZilla oder WinSCP übernehmen.':
-    'Import servers from the SSH configuration, FileZilla or WinSCP.',
-  'Auf diesem Rechner ist 1 Server': 'There is 1 server on this computer',
-  'Auf diesem Rechner sind {0} Server': 'There are {0} servers on this computer',
-  'gespeichert. Bitcrane kann sie übernehmen.': 'saved. Bitcrane can import them.',
-  'Exportdatei von einem anderen Rechner importieren …': 'Import an export file from another computer …',
   '… Die Datei ist länger; gezeigt wird der Anfang.': '… The file is longer; only the beginning is shown.',
   'Zu groß für eine Vorschau.': 'Too large for a preview.',
   'Keine Vorschau für diese Art Datei.': 'No preview for this file type.',
@@ -1001,7 +949,6 @@ export const EN: Record<string, string> = {
   'Gibt es schon, wird als „{0}“ daneben gespeichert': 'Already exists; saving alongside as “{0}”',
   'Ziel ist gleich alt oder neuer': 'Destination is the same age or newer',
   'Wartet auf Entscheidung': 'Waiting for a decision',
-  'Überwachung „{0}“: {1}': 'Watch “{0}”: {1}',
   'Überwachung „{0}“: {1} geändert, {2} gelöscht, {3} umbenannt': 'Watch “{0}”: {1} changed, {2} deleted, {3} renamed',
   'Umbenannt: {0} → {1}': 'Renamed: {0} → {1}',
   'Umbenennen auf dem Server nicht möglich, lade neu hoch: {0}': 'Cannot rename on the server, uploading again: {0}',
@@ -1038,7 +985,6 @@ export const EN: Record<string, string> = {
   'Lädt nichts mehr hoch, bis du fortsetzt. Die Einstellungen bleiben erhalten.':
     'Uploads nothing until you resume. The settings are kept.',
   '„{0}“ ist auf dem Server aktuell.': '“{0}” is up to date on the server.',
-  'Abgleich „{0}“: {1}': 'Comparison “{0}”: {1}',
   'Für diese Überwachung ist kein Befehl eingetragen.': 'No command is set for this watch.',
   'Beim Abgleich gelöscht: {0}': 'Deleted during comparison: {0}',
   'Beim Abgleich in den Papierkorb: {0}': 'Moved to the trash during comparison: {0}',
@@ -1079,7 +1025,6 @@ export const EN: Record<string, string> = {
   'Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.':
     'Files on the server and on this computer stay as they are.',
   '„{0}“ entfernt.': '“{0}” removed.',
-  'Der letzte Tab bleibt offen.': 'The last tab stays open.',
   'Synchron blättern beendet: der Ordner liegt außerhalb der verbundenen Ordner.':
     'Synchronized browsing ended: the folder is outside the linked folders.',
   'Synchron blättern aus.': 'Synchronized browsing off.',
@@ -1093,8 +1038,6 @@ export const EN: Record<string, string> = {
     'A terminal on the server is only available for SFTP servers (via SSH).',
   'Terminal mit {0} wird geöffnet.': 'Opening terminal with {0}.',
   'Terminal im lokalen Ordner wird geöffnet.': 'Opening terminal in the local folder.',
-  'Dieses Lesezeichen gibt es schon.': 'This bookmark already exists.',
-  'Lesezeichen „{0}“ angelegt.': 'Bookmark “{0}” added.',
   'Abgleich gestartet: {0} {1}{2}.': 'Comparison started: {0} {1}{2}.',
   Übertragung: 'transfer',
   ', {0} zu löschen': ', {0} to delete',
@@ -1125,8 +1068,6 @@ export const EN: Record<string, string> = {
   '{0} Objekte gelöscht.': '{0} items deleted.',
   'Kopiert: {0}': 'Copied: {0}',
   'Größe von „{0}“ wird berechnet …': 'Calculating the size of “{0}” …',
-  '„{0}“: {1} in {2} {3}.': '“{0}”: {1} in {2} {3}.',
-  'Größe nicht berechenbar: {0}': 'Could not calculate size: {0}',
   'In der anderen Hälfte einfügen, um zu übertragen.': 'Paste into the other half to transfer.',
   'Pfad kopiert: {0}': 'Path copied: {0}',
   'Rechte auf diesem Computer ändert Bitcrane nicht. Das geht im Finder bzw. Explorer.':
@@ -1215,7 +1156,6 @@ export const EN: Record<string, string> = {
   'Das Zertifikat dieses Servers ist noch nicht bekannt.': "This server's certificate is not known yet.",
   'Der FTP-Server antwortet nicht mehr.': 'The FTP server stopped responding.',
   'Verbindung geschlossen': 'Connection closed',
-  'Unerwartete Antwort: {0}': 'Unexpected response: {0}',
   'Der Server meldet sich nicht als FTP-Server.': 'The server does not identify itself as an FTP server.',
   'Der Server bietet kein verschlüsseltes FTP (FTPS) an.': 'The server does not offer encrypted FTP (FTPS).',
   'Der Server lehnt verschlüsselte Datenverbindungen ab.': 'The server refuses encrypted data connections.',
@@ -1308,11 +1248,7 @@ export const EN: Record<string, string> = {
   '{0}: Datei ist gesperrt.': '{0}: file is locked.',
   '{0}: kein Speicherplatz mehr auf dem Server.': '{0}: no space left on the server.',
   '{0} fehlgeschlagen.': '{0} failed.',
-  'Der Server verweigert den Zugriff.': 'The server denied access.',
-  'Ein Fehler ist aufgetreten.': 'An error occurred.',
-  'Interner Fehler beim Umschalten auf TLS.': 'Internal error while switching to TLS.',
   'Abgebrochen.': 'Canceled.',
-  'Die Antwort des Servers ist zu lang.': "The server's response is too long.",
   'Heute, {0}': 'Today, {0}',
   'Gestern, {0}': 'Yesterday, {0}',
   'Python-Skript': 'Python script',
@@ -1344,7 +1280,6 @@ export const EN: Record<string, string> = {
   verbunden: 'connected',
   synchron: 'synced',
   klein: 'lowercase',
-  gespeichert: 'saved',
   'Web-Adresse': 'Web address',
   'Proxy-Adresse': 'Proxy address',
   'Proxy-Port': 'Proxy port',
@@ -1392,8 +1327,6 @@ export const EN: Record<string, string> = {
   'Name tippen': 'Type a name',
   '1 Name ändert sich': '1 name will change',
   '{0} Namen ändern sich': '{0} names will change',
-  'Neuer Versuch in {0} Sek. ({1} von 10). Die Überwachung sammelt weiter: wartende Dateien werden hochgeladen, sobald die Verbindung steht.':
-    'Retrying in {0} s ({1} of 10). The watch keeps collecting changes: queued files are uploaded as soon as the connection is back.',
   'Überwachung „{0}“ löschen?': 'Delete watch “{0}”?',
   'Die Einstellungen dieser Überwachung gehen verloren. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.':
     "This watch's settings will be lost. Files on the server and on this computer stay as they are.",
@@ -1408,7 +1341,6 @@ export const EN: Record<string, string> = {
     'A terminal cannot be opened for this server (unusual characters in the name or address).',
   'Dieser Ordner kann nicht im Terminal geöffnet werden (ungewöhnliche Zeichen im Namen).':
     'This folder cannot be opened in the terminal (unusual characters in the name).',
-  'Automatisch nach Updates suchen': 'Check for updates automatically',
   'Beim Start und alle paar Stunden. Installiert wird erst, wenn du zustimmst.':
     'At launch and every few hours. Nothing is installed without your approval.',
   'Jetzt suchen': 'Check now',
@@ -1439,14 +1371,8 @@ export const EN: Record<string, string> = {
   'Zu „{0}“ übertragen': 'Transfer to “{0}”',
   'Dateien aus der anderen Hälfte hierher ziehen, um sie zu übertragen.':
     'Drag files from the other half here to transfer them.',
-  'Linke Hälfte: dieser Computer oder ein Server': 'Left half: this computer or a server',
-  'Was die linke Hälfte zeigt': 'What the left half shows',
   'wird übertragen': 'transferring',
   Übertragen: 'Transfer',
-  'Abgleichen geht zwischen diesem Computer und einem Server. Links ist gerade ein zweiter Server geöffnet.':
-    'Comparing works between this computer and a server. The left half currently shows a second server.',
-  'Links wieder diesen Mac zeigen': 'Show this Mac on the left',
-  'Links wieder diesen PC zeigen': 'Show this PC on the left',
   'Übertrage von {0}': 'Transferring from {0}',
   '{0} kopiert. In der anderen Hälfte einfügen, um es dorthin zu übertragen.':
     '{0} copied. Paste into the other half to transfer it there.',
@@ -1459,10 +1385,6 @@ export const EN: Record<string, string> = {
   'Übergeordnete Ordner': 'Parent folders',
   'Klicken zum Öffnen, ziehen zum Verschieben': 'Click to open, drag to move',
   'Ordner hierher ziehen, um sie als Orte zu merken': 'Drag folders here to add them to places',
-  'Auf diesem Rechner ist 1 Server in anderen Programmen gespeichert. Bitcrane kann ihn übernehmen.':
-    '1 server is saved in other apps on this computer. Bitcrane can import it.',
-  'Auf diesem Rechner sind {0} Server in anderen Programmen gespeichert. Bitcrane kann sie übernehmen.':
-    '{0} servers are saved in other apps on this computer. Bitcrane can import them.',
   'Kein Server passt zu „{0}“.': 'No server matches “{0}”.',
   'Verbinden über {0}': 'Connect via {0}',
   'Zu Servern hinzufügen': 'Add to servers',
@@ -1472,12 +1394,8 @@ export const EN: Record<string, string> = {
   'Ein Name darf diese Zeichen nicht enthalten: {0}': 'A name cannot contain these characters: {0}',
   '„{0}“ ist schon in der Ortsleiste.': '“{0}” is already in the places bar.',
   '„{0}“ zur Ortsleiste hinzugefügt.': 'Added “{0}” to the places bar.',
-  'Aus anderen Programmen …': 'From other apps …',
   'Doppelklick zum Verbinden': 'Double-click to connect',
-  'Suche leeren': 'Clear search',
   'Doppelklick: links wieder diesen Computer zeigen': 'Double-click: show this computer on the left again',
-  'Zuletzt verbunden': 'Recently connected',
-  'Gespeicherte Abgleiche': 'Saved comparisons',
   'Zuletzt eingegeben': 'Recently entered',
   'FTPS (explizit)': 'FTPS (explicit)',
   'Loslassen zum Entfernen': 'Release to remove',
@@ -1529,8 +1447,6 @@ export const EN: Record<string, string> = {
     'Add Google Drive, OneDrive, Dropbox, iCloud Drive and Box to the places bar.',
   'Suchen …': 'Search …',
   'Doppelklick auf eine Datei': 'Double-clicking a file',
-  'Ordner öffnen sich immer. ⌘↓ bzw. Enter macht dasselbe wie der Doppelklick.':
-    'Folders always open. ⌘↓ or Enter does the same as a double-click.',
   'In die andere Hälfte übertragen': 'Transfer to the other half',
   'Rechte für hochgeladene Dateien': 'Permissions for uploaded files',
   'Gilt für SFTP und FTP. Webserver erwarten meist 644 für Dateien und 755 für Ordner.':
@@ -1552,11 +1468,9 @@ export const EN: Record<string, string> = {
   'Ordner öffnen sich immer. Enter macht dasselbe wie der Doppelklick.':
     'Folders always open. Enter does the same as a double-click.',
   'Doppelklick zum Umbenennen': 'Double-click to rename',
-  'Server hierher ziehen': 'Drag servers here',
   'Name der Gruppe': 'Group name',
   'Server aus anderen Programmen übernehmen': 'Import servers from other apps',
   Farben: 'Colors',
-  'Je System': 'Per platform',
   'Gruppe auflösen': 'Dissolve group',
   'Neue Gruppe {0}': 'New group {0}',
   Gruppen: 'Groups',
@@ -1565,9 +1479,6 @@ export const EN: Record<string, string> = {
     'This group is empty. Drag servers here from “All servers”.',
   'Noch nichts verbunden.': 'Nothing connected yet.',
   'Wartet auf Verbindung: {0} {1}': 'Waiting for connection: {0} {1}',
-  'Breite der Gruppenspalte': 'Width of the group column (drag; double-click resets)',
-  'Breite der Hälften': 'Width of the halves (drag; double-click resets)',
-  'Höhe der Aktivität': 'Height of the activity area (drag; double-click resets)',
   'Anderer Ordner …': 'Other folder …',
   'Überwachung „{0}“ gestartet': 'Watch “{0}” started',
   'Übertrage {0}': 'Transferring {0}',
@@ -1579,7 +1490,6 @@ export const EN: Record<string, string> = {
   'Spalten wählen': 'Choose columns',
   'Klicken zum Sortieren': 'Click to sort',
   'Cloud-Dienste': 'Cloud services',
-  'Vorschau: Cloud-Dienste kommen mit einer späteren Version.': 'Preview: cloud services come with a later version.',
   'Keine Farbe': 'No color',
   'In den Ordner der anderen Hälfte kopieren': "Copy into the other half's folder",
   'In den Ordner der anderen Hälfte verschieben': "Move into the other half's folder",
@@ -1622,8 +1532,6 @@ export const EN: Record<string, string> = {
   'Vorschaubilder für Bilder auf dem Server': 'Preview pictures for images on the server',
   'In der Symbolansicht wird dafür jedes Bild bis 10 MB vom Server geladen. Bei langsamen Verbindungen oder vielen Fotos dauert das.':
     'In the icons view every image up to 10 MB is read from the server for this. With slow connections or many photos that takes time.',
-  'Statt der farbigen Bitcrane-Symbole die Symbole von Windows bzw. macOS zeigen.':
-    "Show the Windows or macOS icons instead of Bitcrane's colored ones.",
   Symbolgröße: 'Icon size',
   'Strg + Mausrad': 'Ctrl + mouse wheel',
   '{0} versteckt': '{0} hidden',
@@ -1644,7 +1552,6 @@ export const EN: Record<string, string> = {
   'Eine Regel bündelt Einstellungen fürs Übertragen und gilt für einen Server (Server bearbeiten › Regel) oder eine Überwachung. Leere Felder nehmen die allgemeinen Einstellungen.':
     'A rule bundles transfer settings and applies to a server (Edit server › Rule) or a watch. Empty fields use the general settings.',
   'Ohne Namen': 'Unnamed',
-  'Noch keine Regel.': 'No rules yet.',
   Name: 'Name',
   'Name der Regel': 'Rule name',
   'z. B. Bot oder Webseite': 'e.g. bot or website',
@@ -1725,9 +1632,6 @@ export const EN: Record<string, string> = {
   'macOS fragt bei jedem geschützten Ordner (Schreibtisch, Dokumente, Downloads, iCloud, Cloud-Ordner) einzeln, ob Bitcrane ihn lesen darf. Statt vieler einzelner Fragen kannst du Bitcrane einmal den „Festplattenvollzugriff“ geben: Systemeinstellungen › Datenschutz & Sicherheit › Festplattenvollzugriff › Bitcrane einschalten. Das geht auch später unter Einstellungen › Allgemein.':
     'macOS asks separately for each protected folder (Desktop, Documents, Downloads, iCloud, cloud folders) whether Bitcrane may read it. Instead of answering many prompts, you can give Bitcrane “Full Disk Access” once: System Settings › Privacy & Security › Full Disk Access › turn on Bitcrane. You can also do this later under Settings › General.',
   'Systemeinstellungen öffnen': 'Open System Settings',
-  'Zugriff auf alle Ordner': 'Access to all folders',
-  'macOS fragt sonst bei jedem geschützten Ordner einzeln. Mit „Festplattenvollzugriff“ für Bitcrane entfällt das.':
-    'Otherwise macOS asks separately for each protected folder. Giving Bitcrane “Full Disk Access” avoids this.',
   '* steht für beliebig viele Zeichen, ? für genau eines. Mehrere Muster mit Semikolon trennen.':
     '* matches any number of characters, ? exactly one. Separate multiple patterns with semicolons.',
   Abwählen: 'Deselect',
@@ -1743,8 +1647,6 @@ export const EN: Record<string, string> = {
   'Beim Start öffnen sich die Tabs, die beim Beenden offen waren; der Server des vorderen Tabs verbindet sich gleich. Gespeicherte Tab-Sätze: Ablage › Arbeitsbereiche.':
     'At launch, the tabs that were open when you quit are reopened; the server in the front tab connects right away. Saved tab sets: File › Workspaces.',
   'Dazu öffnen': 'Also open',
-  'Erscheinen im Rechtsklick-Menü von Dateien auf SFTP-Servern und laufen dort im Ordner der Datei. Platzhalter: {file} Pfad der Datei (bei mehreren Dateien einmal je Datei), {files} alle Pfade, {name} nur der Name, {dir} der Ordner. Die Ausgabe steht im Protokoll.':
-    "Appear in the context menu of files on SFTP servers and run on the server in the file's folder. Placeholders: {file} the file's path (once per file when multiple files are selected), {files} all paths, {name} only the name, {dir} the folder. The output appears in the log.",
   Hinzufügen: 'Add',
   'Mehrere Tabs auf einmal speichern und später wieder öffnen.': 'Save multiple tabs at once and reopen them later.',
   'Name im Menü': 'Name in the menu',
@@ -1835,15 +1737,12 @@ export const EN: Record<string, string> = {
     'The {0} sign-in page has opened in your browser. Sign in there and allow access for Bitcrane; this window then continues automatically. Bitcrane never sees your password.',
   'Doppelklick: bei {0} anmelden': 'Double-click: sign in to {0}',
   'Kommt mit einem der nächsten Updates.': 'Coming in an upcoming update.',
-  '{0} hinzufügen …': 'Add {0} …',
-  'Anmeldung im Browser': 'sign-in in the browser',
   bald: 'soon',
   'Neu anmelden …': 'Sign in again …',
   Dienst: 'Service',
   Konto: 'Account',
   'Über den Browser; gespeichert {0}. „Neu anmelden …“ unten, falls der Zugriff entzogen wurde.':
     'Through the browser; stored {0}. Use “Sign in again …” below if access was revoked.',
-  'Dropbox verbinden': 'Connect Dropbox',
   'Dropbox ist in dieser Version von Bitcrane noch nicht eingerichtet.':
     'Dropbox is not yet available in this version of Bitcrane.',
   'Die Anmeldung bei Dropbox ist nicht mehr gültig. Bitte neu anmelden.':
@@ -1872,6 +1771,26 @@ export const EN: Record<string, string> = {
   'Die Datei ist in Latin-1 gespeichert; „{0}“ lässt sich darin nicht speichern.':
     'The file is stored in Latin-1; “{0}” cannot be saved in it.',
   'LF/CRLF gemischt': 'LF/CRLF mixed',
+  Details: 'Details',
+  Pull: 'Pull',
+  Push: 'Push',
+  Passphrase: 'Passphrase',
+  System: 'System',
+  Mac: 'Mac',
+  Windows: 'Windows',
+  Port: 'Port',
+  '© 2026 RaccoonWorks': '© 2026 RaccoonWorks',
+  Agent: 'Agent',
+  Proxy: 'Proxy',
+  Filter: 'Filter',
+  'C:/Program Files/Microsoft VS Code/Code.exe': 'C:/Program Files/Microsoft VS Code/Code.exe',
+  Esc: 'Esc',
+  Stylesheet: 'Stylesheet',
+  'TLS-Version': 'TLS version',
+  '.bitcrane-papierkorb': '.bitcrane-trash',
+  'L#lesen': 'R',
+  'S#schreiben': 'W',
+  'A#ausführen': 'X',
   'Überwachung „{0}“ angehalten': 'Watch “{0}” stopped',
   'Die Überwachung meldet einen Fehler.': 'The folder watch reports an error.',
   'Ersetzen fehlgeschlagen; die bisherige Datei liegt jetzt unter „{0}“.':
@@ -1884,9 +1803,6 @@ export const EN: Record<string, string> = {
   'Die Verbindung konnte nicht vorbereitet werden.': 'The connection could not be prepared.',
   'Diesen Cloud-Dienst kennt Bitcrane noch nicht.': 'Bitcrane does not support this cloud service yet.',
   'Cloud-Dienst': 'Cloud service',
-  'OneDrive und Google Drive folgen mit den nächsten Updates.':
-    'OneDrive and Google Drive will follow in upcoming updates.',
-  'Bei Dropbox anmelden …': 'Sign in to Dropbox …',
   'Doppelklick: anmelden': 'double-click to sign in',
   'Weitere hinzufügen': 'Add more',
   '1 Server aus anderen Programmen übernehmen': 'Import 1 server from other apps',
@@ -1927,7 +1843,6 @@ export const EN: Record<string, string> = {
   'Google Drive braucht einen eigenen, kostenlosen App-Schlüssel aus deinem Google-Konto. Einmal einrichten, etwa 10 Minuten.':
     'Google Drive requires your own free app key from your Google account. One-time setup, about 10 minutes.',
   'Zur Anleitung': 'Open the guide',
-  'OneDrive folgt mit einem der nächsten Updates.': 'OneDrive will follow in an upcoming update.',
   'Bei {0} anmelden …': 'Sign in to {0} …',
   'Für Google Drive fehlt dein eigener App-Schlüssel (Client-ID und Client-Schlüssel). Die Anleitung zeigt, wie du ihn bekommst.':
     'Google Drive requires your own app key (client ID and client secret). The guide shows how to get one.',
@@ -1942,8 +1857,6 @@ export const EN: Record<string, string> = {
   'Verbindung zu Google Drive unterbrochen.': 'Connection to Google Drive lost.',
   'Google hat keine dauerhafte Anmeldung geschickt.': 'Google did not provide a persistent sign-in.',
   'Google Drive hat keinen Link geliefert.': 'Google Drive did not return a link.',
-  '„{0}“ ist ein Google-Dokument und lässt sich nicht direkt herunterladen. In Google Drive über „Herunterladen“ als Word-, Excel- oder PDF-Datei speichern.':
-    '“{0}” is a Google document and cannot be downloaded directly. In Google Drive, use “Download” to save it as a Word, Excel or PDF file.',
   'Google Drive kann hier nicht an einer Stelle weiterlesen.': 'Google Drive cannot resume from an offset here.',
   'Google Drive hat das Hochladen nicht gestartet.': 'Google Drive did not start the upload.',
   '„{0}“ gibt es schon.': '“{0}” already exists.',
@@ -2042,21 +1955,13 @@ export const EN: Record<string, string> = {
   'nas.local oder 192.168.1.20': 'nas.local or 192.168.1.20',
   ', Gast': ', guest',
   'SMB (Windows-Freigabe, NAS)': 'SMB (Windows share, NAS)',
-  'Ohne den Server zu speichern. Adresse wie im Terminal eingeben; für FTP, WebDAV oder SMB mit ftp://, ftps://, davs:// oder smb:// davor.':
-    'Without saving the server. Enter the address as in a terminal; for FTP, WebDAV or SMB, prefix it with ftp://, ftps://, davs:// or smb://.',
-  'Kein Zugriff auf „{0}“.': 'No access to “{0}”.',
-  '„{0}“ ist auf dem Server gerade geöffnet.': '“{0}” is currently open on the server.',
-  '„{0}“ wird gerade gelöscht.': '“{0}” is being deleted.',
   'Benutzername oder Passwort stimmen nicht.': 'Incorrect user name or password.',
   'Das Konto darf sich so nicht anmelden (gesperrt oder ohne Passwort).':
     'This account is not allowed to log in this way (locked or no password).',
   'Das Passwort ist abgelaufen.': 'The password has expired.',
-  'Die Freigabe „{0}“ gibt es auf dem Server nicht.': 'The share “{0}” does not exist on the server.',
-  '„{0}“ ist nicht leer.': '“{0}” is not empty.',
   '„{0}“ ist kein Ordner.': '“{0}” is not a folder.',
   '„{0}“ ist ein Ordner.': '“{0}” is a folder.',
   'Die Verbindung zum Server ist abgebrochen.': 'The connection to the server was lost.',
-  'Der Server hat „{0}“ abgelehnt.': 'The server refused “{0}”.',
   'Übertragung über SMB abgebrochen.': 'Transfer over SMB interrupted.',
   'In der Liste der Freigaben lassen sich keine Dateien anlegen oder ändern.':
     'Files cannot be created or changed in the list of shares.',
@@ -2071,7 +1976,6 @@ export const EN: Record<string, string> = {
   'Zwischen zwei Freigaben lässt sich nur kopieren, nicht verschieben.':
     'Between two shares, items can only be copied, not moved.',
   'Freigaben lassen sich nur auf dem Server selbst entfernen.': 'Shares can only be removed on the server itself.',
-  '„{0}“ lässt sich nicht anlegen.': '“{0}” cannot be created.',
   'Der Server hat nichts mehr angenommen (Speicher voll?).': 'The server is no longer accepting data (disk full?).',
   'Im Explorer zeigen': 'Show in Explorer',
   'Im Finder zeigen': 'Show in Finder',
@@ -2165,8 +2069,6 @@ export const EN: Record<string, string> = {
   'Noch keine Snippets. Gespeicherte Befehle fügst du hier mit einem Klick ein.':
     'No snippets yet. Insert saved commands here with one click.',
   'Snippets verwalten …': 'Manage snippets …',
-  'Ein Terminal gibt es für SSH-Server (SFTP). Erst mit einem verbinden.':
-    'A terminal is available for SSH servers (SFTP). Connect to one first.',
   'Erst mit {0} verbinden.': 'Connect to {0} first.',
   '[Sitzung beendet]': '[Session ended]',
   Farbschema: 'Color scheme',
@@ -2185,14 +2087,9 @@ export const EN: Record<string, string> = {
   'Im angezeigten Ordner starten': 'Start in the displayed folder',
   'Das Terminal beginnt im Ordner, den die Serverhälfte gerade zeigt.':
     'The terminal starts in the folder currently shown in the server half.',
-  'Snippets sind gespeicherte Befehle, die du im Terminal mit einem Klick einfügst, z. B. „sudo systemctl restart nginx“.':
-    'Snippets are saved commands you insert into the terminal with one click, e.g. “sudo systemctl restart nginx”.',
   'Nach dem Einfügen gleich ausführen': 'Run right after inserting',
   'Gleich ausführen': 'Run right away',
   'Snippet hinzufügen': 'Add snippet',
-  'Tastenkürzel im Terminal: Kopieren und Einfügen mit {0}. Ein Terminal öffnet die Werkzeugleiste oder {1}.':
-    'Terminal shortcuts: copy and paste with {0}. Open a terminal from the toolbar or with {1}.',
-  'Strg+Umschalt+C / V': 'Ctrl+Shift+C / V',
   'Im System-Terminal öffnen (SSH)': 'Open in system terminal (SSH)',
   'Farbschema des Terminals': 'Terminal color scheme',
   'Farbschema wie eingestellt': 'Color scheme as configured',
@@ -2289,7 +2186,6 @@ export const EN: Record<string, string> = {
     'Local → server: a port on this computer leads through the server to the target, e.g. localhost:5433 → 127.0.0.1:5432 for the database on the server. Server → local: the other way round. SOCKS proxy: all connections of a program go out from the server.',
   '1 Tunnel': '1 tunnel',
   '{0} Tunnel': '{0} tunnels',
-  'Proxy, Terminal, Tunnel, Web-Adresse, Notiz': 'Proxy, terminal, tunnels, web address, note',
   'Vorschläge beim Tippen': 'Suggestions while typing',
   'Aus dem Verlauf dieses Servers, den Snippets, üblichen Befehlen und den Dateien und Ordnern auf dem Server. ↑/↓ wählt, → übernimmt, Esc schließt die Liste; Tab vervollständigt weiter über die Shell.':
     "From this server's history, the snippets, common commands and the files and folders on the server. ↑/↓ chooses, → accepts, Esc closes the list; Tab still completes through the shell.",
@@ -2535,8 +2431,6 @@ export const EN: Record<string, string> = {
   Server: 'Server',
   'Windows-Installer': 'Windows installer',
   'Willkommen bei {0}': 'Welcome to {0}',
-  'Aus FileZilla, WinSCP, Cyberduck, PuTTY, der SSH-Konfiguration oder einer exportierten Datei (etwa aus Transmit). Passwörter werden nicht übernommen; Bitcrane fragt beim ersten Verbinden danach.':
-    'From FileZilla, WinSCP, Cyberduck, PuTTY, the SSH configuration or an exported file (for example from Transmit). Passwords are not taken over; Bitcrane asks for them on the first connection.',
   'Aus Datei …': 'From File …',
   'Exportierte Server wählen': 'Choose Exported Servers',
   'Server-Export': 'Server export',
@@ -2645,8 +2539,6 @@ export const EN: Record<string, string> = {
   '{0} ausgeschnitten. In einem anderen Ordner einfügen, um es dorthin zu verschieben.':
     '{0} cut. Paste in another folder to move it there.',
   'Die Objekte liegen schon in diesem Ordner.': 'The items are already in this folder.',
-  'Zwischen Computer und Server wird kopiert; das Original bleibt erhalten.':
-    'Between computer and server a copy is made; the original stays.',
   Versteckte: 'Hidden',
   Synchron: 'In sync',
   Vergleichen: 'Compare',

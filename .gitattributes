@@ -1,0 +1,9 @@
+# Every text file is stored and checked out with LF line endings, also on Windows: the formatters
+# expect them, and tests read source files (src/backend/rustMessages.test.ts).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

@@ -55,7 +55,7 @@ export function SyncReview() {
             {$t('Nicht übernehmen')}
           </Button>
           <Button variant="primary" onClick={() => answerSyncReview(true)}>
-            {$t('Übernehmen')}
+            {$t('Übernehmen#Änderung')}
           </Button>
         </>
       }

@@ -56,6 +56,33 @@ export function IconButton({
   );
 }
 
+/** One permission bit as a compact check box (permission grids of the inspector and the rights dialog). */
+export function PermToggle({
+  on,
+  label,
+  disabled,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      aria-label={label}
+      className="perm-hit"
+      disabled={disabled}
+      onClick={onToggle}
+    >
+      <span className={`checkbox-box${on ? ' is-on' : ''}`}>{on && <Check size={11} strokeWidth={3} />}</span>
+    </button>
+  );
+}
+
 export function Checkbox({
   checked,
   onChange,

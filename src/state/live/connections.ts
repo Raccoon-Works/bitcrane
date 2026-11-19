@@ -2,6 +2,7 @@
  * Connecting to servers: host keys, passwords and passphrases, retries and the
  * bookkeeping of which servers are connected.
  */
+import { isSftp } from '../../util/protocols';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { type Server, isCloudProtocol, TLS_CERTIFICATE } from '../../backend/types';
 import { type StoredConfig } from './config';
@@ -72,7 +73,6 @@ export async function forgetSecrets(removed: Server, remaining: Server[]) {
 }
 
 /** SFTP (SSH) or one of the other protocols. */
-export const isSftp = (srv: Pick<Server, 'protocol'>) => !srv.protocol || srv.protocol === 'sftp';
 
 /**
  * 0.2.44 brought the built-in terminal: a toolbar the user had changed gets
@@ -221,7 +221,7 @@ const authLabel = (srv: Server) =>
       : srv.auth === 'key'
         ? $t('Schlüssel {0}', srv.keyPath)
         : srv.auth === 'agent'
-          ? 'SSH-Agent'
+          ? $t('SSH-Agent')
           : srv.auth === 'password'
             ? $t('Passwort')
             : $t('automatisch');

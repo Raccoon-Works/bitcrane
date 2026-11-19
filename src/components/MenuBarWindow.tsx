@@ -3,12 +3,16 @@
  * (Windows). Shows the watches and the last uploads while the main window
  * may be closed.
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { AlertTriangle, ArrowUp, Pause, Play, Settings, SquareTerminal } from './glyphs';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { openDialog, pauseAllWatches, setState, toggleWatch, useStore } from '../state/store';
 import { formatAgo } from '../util/format';
 import { BMark } from './icons';
 import { $t } from '../i18n';
+
+const closeMenuBarWindow = () => setState({ menuBarWindowOpen: false });
+const inMenuBar = (t: HTMLElement) => !!t.closest('.menubar-extra') || !!t.closest('.proto-bar');
 
 export function MenuBarWindow() {
   const open = useStore((s) => s.menuBarWindowOpen);
@@ -19,21 +23,8 @@ export function MenuBarWindow() {
   const now = useStore((s) => s.now);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const down = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (!ref.current?.contains(t) && !t.closest('.menubar-extra') && !t.closest('.proto-bar'))
-        setState({ menuBarWindowOpen: false });
-    };
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && setState({ menuBarWindowOpen: false });
-    document.addEventListener('mousedown', down);
-    document.addEventListener('keydown', key);
-    return () => {
-      document.removeEventListener('mousedown', down);
-      document.removeEventListener('keydown', key);
-    };
-  }, [open]);
+  // The menu bar icon that opens it (and the prototype bar) count as inside.
+  useCloseOnOutside(open, ref, closeMenuBarWindow, inMenuBar);
 
   if (!open) return null;
   const active = watches.filter((w) => w.state !== 'paused').length;

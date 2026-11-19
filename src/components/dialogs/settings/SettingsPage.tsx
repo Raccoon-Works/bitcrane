@@ -26,15 +26,15 @@ import { filterSettings, matches } from './search';
 
 /** Colour of each settings area's symbol. */
 const TAB_COLORS: Record<SettingsTab, string> = {
-  general: '#8e8e93',
-  watch: '#2a6de0',
-  transfers: '#e8a600',
-  rules: '#3fbfaa',
-  connections: '#30b158',
-  appearance: '#af52de',
-  terminal: '#30b0c7',
-  keys: '#5ac8fa',
-  advanced: '#ff7a3d',
+  general: 'var(--tint-gray)',
+  watch: 'var(--tint-blue)',
+  transfers: 'var(--tint-yellow)',
+  rules: 'var(--tint-teal)',
+  connections: 'var(--tint-green)',
+  appearance: 'var(--tint-purple)',
+  terminal: 'var(--tint-cyan)',
+  keys: 'var(--tint-sky)',
+  advanced: 'var(--tint-orange)',
 };
 
 /** The rows of each area; the search shows all areas with them at once. */

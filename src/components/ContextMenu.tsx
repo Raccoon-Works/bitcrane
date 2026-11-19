@@ -2,6 +2,7 @@
  * Right-click menu for files. Shows only what fits the clicked entries
  * (design rule: no greyed-out items from later stages).
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { driveLabel, favoriteLabels, placeLabel } from '../util/placeLabel';
 import { Check } from './glyphs';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -91,6 +92,7 @@ import { gitFor, gitRun } from '../state/git';
 import { TAG_COLORS, tagName, tagsFor, toggleTag } from '../state/tags';
 import { openExplorerFolder, setExplorerFolder } from '../state/mount';
 import { runCustomCommand } from '../state/tools';
+import { isSftp } from '../util/protocols';
 
 interface Item {
   label: string;
@@ -102,6 +104,8 @@ interface Item {
   /** Symbol before the label (places and servers in the location menu). */
   icon?: ReactNode;
 }
+
+const closeContextMenu = () => setState({ contextMenu: null });
 
 export function ContextMenu() {
   const menu = useStore((s) => s.contextMenu);
@@ -120,27 +124,20 @@ export function ContextMenu() {
     });
   }, [menu]);
 
+  useCloseOnOutside(!!menu, ref, closeContextMenu);
+  // Arrow keys move through the entries; the first one has the focus when the menu opens.
   useEffect(() => {
     if (!menu) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setState({ contextMenu: null });
-    };
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setState({ contextMenu: null });
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []);
-        const i = items.indexOf(document.activeElement as HTMLElement);
-        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
-      }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []);
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
     };
-    document.addEventListener('mousedown', close);
     document.addEventListener('keydown', key);
     ref.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', key);
-    };
+    return () => document.removeEventListener('keydown', key);
   }, [menu]);
 
   if (!menu) return null;
@@ -152,7 +149,7 @@ export function ContextMenu() {
   const [ls, sid] = paneLoc(menu.side, tab);
   const onServer = ls === 'remote';
   const paneServer = onServer ? getState().servers.find((x) => x.id === sid) : undefined;
-  const sftpTab = !paneServer?.protocol || paneServer.protocol === 'sftp';
+  const sftpTab = !paneServer || isSftp(paneServer);
   const remoteTerminal = !onServer || sftpTab;
   const one = menu.names.length === 1 ? menu.names[0] : undefined;
   const folder = one && tab ? isDirEntry(ls, sid, join(panePath(menu.side), one)) : false;
@@ -183,7 +180,7 @@ export function ContextMenu() {
     const id = menu.serverId;
     const srv = getState().servers.find((x) => x.id === id);
     const other: 'local' | 'remote' = menu.side === 'local' ? 'remote' : 'local';
-    const ssh = !!srv && (!srv.protocol || srv.protocol === 'sftp');
+    const ssh = !!srv && isSftp(srv);
     const termFirst = ssh && srv?.openAs === 'terminal';
     const openTerm = () => void import('../state/terminal').then((m) => m.openServerTerminal(id));
     groups.push([
@@ -257,14 +254,14 @@ export function ContextMenu() {
       ]);
       groups.push([
         {
-          label: st.behind ? $t('Pull ({0} neue)', st.behind) : 'Pull',
+          label: st.behind ? $t('Pull ({0} neue)', st.behind) : $t('Pull'),
           run: () => {
             setState({ contextMenu: null });
             void gitRun(st.root, 'pull');
           },
         },
         {
-          label: st.ahead ? $t('Push ({0} Commits)', st.ahead) : 'Push',
+          label: st.ahead ? $t('Push ({0} Commits)', st.ahead) : $t('Push'),
           run: () => {
             setState({ contextMenu: null });
             void gitRun(st.root, 'push');
@@ -757,9 +754,10 @@ export function ContextMenu() {
       {groups.map((g, gi) => (
         <div key={gi}>
           {gi > 0 && <div className="menu-sep" role="separator" />}
-          {g.map((it) => (
+          {/* Position as key: labels repeat (two crumbs "app" in /srv/app/app). */}
+          {g.map((it, i) => (
             <button
-              key={it.label}
+              key={i}
               type="button"
               role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
               aria-checked={it.checked}

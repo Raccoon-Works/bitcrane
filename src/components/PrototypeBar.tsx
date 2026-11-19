@@ -4,8 +4,9 @@
  * otherwise need a real server: file changes, conflicts, errors and
  * connection drops.
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { ChevronUp, FlaskConical, Keyboard } from './glyphs';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   openDialog,
   resetPrototype,
@@ -30,21 +31,7 @@ export function PrototypeBar() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const down = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', down);
-    document.addEventListener('keydown', key);
-    return () => {
-      document.removeEventListener('mousedown', down);
-      document.removeEventListener('keydown', key);
-    };
-  }, [open]);
+  useCloseOnOutside(open, ref, () => setOpen(false));
 
   const run = (fn: () => void) => () => {
     setOpen(false);

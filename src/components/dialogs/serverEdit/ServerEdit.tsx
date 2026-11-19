@@ -29,7 +29,8 @@ import { CloudFields } from './CloudFields';
 import { CommonFields } from './CommonFields';
 import { ConnectionFields } from './ConnectionFields';
 import { DetailHead } from './DetailHead';
-import { cloudDefaults, familyOf, S3_PROVIDERS, STANDARD_PORTS, type Fam, type SetField } from './model';
+import { cloudDefaults, familyOf, S3_PROVIDERS, type Fam, type SetField } from './model';
+import { defaultPort, STANDARD_PORTS } from '../../../util/protocols';
 import { MoreSettings } from './MoreSettings';
 import { ServerListPane } from './ServerListPane';
 import { SftpAuth } from './SftpAuth';
@@ -90,18 +91,20 @@ export function ServerEdit({
           ...d,
           protocol: 'sftp',
           host: isCloudProtocol(d.protocol) ? '' : d.host,
-          port: isCloudProtocol(d.protocol) ? 22 : port(22),
+          port: isCloudProtocol(d.protocol) ? defaultPort('sftp') : port(defaultPort('sftp')),
           auth: d.protocol && d.protocol !== 'sftp' ? 'auto' : d.auth,
         };
-      if (f === 'ftp') return { ...d, protocol: 'ftps', implicitTls: false, port: port(21), auth: 'password' };
-      if (f === 'smb') return { ...d, protocol: 'smb', port: port(445), auth: 'password', proxy: undefined };
+      if (f === 'ftp')
+        return { ...d, protocol: 'ftps', implicitTls: false, port: port(defaultPort('ftps')), auth: 'password' };
+      if (f === 'smb')
+        return { ...d, protocol: 'smb', port: port(defaultPort('smb')), auth: 'password', proxy: undefined };
       if (f === 's3') {
         const provider = d.s3Provider ?? 'aws';
         const region = d.s3Region ?? S3_PROVIDERS[provider].region;
         return {
           ...d,
           protocol: 's3',
-          port: port(443),
+          port: port(defaultPort('webdav')),
           auth: 'password',
           s3Provider: provider,
           s3Region: region,
@@ -112,7 +115,7 @@ export function ServerEdit({
         ...d,
         protocol: 'webdav',
         davHttps: d.davHttps ?? true,
-        port: port(d.davHttps === false ? 80 : 443),
+        port: port(defaultPort('webdav', { https: d.davHttps !== false })),
         auth: 'password',
       };
     });
@@ -135,7 +138,15 @@ export function ServerEdit({
       ...d,
       protocol: v === 'none' ? 'ftp' : 'ftps',
       implicitTls: v === 'implicit',
-      port: v === 'implicit' ? (d.port === 21 ? 990 : d.port) : d.port === 990 ? 21 : d.port,
+      // The standard port follows the kind of TLS; an own port stays.
+      port:
+        v === 'implicit'
+          ? d.port === defaultPort('ftps')
+            ? defaultPort('ftps', { implicitTls: true })
+            : d.port
+          : d.port === defaultPort('ftps', { implicitTls: true })
+            ? defaultPort('ftps')
+            : d.port,
     }));
   };
 

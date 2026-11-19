@@ -26,9 +26,6 @@ export function familyOf(protocol: Protocol | undefined): Fam {
 /** Changes one field of the server being edited (and resets the connection test). */
 export type SetField = <K extends keyof Server>(k: K, v: Server[K]) => void;
 
-/** Default ports per protocol; a port the user chose stays when the protocol changes. */
-export const STANDARD_PORTS = [22, 21, 990, 443, 80, 445];
-
 /**
  * S3 providers: the address follows from the region, so picking the provider
  * and the region fills it in. "other" is any S3-compatible service (MinIO,

@@ -4,7 +4,7 @@
 //! remote commands, folder watching, settings and secrets. Long-running
 //! operations report progress through events:
 //! - `transfer-progress` `{ id, done, total }`
-//! - `watch-batch` `{ watchId, changed, removed }`
+//! - `watch-batch` `{ watchId, changed, removed, renamed, error? }`
 //!
 //! Mutexes are locked with `LockExt::locked` (below) throughout. A lock is only poisoned when a thread
 //! panicked while holding it, which is a bug; the data behind it may then be half-changed, so

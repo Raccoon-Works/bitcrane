@@ -4,12 +4,14 @@
  * people who only want SSH: a shell on this computer, any saved SSH server,
  * or a quick SSH connection without saving a server first.
  */
+import { useCloseOnOutside } from '../util/useCloseOnOutside';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { $t } from '../i18n';
 import { openDialog, useStore } from '../state/store';
 import { localShells, newTerminal, openServerTerminal, terminalSettings } from '../state/terminal';
 import { ServerTile } from './ServerTile';
+import { isSftp } from '../util/protocols';
 
 export function TermNewMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -29,25 +31,15 @@ export function TermNewMenu({ x, y, onClose }: { x: number; y: number; onClose: 
       top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)),
     });
   }, [x, y, shells.length, servers.length]);
+  useCloseOnOutside(true, ref, onClose);
+  // Switching to another window closes it as well.
   useEffect(() => {
-    const down = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('mousedown', down);
-    window.addEventListener('keydown', key);
     window.addEventListener('blur', onClose);
-    return () => {
-      window.removeEventListener('mousedown', down);
-      window.removeEventListener('keydown', key);
-      window.removeEventListener('blur', onClose);
-    };
+    return () => window.removeEventListener('blur', onClose);
   }, [onClose]);
 
   // Saved SSH servers (SFTP / SSH), plus quick connections that are open right now.
-  const ssh = servers.filter((s) => (!s.protocol || s.protocol === 'sftp') && (!s.temporary || s.online));
+  const ssh = servers.filter((s) => isSftp(s) && (!s.temporary || s.online));
   const preferred = terminalSettings().localShell || shells[0]?.id || '';
   const run = (f: () => void) => () => {
     onClose();

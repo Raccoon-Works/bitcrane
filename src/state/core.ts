@@ -37,6 +37,14 @@ export function emptySelection(): PaneSelection {
   return { names: [], cursor: -1, anchor: -1 };
 }
 
+/** Sidebar places of the prototype. */
+const DEMO_PLACES = [
+  { name: 'Alex', path: '~' },
+  { name: 'Projekte', path: '~/Projekte' },
+  { name: 'Schreibtisch', path: '~/Schreibtisch' },
+  { name: 'Downloads', path: '~/Downloads' },
+];
+
 export function initialState(): AppState {
   const servers = LIVE ? [] : sampleServers();
   return {
@@ -173,13 +181,9 @@ export function initialState(): AppState {
     toast: null,
     speed: 0,
     drives: [],
-    places: [
-      { name: 'Alex', path: '~' },
-      { name: 'Projekte', path: '~/Projekte' },
-      { name: 'Schreibtisch', path: '~/Schreibtisch' },
-      { name: 'Downloads', path: '~/Downloads' },
-    ],
-    homeName: 'Alex',
+    // The app reads its places and the name of the home folder from the system (live/config.ts).
+    places: LIVE ? [] : DEMO_PLACES,
+    homeName: LIVE ? '~' : 'Alex',
     update: null,
     dropHint: null,
     expanded: { local: [], remote: [] },

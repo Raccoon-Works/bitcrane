@@ -480,7 +480,7 @@ async function start(queued: Transfer) {
           if (!(await backend.isConnected(id))) markOffline(id);
         }
       } else markOffline(tr.serverId);
-    } else if (cur && s0AutoRetry(tr, err)) {
+    } else if (cur && scheduleRetry(tr, err)) {
       // Temporary problem: try again in a few seconds (up to three times).
     } else if (cur) {
       const detail =
@@ -507,7 +507,7 @@ async function start(queued: Transfer) {
 const PERMANENT: BackendError['kind'][] = ['permissionDenied', 'notFound', 'alreadyExists', 'authFailed'];
 
 /** Schedules an automatic retry; false when it is not worth one (or retries are used up). */
-function s0AutoRetry(tr: Transfer, err: BackendError): boolean {
+function scheduleRetry(tr: Transfer, err: BackendError): boolean {
   const s = getState();
   const tries = tr.retries ?? 0;
   if (!s.settings.autoRetry || tries >= 3 || PERMANENT.includes(err.kind) || tr.direction === 'command') return false;

@@ -180,7 +180,7 @@ export function ImportDialog() {
             disabled={!picked.size}
             onClick={() => found && importServers(found.servers.filter((_, i) => picked.has(i)))}
           >
-            {$t('Übernehmen')}
+            {$t('Übernehmen#importieren')}
           </Button>
         </>
       }

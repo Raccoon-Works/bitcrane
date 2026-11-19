@@ -10,6 +10,9 @@ import { $t } from '../../../i18n';
 import { ForwardEditor } from '../ForwardEditor';
 import { SUDO_SFTP, TIMEZONES, type Fam, type SetField } from './model';
 
+/** Folder suggested for the recycle bin on a server, in the interface language. */
+const defaultTrash = () => $t('.bitcrane-papierkorb');
+
 export function ProtocolOptions({ draft, set, family }: { draft: Server; set: SetField; family: Fam }) {
   return (
     <>
@@ -58,7 +61,7 @@ export function ProtocolOptions({ draft, set, family }: { draft: Server; set: Se
             <span className="row-inline">
               <Switch
                 checked={draft.trashDir !== undefined}
-                onChange={(v) => set('trashDir', v ? '.bitcrane-papierkorb' : undefined)}
+                onChange={(v) => set('trashDir', v ? defaultTrash() : undefined)}
                 label={$t('Papierkorb auf dem Server')}
               />
               <span>{$t('Papierkorb auf dem Server')}</span>
@@ -69,7 +72,7 @@ export function ProtocolOptions({ draft, set, family }: { draft: Server; set: Se
                 value={draft.trashDir}
                 onChange={(v) => set('trashDir', v)}
                 mono
-                placeholder=".bitcrane-papierkorb"
+                placeholder={defaultTrash()}
               />
             )}
             <span className="small muted">
@@ -163,10 +166,10 @@ export function ProtocolOptions({ draft, set, family }: { draft: Server; set: Se
         (draft.protocol === 'webdav' && draft.davHttps !== false) ||
         (draft.protocol === 's3' && !draft.s3Http)) && (
         <>
-          <label htmlFor="s-tlsver">TLS-Version</label>
+          <label htmlFor="s-tlsver">{$t('TLS-Version')}</label>
           <Select<'any' | '13'>
             id="s-tlsver"
-            label="TLS-Version"
+            label={$t('TLS-Version')}
             value={draft.tls13Only ? '13' : 'any'}
             onChange={(v) => set('tls13Only', v === '13' || undefined)}
             options={[

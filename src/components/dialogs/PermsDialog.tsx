@@ -8,7 +8,7 @@ import { activeTab, closeDialog, LIVE, paneLoc, paneOnServer, savePerms, statEnt
 import { permsToText } from '../../util/format';
 import { Info } from '../glyphs';
 import { FileGlyph, FolderGlyph } from '../icons';
-import { Button, Checkbox, TextField } from '../ui';
+import { Button, Checkbox, PermToggle, TextField } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
@@ -47,7 +47,7 @@ export function PermsDialog({ side, path }: { side: PaneSide; path: string }) {
             disabled={!valid}
             onClick={() => savePerms(side, path, perms, owner, group, recursive && entry.kind === 'dir')}
           >
-            {$t('Übernehmen')}
+            {$t('Übernehmen#anwenden')}
           </Button>
         </>
       }
@@ -101,22 +101,7 @@ export function PermsDialog({ side, path }: { side: PaneSide; path: string }) {
                   const on = (digits[r] & [4, 2, 1][c]) !== 0;
                   return (
                     <td key={x}>
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={on}
-                        aria-label={`${w} ${x}`}
-                        className="perm-hit"
-                        onClick={() => toggle(r, c)}
-                      >
-                        <span className={`checkbox-box${on ? ' is-on' : ''}`}>
-                          {on && (
-                            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.6">
-                              <path d="m3.5 8.5 3 3 6-7" />
-                            </svg>
-                          )}
-                        </span>
-                      </button>
+                      <PermToggle on={on} label={`${w} ${x}`} onToggle={() => toggle(r, c)} />
                     </td>
                   );
                 })}
