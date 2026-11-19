@@ -25,6 +25,7 @@ import {
 import { removeEntries } from './fileOps';
 import { editUploaded } from './editing';
 import { invalidate, bump, readFolder, statEntry } from './listing';
+import { existingDecision, watchDecision } from '../preflight';
 
 /** Left out by the general "auslassen" settings or by the server's transfer rule. */
 function skippedByRules(relative: string, size: number, serverId = ''): boolean {
@@ -578,22 +579,21 @@ async function preflight(tr: Transfer): Promise<boolean> {
   }
 
   if (watch) {
-    if (!watch.options.onlyExisting && !watch.options.warnIfServerNewer) return false;
+    const o = watch.options;
+    if (!o.onlyExisting && !o.warnIfServerNewer) return false;
     const remote = await statOrNull('remote', tr.serverId, tr.target);
-    if (!remote) {
-      if (watch.options.onlyExisting) {
-        removeTransfer(tr.id);
-        addLog('info', $t('Nicht hochgeladen (nur vorhandene Dateien): {0}', tr.target), tr.serverId);
-        return true;
-      }
-      return false;
+    const local = remote && o.warnIfServerNewer ? await statOrNull('local', tr.serverId, tr.source) : null;
+    const d = watchDecision(o, local, remote, timeTolerance(tr.serverId));
+    if (d.do === 'drop') {
+      removeTransfer(tr.id);
+      addLog('info', $t('Nicht hochgeladen (nur vorhandene Dateien): {0}', tr.target), tr.serverId);
+      return true;
     }
-    if (!watch.options.warnIfServerNewer) return false;
-    const local = await statOrNull('local', tr.serverId, tr.source);
-    // SFTP stores whole seconds; allow for that rounding.
-    if (!local || remote.mtime - local.mtime <= timeTolerance(tr.serverId)) return false;
-    askConflict(tr, 'newer', local, remote, watch.name);
-    return true;
+    if (d.do === 'ask' && local && remote) {
+      askConflict(tr, d.reason, local, remote, watch.name);
+      return true;
+    }
+    return false;
   }
 
   if (!tr.manual) return false;
@@ -607,44 +607,35 @@ async function preflight(tr: Transfer): Promise<boolean> {
   if (!target || target.kind === 'dir') return false;
   const source = await statOrNull(sourceSide, sourceServer, tr.source);
   if (!source) return false;
-  const skip = (skipped: NonNullable<Transfer['skipped']>) => {
-    patchTransfer(tr.id, { state: 'done', done: 0, finishedAt: Date.now(), skipped });
-    addLog('info', $t('Übersprungen ({0}): {1}', skippedText(skipped), tr.target), tr.serverId);
-    return true;
-  };
-  // Same size and modification time: the file is already there.
-  if (
-    s.settings.skipUnchanged &&
-    source.size === target.size &&
-    Math.abs(source.mtime - target.mtime) <= timeTolerance(tr.serverId)
-  )
-    return skip('unchanged');
-  if (rule === 'overwrite') return false;
-  if (rule === 'skip') return skip('exists');
-  if (rule === 'keepBoth') {
-    // Keep the existing file and store this one next to it under a free name.
-    const names = new Set(
-      (await readFolder(targetSide, tr.serverId, parent(tr.target)).catch(() => [])).map((e) => e.name),
-    );
-    const dot = tr.name.lastIndexOf('.');
-    const [stem, ext] = dot > 0 ? [tr.name.slice(0, dot), tr.name.slice(dot)] : [tr.name, ''];
-    let n = 2;
-    let free = `${stem} ${n}${ext}`;
-    while (names.has(free)) free = `${stem} ${++n}${ext}`;
-    patchTransfer(tr.id, { name: free, target: join(parent(tr.target), free), decided: true });
-    addLog('info', $t('Gibt es schon, wird als „{0}“ daneben gespeichert', free), tr.serverId);
-    return false;
+  const d = existingDecision(rule, s.settings.skipUnchanged, source, target, timeTolerance(tr.serverId), tr.direction);
+  switch (d.do) {
+    case 'skip':
+      patchTransfer(tr.id, { state: 'done', done: 0, finishedAt: Date.now(), skipped: d.skipped });
+      addLog('info', $t('Übersprungen ({0}): {1}', skippedText(d.skipped), tr.target), tr.serverId);
+      return true;
+    case 'keepBoth':
+      await keepBoth(tr, targetSide);
+      return false;
+    case 'ask':
+      askConflict(tr, d.reason, tr.direction === 'down' ? target : source, tr.direction === 'down' ? source : target);
+      return true;
+    default:
+      return false;
   }
-  if (rule === 'newer') return source.mtime - target.mtime > timeTolerance(tr.serverId) ? false : skip('notNewer');
-  const local = tr.direction === 'down' ? target : source;
-  const remote = tr.direction === 'down' ? source : target;
-  askConflict(
-    tr,
-    remote.mtime - local.mtime > timeTolerance(tr.serverId) && tr.direction !== 'down' ? 'newer' : 'exists',
-    local,
-    remote,
+}
+
+/** Keeps the existing file and stores this one next to it under a free name ("datei 2.txt"). */
+async function keepBoth(tr: Transfer, targetSide: PaneSide) {
+  const names = new Set(
+    (await readFolder(targetSide, tr.serverId, parent(tr.target)).catch(() => [])).map((e) => e.name),
   );
-  return true;
+  const dot = tr.name.lastIndexOf('.');
+  const [stem, ext] = dot > 0 ? [tr.name.slice(0, dot), tr.name.slice(dot)] : [tr.name, ''];
+  let n = 2;
+  let free = `${stem} ${n}${ext}`;
+  while (names.has(free)) free = `${stem} ${++n}${ext}`;
+  patchTransfer(tr.id, { name: free, target: join(parent(tr.target), free), decided: true });
+  addLog('info', $t('Gibt es schon, wird als „{0}“ daneben gespeichert', free), tr.serverId);
 }
 
 function askConflict(

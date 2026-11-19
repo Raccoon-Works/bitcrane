@@ -10,6 +10,7 @@
 import * as live from './live';
 import { matchesExclude } from '../util/format';
 import { $t } from '../i18n';
+import type { WalkItem } from '../backend/api';
 import type { Platform } from '../backend/types';
 import { demoWalk, getState, LIVE, ruleFor, serverById, watchForLocal, type SyncAction } from './store';
 
@@ -79,7 +80,27 @@ export async function readPlaces(left: Place, right: Place): Promise<[Map<string
     if (LIVE && !live.isConnected(sid) && !(await live.connectServer(sid)))
       throw new Error($t('Keine Verbindung zu {0}.', serverById(sid)?.name ?? sid));
   }
-  return Promise.all([walkPlace(left), walkPlace(right)]);
+  const [l, r] = await Promise.all([walkPlace(left), walkPlace(right)]);
+  // This computer (macOS, Windows) does not tell names apart by case, so neither may the comparison.
+  return !left.serverId || !right.serverId ? [alignCase(l, r), r] : [l, r];
+}
+
+/**
+ * The left files keyed like the right ones where the paths differ only in case
+ * ("Readme.md" and "README.md"): on a computer that ignores case they are one
+ * file, so they are compared with each other, and a transfer keeps the name the
+ * target already has. Without this the plan would see two different files and
+ * could delete the one it has just copied over.
+ */
+export function alignCase(left: Map<string, Side>, right: Map<string, Side>): Map<string, Side> {
+  const byFold = new Map<string, string>();
+  for (const key of right.keys()) if (!byFold.has(key.toLowerCase())) byFold.set(key.toLowerCase(), key);
+  const out = new Map<string, Side>();
+  for (const [key, side] of left) {
+    const match = right.has(key) ? key : byFold.get(key.toLowerCase());
+    out.set(match && !out.has(match) ? match : key, side);
+  }
+  return out;
 }
 
 interface PlanOptions {
@@ -168,7 +189,14 @@ export async function walkPlace(place: Place): Promise<Map<string, Side>> {
   const items = LIVE
     ? await live.walkFiles(side, place.serverId, place.dir)
     : demoWalk(side, place.serverId, place.dir);
-  const offset = place.serverId ? live.clockOffset(place.serverId) : 0;
+  return sidesOf(items, place.serverId ? live.clockOffset(place.serverId) : 0);
+}
+
+/**
+ * Walk results keyed by their path below the walked folder. Times are moved by
+ * the server's clock offset (ms), so they compare with this computer's.
+ */
+export function sidesOf(items: WalkItem[], offset: number): Map<string, Side> {
   const map = new Map<string, Side>();
   // Walk results start with the walked folder's own name; drop it.
   const below = (rel: string) => rel.split('/').slice(1).join('/');

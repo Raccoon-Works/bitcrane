@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { WalkItem } from '../backend/api';
 import {
   actionsOf,
+  alignCase,
   baseKey,
   isExcluded,
   learnBase,
   planLines,
   sameSizePairs,
+  sidesOf,
   TOLERANCE_MS,
   type Base,
   type Direction,
@@ -146,6 +149,16 @@ describe('planLines', () => {
     it('ignores the base for one-way comparisons', () => {
       expect(plan([l('gone', 5, T)], [], { direction: 'up', base, deletes: true })).toEqual([['gone', 'upload']]);
     });
+
+    it('copies a file deleted on one side back when deleting is off', () => {
+      expect(plan([l('gone', 5, T)], [], { direction: 'both', base })).toEqual([['gone', 'upload']]);
+      expect(plan([], [r('gone', 5, T)], { direction: 'both', base })).toEqual([['gone', 'download']]);
+    });
+
+    it('takes the newer copy without a base, and leaves equal times to the user', () => {
+      expect(plan([l('new', 1, T + 60000)], [r('new', 2, T)], { direction: 'both' })).toEqual([['new', 'upload']]);
+      expect(plan([l('new', 1, T)], [r('new', 2, T)], { direction: 'both' })).toEqual([['new', 'conflict']]);
+    });
   });
 });
 
@@ -229,5 +242,56 @@ describe('learnBase', () => {
     expect(second).toEqual(new Map([['a', [10, T]]]));
 
     expect(learnBase(key, new Map(), new Map())).toEqual(new Map());
+  });
+});
+
+describe('alignCase', () => {
+  it('pairs names that differ only in case, under the name the right side has', () => {
+    const left = alignCase(new Map([l('Docs/Readme.md', 3)]), new Map([r('docs/README.md', 4)]));
+    expect([...left.keys()]).toEqual(['docs/README.md']);
+    expect(left.get('docs/README.md')?.path).toBe('~/site/Docs/Readme.md');
+  });
+
+  it('prefers the exact name and leaves other files alone', () => {
+    const right = new Map([r('a.txt', 1), r('A.txt', 2)]);
+    expect([...alignCase(new Map([l('A.txt', 1), l('b.txt', 1)]), right).keys()]).toEqual(['A.txt', 'b.txt']);
+  });
+
+  it('keeps a downloaded case twin from being deleted again', () => {
+    const local = new Map([l('Readme.md', 3, T)]);
+    const remote = new Map([r('README.md', 3, T + 60000)]);
+    const lines = planLines(alignCase(local, remote), remote, {
+      direction: 'down',
+      bySize: false,
+      deletes: true,
+      days: 0,
+      excludes: [],
+    });
+    expect(lines.map((x) => [x.rel, x.action])).toEqual([['README.md', 'download']]);
+    expect(actionsOf(lines)[0]).toMatchObject({ from: '/srv/www/README.md', to: '~/site/Readme.md' });
+  });
+});
+
+describe('sidesOf', () => {
+  const item = (relative: string, mtime = T): WalkItem => ({
+    path: `/srv/www/${relative}`,
+    relative: `www/${relative}`,
+    localRelative: `www/${relative}`,
+    size: 1,
+    mtime,
+  });
+
+  it('keys files below the walked folder and drops the folder itself', () => {
+    expect([...sidesOf([item(''), item('a/b.txt')], 0).keys()]).toEqual(['a/b.txt']);
+  });
+
+  it('keys composed and decomposed umlauts alike', () => {
+    const decomposed = 'u\u0308ber.txt';
+    expect([...sidesOf([item(decomposed)], 0).keys()]).toEqual(['\u00fcber.txt']);
+    expect(sidesOf([item(decomposed)], 0).get('\u00fcber.txt')?.path).toBe(`/srv/www/${decomposed}`);
+  });
+
+  it('moves server times by the clock offset', () => {
+    expect(sidesOf([item('a', T + 5000)], 5000).get('a')?.mtime).toBe(T);
   });
 });
