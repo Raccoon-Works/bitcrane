@@ -9,7 +9,9 @@
  */
 import * as live from './live';
 import { matchesExclude } from '../util/format';
-import { demoWalk, LIVE, type SyncAction } from './store';
+import { $t } from '../i18n';
+import type { Platform } from '../backend/types';
+import { demoWalk, getState, LIVE, ruleFor, serverById, watchForLocal, type SyncAction } from './store';
 
 export type Direction = 'up' | 'down' | 'both';
 
@@ -32,6 +34,52 @@ export interface Place {
   serverId: string;
   dir: string;
   name: string;
+}
+
+/** A place for one half: this computer ('') or a server, with the name shown for it. */
+export function comparePlace(serverId: string, dir: string, platform: Platform = getState().platform): Place {
+  const here = platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC');
+  return { serverId, dir, name: serverId ? (serverById(serverId)?.name ?? $t('Server')) : here };
+}
+
+/**
+ * Left out of a comparison: the patterns of the watch on the local folder (or
+ * the general ones) plus those of the servers' rules. `useChoice`: the rule
+ * chosen in the activity area counts (in the window, not in scheduled runs).
+ */
+export function compareExcludes(left: Place, right: Place, useChoice: boolean): string[] {
+  const s = getState();
+  const own = (!left.serverId ? watchForLocal(left.dir)?.excludes : undefined) ?? s.settings.defaultExcludes;
+  const rules = [left.serverId, right.serverId]
+    .filter(Boolean)
+    .flatMap((sid) => ruleFor(sid, undefined, s, useChoice)?.excludes ?? []);
+  return [...new Set([...own, ...rules])];
+}
+
+/** A note per server whose clock is off by more than a few seconds (corrected when comparing). */
+export function clockOffsetNotes(places: Place[]): string[] {
+  if (!LIVE) return [];
+  return places
+    .filter((p) => p.serverId && Math.abs(live.clockOffset(p.serverId)) > 2000)
+    .map((p) => {
+      const off = live.clockOffset(p.serverId);
+      return $t(
+        'Die Uhr von „{0}“ geht {1} Sek. {2}; das wird beim Vergleich ausgeglichen.',
+        p.name,
+        Math.round(Math.abs(off) / 1000),
+        off > 0 ? $t('vor') : $t('nach'),
+      );
+    });
+}
+
+/** Connects the servers of both places when needed (a saved comparison may start before them) and reads both. */
+export async function readPlaces(left: Place, right: Place): Promise<[Map<string, Side>, Map<string, Side>]> {
+  for (const sid of [left.serverId, right.serverId].filter(Boolean)) {
+    if (!serverById(sid)) throw new Error($t('Der Server dieses Abgleichs gibt es nicht mehr.'));
+    if (LIVE && !live.isConnected(sid) && !(await live.connectServer(sid)))
+      throw new Error($t('Keine Verbindung zu {0}.', serverById(sid)?.name ?? sid));
+  }
+  return Promise.all([walkPlace(left), walkPlace(right)]);
 }
 
 interface PlanOptions {

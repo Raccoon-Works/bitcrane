@@ -9,17 +9,8 @@
  * reported. Every run is written to the log and announced as a notification.
  */
 import { addLog } from './log';
-import { connectServer, isConnected } from './live';
 import { notify } from './shell';
-import {
-  getState,
-  ruleFor,
-  runSyncBetween,
-  serverById,
-  updateSettings,
-  watchForLocal,
-  type SyncFavorite,
-} from './store';
+import { getState, runSyncBetween, updateSettings, type SyncFavorite } from './store';
 import {
   actionsOf,
   baseKey,
@@ -27,8 +18,9 @@ import {
   learnBase,
   planLines,
   sameSizePairs,
-  walkPlace,
-  type Place,
+  compareExcludes,
+  comparePlace,
+  readPlaces,
 } from './syncPlan';
 import { $t } from '../i18n';
 import { toBackendError } from '../backend/api';
@@ -61,35 +53,12 @@ async function runScheduled(f: SyncFavorite): Promise<void> {
   running.add(f.id);
   const leftServer = f.leftServerId ?? '';
   const rightServer = f.rightLocal ? '' : f.serverId;
-  const here = getState().platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC');
-  const left: Place = {
-    serverId: leftServer,
-    dir: f.local,
-    name: leftServer ? (serverById(leftServer)?.name ?? '?') : here,
-  };
-  const right: Place = {
-    serverId: rightServer,
-    dir: f.remote,
-    name: rightServer ? (serverById(rightServer)?.name ?? '?') : here,
-  };
+  const left = comparePlace(leftServer, f.local);
+  const right = comparePlace(rightServer, f.remote);
   try {
-    for (const sid of [leftServer, rightServer].filter(Boolean)) {
-      if (!serverById(sid)) throw new Error($t('Der Server dieses Abgleichs gibt es nicht mehr.'));
-      if (!isConnected(sid) && !(await connectServer(sid)))
-        throw new Error($t('Keine Verbindung zu {0}.', serverById(sid)?.name ?? sid));
-    }
-    const [local, remote] = await Promise.all([walkPlace(left), walkPlace(right)]);
-    // Left out: like in the window (watch or general patterns plus the servers' rules).
-    const s = getState().settings;
-    const own = (!leftServer ? watchForLocal(f.local)?.excludes : undefined) ?? s.defaultExcludes;
-    const excludes = [
-      ...new Set([
-        ...own,
-        ...[leftServer, rightServer]
-          .filter(Boolean)
-          .flatMap((sid) => ruleFor(sid, undefined, undefined, false)?.excludes ?? []),
-      ]),
-    ];
+    const [local, remote] = await readPlaces(left, right);
+    // Left out: like in the window, but without the rule chosen in the activity area.
+    const excludes = compareExcludes(left, right, false);
     const differs = f.byContent ? await contentDiffers(left, right, sameSizePairs(local, remote, excludes)) : null;
     const agreed = f.direction === 'both' ? learnBase(baseKey(left, right), local, remote) : null;
     const base = { direction: f.direction, bySize: f.bySize, days: f.days ?? 0, excludes, differs, base: agreed };

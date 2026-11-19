@@ -9,32 +9,22 @@
  * X days". A server clock that is off is corrected before comparing times.
  */
 import { ArrowLeft, ArrowRight, Loader2, Star, Trash2 } from '../glyphs';
-import { useEffect, useMemo, useState } from 'react';
-import { toBackendError } from '../../backend/api';
-import { clockOffset, connectServer, isConnected } from '../../state/live';
+import { useMemo, useState } from 'react';
+
 import {
   actionsOf,
-  baseKey,
-  contentDiffers,
-  learnBase,
-  planLines,
-  sameSizePairs,
-  walkPlace as walk,
-  type Base,
+  clockOffsetNotes,
+  compareExcludes,
+  comparePlace,
   type Direction,
   type Line,
-  type Place,
-  type Side,
 } from '../../state/syncPlan';
+import { useComparePlan } from './useComparePlan';
 import {
-  activeTab,
   closeDialog,
   getState,
-  LIVE,
   paneLoc,
-  ruleFor,
   applySyncActions,
-  serverById,
   showToast,
   uid,
   updateSettings,
@@ -84,6 +74,8 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
   const tab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const platform = useStore((s) => s.platform);
   const defaults = useStore((s) => s.settings.defaultExcludes);
+  const watches = useStore((s) => s.watches);
+  const rules = useStore((s) => s.settings.rules);
   const favorites = useStore((s) => s.settings.syncFavorites);
   const fav = favorites.find((f) => f.id === favoriteId);
   const [direction, setDirection] = useState<Direction>(fav?.direction ?? 'up');
@@ -95,108 +87,41 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
   const [schedMode, setSchedMode] = useState<'off' | SyncSchedule['mode']>(fav?.schedule?.mode ?? 'off');
   const [schedTime, setSchedTime] = useState(fav?.schedule?.time ?? DEFAULT_RUN_TIME);
   const [schedDelete, setSchedDelete] = useState(!!fav?.schedule?.allowDelete);
-  const [differs, setDiffers] = useState<Map<string, boolean> | null>(null);
-  const [checking, setChecking] = useState(false);
   const [favName, setFavName] = useState<string | null>(null);
-  const [data, setData] = useState<{ local: Map<string, Side>; remote: Map<string, Side>; base: Base } | null>(null);
   // Conflicts (changed on both sides): which side the user keeps; none chosen = left alone.
   const [keep, setKeep] = useState<Map<string, 'upload' | 'download'>>(new Map());
-  const [error, setError] = useState('');
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
 
-  // The two halves as places.
-  const thisComputer = platform === 'mac' ? $t('Dieser Mac') : $t('Dieser PC');
-  // Built from plain values, so they stay the same objects from one render to the next.
+  // The two halves as places, built from plain values so they stay the same objects between renders.
   const serverOf = (side: 'local' | 'remote') => {
     const [ls, sid] = paneLoc(side, tab);
     return ls === 'remote' ? sid : '';
   };
-  const nameOf = (serverId: string) => (serverId ? (serverById(serverId)?.name ?? $t('Server')) : thisComputer);
   const [leftServer, rightServer] = [serverOf('local'), serverOf('remote')];
   const [leftDir, rightDir] = [tab?.localPath ?? '', tab?.remotePath ?? ''];
-  const [leftName, rightName] = [nameOf(leftServer), nameOf(rightServer)];
-  const left = useMemo<Place>(
-    () => ({ serverId: leftServer, dir: leftDir, name: leftName }),
-    [leftServer, leftDir, leftName],
-  );
-  const right = useMemo<Place>(
-    () => ({ serverId: rightServer, dir: rightDir, name: rightName }),
-    [rightServer, rightDir, rightName],
-  );
+  const left = useMemo(() => comparePlace(leftServer, leftDir, platform), [leftServer, leftDir, platform]);
+  const right = useMemo(() => comparePlace(rightServer, rightDir, platform), [rightServer, rightDir, platform]);
   // The usual case (this computer left, a server right) keeps the words "hochladen" and "herunterladen".
   const classic = !left.serverId && !!right.serverId;
 
   // Left out: the watch's patterns (or the general ones) plus those of the servers' rules.
-  const watch = tab && !left.serverId ? watchForLocal(tab.localPath) : undefined;
-  const excludes = useMemo(() => {
-    const own = watch?.excludes ?? defaults;
-    const rules = [left.serverId, right.serverId].filter(Boolean).flatMap((sid) => ruleFor(sid)?.excludes ?? []);
-    return [...new Set([...own, ...rules])];
-  }, [watch, defaults, left.serverId, right.serverId]);
-
-  // A server whose clock is off by more than a few seconds is mentioned (and corrected).
-  const offsets = [left, right]
-    .filter((p) => p.serverId && LIVE && Math.abs(clockOffset(p.serverId)) > 2000)
-    .map((p) =>
-      $t(
-        'Die Uhr von „{0}“ geht {1} Sek. {2}; das wird beim Vergleich ausgeglichen.',
-        p.name,
-        Math.round(Math.abs(clockOffset(p.serverId)) / 1000),
-        clockOffset(p.serverId) > 0 ? $t('vor') : $t('nach'),
-      ),
-    );
-
-  useEffect(() => {
-    const t = activeTab();
-    if (!t) return;
-    // Opened from a favorite the connections may still be starting.
-    const ready = Promise.all(
-      [left.serverId, right.serverId]
-        .filter(Boolean)
-        .map((sid) => (LIVE && !isConnected(sid) ? connectServer(sid) : Promise.resolve(true))),
-    );
-    ready
-      .then(() => Promise.all([walk(left), walk(right)]))
-      // The agreed state from the last time (for "Beide Richtungen"); what is equal now is remembered.
-      .then(([local, remote]) => setData({ local, remote, base: learnBase(baseKey(left, right), local, remote) }))
-      .catch((e) => setError(toBackendError(e).message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- both folders are read once, when the dialog opens
-  }, []);
-
-  // "Inhalt prüfen": checksums for files of the same size on both sides.
-  useEffect(() => {
-    // Data exists only once both folders were read, which needs a tab.
-    if (!byContent || !data) {
-      setDiffers(null);
-      return;
-    }
-    const pairs = sameSizePairs(data.local, data.remote, excludes);
-    setChecking(true);
-    let cancelled = false;
-    contentDiffers(left, right, pairs)
-      .then(
-        (m) => {
-          if (!cancelled) setDiffers(m);
-        },
-        (e) => {
-          if (!cancelled) setError(toBackendError(e).message);
-        },
-      )
-      .finally(() => {
-        if (!cancelled) setChecking(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [byContent, data, excludes, left, right]);
-
-  const lines: Line[] = useMemo(
-    () =>
-      data
-        ? planLines(data.local, data.remote, { direction, bySize, deletes, days, excludes, differs, base: data.base })
-        : [],
-    [data, direction, bySize, deletes, excludes, differs, days],
+  const excludes = useMemo(
+    () => compareExcludes(left, right, true),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the store values compareExcludes reads
+    [left, right, defaults, watches, rules],
   );
+
+  const watch = !left.serverId ? watchForLocal(left.dir) : undefined;
+  const clockNotes = clockOffsetNotes([left, right]);
+
+  const { loaded, knowsBase, lines, checking, error } = useComparePlan(left, right, {
+    direction,
+    bySize,
+    byContent,
+    deletes,
+    days,
+    excludes,
+  });
 
   const todo = lines.filter((l) => l.action !== 'none');
   // A conflict takes part once a side is chosen; it then counts as that copy.
@@ -299,7 +224,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
               {fav ? $t('Favorit ändern') : $t('Als Favorit sichern')}
             </Button>
             <span className="small muted">
-              {data ? (checking ? $t('Prüfsummen werden berechnet …') : summary || $t('Nichts zu tun.')) : ''}
+              {loaded ? (checking ? $t('Prüfsummen werden berechnet …') : summary || $t('Nichts zu tun.')) : ''}
             </span>
             <span className="flex-1" />
             <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
@@ -357,7 +282,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
         </span>
         {direction === 'both' && (
           <span className="small muted">
-            {data?.base.size
+            {knowsBase
               ? $t(
                   'Bitcrane kennt den Stand vom letzten Abgleich: Kopiert wird jeweils die geänderte Seite. Wurde eine Datei auf beiden Seiten geändert, entscheidest du.',
                 )
@@ -371,7 +296,7 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
           {watch ? $t(' (wie bei der Überwachung „{0}“)', watch.name) : ''}.{' '}
           {same > 0 && $t('{0} {1} schon gleich.', same, same === 1 ? $t('Datei ist') : $t('Dateien sind'))}
         </span>
-        {offsets.map((o) => (
+        {clockNotes.map((o) => (
           <span key={o} className="small tone-accent">
             {o}
           </span>
@@ -420,14 +345,14 @@ function CompareBody({ favoriteId }: { favoriteId?: string }) {
             {$t('Zuletzt automatisch: {0} – {1}', formatDate(fav.lastRun), fav.lastResult ?? '')}
           </span>
         )}
-        {!data && !error && (
+        {!loaded && !error && (
           <span className="row-inline muted">
             <Loader2 size={14} className="spin" aria-hidden="true" />
             {$t('Ordner werden gelesen …')}
           </span>
         )}
         {error && <p className="tone-danger">{error}</p>}
-        {data && !todo.length && (
+        {loaded && !todo.length && (
           <p className="muted">
             {days
               ? $t('In diesem Zeitraum sind beide Ordner auf dem gleichen Stand.')
