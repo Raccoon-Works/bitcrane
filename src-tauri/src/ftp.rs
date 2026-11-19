@@ -804,6 +804,11 @@ const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "au
 /// One line of LIST in Unix ("drwxr-xr-x 2 u g 4096 Oct 27 12:34 name") or
 /// DOS/IIS format ("10-27-26  12:34PM <DIR> name"). Times are server-local.
 pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
+    parse_list_line_at(line, tz_offset_min, chrono::Utc::now().timestamp_millis())
+}
+
+/// [`parse_list_line`] as of `now` (ms), which a Unix line without a year is dated against.
+fn parse_list_line_at(line: &str, tz_offset_min: i32, now: i64) -> Option<FileEntry> {
     let line = line.trim_end();
     if line.is_empty() || line.starts_with("total ") {
         return None;
@@ -842,21 +847,18 @@ pub fn parse_list_line(line: &str, tz_offset_min: i32) -> Option<FileEntry> {
         let ty = fields[mi + 2].1;
         let name_start = fields.get(mi + 3).map(|f| f.0)?;
         let mut name = line[name_start..].to_string();
-        let now = chrono::Utc::now();
         let mtime = if let Some((h, m)) = ty.split_once(':') {
             use chrono::Datelike;
-            let mut year = now.year();
-            let make = |y: i32| {
+            let (h, m): (u32, u32) = (h.parse().ok()?, m.parse().ok()?);
+            let at = |y: i32| {
                 chrono::NaiveDate::from_ymd_opt(y, month, day)
-                    .and_then(|d| d.and_hms_opt(h.parse().ok()?, m.parse().ok()?, 0))
+                    .and_then(|d| d.and_hms_opt(h, m, 0))
+                    .map(|t| t.and_utc().timestamp_millis() - offset_ms)
             };
-            let mut t = make(year)?;
-            // Without a year the date is within the last half year.
-            if t.and_utc().timestamp_millis() - offset_ms > now.timestamp_millis() + 86_400_000 {
-                year -= 1;
-                t = make(year)?;
-            }
-            t.and_utc().timestamp_millis() - offset_ms
+            // Without a year the date lies in the past half year: this year, unless that is more
+            // than a day ahead (clocks differ) or does not exist (29 February), then last year.
+            let year = chrono::DateTime::from_timestamp_millis(now)?.year();
+            at(year).filter(|t| *t <= now + 86_400_000).or_else(|| at(year - 1))?
         } else {
             let y: i32 = ty.parse().ok()?;
             chrono::NaiveDate::from_ymd_opt(y, month, day)?.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis()
@@ -1226,6 +1228,105 @@ mod tests {
         let n = parse_list_line("-rw-r--r-- 1 owner 99 Dec 24 2023 x.txt", 0).unwrap();
         assert_eq!((n.name.as_str(), n.size), ("x.txt", 99));
         assert!(parse_list_line("total 12", 0).is_none());
+    }
+
+    /// A stand-in for the session pool of FtpConn: sessions are numbers, handed out in order.
+    #[derive(Default)]
+    struct Pool {
+        idle: std::sync::Mutex<Vec<u32>>,
+        opened: std::sync::atomic::AtomicU32,
+        returned: std::sync::Mutex<Vec<u32>>,
+    }
+
+    impl Pool {
+        async fn take(&self) -> AppResult<u32> {
+            let idle = self.idle.lock().unwrap().pop();
+            match idle {
+                Some(s) => Ok(s),
+                None => self.fresh().await,
+            }
+        }
+        async fn fresh(&self) -> AppResult<u32> {
+            Ok(self.opened.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1)
+        }
+        async fn put(&self, s: u32) {
+            self.returned.lock().unwrap().push(s);
+        }
+    }
+
+    /// A command that fails on the sessions in `broken` with `kind` (it borrows the session like the real ones).
+    async fn command(s: &mut u32, broken: &[u32], kind: ErrorKind) -> AppResult<u32> {
+        if broken.contains(s) {
+            Err(AppError::new(kind, "test"))
+        } else {
+            Ok(*s)
+        }
+    }
+
+    async fn browse(p: &Pool, broken: &[u32], kind: ErrorKind) -> AppResult<u32> {
+        with_session!(p, |s| command(&mut s, broken, kind))
+    }
+
+    async fn change(p: &Pool, broken: &[u32], kind: ErrorKind) -> AppResult<u32> {
+        once_on_session!(p, |s| command(&mut s, broken, kind))
+    }
+
+    #[tokio::test]
+    async fn with_session_replaces_a_lost_session_once() {
+        let pool = Pool::default();
+        // Session 1 was lost while idle: the command runs again on session 2, which goes back to the pool.
+        let r = browse(&pool, &[1], ErrorKind::ConnectionLost).await;
+        assert_eq!(r.unwrap(), 2);
+        assert_eq!(*pool.returned.lock().unwrap(), vec![2]);
+        // Lost twice: no third try, and neither session is kept.
+        let pool = Pool::default();
+        let r = browse(&pool, &[1, 2], ErrorKind::ConnectionLost).await;
+        assert_eq!(r.unwrap_err().kind, ErrorKind::ConnectionLost);
+        assert!(pool.returned.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn with_session_keeps_the_session_after_other_errors() {
+        let pool = Pool::default();
+        let r = browse(&pool, &[1], ErrorKind::NotFound).await;
+        assert_eq!(r.unwrap_err().kind, ErrorKind::NotFound);
+        assert_eq!(pool.opened.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(*pool.returned.lock().unwrap(), vec![1]);
+    }
+
+    #[tokio::test]
+    async fn once_on_session_does_not_repeat_a_change() {
+        let pool = Pool::default();
+        let r = change(&pool, &[1], ErrorKind::ConnectionLost).await;
+        assert_eq!(r.unwrap_err().kind, ErrorKind::ConnectionLost);
+        assert_eq!(pool.opened.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(pool.returned.lock().unwrap().is_empty());
+    }
+
+    /// Milliseconds of a UTC date and time.
+    fn utc(y: i32, mo: u32, d: u32, h: u32, mi: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(y, mo, d).unwrap().and_hms_opt(h, mi, 0).unwrap().and_utc().timestamp_millis()
+    }
+
+    #[test]
+    fn dates_lines_without_a_year_into_the_past_half_year() {
+        let now = utc(2026, 1, 5, 12, 0);
+        let mtime =
+            |date: &str, tz| parse_list_line_at(&format!("-rw-r--r-- 1 u g 1 {date} a.txt"), tz, now).unwrap().mtime;
+        // Shortly after New Year a December date is from last year, a January one from this year.
+        assert_eq!(mtime("Dec 30 10:20", 0), utc(2025, 12, 30, 10, 20));
+        assert_eq!(mtime("Jan 03 10:20", 0), utc(2026, 1, 3, 10, 20));
+        // A server clock a little ahead still counts as this year; more than a day ahead is last year.
+        assert_eq!(mtime("Jan 06 08:00", 0), utc(2026, 1, 6, 8, 0));
+        assert_eq!(mtime("Jan 07 10:20", 0), utc(2025, 1, 7, 10, 20));
+        // Server time one hour ahead of UTC.
+        assert_eq!(mtime("Jan 03 10:20", 60), utc(2026, 1, 3, 9, 20));
+    }
+
+    #[test]
+    fn dates_29_february_in_the_last_leap_year() {
+        let line = "-rw-r--r-- 1 u g 1 Feb 29 10:00 leap.txt";
+        assert_eq!(parse_list_line_at(line, 0, utc(2025, 3, 1, 0, 0)).unwrap().mtime, utc(2024, 2, 29, 10, 0));
     }
 
     #[test]

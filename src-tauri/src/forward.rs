@@ -19,7 +19,7 @@ use crate::LockExt;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 
@@ -72,58 +72,79 @@ async fn through(conn: &Remote, mut tcp: TcpStream, host: &str, port: u16) {
     }
 }
 
-/// SOCKS5 without login (RFC 1928, CONNECT only): reads the target, answers, then tunnels.
-async fn socks5(conn: Arc<Remote>, mut tcp: TcpStream) -> std::io::Result<()> {
+/// Reply codes of SOCKS5 (RFC 1928, section 6), sent with an empty IPv4 address.
+const SOCKS_OK: u8 = 0;
+const SOCKS_UNREACHABLE: u8 = 4;
+const SOCKS_NO_COMMAND: u8 = 7;
+const SOCKS_NO_ADDRESS_TYPE: u8 = 8;
+
+async fn socks_reply<S: AsyncWrite + Unpin>(s: &mut S, code: u8) -> std::io::Result<()> {
+    s.write_all(&[5, code, 0, 1, 0, 0, 0, 0, 0, 0]).await
+}
+
+/// The SOCKS5 handshake without login (RFC 1928, CONNECT only): the target host
+/// and port, or None after a refusal was sent (other version, login required,
+/// another command or address type).
+async fn socks5_target<S: AsyncRead + AsyncWrite + Unpin>(s: &mut S) -> std::io::Result<Option<(String, u16)>> {
     let mut head = [0u8; 2];
-    tcp.read_exact(&mut head).await?;
+    s.read_exact(&mut head).await?;
     if head[0] != 5 {
-        return Ok(());
+        return Ok(None);
     }
     let mut methods = vec![0u8; head[1] as usize];
-    tcp.read_exact(&mut methods).await?;
-    tcp.write_all(&[5, 0]).await?;
+    s.read_exact(&mut methods).await?;
+    // Only "no login" is offered; a client that requires one is told that nothing fits.
+    if !methods.contains(&0) {
+        s.write_all(&[5, 0xff]).await?;
+        return Ok(None);
+    }
+    s.write_all(&[5, 0]).await?;
     let mut req = [0u8; 4];
-    tcp.read_exact(&mut req).await?;
+    s.read_exact(&mut req).await?;
     let host = match req[3] {
         1 => {
             let mut a = [0u8; 4];
-            tcp.read_exact(&mut a).await?;
+            s.read_exact(&mut a).await?;
             std::net::Ipv4Addr::from(a).to_string()
         }
         3 => {
             let mut len = [0u8; 1];
-            tcp.read_exact(&mut len).await?;
+            s.read_exact(&mut len).await?;
             let mut name = vec![0u8; len[0] as usize];
-            tcp.read_exact(&mut name).await?;
+            s.read_exact(&mut name).await?;
             String::from_utf8_lossy(&name).into_owned()
         }
         4 => {
             let mut a = [0u8; 16];
-            tcp.read_exact(&mut a).await?;
+            s.read_exact(&mut a).await?;
             std::net::Ipv6Addr::from(a).to_string()
         }
-        _ => return Ok(()),
+        _ => {
+            socks_reply(s, SOCKS_NO_ADDRESS_TYPE).await?;
+            return Ok(None);
+        }
     };
     let mut port = [0u8; 2];
-    tcp.read_exact(&mut port).await?;
-    let port = u16::from_be_bytes(port);
+    s.read_exact(&mut port).await?;
     if req[1] != 1 {
-        // Only CONNECT: "command not supported".
-        tcp.write_all(&[5, 7, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
-        return Ok(());
+        socks_reply(s, SOCKS_NO_COMMAND).await?;
+        return Ok(None);
     }
+    Ok(Some((host, u16::from_be_bytes(port))))
+}
+
+/// SOCKS5 proxy connection: reads the target, then tunnels to it through the server.
+async fn socks5(conn: Arc<Remote>, mut tcp: TcpStream) -> std::io::Result<()> {
+    let Some((host, port)) = socks5_target(&mut tcp).await? else { return Ok(()) };
     let Ok((handle, _)) = conn.tunnel() else { return Ok(()) };
     match handle.channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0).await {
         Ok(channel) => {
-            tcp.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
+            socks_reply(&mut tcp, SOCKS_OK).await?;
             let _ = tcp.set_nodelay(true);
             let mut stream = channel.into_stream();
             let _ = tokio::io::copy_bidirectional(&mut tcp, &mut stream).await;
         }
-        Err(_) => {
-            // "Host unreachable".
-            tcp.write_all(&[5, 4, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
-        }
+        Err(_) => socks_reply(&mut tcp, SOCKS_UNREACHABLE).await?,
     }
     Ok(())
 }
@@ -214,5 +235,60 @@ impl Forwards {
         // A tunnel whose connection is closed, or whose listener ended, is no longer running.
         map.retain(|_, r| !r.conn.is_closed() && r.task.as_ref().map(|t| !t.is_finished()).unwrap_or(true));
         map.keys().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Runs the handshake against what a client sends; returns the target and what the proxy answered.
+    async fn handshake(client: &[u8]) -> (Option<(String, u16)>, Vec<u8>) {
+        let (mut ours, mut theirs) = tokio::io::duplex(1024);
+        theirs.write_all(client).await.unwrap();
+        let target = socks5_target(&mut ours).await.unwrap();
+        drop(ours);
+        let mut answer = Vec::new();
+        theirs.read_to_end(&mut answer).await.unwrap();
+        (target, answer)
+    }
+
+    #[tokio::test]
+    async fn reads_a_connect_to_a_host_name() {
+        let mut client = vec![5, 1, 0, 5, 1, 0, 3, 11];
+        client.extend_from_slice(b"example.com");
+        client.extend_from_slice(&443u16.to_be_bytes());
+        assert_eq!(handshake(&client).await, (Some(("example.com".into(), 443)), vec![5, 0]));
+    }
+
+    #[tokio::test]
+    async fn reads_ipv4_and_ipv6_targets() {
+        let v4 = [5, 1, 0, 5, 1, 0, 1, 10, 0, 0, 7, 0, 22];
+        assert_eq!(handshake(&v4).await.0, Some(("10.0.0.7".into(), 22)));
+        let mut v6 = vec![5, 1, 0, 5, 1, 0, 4];
+        v6.extend_from_slice(&std::net::Ipv6Addr::LOCALHOST.octets());
+        v6.extend_from_slice(&80u16.to_be_bytes());
+        assert_eq!(handshake(&v6).await.0, Some(("::1".into(), 80)));
+    }
+
+    #[tokio::test]
+    async fn refuses_a_client_that_needs_a_login() {
+        // Offers only user/password (method 2).
+        assert_eq!(handshake(&[5, 1, 2]).await, (None, vec![5, 0xff]));
+    }
+
+    #[tokio::test]
+    async fn refuses_other_commands_and_address_types() {
+        // BIND instead of CONNECT.
+        let (target, answer) = handshake(&[5, 1, 0, 5, 2, 0, 1, 10, 0, 0, 7, 0, 22]).await;
+        assert_eq!((target, answer[2..4].to_vec()), (None, vec![5, SOCKS_NO_COMMAND]));
+        // Unknown address type 9.
+        let (target, answer) = handshake(&[5, 1, 0, 5, 1, 0, 9]).await;
+        assert_eq!((target, answer[2..4].to_vec()), (None, vec![5, SOCKS_NO_ADDRESS_TYPE]));
+    }
+
+    #[tokio::test]
+    async fn ignores_other_protocol_versions() {
+        assert_eq!(handshake(&[4, 1, 0, 80]).await, (None, vec![]));
     }
 }

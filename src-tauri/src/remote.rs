@@ -294,9 +294,8 @@ impl Remote {
         }
     }
 
-    /// Puts `from` in place of `to`. SFTP and FTP cannot overwrite in one
-    /// step, so the old file is first renamed aside and only deleted once the
-    /// new one is in place; if that fails, the old file is put back.
+    /// Puts `from` in place of `to`: each service its own way, SFTP and FTP
+    /// through a side name (they cannot overwrite in one step).
     pub async fn replace(&self, from: &str, to: &str) -> AppResult<()> {
         if let Remote::Dav(c) = self {
             return c.replace(from, to).await;
@@ -322,26 +321,7 @@ impl Remote {
         if let Remote::S3(c) = self {
             return c.replace(from, to).await;
         }
-        if !self.exists(to).await {
-            return self.rename(from, to).await;
-        }
-        let aside =
-            crate::paths::remote_join(&crate::paths::remote_parent(to), &format!(".{}.bitcrane-old", remote_name(to)));
-        if self.exists(&aside).await {
-            self.remove_file(&aside).await?;
-        }
-        self.rename(to, &aside).await?;
-        if let Err(e) = self.rename(from, to).await {
-            if let Err(back) = self.rename(&aside, to).await {
-                // The original is only under the side name now; the user must know where it is.
-                return Err(AppError::other("Ersetzen fehlgeschlagen; die bisherige Datei liegt jetzt unter „{0}“.")
-                    .param(remote_name(&aside))
-                    .with_detail(format!("{} / {}", e.detail.unwrap_or_default(), back)));
-            }
-            return Err(e);
-        }
-        let _ = self.remove_file(&aside).await;
-        Ok(())
+        replace_via_aside(self, from, to).await
     }
 
     pub async fn remove(&self, path: &str) -> AppResult<()> {
@@ -806,6 +786,52 @@ impl Remote {
 }
 
 /* ----------------------------------------------------------- Streams */
+
+/// What putting a file in place through a side name needs: the server for SFTP
+/// and FTP, a stand-in in the tests.
+trait AsideOps {
+    async fn exists(&self, path: &str) -> bool;
+    async fn rename(&self, from: &str, to: &str) -> AppResult<()>;
+    async fn remove_file(&self, path: &str) -> AppResult<()>;
+}
+
+impl AsideOps for Remote {
+    async fn exists(&self, path: &str) -> bool {
+        Remote::exists(self, path).await
+    }
+    async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
+        Remote::rename(self, from, to).await
+    }
+    async fn remove_file(&self, path: &str) -> AppResult<()> {
+        Remote::remove_file(self, path).await
+    }
+}
+
+/// Puts `from` in place of `to` where the protocol cannot overwrite in one step:
+/// the old file is renamed aside and only deleted once the new one is in place;
+/// if that fails, the old file is put back.
+async fn replace_via_aside(ops: &impl AsideOps, from: &str, to: &str) -> AppResult<()> {
+    if !ops.exists(to).await {
+        return ops.rename(from, to).await;
+    }
+    let aside =
+        crate::paths::remote_join(&crate::paths::remote_parent(to), &format!(".{}.bitcrane-old", remote_name(to)));
+    if ops.exists(&aside).await {
+        ops.remove_file(&aside).await?;
+    }
+    ops.rename(to, &aside).await?;
+    if let Err(e) = ops.rename(from, to).await {
+        if let Err(back) = ops.rename(&aside, to).await {
+            // The original is only under the side name now; the user must know where it is.
+            return Err(AppError::other("Ersetzen fehlgeschlagen; die bisherige Datei liegt jetzt unter „{0}“.")
+                .param(remote_name(&aside))
+                .with_detail(format!("{} / {}", e.detail.unwrap_or_default(), back)));
+        }
+        return Err(e);
+    }
+    let _ = ops.remove_file(&aside).await;
+    Ok(())
+}
 
 pub enum RemoteReader {
     Plain(Box<dyn AsyncRead + Unpin + Send>),
@@ -1326,5 +1352,85 @@ mod mkdir_tests {
         };
         assert!(mkdir_levels("", "/x/y", exists, |_| refused()).await.is_ok());
         assert!(mkdir_levels("", "/x", |_| async { false }, |_| refused()).await.is_err());
+    }
+}
+
+#[cfg(test)]
+mod aside_tests {
+    use super::*;
+    use crate::error::Param;
+    use std::collections::BTreeMap;
+    use std::sync::Mutex;
+
+    /// Files as name → content; renames of a path in `stuck` fail, as on a server that refuses.
+    #[derive(Default)]
+    struct Files {
+        files: Mutex<BTreeMap<String, &'static str>>,
+        stuck: Vec<&'static str>,
+    }
+
+    impl Files {
+        fn with(list: &[(&str, &'static str)], stuck: &[&'static str]) -> Self {
+            let files = list.iter().map(|(k, v)| (k.to_string(), *v)).collect();
+            Files { files: Mutex::new(files), stuck: stuck.to_vec() }
+        }
+        fn list(&self) -> Vec<(String, &'static str)> {
+            self.files.lock().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect()
+        }
+    }
+
+    impl AsideOps for Files {
+        async fn exists(&self, path: &str) -> bool {
+            self.files.lock().unwrap().contains_key(path)
+        }
+        async fn rename(&self, from: &str, to: &str) -> AppResult<()> {
+            if self.stuck.contains(&from) {
+                return Err(AppError::other("refused"));
+            }
+            let mut files = self.files.lock().unwrap();
+            let content = files.remove(from).ok_or_else(|| AppError::new(ErrorKind::NotFound, "missing"))?;
+            files.insert(to.to_string(), content);
+            Ok(())
+        }
+        async fn remove_file(&self, path: &str) -> AppResult<()> {
+            self.files.lock().unwrap().remove(path);
+            Ok(())
+        }
+    }
+
+    fn files(list: &[(&str, &'static str)]) -> Vec<(String, &'static str)> {
+        list.iter().map(|(k, v)| (k.to_string(), *v)).collect()
+    }
+
+    const NEW: &str = "/a/.x.part";
+    const OLD: &str = "/a/.x.bitcrane-old";
+
+    #[tokio::test]
+    async fn renames_when_there_is_nothing_to_replace() {
+        let f = Files::with(&[(NEW, "new")], &[]);
+        replace_via_aside(&f, NEW, "/a/x").await.unwrap();
+        assert_eq!(f.list(), files(&[("/a/x", "new")]));
+    }
+
+    #[tokio::test]
+    async fn replaces_and_removes_the_old_file_and_a_stale_side_file() {
+        let f = Files::with(&[(NEW, "new"), ("/a/x", "old"), (OLD, "older")], &[]);
+        replace_via_aside(&f, NEW, "/a/x").await.unwrap();
+        assert_eq!(f.list(), files(&[("/a/x", "new")]));
+    }
+
+    #[tokio::test]
+    async fn puts_the_old_file_back_when_the_new_one_cannot_take_its_place() {
+        let f = Files::with(&[(NEW, "new"), ("/a/x", "old")], &[NEW]);
+        assert!(replace_via_aside(&f, NEW, "/a/x").await.is_err());
+        assert_eq!(f.list(), files(&[(NEW, "new"), ("/a/x", "old")]));
+    }
+
+    #[tokio::test]
+    async fn says_where_the_old_file_is_when_it_cannot_be_put_back() {
+        let f = Files::with(&[(NEW, "new"), ("/a/x", "old")], &[NEW, OLD]);
+        let e = replace_via_aside(&f, NEW, "/a/x").await.unwrap_err();
+        assert_eq!(e.message.params, vec![Param::Text(".x.bitcrane-old".into())]);
+        assert_eq!(f.list(), files(&[(OLD, "old"), (NEW, "new")]));
     }
 }

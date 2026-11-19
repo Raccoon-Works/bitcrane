@@ -9,7 +9,7 @@
 
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::paths::{remote_join, remote_name, remote_parent, to_native};
-use crate::remote::Remote;
+use crate::remote::{Meta, Remote};
 use serde::Deserialize;
 use std::future::Future;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -188,25 +188,63 @@ async fn keep_old_version(conn: &Remote, remote_path: &str, keep: u32) -> AppRes
     }
     let name = remote_name(remote_path);
     let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-    // Two uploads within one second get "-2", "-3", ... instead of clashing.
-    let existing: std::collections::HashSet<String> = conn.list(&dir).await?.into_iter().map(|e| e.name).collect();
+    let existing: Vec<String> = conn.list(&dir).await?.into_iter().map(|e| e.name).collect();
+    let version = version_name(&name, &stamp, &existing);
+    conn.rename(remote_path, &remote_join(&dir, &version)).await?;
+    let mut now: Vec<String> = existing;
+    now.push(version);
+    for old in outdated_versions(&now, &name, keep) {
+        let _ = conn.remove_file(&remote_join(&dir, &old)).await;
+    }
+    Ok(())
+}
+
+/// The name of a new version: "<name>.<stamp>", or with "-2", "-3", ... when
+/// two uploads fall into the same second.
+fn version_name(name: &str, stamp: &str, existing: &[String]) -> String {
     let mut version = format!("{name}.{stamp}");
     let mut n = 2;
     while existing.contains(&version) {
         version = format!("{name}.{stamp}-{n}");
         n += 1;
     }
-    conn.rename(remote_path, &remote_join(&dir, &version)).await?;
-    // Remove the oldest versions of this file beyond the limit (names sort by time).
-    // Only exact "<name>.<stamp>" names count, so ".env" leaves ".env.example.<stamp>" alone.
-    let mut versions: Vec<String> =
-        conn.list(&dir).await?.into_iter().map(|e| e.name).filter(|n| is_version_of(n, &name)).collect();
+    version
+}
+
+/// The oldest versions of `name` beyond `keep` (names sort by time). Only exact
+/// "<name>.<stamp>" names count, so ".env" leaves ".env.example.<stamp>" alone.
+fn outdated_versions(names: &[String], name: &str, keep: u32) -> Vec<String> {
+    let mut versions: Vec<&String> = names.iter().filter(|n| is_version_of(n, name)).collect();
+    // "-2" sorts after the plain stamp of the same second, which is the order they were made in.
     versions.sort();
-    while versions.len() > keep as usize {
-        let old = versions.remove(0);
-        let _ = conn.remove_file(&remote_join(&dir, &old)).await;
-    }
-    Ok(())
+    let extra = versions.len().saturating_sub(keep as usize);
+    versions.into_iter().take(extra).cloned().collect()
+}
+
+/// How much of an upload's partial file can be kept: all of it when it is not
+/// longer than the source and was written after the source last changed
+/// (`slack`: seconds a server's times may lag), else nothing.
+fn upload_offset(part: Option<&Meta>, total: u64, source_mtime: Option<u32>, slack: u32) -> u64 {
+    part.filter(|m| m.size <= total && matches!((m.mtime, source_mtime), (Some(p), Some(src)) if p + slack >= src))
+        .map(|m| m.size)
+        .unwrap_or(0)
+}
+
+/// Whether a failed or stopped upload's partial file goes: kept for resuming
+/// after a pause or an error, removed when the transfer was thrown away
+/// ([`DISCARD`]) or the protocol cannot continue it. Without a temp name the
+/// target is the real file, which is never removed.
+fn drops_upload_part(use_temp: bool, state: u8, can_append: bool) -> bool {
+    use_temp && (state == DISCARD || !can_append)
+}
+
+/// The same for a download: the local partial (`size`, `mtime` in seconds) against the server file.
+fn download_offset(part: Option<(u64, Option<u64>)>, total: u64, source_mtime: Option<u32>) -> u64 {
+    part.filter(|(size, mtime)| {
+        *size <= total && matches!((mtime, source_mtime), (Some(p), Some(src)) if *p >= src as u64)
+    })
+    .map(|(size, _)| size)
+    .unwrap_or(0)
 }
 
 /// True for "<name>.YYYY-MM-DD_HH-MM-SS" (optionally "-N").
@@ -256,14 +294,7 @@ pub async fn upload(
     // the local file has not changed since the partial was written (else the
     // new file's tail would land on the old file's head).
     let offset = if use_temp && opts.resume && conn.can_append(remote_path) {
-        conn.meta(&target)
-            .await
-            .filter(|m| {
-                m.size <= total
-                    && matches!((m.mtime, mtime), (Some(part), Some(src)) if part + conn.mtime_slack() >= src)
-            })
-            .map(|m| m.size)
-            .unwrap_or(0)
+        upload_offset(conn.meta(&target).await.as_ref(), total, mtime, conn.mtime_slack())
     } else {
         0
     };
@@ -315,7 +346,7 @@ pub async fn upload(
     if let Err(e) = result {
         // Keep the partial file for resuming unless the user threw the transfer away.
         // Without a temp name the target is the real file: it is never deleted.
-        if use_temp && (control.state() == DISCARD || !conn.can_append(remote_path)) {
+        if drops_upload_part(use_temp, control.state(), conn.can_append(remote_path)) {
             let _ = conn.remove_file(&target).await;
         }
         return Err(e);
@@ -356,14 +387,8 @@ pub async fn download(
         let part_time = |m: &std::fs::Metadata| {
             m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_secs())
         };
-        tokio::fs::metadata(&tmp)
-            .await
-            .ok()
-            .filter(|m| {
-                m.len() <= total && matches!((part_time(m), meta.mtime), (Some(part), Some(src)) if part >= src as u64)
-            })
-            .map(|m| m.len())
-            .unwrap_or(0)
+        let part = tokio::fs::metadata(&tmp).await.ok().map(|m| (m.len(), part_time(&m)));
+        download_offset(part, total, meta.mtime)
     } else {
         0
     };
@@ -540,7 +565,7 @@ pub async fn discard_download_part(local_path: &str) {
 
 #[cfg(test)]
 mod version_tests {
-    use super::is_version_of;
+    use super::*;
 
     #[test]
     fn matches_only_own_versions() {
@@ -549,6 +574,75 @@ mod version_tests {
         assert!(!is_version_of(".env.example.2026-10-27_18-51-02", ".env"));
         assert!(!is_version_of(".env.2026-10-27", ".env"));
         assert!(!is_version_of("bot.py", ".env"));
+    }
+
+    #[test]
+    fn numbers_versions_of_the_same_second() {
+        let stamp = "2026-10-27_18-51-02";
+        assert_eq!(version_name("a.txt", stamp, &[]), "a.txt.2026-10-27_18-51-02");
+        let taken = vec!["a.txt.2026-10-27_18-51-02".to_string(), "a.txt.2026-10-27_18-51-02-2".to_string()];
+        assert_eq!(version_name("a.txt", stamp, &taken), "a.txt.2026-10-27_18-51-02-3");
+    }
+
+    #[test]
+    fn removes_only_the_oldest_own_versions_beyond_the_limit() {
+        let names: Vec<String> = [
+            "a.txt.2026-10-27_18-51-02-2",
+            "a.txt.2026-10-25_09-00-00",
+            "a.txt.example.2026-01-01_00-00-00",
+            "a.txt.2026-10-27_18-51-02",
+            "b.txt.2026-01-01_00-00-00",
+        ]
+        .map(String::from)
+        .to_vec();
+        assert_eq!(outdated_versions(&names, "a.txt", 2), vec!["a.txt.2026-10-25_09-00-00"]);
+        assert!(outdated_versions(&names, "a.txt", 3).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod resume_tests {
+    use super::*;
+
+    const SRC: u32 = 1_700_000_000;
+    fn part(size: u64, mtime: Option<u32>) -> Meta {
+        Meta { size, mtime, perms: None }
+    }
+
+    #[test]
+    fn continues_an_upload_written_after_the_source_changed() {
+        assert_eq!(upload_offset(Some(&part(400, Some(SRC + 5))), 1000, Some(SRC), 0), 400);
+        // The partial is older than the source: the source changed, so start again.
+        assert_eq!(upload_offset(Some(&part(400, Some(SRC - 5))), 1000, Some(SRC), 0), 0);
+        // ... unless the server's times may lag that much.
+        assert_eq!(upload_offset(Some(&part(400, Some(SRC - 5))), 1000, Some(SRC), 60), 400);
+    }
+
+    #[test]
+    fn starts_an_upload_again_when_the_partial_does_not_fit() {
+        assert_eq!(upload_offset(Some(&part(1200, Some(SRC + 5))), 1000, Some(SRC), 0), 0);
+        assert_eq!(upload_offset(Some(&part(400, None)), 1000, Some(SRC), 0), 0);
+        assert_eq!(upload_offset(None, 1000, Some(SRC), 0), 0);
+    }
+
+    #[test]
+    fn continues_a_download_only_from_a_partial_newer_than_the_server_file() {
+        let src = Some(SRC);
+        assert_eq!(download_offset(Some((400, Some(SRC as u64 + 1))), 1000, src), 400);
+        assert_eq!(download_offset(Some((400, Some(SRC as u64 - 1))), 1000, src), 0);
+        assert_eq!(download_offset(Some((1200, Some(SRC as u64 + 1))), 1000, src), 0);
+        assert_eq!(download_offset(Some((400, Some(SRC as u64 + 1))), 1000, None), 0);
+    }
+
+    #[test]
+    fn keeps_an_upload_part_after_a_pause_and_drops_it_when_discarded() {
+        assert!(!drops_upload_part(true, PAUSE, true));
+        assert!(!drops_upload_part(true, RUN, true));
+        assert!(drops_upload_part(true, DISCARD, true));
+        // Nothing to continue it with.
+        assert!(drops_upload_part(true, PAUSE, false));
+        // Written straight to the target: the real file stays.
+        assert!(!drops_upload_part(false, DISCARD, true));
     }
 }
 
