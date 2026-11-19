@@ -13,49 +13,17 @@
  * for little gain): a minimap, language servers (IntelliSense), a debugger and
  * extensions. For that, a desktop editor can still be chosen in the settings.
  */
-import {
-  autocompletion,
-  closeBrackets,
-  closeBracketsKeymap,
-  completeAnyWord,
-  completionKeymap,
-} from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, indentWithTab, toggleComment } from '@codemirror/commands';
-import {
-  bracketMatching,
-  foldGutter,
-  foldKeymap,
-  HighlightStyle,
-  indentOnInput,
-  indentUnit,
-  LanguageDescription,
-  syntaxHighlighting,
-} from '@codemirror/language';
+import { toggleComment } from '@codemirror/commands';
+import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import {
-  gotoLine,
-  highlightSelectionMatches,
-  openSearchPanel,
-  search,
-  searchKeymap,
-  selectNextOccurrence,
-} from '@codemirror/search';
-import { Compartment, EditorState, Text, type Extension } from '@codemirror/state';
-import {
-  crosshairCursor,
-  drawSelection,
-  dropCursor,
-  EditorView,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  highlightSpecialChars,
-  keymap,
-  lineNumbers,
-  rectangularSelection,
-} from '@codemirror/view';
-import { tags as t } from '@lezer/highlight';
+import { gotoLine, openSearchPanel, selectNextOccurrence } from '@codemirror/search';
+import { EditorState, Text } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+
 import { ArrowLeft, FilePlus, FloppyDisk, FolderOpen, MagnifyingGlass, TextAlignLeft, X } from '@phosphor-icons/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDocumentCache } from './useDocumentCache';
+import { documentExtensions, fontTheme, guessIndent, languageNames, newCompartments } from './codeEditorSetup';
 import { $t } from '../i18n';
 import {
   setMenuKeyHandler,
@@ -69,7 +37,6 @@ import {
   markDirty,
   newDocument,
   openLocalFiles,
-  registerText,
   reloadDoc,
   saveAs,
   saveDoc,
@@ -81,113 +48,6 @@ import { updateSettings, useStore } from '../state/store';
 import { FileGlyph } from './icons';
 import { Button, IconButton } from './ui';
 
-/** Syntax colours as CSS variables, so the light and the dark theme each set their own. */
-const highlight = HighlightStyle.define([
-  {
-    tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.operatorKeyword, t.definitionKeyword, t.modifier],
-    color: 'var(--syn-keyword)',
-  },
-  { tag: [t.string, t.special(t.string), t.regexp, t.character], color: 'var(--syn-string)' },
-  { tag: [t.number, t.bool, t.null, t.atom, t.unit], color: 'var(--syn-number)' },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: 'var(--syn-comment)', fontStyle: 'italic' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: 'var(--syn-function)' },
-  { tag: [t.typeName, t.className, t.namespace, t.standard(t.variableName)], color: 'var(--syn-type)' },
-  { tag: [t.propertyName, t.attributeName, t.labelName], color: 'var(--syn-property)' },
-  { tag: [t.tagName, t.angleBracket], color: 'var(--syn-tag)' },
-  { tag: [t.definition(t.variableName), t.self, t.special(t.variableName)], color: 'var(--syn-variable)' },
-  { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: 'var(--syn-punct)' },
-  { tag: [t.heading, t.strong], fontWeight: '700', color: 'var(--syn-heading)' },
-  { tag: t.emphasis, fontStyle: 'italic' },
-  { tag: [t.link, t.url], color: 'var(--syn-string)', textDecoration: 'underline' },
-  { tag: [t.meta, t.processingInstruction, t.annotation], color: 'var(--syn-meta)' },
-  { tag: t.invalid, color: 'var(--danger, #ff6b6b)' },
-]);
-
-/** Look of the editor in Bitcrane's colours (CSS variables, both themes). */
-const look = EditorView.theme({
-  '&': { height: '100%', backgroundColor: 'var(--bg-card)', color: 'var(--text)' },
-  '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.55' },
-  '.cm-content': { caretColor: 'var(--accent-text)', padding: '8px 0' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent-text)', borderLeftWidth: '2px' },
-  '.cm-gutters': { backgroundColor: 'var(--bg-card)', color: 'var(--text-faint)', border: 'none', paddingRight: '4px' },
-  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text-2)' },
-  '.cm-activeLine': { backgroundColor: 'var(--ce-active-line)' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-    backgroundColor: 'var(--ce-selection) !important',
-  },
-  '.cm-selectionMatch': { backgroundColor: 'var(--ce-match)' },
-  '.cm-matchingBracket': { backgroundColor: 'var(--ce-match)', outline: '1px solid var(--line-strong, var(--line))' },
-  '.cm-foldPlaceholder': {
-    backgroundColor: 'var(--bg-control)',
-    border: 'none',
-    color: 'var(--text-muted)',
-    padding: '0 6px',
-  },
-  '.cm-tooltip': {
-    backgroundColor: 'var(--bg-popover, var(--bg-card))',
-    border: '1px solid var(--line)',
-    borderRadius: '8px',
-    color: 'var(--text)',
-  },
-  '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'var(--sel-row)', color: 'var(--sel-fg)' },
-  '.cm-panels': {
-    backgroundColor: 'var(--bg-pane-head, var(--bg-section))',
-    color: 'var(--text)',
-    borderTop: '1px solid var(--line)',
-  },
-  '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--line)' },
-  '.cm-searchMatch': { backgroundColor: 'var(--ce-search)', outline: '1px solid var(--ce-search-line)' },
-  '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'var(--ce-search-sel)' },
-});
-
-/** Indentation of a text: tabs, or the smallest step of leading spaces (2 or 4 …). */
-function guessIndent(text: string, fallback: number): string {
-  let tabs = 0;
-  const steps: number[] = [];
-  for (const line of text.split('\n', 400)) {
-    if (line.startsWith('\t')) tabs++;
-    else {
-      const m = /^( +)\S/.exec(line);
-      if (m) steps.push(m[1].length);
-    }
-  }
-  if (tabs > steps.length) return '\t';
-  const step = steps.filter((n) => n >= 2).reduce((a, b) => Math.min(a, b), 99);
-  return ' '.repeat(step >= 2 && step <= 8 ? step : fallback);
-}
-
-/** CodeMirror's own words (search panel, go to line, folding) in the interface language. */
-const phrases = () => ({
-  Find: $t('Suchen'),
-  Replace: $t('Ersetzen'),
-  next: $t('Weiter'),
-  previous: $t('Zurück'),
-  all: $t('Alle'),
-  'match case': $t('Groß/klein'),
-  regexp: $t('Regulärer Ausdruck'),
-  'by word': $t('Ganzes Wort'),
-  replace: $t('Ersetzen'),
-  'replace all': $t('Alle ersetzen'),
-  close: $t('Schließen'),
-  'Go to line': $t('Gehe zu Zeile'),
-  go: 'OK',
-  'Folded lines': $t('Eingeklappte Zeilen'),
-  'Unfolded lines': $t('Ausgeklappte Zeilen'),
-  'folded code': $t('eingeklappter Code'),
-  unfold: $t('ausklappen'),
-  'Fold line': $t('Zeile einklappen'),
-  'Unfold line': $t('Zeile ausklappen'),
-  'current match': $t('aktueller Treffer'),
-  'on line': $t('in Zeile'),
-  'replaced match on line $': $t('Treffer in Zeile $ ersetzt'),
-  'replaced $ matches': $t('$ Treffer ersetzt'),
-  Completions: $t('Vorschläge'),
-});
-
-const fontTheme = (size: number) => EditorView.theme({ '&': { fontSize: `${size}px` } });
-
-const languageNames = [...languages].sort((a, b) => a.name.localeCompare(b.name)).map((l) => l.name);
-
 export function CodeEditor() {
   const ed = useEditor();
   const savedPrefs = useStore((s) => s.settings.editorPrefs);
@@ -195,14 +55,8 @@ export function CodeEditor() {
   const mac = useStore((s) => s.platform === 'mac');
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  // Per document: its CodeMirror state, the text as last saved, and its language name.
-  const states = useRef(new Map<string, EditorState>());
-  const saved = useRef(new Map<string, Text>());
-  const langOf = useRef(new Map<string, string>());
-  const comp = useMemo(
-    () => ({ lang: new Compartment(), wrap: new Compartment(), indent: new Compartment(), font: new Compartment() }),
-    [],
-  );
+  const cache = useDocumentCache(view, ed.docs, ed.active);
+  const comp = useMemo(newCompartments, []);
   const [cursor, setCursor] = useState({ line: 1, col: 1, sel: 0 });
   const [langName, setLangName] = useState('');
   const [indentText, setIndentText] = useState('');
@@ -214,81 +68,28 @@ export function CodeEditor() {
   const applyLanguage = async (id: string, desc: LanguageDescription | null) => {
     const support = desc ? await desc.load().catch(() => null) : null;
     const v = view.current;
-    langOf.current.set(id, desc?.name ?? '');
+    cache.langOf.set(id, desc?.name ?? '');
     if (v && ed.active === id) {
       v.dispatch({ effects: comp.lang.reconfigure(support ?? []) });
       setLangName(desc?.name ?? '');
     } else {
-      const s = states.current.get(id);
-      if (s) states.current.set(id, s.update({ effects: comp.lang.reconfigure(support ?? []) }).state);
+      const s = cache.states.get(id);
+      if (s) cache.states.set(id, s.update({ effects: comp.lang.reconfigure(support ?? []) }).state);
     }
   };
 
   const makeState = (id: string, text: string): EditorState => {
     const p = prefsRef.current;
     const unit = guessIndent(text, p.tabSize);
-    const extensions: Extension[] = [
-      lineNumbers(),
-      highlightActiveLineGutter(),
-      highlightSpecialChars(),
-      history(),
-      foldGutter(),
-      drawSelection(),
-      dropCursor(),
-      EditorState.allowMultipleSelections.of(true),
-      indentOnInput(),
-      bracketMatching(),
-      closeBrackets(),
-      autocompletion({ override: [completeAnyWord], activateOnTyping: true }),
-      rectangularSelection(),
-      crosshairCursor(),
-      highlightActiveLine(),
-      highlightSelectionMatches(),
-      search({ top: false }),
-      syntaxHighlighting(highlight),
-      EditorState.phrases.of(phrases()),
-      look,
-      comp.lang.of([]),
-      comp.wrap.of(p.wrap ? EditorView.lineWrapping : []),
-      comp.indent.of([indentUnit.of(unit), EditorState.tabSize.of(p.tabSize)]),
-      comp.font.of(fontTheme(p.fontSize)),
-      keymap.of([
-        {
-          key: 'Mod-s',
-          preventDefault: true,
-          run: () => {
-            void saveDoc(id);
-            return true;
-          },
-        },
-        {
-          key: 'Mod-Shift-s',
-          preventDefault: true,
-          run: () => {
-            void saveAs(id);
-            return true;
-          },
-        },
-        {
-          key: 'Mod-w',
-          preventDefault: true,
-          run: () => {
-            closeDoc(id);
-            return true;
-          },
-        },
-        { key: 'Mod-g', preventDefault: true, run: gotoLine },
-        { key: 'Mod-/', preventDefault: true, run: toggleComment },
-        ...closeBracketsKeymap,
-        ...defaultKeymap,
-        ...searchKeymap,
-        ...historyKeymap,
-        ...foldKeymap,
-        ...completionKeymap,
-        indentWithTab,
-      ]),
-      EditorView.updateListener.of((u) => {
-        if (u.docChanged) markDirty(id, !u.state.doc.eq(saved.current.get(id) ?? u.startState.doc));
+    const extensions = documentExtensions({
+      prefs: p,
+      unit,
+      comp,
+      onSave: () => void saveDoc(id),
+      onSaveAs: () => void saveAs(id),
+      onClose: () => closeDoc(id),
+      onUpdate: (u) => {
+        if (u.docChanged) markDirty(id, !u.state.doc.eq(cache.saved.get(id) ?? u.startState.doc));
         if (u.docChanged || u.selectionSet) {
           const r = u.state.selection.main;
           const line = u.state.doc.lineAt(r.head);
@@ -298,8 +99,8 @@ export function CodeEditor() {
             sel: u.state.selection.ranges.reduce((n, x) => n + (x.to - x.from), 0),
           });
         }
-      }),
-    ];
+      },
+    });
     // A file with mixed line endings keeps its "\r" characters in the lines (shown as special
     // characters), so saving writes every line back with its own ending.
     const mixed = ed.docs.find((d) => d.id === id)?.eol === 'mixed';
@@ -307,7 +108,7 @@ export function CodeEditor() {
     const state = EditorState.create({ doc: text, extensions });
     // The reference for "unsaved changes" is the text as read or last saved, not edits kept from before.
     const ref = ed.docs.find((d) => d.id === id)?.initial;
-    saved.current.set(id, ref !== undefined && ref !== text ? Text.of(ref.split(mixed ? '\n' : /\r?\n/)) : state.doc);
+    cache.saved.set(id, ref !== undefined && ref !== text ? Text.of(ref.split(mixed ? '\n' : /\r?\n/)) : state.doc);
     setIndentText(unit === '\t' ? $t('Tabs') : $t('{0} Leerzeichen', unit.length));
     return state;
   };
@@ -317,20 +118,20 @@ export function CodeEditor() {
     if (!host.current) return;
     const v = new EditorView({ parent: host.current });
     view.current = v;
-    const saved = states.current;
+    const kept = cache.states;
     return () => {
       // Closing the editor keeps what was typed: the texts go into the documents and come back
       // when it opens again. The shown document's text is taken from the view, which is ahead
       // of its kept state.
       const a = activeRef.current;
-      if (a && saved.has(a)) saved.set(a, v.state);
+      if (a && kept.has(a)) kept.set(a, v.state);
       const texts = new Map<string, string>();
-      for (const [id, st] of saved) texts.set(id, st.doc.toString());
+      for (const [id, st] of kept) texts.set(id, st.doc.toString());
       keepTexts(texts);
       v.destroy();
       view.current = null;
     };
-  }, []);
+  }, [cache]);
 
   // ⌘ shortcuts that the Mac menu bar would otherwise take (state/editor.ts editorMenuKey).
   const activeRef = useRef(ed.active);
@@ -373,57 +174,33 @@ export function CodeEditor() {
   useEffect(() => {
     const v = view.current;
     if (!v || !doc || doc.loading || doc.error) return;
-    let s = states.current.get(doc.id);
+    let s = cache.states.get(doc.id);
     const isNew = !s;
     if (!s) {
       s = makeState(doc.id, doc.text ?? doc.initial);
-      states.current.set(doc.id, s);
-      registerText(doc.id, () =>
-        ed.active === doc.id && view.current
-          ? view.current.state.doc.toString()
-          : (states.current.get(doc.id)?.doc.toString() ?? ''),
-      );
+      cache.add(doc.id, s);
     }
     v.setState(s);
     if (isNew)
       void applyLanguage(doc.id, doc.path || doc.name ? LanguageDescription.matchFilename(languages, doc.name) : null);
-    else setLangName(langOf.current.get(doc.id) ?? '');
+    else setLangName(cache.langOf.get(doc.id) ?? '');
     const r = s.selection.main;
     const line = s.doc.lineAt(r.head);
     setCursor({ line: line.number, col: r.head - line.from + 1, sel: 0 });
     v.focus();
-    const saved = states.current;
+    const kept = cache.states;
     return () => {
       // Keep the state (text, history, cursor) for when the document is shown again.
-      if (view.current && saved.has(doc.id)) saved.set(doc.id, view.current.state);
+      if (view.current && kept.has(doc.id)) kept.set(doc.id, view.current.state);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only when another document is shown or has loaded; on every edit it would reset the view
   }, [doc?.id, doc?.loading, doc?.error]);
 
-  // Text getters always read the live view for the shown document.
-  useEffect(() => {
-    for (const d of ed.docs) {
-      if (states.current.has(d.id))
-        registerText(d.id, () =>
-          view.current && ed.active === d.id
-            ? view.current.state.doc.toString()
-            : (states.current.get(d.id)?.doc.toString() ?? ''),
-        );
-    }
-    // Forget the states of closed documents.
-    for (const id of [...states.current.keys()])
-      if (!ed.docs.some((d) => d.id === id)) {
-        states.current.delete(id);
-        saved.current.delete(id);
-        langOf.current.delete(id);
-      }
-  }, [ed.docs, ed.active]);
-
   // After saving, the saved text is the new reference for "unsaved changes".
   useEffect(() => {
     const v = view.current;
-    if (v && doc && !doc.dirty && states.current.has(doc.id)) saved.current.set(doc.id, v.state.doc);
-  }, [doc, doc?.dirty]);
+    if (v && doc && !doc.dirty && cache.states.has(doc.id)) cache.saved.set(doc.id, v.state.doc);
+  }, [cache, doc]);
 
   // Settings changed: apply them to the view and the kept states.
   useEffect(() => {
@@ -433,9 +210,8 @@ export function CodeEditor() {
     ];
     view.current?.dispatch({ effects });
     // The shown document got them through the view; the others are updated in their kept states.
-    for (const [id, s] of states.current)
-      if (id !== activeRef.current) states.current.set(id, s.update({ effects }).state);
-  }, [comp, prefs.wrap, prefs.fontSize]);
+    for (const [id, s] of cache.states) if (id !== activeRef.current) cache.states.set(id, s.update({ effects }).state);
+  }, [cache, comp, prefs.wrap, prefs.fontSize]);
 
   const chooseLanguage = (name: string) => {
     if (!doc) return;

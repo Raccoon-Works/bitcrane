@@ -26,14 +26,14 @@ import { isConnected, refreshVisible } from './live';
 import { toBackendError, type EditorEncoding, type EditorEol } from '../backend/api';
 
 /** Editor settings with their standard values (CodeEditor.tsx and Settings › Allgemein). */
-interface EditorPrefs {
+export interface EditorPrefs {
   fontSize: number;
   wrap: boolean;
   tabSize: number;
 }
 export const EDITOR_DEFAULTS: EditorPrefs = { fontSize: 13, wrap: false, tabSize: 4 };
 
-interface EditorDoc {
+export interface EditorDoc {
   id: string;
   /** Server of the file; '' for a file of this computer, null for a new, unsaved document. */
   serverId: string | null;
