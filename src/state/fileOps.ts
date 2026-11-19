@@ -24,6 +24,7 @@ import {
   paneShowsServers,
   isDirEntry,
   getState,
+  emptySelection,
 } from './core';
 import type { AppState } from './appState';
 import { openDialog } from './panels';
@@ -180,7 +181,7 @@ export function deleteNames(side: PaneSide, names: string[]) {
   const t = activeTab();
   if (!t) return;
   if (LIVE) {
-    setState((s) => ({ dialog: null, selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+    setState((s) => ({ dialog: null, selection: { ...s.selection, [side]: emptySelection() } }));
     void live.removeEntries(...paneLoc(side, t), panePath(side), names);
     return;
   }
@@ -188,7 +189,7 @@ export function deleteNames(side: PaneSide, names: string[]) {
   setState((s) => ({
     fsRev: s.fsRev + 1,
     dialog: null,
-    selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } },
+    selection: { ...s.selection, [side]: emptySelection() },
   }));
   showToast(names.length === 1 ? $t('„{0}“ gelöscht.', names[0]) : $t('{0} Objekte gelöscht.', names.length));
 }
@@ -380,7 +381,7 @@ export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, d
     for (const n of list) fs.move(...loc, paths.join(dir, n), toDir);
     setState((s) => ({
       fsRev: s.fsRev + 1,
-      selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } },
+      selection: { ...s.selection, [side]: emptySelection() },
     }));
     showToast(
       list.length === 1 ? $t('„{0}“ verschoben.', paths.basename(list[0])) : $t('{0} Objekte verschoben.', list.length),
@@ -405,7 +406,7 @@ export function moveIntoFolder(side: PaneSide, names: string[], toDir: string, d
       });
     }
   } else void live.moveInto(...loc, dir, list, toDir);
-  setState((s) => ({ selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+  setState((s) => ({ selection: { ...s.selection, [side]: emptySelection() } }));
 }
 
 /**

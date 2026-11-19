@@ -4,7 +4,7 @@
 
 import type { PaneSide } from '../backend/types';
 
-import { setState, paneEntries, getState } from './core';
+import { setState, paneEntries, getState, emptySelection } from './core';
 import { updateSettings } from './settings';
 
 export function setFocusSide(side: PaneSide) {
@@ -47,7 +47,7 @@ export function clickRow(side: PaneSide, index: number, mod: { shift?: boolean; 
 }
 
 export function clearPaneSelection(side: PaneSide) {
-  setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: { names: [], cursor: -1, anchor: -1 } } }));
+  setState((s) => ({ focusSide: side, selection: { ...s.selection, [side]: emptySelection() } }));
 }
 
 /** Arrow-key movement in the focused pane. */

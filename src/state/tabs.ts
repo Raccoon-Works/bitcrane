@@ -27,6 +27,7 @@ import {
   paneEntries,
   isDirEntry,
   getState,
+  emptySelection,
 } from './core';
 import type { PaneSelection, AppState, TransferRule } from './appState';
 import { openDialog } from './panels';
@@ -37,7 +38,7 @@ import { openWithDefaultApp, editorFor } from './fileOps';
 import { upload, download } from './transfers';
 
 export function clearSelection(): Record<PaneSide, PaneSelection> {
-  return { local: { names: [], cursor: -1, anchor: -1 }, remote: { names: [], cursor: -1, anchor: -1 } };
+  return { local: emptySelection(), remote: emptySelection() };
 }
 
 export function selectTab(id: string) {
@@ -283,7 +284,7 @@ export function navigate(side: PaneSide, path: string, record = true) {
     selection: {
       ...s.selection,
       [side]: { names: [], cursor: 0, anchor: 0 },
-      ...(other ? { [other]: { names: [], cursor: -1, anchor: -1 } } : {}),
+      ...(other ? { [other]: emptySelection() } : {}),
     },
     expanded: { ...s.expanded, [side]: [], ...(other ? { [other]: [] } : {}) },
     focusSide: side,

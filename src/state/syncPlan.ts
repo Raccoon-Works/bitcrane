@@ -8,6 +8,7 @@
  * from; this covers computer ↔ server, server ↔ server and two local folders.
  */
 import * as live from './live';
+import { matchesExclude } from '../util/format';
 import { demoWalk, LIVE, type SyncAction } from './store';
 
 export type Direction = 'up' | 'down' | 'both';
@@ -107,11 +108,7 @@ const DAY_MS = 24 * 3600 * 1000;
 
 /** Whether a relative path has a segment matching one of the patterns (a name or "*.ext"). */
 export function isExcluded(rel: string, excludes: string[]): boolean {
-  return rel
-    .split('/')
-    .some((seg) =>
-      excludes.some((p) => (p.startsWith('*.') ? seg.toLowerCase().endsWith(p.slice(1).toLowerCase()) : seg === p)),
-    );
+  return rel.split('/').some((seg) => matchesExclude(seg, excludes));
 }
 
 /**

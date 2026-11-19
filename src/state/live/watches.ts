@@ -349,44 +349,31 @@ export async function syncDeletes(serverId: string, remote: string[], local: str
 }
 
 /** "Jetzt testen" in the watch dialog: runs the command once on the server. */
-export async function testCommand(
-  serverId: string,
-  command: string,
-): Promise<{ code: number; output: string } | { error: string }> {
-  if (!connected.has(serverId)) {
-    const ok = await connectServer(serverId);
-    if (!ok) return { error: $t('Keine Verbindung zum Server.') };
-  }
-  try {
-    addLog('info', $t('Befehl testen: {0}', command), serverId);
-    const r = await backend.remoteExec(serverId, command);
-    addLog(
-      r.code === 0 ? 'ok' : 'error',
-      $t('Test endete mit Code {0}', r.code),
-      serverId,
-      r.output.trim() || undefined,
-    );
-    return r;
-  } catch (e) {
-    return { error: toBackendError(e).message };
-  }
+export function testCommand(serverId: string, command: string) {
+  return execOnServer(serverId, command, 'test');
 }
 
 /** Runs a command on the server (own commands from the context menu); connects first when needed. */
-export async function runRemoteCommand(
+export function runRemoteCommand(serverId: string, command: string) {
+  return execOnServer(serverId, command, 'own');
+}
+
+/** Runs a command on the server and logs it, as a test or as an own command. */
+async function execOnServer(
   serverId: string,
   command: string,
+  kind: 'test' | 'own',
 ): Promise<{ code: number; output: string } | { error: string }> {
   if (!connected.has(serverId)) {
     const ok = await connectServer(serverId);
     if (!ok) return { error: $t('Keine Verbindung zum Server.') };
   }
   try {
-    addLog('info', $t('Befehl: {0}', command), serverId);
+    addLog('info', kind === 'test' ? $t('Befehl testen: {0}', command) : $t('Befehl: {0}', command), serverId);
     const r = await backend.remoteExec(serverId, command);
     addLog(
       r.code === 0 ? 'ok' : 'error',
-      $t('Befehl endete mit Code {0}', r.code),
+      kind === 'test' ? $t('Test endete mit Code {0}', r.code) : $t('Befehl endete mit Code {0}', r.code),
       serverId,
       r.output.trim() || undefined,
     );

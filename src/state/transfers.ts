@@ -253,11 +253,8 @@ export function retryTransfer(id: string) {
   }));
 }
 
-export function skipTransfer(id: string) {
-  setState((s) => ({ transfers: s.transfers.filter((x) => x.id !== id) }));
-}
-
-export function cancelTransfer(id: string) {
+/** Removes a transfer from the list ("Abbrechen", "Überspringen"); a running one is stopped and its partial file deleted. */
+export function removeTransfer(id: string) {
   setState((s) => ({ transfers: s.transfers.filter((x) => x.id !== id) }));
 }
 

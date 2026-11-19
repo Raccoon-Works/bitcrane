@@ -26,7 +26,7 @@ import {
   retryTransfer,
   setActivityFilter,
   setState,
-  skipTransfer,
+  removeTransfer,
   toggleActivity,
   updateSettings,
   useStore,
@@ -112,7 +112,7 @@ function ActivityRow({ t }: { t: Transfer }) {
           <Button small onClick={() => setState({ dialog: { type: 'transfers' } })}>
             {isDenied(t.error) ? $t('Rechte prüfen') : $t('Details')}
           </Button>
-          <Button small onClick={() => skipTransfer(t.id)}>
+          <Button small onClick={() => removeTransfer(t.id)}>
             {$t('Überspringen')}
           </Button>
           <Button small variant="primary" onClick={onRetry}>

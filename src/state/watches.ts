@@ -20,6 +20,7 @@ import {
   paneLoc,
   setLeftServer,
   getState,
+  emptySelection,
 } from './core';
 import { relFolder } from '../util/paths';
 import { defaultWatchOptions } from './defaults';
@@ -304,7 +305,7 @@ export function closePaneServer(side: PaneSide) {
       serverList: { ...t.serverList, remote: true },
     });
     setState((s) => ({
-      selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+      selection: { ...s.selection, remote: emptySelection() },
       expanded: { ...s.expanded, remote: [] },
     }));
   }

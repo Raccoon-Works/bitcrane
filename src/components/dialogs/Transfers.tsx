@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, GripVertical, Pause, Play, X } from '../glyp
 import { useState } from 'react';
 import {
   askCancelAllTransfers,
-  cancelTransfer,
   clearFinished,
   closeDialog,
   fixDemoPermissions,
@@ -14,7 +13,7 @@ import {
   pauseAllTransfers,
   reorderTransfer,
   retryTransfer,
-  skipTransfer,
+  removeTransfer,
   skippedText,
   toggleTransferPause,
   useStore,
@@ -123,7 +122,7 @@ export function TransfersDialog() {
               type="button"
               className="icon-btn"
               aria-label={$t('Abbrechen')}
-              onClick={() => cancelTransfer(t.id)}
+              onClick={() => removeTransfer(t.id)}
             >
               <X size={13} strokeWidth={1.75} />
             </button>
@@ -136,7 +135,7 @@ export function TransfersDialog() {
               <Button small onClick={() => openDialog({ type: 'log' })}>
                 {$t('Protokoll')}
               </Button>
-              <Button small onClick={() => skipTransfer(t.id)}>
+              <Button small onClick={() => removeTransfer(t.id)}>
                 {$t('Überspringen')}
               </Button>
               <Button

@@ -17,7 +17,7 @@ import type { FileEntry, PaneSide, Server, Tab, Watch } from '../backend/types';
 import { describeFile } from '../util/format';
 import * as paths from '../util/paths';
 import { $t, LANG } from '../i18n';
-import type { AppState, SidebarSection, SortKey, ViewMode } from './appState';
+import type { AppState, PaneSelection, SidebarSection, SortKey, ViewMode } from './appState';
 import { defaultToolbar, detectPlatform, detectTheme } from './defaults';
 import { sampleServers, sampleTransfers, sampleWatches } from './demoData';
 import { updateTab } from './tabs';
@@ -31,6 +31,11 @@ import { updateSettings } from './settings';
  * asks at run time whether Tauri is there.
  */
 export const LIVE: boolean = __BITCRANE_LIVE__ ?? '__TAURI_INTERNALS__' in window;
+
+/** The selection of a half with nothing selected. */
+export function emptySelection(): PaneSelection {
+  return { names: [], cursor: -1, anchor: -1 };
+}
 
 export function initialState(): AppState {
   const servers = LIVE ? [] : sampleServers();
@@ -62,8 +67,8 @@ export function initialState(): AppState {
     syncReview: [],
     transfers: LIVE ? [] : sampleTransfers(),
     selection: LIVE
-      ? { local: { names: [], cursor: -1, anchor: -1 }, remote: { names: [], cursor: -1, anchor: -1 } }
-      : { local: { names: ['app.py'], cursor: 3, anchor: 3 }, remote: { names: [], cursor: -1, anchor: -1 } },
+      ? { local: emptySelection(), remote: emptySelection() }
+      : { local: { names: ['app.py'], cursor: 3, anchor: 3 }, remote: emptySelection() },
     focusSide: 'local',
     inspectorOpen: false,
     activityOpen: false,
@@ -308,7 +313,7 @@ export function setRightLocal(path?: string) {
     serverList: { ...cur.serverList, remote: false },
   });
   setState((s) => ({
-    selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+    selection: { ...s.selection, remote: emptySelection() },
     expanded: { ...s.expanded, remote: [] },
     focusSide: 'remote',
     contextMenu: null,
@@ -348,7 +353,7 @@ export function openServerIn(side: PaneSide, serverId: string) {
     serverList: { ...t.serverList, remote: false },
   });
   setState((s) => ({
-    selection: { ...s.selection, remote: { names: [], cursor: -1, anchor: -1 } },
+    selection: { ...s.selection, remote: emptySelection() },
     expanded: { ...s.expanded, remote: [] },
     focusSide: 'remote',
   }));
@@ -390,7 +395,7 @@ export function setLeftServer(serverId: string) {
     tabs: s.tabs.map((x) =>
       x.id === t.id ? { ...x, leftServerId: srv?.id, localPath, back: [], forward: [], syncBrowse: undefined } : x,
     ),
-    selection: { ...s.selection, local: { names: [], cursor: -1, anchor: -1 } },
+    selection: { ...s.selection, local: emptySelection() },
     contextMenu: null,
   }));
   if (srv && LIVE && !live.isConnected(srv.id)) live.connectNow(srv.id);
