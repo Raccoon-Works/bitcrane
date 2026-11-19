@@ -20,14 +20,12 @@ import {
   panePath,
   uid,
   getState,
-  setLeftServer,
-  setRightLocal,
 } from './core';
 import type { AppState } from './appState';
 import { updateSettings } from './settings';
 import { openDialog } from './panels';
 import { editPath, placeOf } from './fileOps';
-import { navigate } from './tabs';
+import { navigate, setLeftServer, setRightLocal } from './tabs';
 import { chooseFolder } from '../backend/dialogs';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';

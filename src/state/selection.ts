@@ -4,7 +4,8 @@
 
 import type { PaneSide } from '../backend/types';
 
-import { setState, paneEntries, getState, emptySelection } from './core';
+import { setState, getState, emptySelection } from './core';
+import { paneEntries } from './rows';
 import { updateSettings } from './settings';
 
 export function setFocusSide(side: PaneSide) {

@@ -17,13 +17,13 @@ import {
   paneShowsServers,
   paneLoc,
   serverById,
-  paneEntries,
   showToast,
   panePath,
   LIVE,
   uid,
   getState,
 } from './core';
+import { paneEntries } from './rows';
 import type { SettingsTab } from '../backend/types';
 import type { DialogState, AppState } from './appState';
 import { clearSelection, navigate, openServerInNewTab } from './tabs';

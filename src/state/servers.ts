@@ -6,20 +6,9 @@ import * as live from './live';
 import type { PaneSide, Server } from '../backend/types';
 import { isCloudProtocol } from '../backend/types';
 import { $t } from '../i18n';
-import {
-  setState,
-  LIVE,
-  showToast,
-  serverById,
-  uid,
-  openServerIn,
-  activeTab,
-  watchForLocal,
-  panePath,
-  getState,
-} from './core';
+import { setState, LIVE, showToast, serverById, uid, activeTab, watchForLocal, panePath, getState } from './core';
 import type { AppState } from './appState';
-import { openServer } from './tabs';
+import { openServer, openServerIn } from './tabs';
 import { openDialog } from './panels';
 import { updateSettings } from './settings';
 import { closePaneServer, simulateLocalChange } from './watches';

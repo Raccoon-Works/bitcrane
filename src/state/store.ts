@@ -8,6 +8,8 @@
  * (`LIVE`) they delegate to live.ts, which calls the Rust core.
  */
 export * from './core';
+export * from './rows';
+export * from './sidebar';
 export * from './appState';
 export * from './defaults';
 export * from './tabs';

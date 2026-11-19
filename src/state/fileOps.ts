@@ -18,7 +18,6 @@ import {
   LIVE,
   isOffline,
   listEntries,
-  paneEntries,
   paneOnServer,
   serverById,
   paneShowsServers,
@@ -26,6 +25,7 @@ import {
   getState,
   emptySelection,
 } from './core';
+import { paneEntries } from './rows';
 import type { AppState } from './appState';
 import { openDialog } from './panels';
 import { pushUndo, renameAt } from './undo';

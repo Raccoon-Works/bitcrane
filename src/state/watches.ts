@@ -18,7 +18,6 @@ import {
   panePath,
   activeTab,
   paneLoc,
-  setLeftServer,
   getState,
   emptySelection,
 } from './core';
@@ -26,7 +25,7 @@ import { relFolder } from '../util/paths';
 import { defaultWatchOptions } from './defaults';
 import { openDialog } from './panels';
 import { enqueue } from './transfers';
-import { clearSelection, openServer, updateTab } from './tabs';
+import { clearSelection, openServer, updateTab, setLeftServer } from './tabs';
 import { addLog } from './log';
 
 /** Options a new watch (and a template taken over from a built-in one) starts with: the defaults of the settings. */

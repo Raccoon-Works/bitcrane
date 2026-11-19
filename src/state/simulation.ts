@@ -12,18 +12,8 @@ import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
 import { DEMO_CLIP, DEMO_THEME, listenForDemoMessages } from '../util/demo';
 import { $t } from '../i18n';
-import {
-  emptyTab,
-  setState,
-  initialState,
-  subscribeStore,
-  showToast,
-  uid,
-  activeTab,
-  openServerIn,
-  LIVE,
-  getState,
-} from './core';
+import { emptyTab, setState, initialState, subscribeStore, showToast, uid, activeTab, LIVE, getState } from './core';
+import { openServerIn } from './tabs';
 import { detectTheme } from './defaults';
 import { sampleServers } from './demoData';
 import { openDialog } from './panels';

@@ -17,18 +17,18 @@ import {
   linkedStart,
   showToast,
   activeTab,
-  openServerIn,
   emptyTab,
   paneLoc,
   isOffline,
   paneShowsServers,
   listEntries,
   panePath,
-  paneEntries,
   isDirEntry,
   getState,
   emptySelection,
 } from './core';
+import { paneEntries } from './rows';
+import { closePaneServer } from './watches';
 import type { PaneSelection, AppState, TransferRule } from './appState';
 import { openDialog } from './panels';
 import { deleteServer } from './servers';
@@ -554,4 +554,111 @@ export function openTerminal(side: PaneSide = getState().focusSide) {
         }
       : { localPath: home, app: getState().settings.externalTerminal };
   void backend.openTerminal(target).catch((e) => showError(e));
+}
+
+/** Switches a half between its files and the server list. */
+export function setPaneServerList(side: PaneSide, on: boolean) {
+  const t = activeTab();
+  if (!t) return;
+  // Without a server the right half has no files to go back to.
+  if (!on && side === 'remote' && !t.serverId && !t.rightLocal) return;
+  updateTab({ serverList: { ...t.serverList, [side]: on } });
+  setState({ focusSide: side, contextMenu: null });
+}
+
+/**
+ * Two local halves (Total Commander): the right half shows a folder of this
+ * computer instead of a server. A server shown there is closed first.
+ */
+export function setRightLocal(path?: string) {
+  const t = activeTab();
+  if (!t) return;
+  if (t.serverId) closePaneServer('remote');
+  const cur = activeTab() ?? t;
+  updateTab({
+    rightLocal: true,
+    serverId: '',
+    remotePath: path ?? (cur.rightLocal && cur.remotePath ? cur.remotePath : cur.leftServerId ? '~' : cur.localPath),
+    back: [],
+    forward: [],
+    syncBrowse: undefined,
+    serverList: { ...cur.serverList, remote: false },
+  });
+  setState((s) => ({
+    selection: { ...s.selection, remote: emptySelection() },
+    expanded: { ...s.expanded, remote: [] },
+    focusSide: 'remote',
+    contextMenu: null,
+  }));
+}
+
+/**
+ * Connects a server into a half (from the server list or "Schnell verbinden").
+ * The left half then shows that server (server to server), the right half
+ * becomes the tab's server.
+ */
+export function openServerIn(side: PaneSide, serverId: string) {
+  const t = activeTab();
+  const srv = serverById(serverId);
+  if (!t || !srv) return;
+  setState((st) => ({
+    servers: st.servers.map((x) => (x.id === serverId ? { ...x, lastUsed: Date.now() } : x)),
+    firstRun: false,
+  }));
+  if (side === 'local') {
+    updateTab({ serverList: { ...t.serverList, local: false } });
+    setLeftServer(serverId);
+    return;
+  }
+  // Without a start folder the server's home folder is used; it is known only once connected
+  // (an already open connection, e.g. of a folder watch, does not report it again).
+  const start = srv.remoteStart || (LIVE && live.isConnected(serverId) ? (live.homeOf(serverId) ?? '') : '');
+  const linked = linkedStart(srv, start);
+  updateTab({
+    serverId,
+    rightLocal: false,
+    remotePath: start,
+    back: [],
+    forward: [],
+    syncBrowse: linked,
+    ...(linked ? { localPath: linked.local } : {}),
+    serverList: { ...t.serverList, remote: false },
+  });
+  setState((s) => ({
+    selection: { ...s.selection, remote: emptySelection() },
+    expanded: { ...s.expanded, remote: [] },
+    focusSide: 'remote',
+  }));
+  if (LIVE) {
+    if (!live.isConnected(serverId)) live.connectNow(serverId);
+  } else {
+    setState((s) => ({ servers: s.servers.map((x) => (x.id === serverId ? { ...x, online: true } : x)) }));
+    showToast($t('Verbunden mit {0}', srv.name), 'ok');
+  }
+}
+
+/** Server to server: shows a server in the left half, or this computer again (''). */
+export function setLeftServer(serverId: string) {
+  const t = activeTab();
+  if (!t) return;
+  const srv = serverId ? serverById(serverId) : undefined;
+  if (serverId && !srv) return;
+  if ((t.leftServerId ?? '') === serverId) {
+    setState({ contextMenu: null });
+    return;
+  }
+  // An empty path is filled with the server's home folder once connected.
+  const localPath = srv
+    ? srv.remoteStart || (LIVE ? (live.isConnected(srv.id) ? (live.homeOf(srv.id) ?? '') : '') : '/')
+    : getState().servers.find((x) => x.id === t.serverId)?.localStart || '~';
+  setState((s) => ({
+    tabs: s.tabs.map((x) =>
+      x.id === t.id ? { ...x, leftServerId: srv?.id, localPath, back: [], forward: [], syncBrowse: undefined } : x,
+    ),
+    selection: { ...s.selection, local: emptySelection() },
+    contextMenu: null,
+  }));
+  if (srv && LIVE && !live.isConnected(srv.id)) live.connectNow(srv.id);
+  if (srv && !LIVE)
+    setState((s) => ({ servers: s.servers.map((x) => (x.id === srv.id ? { ...x, online: true } : x)) }));
 }
