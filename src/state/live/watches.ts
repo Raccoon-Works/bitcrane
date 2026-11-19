@@ -351,14 +351,8 @@ export async function runRemoteCommand(
   }
 }
 
-/** "Testlauf": tells the user how many files the watch would cover. */
-export async function testRun(localPath: string, excludes: string[]) {
-  try {
-    const files = (await backend.localWalk(localPath)).filter(
-      (f) => !isExcluded(f.path.slice(localPath.length + 1), excludes),
-    );
-    showToast($t('Testlauf: {0} Dateien würden beobachtet. Es wurde nichts übertragen.', files.length));
-  } catch (e) {
-    showError(e);
-  }
+/** "Testlauf": how many files below the folder the watch would cover. Errors go to the dialog that asked. */
+export async function testRun(localPath: string, excludes: string[]): Promise<number> {
+  return (await backend.localWalk(localPath)).filter((f) => !isExcluded(f.path.slice(localPath.length + 1), excludes))
+    .length;
 }

@@ -26,6 +26,8 @@ import type { UpdateState } from './updates';
 
 export type DialogState =
   | { type: 'watchSetup'; editId?: string }
+  /** An own watch template, edited by name (settings.watchTemplates). */
+  | { type: 'watchTemplate'; name: string }
   | { type: 'serverEdit'; serverId?: string; cloud?: Protocol; terminal?: boolean; preset?: Partial<Server> }
   | {
       type: 'confirm';

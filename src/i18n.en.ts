@@ -812,6 +812,27 @@ export const EN: Record<string, string> = {
   'Lokalen Ordner wählen': 'Choose local folder',
   'Vorlage „{0}“ gespeichert. Du findest sie bei „Vorlage wählen …“.':
     'Template “{0}” saved. You can find it under “Choose template …”.',
+  'Vorlage „{0}“ überschrieben. Bearbeiten und löschen: Einstellungen › Überwachung.':
+    'Template “{0}” overwritten. Edit and delete: Settings › Watch.',
+  'Vorlage „{0}“ löschen?': 'Delete template “{0}”?',
+  'Bestehende Überwachungen bleiben, wie sie sind.': 'Existing watches stay as they are.',
+  'Vorlage bearbeiten': 'Edit template',
+  'Vorlage „{0}“ bearbeiten': 'Edit template “{0}”',
+  'Gilt für neue Überwachungen, die diese Vorlage wählen. Bestehende bleiben, wie sie sind.':
+    'Applies to new watches that choose this template. Existing ones stay as they are.',
+  'Vorlage löschen': 'Delete template',
+  'Eine Vorlage mit diesem Namen gibt es schon.': 'A template with this name already exists.',
+  'Name der Vorlage': 'Template name',
+  'Noch keine Überwachung': 'No watch yet',
+  'Mit einer Überwachung lädt Bitcrane jede Änderung in einem Ordner automatisch hoch.':
+    'With a watch, Bitcrane uploads every change in a folder automatically.',
+  'Eigene Vorlagen': 'Your templates',
+  'Noch keine eigene Vorlage': 'No template of your own yet',
+  'Im Fenster einer neuen Überwachung „Als Vorlage speichern“ wählen oder unten eine mitgelieferte Vorlage übernehmen.':
+    'Choose “Save as template” in the window of a new watch, or take over a built-in template below.',
+  'Mitgelieferte Vorlagen': 'Built-in templates',
+  'Als eigene Vorlage übernehmen': 'Use as own template',
+  'Lädt alles hoch': 'Uploads everything',
   'Der Server-Ordner muss mit / beginnen.': 'The server folder must start with /.',
   'Überwachung löschen': 'Delete watch',
   'Als Vorlage speichern': 'Save as template',
@@ -1088,8 +1109,9 @@ export const EN: Record<string, string> = {
   'Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.':
     'Watch “{0}” saved. It keeps running without a restart.',
   'Überwachung „{0}“ läuft.': 'Watch “{0}” is running.',
-  'Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.':
-    'Dry run: {0} files would be watched, {1} uploaded at the start. Nothing was transferred.',
+  'Testlauf: 1 Datei würde beobachtet. Es wurde nichts übertragen.':
+    'Dry run: 1 file would be watched. Nothing was transferred.',
+  'Zähle …': 'Counting …',
   'Für diesen Ordner gibt es keine Überwachung.': 'There is no watch for this folder.',
   'Keine aktive Überwachung. Starte zuerst eine.': 'No active watch. Start one first.',
   '„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.':

@@ -977,7 +977,6 @@
   "Alle Überwachungen laufen wieder.": "Alle bewakingen hervat.",
   "Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.": "Bewaking “{0}” bewaard. Ze blijft actief zonder herstart.",
   "Überwachung „{0}“ läuft.": "Bewaking “{0}” is actief.",
-  "Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.": "Proefdraaien: {0} bestanden zouden worden bewaakt, {1} bij de start geüpload. Er is niets overgezet.",
   "Für diesen Ordner gibt es keine Überwachung.": "Voor deze map is er geen bewaking.",
   "Keine aktive Überwachung. Starte zuerst eine.": "Geen actieve bewaking. Start er eerst een.",
   "„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.": "“{0}” is gewijzigd. De bewaking is gepauzeerd en uploadt niets.",

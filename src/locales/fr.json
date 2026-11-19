@@ -977,7 +977,6 @@
   "Alle Überwachungen laufen wieder.": "Toutes les surveillances ont repris.",
   "Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.": "Surveillance « {0} » enregistrée. Elle continue sans redémarrage.",
   "Überwachung „{0}“ läuft.": "La surveillance « {0} » est en cours.",
-  "Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.": "Simulation : {0} fichiers seraient surveillés, {1} envoyés au démarrage. Rien n’a été transféré.",
   "Für diesen Ordner gibt es keine Überwachung.": "Il n’y a pas de surveillance pour ce dossier.",
   "Keine aktive Überwachung. Starte zuerst eine.": "Aucune surveillance active. Lancez-en une d’abord.",
   "„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.": "« {0} » a changé. La surveillance est en pause et n’enverra rien.",

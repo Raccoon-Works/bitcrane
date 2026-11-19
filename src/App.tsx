@@ -47,6 +47,7 @@ import { ServerEdit } from './components/dialogs/serverEdit/ServerEdit';
 import { ToolbarCustomize } from './components/dialogs/ToolbarCustomize';
 import { TransfersDialog } from './components/dialogs/Transfers';
 import { WatchSetup } from './components/dialogs/WatchSetup';
+import { WatchTemplateEdit } from './components/dialogs/WatchTemplateEdit';
 import { MainWindow } from './components/MainWindow';
 import { MenuBarWindow } from './components/MenuBarWindow';
 import { PrototypeBar } from './components/PrototypeBar';
@@ -80,6 +81,8 @@ function Dialogs() {
   switch (dialog.type) {
     case 'watchSetup':
       return <WatchSetup key={dialog.editId ?? 'new'} editId={dialog.editId} />;
+    case 'watchTemplate':
+      return <WatchTemplateEdit key={dialog.name} name={dialog.name} />;
     case 'serverEdit':
       return (
         <ServerEdit

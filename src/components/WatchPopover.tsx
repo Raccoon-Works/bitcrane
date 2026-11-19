@@ -3,10 +3,38 @@
  * toolbar. Scales in from the button (origin-aware, 150 ms ease-out).
  */
 import { useEffect, useRef } from 'react';
-import { openDialog, openWatchFolders, setState, toggleWatch, updateSettings, useStore } from '../state/store';
+import type { Watch } from '../backend/types';
+import {
+  askDeleteWatch,
+  openDialog,
+  openWatchFolders,
+  setState,
+  toggleWatch,
+  updateSettings,
+  useStore,
+  watchRoute,
+  watchStatus,
+} from '../state/store';
 import { formatAgo } from '../util/format';
 import { Button, Switch } from './ui';
 import { $t } from '../i18n';
+
+/** Pause or resume, edit and delete one watch. */
+export function WatchActions({ w }: { w: Watch }) {
+  return (
+    <>
+      <Button small onClick={() => toggleWatch(w.id)}>
+        {w.state === 'paused' ? $t('Fortsetzen') : $t('Pausieren')}
+      </Button>
+      <Button small onClick={() => openDialog({ type: 'watchSetup', editId: w.id })}>
+        {$t('Bearbeiten')}
+      </Button>
+      <Button small onClick={() => askDeleteWatch(w)}>
+        {$t('Löschen')}
+      </Button>
+    </>
+  );
+}
 
 export function WatchPopover() {
   const watches = useStore((s) => s.watches);
@@ -47,10 +75,7 @@ export function WatchPopover() {
         </p>
       )}
       {watches.map((w) => {
-        const srv = servers.find((x) => x.id === w.serverId);
-        const stateText =
-          w.state === 'active' ? 'aktiv' : w.state === 'waiting' ? $t('wartet auf Verbindung') : 'pausiert';
-        const tone = w.state === 'active' ? 'accent' : w.state === 'waiting' ? 'warn' : 'muted';
+        const { text: stateText, tone } = watchStatus(w);
         return (
           <div key={w.id} className="watch-card">
             <div className="watch-card-head">
@@ -61,22 +86,18 @@ export function WatchPopover() {
               <span className={`small tone-${tone}`}>{stateText}</span>
             </div>
             <span className="watch-path mono">
-              {w.localPath} → {srv?.name ?? $t('Server')}
+              {watchRoute(
+                w,
+                servers.find((x) => x.id === w.serverId),
+              )}
+            </span>
+            {/* The last upload has a line of its own: beside three buttons it would be cut to a few letters. */}
+            <span className="watch-path small">
+              {w.lastFile ? `${w.lastFile} · ${formatAgo(w.lastTime, now)}` : $t('noch nichts hochgeladen')}
             </span>
             <div className="watch-card-foot">
-              <span className="small muted flex-1">
-                {w.state === 'paused'
-                  ? 'pausiert'
-                  : w.lastFile
-                    ? `${w.lastFile} · ${formatAgo(w.lastTime, now)}`
-                    : $t('noch nichts hochgeladen')}
-              </span>
-              <Button small onClick={() => toggleWatch(w.id)}>
-                {w.state === 'paused' ? $t('Fortsetzen') : $t('Pausieren')}
-              </Button>
-              <Button small onClick={() => openDialog({ type: 'watchSetup', editId: w.id })}>
-                {$t('Bearbeiten')}
-              </Button>
+              <span className="flex-1" />
+              <WatchActions w={w} />
             </div>
           </div>
         );

@@ -1,17 +1,20 @@
 /**
- * Settings › Überwachung: running in the background, defaults for new watches
- * and how Bitcrane reports what they did.
+ * Settings › Überwachung: the watches and templates, running in the background,
+ * defaults for new watches and how Bitcrane reports what they did.
  */
 import { setSettingsSection, updateSettings, useStore } from '../../../state/store';
 import { Button, Select, Switch } from '../../ui';
 import { $t } from '../../../i18n';
 import { Chips, Group, Row } from './parts';
+import { WatchList, WatchTemplateList } from './WatchManage';
 
 export function WatchSettings() {
   const s = useStore((st) => st.settings);
   const mac = useStore((st) => st.platform) === 'mac';
   return (
     <>
+      <WatchList />
+      <WatchTemplateList />
       <Group title={$t('Hintergrund')}>
         <Row
           label={$t('Im Hintergrund weiterlaufen')}

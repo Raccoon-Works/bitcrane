@@ -1922,7 +1922,8 @@ body.is-resizing * {
   left: 50%;
   /* Above the status lines of both halves, so a message never covers them. */
   bottom: 96px;
-  z-index: 70;
+  /* Above the dialog scrim (90): actions inside a dialog (Testlauf, Als Vorlage speichern) confirm with a toast. */
+  z-index: 95;
   /* Informational only: clicks go through to what lies underneath. */
   pointer-events: none;
   max-width: 560px;
@@ -3461,6 +3462,8 @@ body.is-dragging * {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-control);
   background: var(--bg-section);
+  /* Scrolled into view when it appears; the margin keeps its rounded edge clear of the dialog's edge. */
+  scroll-margin: var(--space-4);
 }
 .cmd-result.is-ok .strong-500 {
   color: var(--success);
@@ -7333,11 +7336,8 @@ body.is-dragging-snippet * {
   user-select: text;
 }
 
-/* Server colour (WinSCP site colour): a tinted path bar over the server half; elsewhere the dot on its symbol. */
-.pane.has-srv-color .pane-head {
-  background: color-mix(in srgb, var(--srv-color) 14%, transparent);
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--srv-color) 45%, transparent);
-}
+/* Server colour (WinSCP site colour): the line on top of the focused server half; elsewhere the dot on its symbol.
+   The path bar itself stays neutral, a tinted band under it read as a stray stripe. */
 .pane.has-srv-color.is-focused::after {
   background: var(--srv-color);
 }

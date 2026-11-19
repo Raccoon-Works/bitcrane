@@ -46,22 +46,24 @@ export function Group({ title, children }: { title: string; children: ReactNode 
   );
 }
 
-/** Editable list of patterns as chips. */
+/** Editable list of patterns as chips (settings and the watch dialogs). */
 export function Chips({
   values,
   onChange,
   placeholder,
+  className = '',
 }: {
   values: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
+  className?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const add = () => {
     if (draft?.trim() && !values.includes(draft.trim())) onChange([...values, draft.trim()]);
   };
   return (
-    <div className="chips">
+    <div className={`chips ${className}`}>
       {values.map((x) => (
         <span key={x} className="chip mono">
           {x}
@@ -98,7 +100,13 @@ export function Chips({
           }}
         />
       ) : (
-        <button type="button" className="chip-add" aria-label={$t('Muster hinzufügen')} onClick={() => setDraft('')}>
+        <button
+          type="button"
+          className="chip-add"
+          aria-label={$t('Muster hinzufügen')}
+          title={$t('Muster hinzufügen')}
+          onClick={() => setDraft('')}
+        >
           <Plus size={12} strokeWidth={2} />
         </button>
       )}

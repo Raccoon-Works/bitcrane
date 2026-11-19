@@ -977,7 +977,6 @@
   "Alle Überwachungen laufen wieder.": "Wszystkie obserwacje wznowione.",
   "Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.": "Zapisano obserwację „{0}”. Działa dalej bez ponownego uruchamiania.",
   "Überwachung „{0}“ läuft.": "Obserwacja „{0}” działa.",
-  "Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.": "Przebieg próbny: obserwowane byłyby pliki ({0}), przy starcie wysłane zostałyby ({1}). Niczego nie przesłano.",
   "Für diesen Ordner gibt es keine Überwachung.": "Dla tego folderu nie ma obserwacji.",
   "Keine aktive Überwachung. Starte zuerst eine.": "Brak aktywnej obserwacji. Najpierw ją uruchom.",
   "„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.": "Zmieniono „{0}”. Obserwacja jest wstrzymana i niczego nie wyśle.",

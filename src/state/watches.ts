@@ -4,7 +4,7 @@
 
 import * as fs from '../backend/mockFs';
 import * as live from './live';
-import type { PaneSide, Tab, Transfer, Watch } from '../backend/types';
+import type { PaneSide, Server, Tab, Transfer, Watch, WatchOptions } from '../backend/types';
 
 import { matchesExclude } from '../util/format';
 import * as paths from '../util/paths';
@@ -22,8 +22,28 @@ import {
   getState,
 } from './core';
 import { relFolder } from '../util/paths';
+import { defaultWatchOptions } from './defaults';
+import { openDialog } from './panels';
 import { enqueue } from './transfers';
 import { updateTab } from './tabs';
+
+/** Options a new watch (and a template taken over from a built-in one) starts with: the defaults of the settings. */
+export function newWatchOptions(): WatchOptions {
+  const s = getState().settings;
+  return { ...defaultWatchOptions, delay: s.defaultDelay, mirrorDeletes: s.defaultMirrorDeletes };
+}
+
+/** State of a watch in words and its tone (popover and Settings › Überwachung). */
+export function watchStatus(w: Watch): { text: string; tone: 'accent' | 'warn' | 'muted' } {
+  if (w.state === 'active') return { text: $t('aktiv'), tone: 'accent' };
+  if (w.state === 'waiting') return { text: $t('wartet auf Verbindung'), tone: 'warn' };
+  return { text: $t('pausiert'), tone: 'muted' };
+}
+
+/** "~/site → Webserver:/var/www": where a watch uploads from and to. */
+export function watchRoute(w: Watch, srv: Server | undefined): string {
+  return `${w.localPath} → ${srv?.name ?? $t('Server')}:${w.remotePath}`;
+}
 
 export function toggleWatch(id: string) {
   setState((s) => ({
@@ -64,20 +84,24 @@ export function deleteWatch(id: string) {
   setState((s) => ({ watches: s.watches.filter((w) => w.id !== id), dialog: null }));
 }
 
-/** Simulated test run: tells the user what would be uploaded. */
-export function testRunWatch(localPath: string, excludes: string[]) {
-  if (LIVE) {
-    void live.testRun(localPath, excludes);
-    return;
-  }
-  const files = fs.walkFiles('local', 'ob', localPath).filter((f) => !matchesExclude(f.entry.name, excludes));
-  showToast(
-    $t(
-      'Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.',
-      files.length,
-      Math.min(2, files.length),
+/** Asks before deleting a watch (watch dialog, watch popover, Settings › Überwachung). */
+export function askDeleteWatch(w: Watch) {
+  openDialog({
+    type: 'confirm',
+    danger: true,
+    confirm: $t('Löschen'),
+    title: $t('Überwachung „{0}“ löschen?', w.name),
+    text: $t(
+      'Die Einstellungen dieser Überwachung gehen verloren. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.',
     ),
-  );
+    run: () => deleteWatch(w.id),
+  });
+}
+
+/** "Testlauf": the number of files a watch of this folder would cover; nothing is transferred. */
+export async function testRunWatch(localPath: string, excludes: string[]): Promise<number> {
+  if (LIVE) return live.testRun(localPath, excludes);
+  return fs.walkFiles('local', 'ob', localPath).filter((f) => !matchesExclude(f.entry.name, excludes)).length;
 }
 
 function enqueueWatchFiles(w: Watch, files: string[]) {

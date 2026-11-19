@@ -977,7 +977,6 @@
   "Alle Überwachungen laufen wieder.": "Tutti i monitoraggi ripresi.",
   "Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.": "Monitoraggio “{0}” salvato. Continua a funzionare senza riavvio.",
   "Überwachung „{0}“ läuft.": "Il monitoraggio “{0}” è in esecuzione.",
-  "Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.": "Prova a vuoto: {0} file verrebbero monitorati, {1} caricati all'avvio. Non è stato trasferito nulla.",
   "Für diesen Ordner gibt es keine Überwachung.": "Non c'è alcun monitoraggio per questa cartella.",
   "Keine aktive Überwachung. Starte zuerst eine.": "Nessun monitoraggio attivo. Avviane prima uno.",
   "„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.": "“{0}” è cambiato. Il monitoraggio è in pausa e non caricherà nulla.",

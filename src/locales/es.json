@@ -977,7 +977,6 @@
   "Alle Überwachungen laufen wieder.": "Todas las vigilancias reanudadas.",
   "Überwachung „{0}“ gespeichert. Sie läuft ohne Neustart weiter.": "Vigilancia “{0}” guardada. Sigue funcionando sin reiniciar.",
   "Überwachung „{0}“ läuft.": "La vigilancia “{0}” está en marcha.",
-  "Testlauf: {0} Dateien würden beobachtet, beim Start {1} hochgeladen. Es wurde nichts übertragen.": "Simulación: se vigilarían {0} archivos y se subirían {1} al iniciar. No se ha transferido nada.",
   "Für diesen Ordner gibt es keine Überwachung.": "No hay ninguna vigilancia para esta carpeta.",
   "Keine aktive Überwachung. Starte zuerst eine.": "No hay ninguna vigilancia activa. Inicia una primero.",
   "„{0}“ geändert. Die Überwachung ist pausiert und lädt nichts hoch.": "“{0}” ha cambiado. La vigilancia está en pausa y no subirá nada.",

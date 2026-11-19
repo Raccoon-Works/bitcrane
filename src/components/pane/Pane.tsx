@@ -247,7 +247,7 @@ export function Pane({ side }: { side: PaneSide }) {
   const items = (list: typeof entries, from = 0) =>
     list.map((entry, i) => <FileItem key={entry.name} ctx={ctx} entry={entry} index={from + i} />);
 
-  // A server with its own colour (e.g. red for a live server) tints its half's path bar (WinSCP, FileZilla).
+  // A server with its own colour (e.g. red for a live server) colours its half's top line (WinSCP, FileZilla).
   const srvColor = onServer ? serverColorCss(server?.color) : undefined;
   return (
     <section

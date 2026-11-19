@@ -5,40 +5,36 @@
  * options are visible; everything else sits under "Weitere Optionen".
  * The button row always stays visible.
  */
-import { ArrowRight, ChevronRight, Eye, Plus, X } from '../glyphs';
+import { ArrowRight, Eye } from '../glyphs';
 import { useState } from 'react';
-import type { WatchOptions } from '../../backend/types';
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { chooseFolder } from '../../backend/dialogs';
 import {
   activeTab,
+  askDeleteWatch,
+  BUILTIN_WATCH_TEMPLATES,
   closeDialog,
-  defaultWatchOptions,
-  deleteWatch,
   getState,
   LIVE,
+  newWatchOptions,
   NO_RULES,
-  openDialog,
   panePath,
   saveWatch,
+  saveWatchTemplate,
   showToast,
   testRunWatch,
-  updateSettings,
   useStore,
 } from '../../state/store';
+import { explainError } from '../../state/errors';
 import { FolderPicker, SubfolderChooser } from '../FolderPicker';
 import { testCommand } from '../../state/live';
 import { WatchIcon } from '../icons';
 import { ServerTile } from '../ServerTile';
-import { Button, Checkbox, Select, Switch, TextField } from '../ui';
+import { Button, Select, TextField } from '../ui';
 import { Dialog } from './Dialog';
-import { $t } from '../../i18n';
-
-const templates: Record<string, string[]> = {
-  python: ['.git', '__pycache__', '.DS_Store', '*.log', '*.tmp', '.venv'],
-  web: ['.git', 'node_modules', '.DS_Store', '*.log', '.cache'],
-  none: [],
-};
+import { WatchBehaviour, WatchCommand, WatchExcludes, WatchMoreOptions } from './WatchFields';
+import { useWatchOptions } from './useWatchOptions';
+import { $t, LOCALE } from '../../i18n';
 
 /** Brings a typed folder into the form watch events use ("~/x", forward slashes, no trailing slash). */
 async function normaliseLocalPath(typed: string): Promise<string> {
@@ -63,13 +59,7 @@ export function WatchSetup({ editId }: { editId?: string }) {
     return !p || p === 'sftp';
   })();
   const [remotePath, setRemotePath] = useState(existing?.remotePath ?? panePath('remote'));
-  const [opts, setOpts] = useState<WatchOptions>(
-    existing?.options ?? {
-      ...defaultWatchOptions,
-      delay: defaults.defaultDelay,
-      mirrorDeletes: defaults.defaultMirrorDeletes,
-    },
-  );
+  const { opts, set, setOpts } = useWatchOptions(existing?.options ?? newWatchOptions);
   const [excludes, setExcludes] = useState<string[]>(existing?.excludes ?? defaults.defaultExcludes);
   // Transfer rule: '' = the server's rule, 'none' = no rule, else a rule id (settings > Regeln).
   const [ruleId, setRuleId] = useState<string>(existing?.ruleId ?? '');
@@ -78,12 +68,30 @@ export function WatchSetup({ editId }: { editId?: string }) {
     const id = s.servers.find((x) => x.id === serverId)?.ruleId;
     return (s.settings.rules ?? []).find((r) => r.id === id)?.name ?? '';
   });
-  const [newPattern, setNewPattern] = useState<string | null>(null);
-  const [more, setMore] = useState(false);
   const [tried, setTried] = useState(false);
   const [subfolders, setSubfolders] = useState<string[]>(existing?.subfolders ?? []);
   const [picker, setPicker] = useState(false);
   const [cmdTest, setCmdTest] = useState<null | 'running' | { ok: boolean; title: string; output?: string }>(null);
+  // "Testlauf" walks the whole folder; its result belongs to the folder and patterns it was run with.
+  const dryRunKey = JSON.stringify([localPath, excludes]);
+  const [dryRun, setDryRun] = useState<null | 'running' | { key: string; ok: boolean; title: string }>(null);
+
+  const runDryRun = async () => {
+    setDryRun('running');
+    try {
+      const count = await testRunWatch(await normaliseLocalPath(localPath), excludes);
+      setDryRun({
+        key: dryRunKey,
+        ok: true,
+        title:
+          count === 1
+            ? $t('Testlauf: 1 Datei würde beobachtet. Es wurde nichts übertragen.')
+            : $t('Testlauf: {0} Dateien würden beobachtet. Es wurde nichts übertragen.', count.toLocaleString(LOCALE)),
+      });
+    } catch (e) {
+      setDryRun({ key: dryRunKey, ok: false, title: explainError(e).text });
+    }
+  };
 
   /** Runs the post-upload command once on the chosen server and shows its output. */
   const runCommandTest = async () => {
@@ -117,25 +125,28 @@ export function WatchSetup({ editId }: { editId?: string }) {
 
   const saveTemplate = () => {
     const tplName = effectiveName || $t('Vorlage');
-    const rest = userTemplates.filter((t) => t.name !== tplName);
-    updateSettings({
-      watchTemplates: [...rest, { name: tplName, excludes, options: { ...opts, command: opts.command } }],
-    });
-    showToast($t('Vorlage „{0}“ gespeichert. Du findest sie bei „Vorlage wählen …“.', tplName), 'ok');
+    const replaced = userTemplates.some((t) => t.name === tplName);
+    // The chosen subfolders belong to this folder; a template has none, so it never limits to them.
+    saveWatchTemplate({ name: tplName, excludes, options: { ...opts, onlySelectedSubfolders: false } });
+    showToast(
+      replaced
+        ? $t('Vorlage „{0}“ überschrieben. Bearbeiten und löschen: Einstellungen › Überwachung.', tplName)
+        : $t('Vorlage „{0}“ gespeichert. Du findest sie bei „Vorlage wählen …“.', tplName),
+      'ok',
+    );
   };
 
+  /** Values of the template menu: "user:<name>" for own templates, "builtin:<id>", "none" to clear the list. */
   const applyTemplate = (v: string) => {
-    if (!v) return;
-    if (v.startsWith('user:')) {
-      const t = userTemplates.find((x) => x.name === v.slice(5));
-      if (t) {
-        setExcludes(t.excludes);
-        setOpts(t.options);
-      }
-    } else setExcludes(templates[v]);
+    if (v === 'none') setExcludes([]);
+    else if (v.startsWith('user:')) {
+      const t = userTemplates.find((x) => x.name === v.slice(5))!;
+      setExcludes(t.excludes);
+      setOpts(t.options);
+    } else if (v.startsWith('builtin:'))
+      setExcludes(BUILTIN_WATCH_TEMPLATES.find((x) => x.id === v.slice(8))!.excludes);
   };
 
-  const set = <K extends keyof WatchOptions>(k: K, v: WatchOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
   // The last two folder names, without the home sign or a drive letter ("~ bitcrane-test" read oddly).
   const effectiveName =
     name.trim() ||
@@ -145,18 +156,6 @@ export function WatchSetup({ editId }: { editId?: string }) {
       .slice(-2)
       .join(' ');
   const invalidRemote = tried && !remotePath.trim().startsWith('/');
-  const changedCount =
-    (
-      [
-        'continueOnError',
-        'onlyExisting',
-        'onlySelectedSubfolders',
-        'setPermissions',
-        'mirrorDeletes',
-        'keepOldVersion',
-        'commandEnabled',
-      ] as const
-    ).filter((k) => opts[k] !== defaultWatchOptions[k]).length + (opts.delay !== defaultWatchOptions.delay ? 1 : 0);
 
   const submit = () => {
     setTried(true);
@@ -182,22 +181,7 @@ export function WatchSetup({ editId }: { editId?: string }) {
   const footer = (
     <>
       {existing ? (
-        <Button
-          variant="link"
-          className="tone-danger-text"
-          onClick={() =>
-            openDialog({
-              type: 'confirm',
-              danger: true,
-              confirm: $t('Löschen'),
-              title: $t('Überwachung „{0}“ löschen?', existing.name),
-              text: $t(
-                'Die Einstellungen dieser Überwachung gehen verloren. Dateien auf dem Server und auf diesem Computer bleiben, wie sie sind.',
-              ),
-              run: () => deleteWatch(existing.id),
-            })
-          }
-        >
+        <Button variant="link" className="tone-danger-text" onClick={() => askDeleteWatch(existing)}>
           {$t('Überwachung löschen')}
         </Button>
       ) : (
@@ -206,9 +190,9 @@ export function WatchSetup({ editId }: { editId?: string }) {
         </Button>
       )}
       <span className="flex-1" />
-      <Button onClick={() => testRunWatch(localPath, excludes)}>
+      <Button disabled={dryRun === 'running'} onClick={() => void runDryRun()}>
         <Eye size={13} strokeWidth={1.75} aria-hidden="true" />
-        {$t('Testlauf')}
+        {dryRun === 'running' ? $t('Zähle …') : $t('Testlauf')}
       </Button>
       <Button onClick={closeDialog}>{$t('Abbrechen')}</Button>
       <Button variant="primary" onClick={submit}>
@@ -307,43 +291,7 @@ export function WatchSetup({ editId }: { editId?: string }) {
           </span>
         </div>
 
-        <section aria-label={$t('Verhalten')} className="form-section">
-          <span className="caption-strong">{$t('Verhalten')}</span>
-          <div className="section-card list-card">
-            <Checkbox
-              checked={opts.includeSubfolders}
-              onChange={(v) => set('includeSubfolders', v)}
-              label={$t('Unterordner einbeziehen')}
-              note={$t('Auch Änderungen in allen Unterordnern hochladen.')}
-            />
-            <Checkbox
-              checked={opts.syncOnStart}
-              onChange={(v) => set('syncOnStart', v)}
-              label={$t('Beim Start abgleichen')}
-              note={$t('Einmal alles hochladen, was lokal neuer ist.')}
-            />
-            <Checkbox
-              checked={opts.warnIfServerNewer}
-              onChange={(v) => set('warnIfServerNewer', v)}
-              label={$t('Warnen, wenn die Server-Datei neuer ist')}
-              note={$t('Nachfragen statt still überschreiben.')}
-            />
-            <Checkbox
-              checked={opts.runInBackground}
-              onChange={(v) => set('runInBackground', v)}
-              label={$t('Im Hintergrund weiterlaufen')}
-              note={$t('Auch bei geschlossenem Fenster.')}
-            />
-            <Checkbox
-              checked={opts.startWithApp !== false}
-              onChange={(v) => set('startWithApp', v)}
-              label={$t('Beim Start von Bitcrane automatisch starten')}
-              note={$t(
-                'Verbindet sich selbst und überwacht sofort, z. B. nach dem Hochfahren. Aus: bleibt pausiert, bis du sie startest.',
-              )}
-            />
-          </div>
-        </section>
+        <WatchBehaviour opts={opts} set={set} />
 
         <section aria-label={$t('Regel')} className="form-section">
           <div className="form-section-head">
@@ -369,9 +317,10 @@ export function WatchSetup({ editId }: { editId?: string }) {
           </span>
         </section>
 
-        <section aria-label={$t('Nicht hochladen')} className="form-section">
-          <div className="form-section-head">
-            <span className="caption-strong">{$t('Nicht hochladen')}</span>
+        <WatchExcludes
+          excludes={excludes}
+          onChange={setExcludes}
+          choose={
             <Select
               label={$t('Vorlage für Ausschlüsse')}
               value={'' as string}
@@ -379,160 +328,33 @@ export function WatchSetup({ editId }: { editId?: string }) {
               options={[
                 { value: '', label: $t('Vorlage wählen …') },
                 ...userTemplates.map((t) => ({ value: `user:${t.name}`, label: $t('{0} (eigene Vorlage)', t.name) })),
-                { value: 'python', label: $t('Python-Projekt') },
-                { value: 'web', label: $t('Web-Projekt') },
+                ...BUILTIN_WATCH_TEMPLATES.map((t) => ({ value: `builtin:${t.id}`, label: t.label })),
                 { value: 'none', label: $t('Leer') },
               ]}
             />
-          </div>
-          <div className="section-card chips">
-            {excludes.map((x) => (
-              <span key={x} className="chip mono">
-                {x}
-                <button
-                  type="button"
-                  aria-label={$t('Muster {0} entfernen', x)}
-                  onClick={() => setExcludes(excludes.filter((y) => y !== x))}
-                >
-                  <X size={10} strokeWidth={2.4} />
-                </button>
-              </span>
-            ))}
-            {newPattern !== null ? (
-              <input
-                className="chip-input mono"
-                autoFocus
-                value={newPattern}
-                placeholder="*.bak"
-                aria-label={$t('Neues Muster')}
-                onChange={(e) => setNewPattern(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newPattern.trim()) {
-                    e.preventDefault();
-                    setExcludes([...excludes, newPattern.trim()]);
-                    setNewPattern('');
-                  }
-                  if (e.key === 'Escape') {
-                    e.stopPropagation();
-                    setNewPattern(null);
-                  }
-                }}
-                onBlur={() => {
-                  if (newPattern.trim()) setExcludes([...excludes, newPattern.trim()]);
-                  setNewPattern(null);
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                className="chip-add"
-                aria-label={$t('Muster hinzufügen')}
-                title={$t('Muster hinzufügen')}
-                onClick={() => setNewPattern('')}
-              >
-                <Plus size={12} strokeWidth={2} />
-              </button>
-            )}
-          </div>
-        </section>
+          }
+        />
 
-        <section aria-label={$t('Weitere Optionen')} className="section-card disclosure">
-          <button type="button" className="disclosure-head" aria-expanded={more} onClick={() => setMore(!more)}>
-            <ChevronRight size={13} strokeWidth={2} className={`chev${more ? ' is-open' : ''}`} aria-hidden="true" />
-            <span className="strong">{$t('Weitere Optionen')}</span>
-            <span className="small muted ellipsis">
-              {$t('Fehler, Löschen, Rechte, Befehl, Wartezeit')}
-              {changedCount ? $t(' · {0} geändert', changedCount) : ''}
-            </span>
-          </button>
-          {more && (
-            <div className="disclosure-body">
-              <div className="option-grid">
-                <Checkbox
-                  checked={opts.continueOnError}
-                  onChange={(v) => set('continueOnError', v)}
-                  label={$t('Bei Fehlern weitermachen')}
-                  note={$t('Ein Fehler hält die Überwachung nicht an; er erscheint in der Aktivität.')}
-                />
-                <Checkbox
-                  checked={opts.onlyExisting}
-                  onChange={(v) => set('onlyExisting', v)}
-                  label={$t('Nur vorhandene Dateien aktualisieren')}
-                  note={$t('Neue Dateien bleiben lokal, nur bestehende werden ersetzt.')}
-                />
-                <Checkbox
-                  checked={opts.onlySelectedSubfolders}
-                  onChange={(v) => set('onlySelectedSubfolders', v)}
-                  label={$t('Nur ausgewählte Unterordner')}
-                  note={$t('Statt des ganzen Ordners nur bestimmte Unterordner überwachen.')}
-                />
-                {opts.onlySelectedSubfolders && (
-                  <SubfolderChooser root={localPath} selected={subfolders} onChange={setSubfolders} />
-                )}
-                <Checkbox
-                  checked={opts.setPermissions}
-                  onChange={(v) => set('setPermissions', v)}
-                  label={$t('Rechte nach dem Hochladen setzen')}
-                  note={$t('Zum Beispiel rw-r--r-- für Dateien und rwxr-xr-x für Ordner.')}
-                />
-                <Checkbox
-                  danger
-                  checked={opts.mirrorDeletes}
-                  onChange={(v) => set('mirrorDeletes', v)}
-                  label={$t('Lokal Gelöschtes auch auf dem Server löschen')}
-                  note={$t('Vorsicht: Dateien auf dem Server gehen dabei verloren. Standardmäßig aus.')}
-                />
-                <Checkbox
-                  checked={opts.keepOldVersion}
-                  onChange={(v) => set('keepOldVersion', v)}
-                  label={$t('Ältere Version auf dem Server behalten')}
-                  note={$t(
-                    'Vor dem Überschreiben kommt die alte Datei in den versteckten Ordner .bitcrane-versions daneben; die letzten 5 Versionen bleiben.',
-                  )}
-                />
-              </div>
-
-              {!sshServer && (
-                <div className="sub-card">
-                  <span className="small muted">
-                    {$t('Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt')}{' '}
-                    {({ webdav: 'WebDAV', smb: 'SMB' } as Record<string, string>)[
-                      servers.find((x) => x.id === serverId)?.protocol ?? ''
-                    ] ?? 'FTP'}
-                    .
-                  </span>
-                </div>
-              )}
-              {sshServer && (
-                <div className="sub-card">
-                  <div className="row-between">
-                    <label htmlFor="w-cmd" className="strong-500">
-                      {$t('Nach dem Hochladen einen Befehl auf dem Server ausführen')}
-                    </label>
-                    <Switch
-                      checked={opts.commandEnabled}
-                      onChange={(v) => set('commandEnabled', v)}
-                      label={$t('Befehl nach dem Hochladen ausführen')}
-                    />
-                  </div>
-                  <div className="field-row">
-                    <TextField
-                      id="w-cmd"
-                      mono
-                      className="flex-1 is-terminal"
-                      prefix={<span className="tone-ok">$</span>}
-                      value={opts.command}
-                      onChange={(v) => set('command', v)}
-                      placeholder={$t('pm2 restart meinbot')}
-                    />
-                    <Button
-                      disabled={!opts.command.trim() || cmdTest === 'running'}
-                      onClick={() => void runCommandTest()}
-                    >
-                      {cmdTest === 'running' ? $t('Läuft …') : $t('Jetzt testen')}
-                    </Button>
-                  </div>
-                  {cmdTest && cmdTest !== 'running' && (
+        <WatchMoreOptions
+          opts={opts}
+          set={set}
+          subfolders={<SubfolderChooser root={localPath} selected={subfolders} onChange={setSubfolders} />}
+          command={
+            sshServer ? (
+              <WatchCommand
+                opts={opts}
+                set={set}
+                action={
+                  <Button
+                    disabled={!opts.command.trim() || cmdTest === 'running'}
+                    onClick={() => void runCommandTest()}
+                  >
+                    {cmdTest === 'running' ? $t('Läuft …') : $t('Jetzt testen')}
+                  </Button>
+                }
+                result={
+                  cmdTest &&
+                  cmdTest !== 'running' && (
                     <div
                       className={`cmd-result ${cmdTest.ok ? 'is-ok' : 'is-error'}`}
                       ref={(el) => el?.scrollIntoView({ block: 'nearest' })}
@@ -540,39 +362,32 @@ export function WatchSetup({ editId }: { editId?: string }) {
                       <span className="small strong-500">{cmdTest.title}</span>
                       {cmdTest.output && <pre className="mono">{cmdTest.output}</pre>}
                     </div>
-                  )}
-                  <span className="small muted">
-                    {$t(
-                      'Läuft einmal, nachdem ein Schub Änderungen fertig hochgeladen ist, und nur, wenn dabei kein Fehler auftrat. Die Ausgabe steht in der Aktivität.',
-                    )}
-                  </span>
-                </div>
-              )}
-
-              <div className="sub-card row-card">
-                <div className="col-text">
-                  <span className="strong-500">{$t('Kurz warten, bevor hochgeladen wird')}</span>
-                  <span className="small muted">
-                    {$t('Sammelt Änderungen, damit keine halb gespeicherten Dateien hochgehen.')}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={10}
-                  step={1}
-                  value={opts.delay}
-                  aria-label={$t('Wartezeit in Sekunden')}
-                  className="slider"
-                  onChange={(e) => set('delay', Number(e.target.value))}
-                />
-                <span className="num slider-value">
-                  {opts.delay} {$t('Sek.')}
+                  )
+                }
+              />
+            ) : (
+              <div className="sub-card">
+                <span className="small muted">
+                  {$t('Befehle nach dem Hochladen gibt es nur bei SFTP-Servern (über SSH). Dieser Server nutzt')}{' '}
+                  {({ webdav: 'WebDAV', smb: 'SMB' } as Record<string, string>)[
+                    servers.find((x) => x.id === serverId)?.protocol ?? ''
+                  ] ?? 'FTP'}
+                  .
                 </span>
               </div>
-            </div>
-          )}
-        </section>
+            )
+          }
+        />
+
+        {dryRun && dryRun !== 'running' && dryRun.key === dryRunKey && (
+          <div
+            className={`cmd-result ${dryRun.ok ? 'is-ok' : 'is-error'}`}
+            role="status"
+            ref={(el) => el?.scrollIntoView({ block: 'nearest' })}
+          >
+            <span className="small strong-500">{dryRun.title}</span>
+          </div>
+        )}
       </div>
     </Dialog>
   );

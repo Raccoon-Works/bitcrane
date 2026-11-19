@@ -18,6 +18,7 @@ export * from './panels';
 export * from './fileOps';
 export * from './transfers';
 export * from './watches';
+export * from './watchTemplates';
 export * from './servers';
 export * from './settings';
 export * from './simulation';
