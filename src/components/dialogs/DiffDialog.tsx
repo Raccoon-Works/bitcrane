@@ -6,19 +6,12 @@
  */
 import { AlertTriangle, Loader2 } from '../glyphs';
 import { useEffect, useMemo, useState } from 'react';
-import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { toBackendError } from '../../backend/api';
-import { closeDialog, LIVE, openDialog, useStore, type CompareRef } from '../../state/store';
+import { closeDialog, openDialog, readText, useStore, type CompareRef } from '../../state/store';
 import { diffLines, diffStats, toHunks } from '../../util/diff';
 import { Button } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
-
-/** Demo texts for the browser prototype. */
-const DEMO_SERVER =
-  'from flask import Flask\n\nfrom .routes import cart, products\n\nDEBUG = True\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\n\n\n@app.get("/health")\ndef health():\n    return "ok"\n';
-const DEMO_LOCAL =
-  'from flask import Flask\n\nfrom .routes import cart, checkout, products\n\nDEBUG = False\nLOG_LEVEL = "info"\n\napp = Flask(__name__)\napp.register_blueprint(cart)\napp.register_blueprint(products)\napp.register_blueprint(checkout)\n\n\n@app.get("/health")\ndef health():\n    return "Webshop ok"\n';
 
 interface Loaded {
   server: string;
@@ -39,12 +32,8 @@ export function DiffDialog({ transferId }: { transferId: string }) {
 
   useEffect(() => {
     if (serverId === undefined || remotePath === undefined || localPath === undefined) return;
-    if (!LIVE) {
-      setData({ server: DEMO_SERVER, local: DEMO_LOCAL, truncated: false });
-      return;
-    }
     let cancelled = false;
-    Promise.all([backend.remoteReadText(serverId, remotePath), backend.localReadText(localPath)])
+    Promise.all([readText('remote', serverId, remotePath), readText('local', '', localPath)])
       .then(([server, local]) => {
         if (!cancelled)
           setData({ server: server.text, local: local.text, truncated: server.truncated || local.truncated });
@@ -145,22 +134,13 @@ function DiffTable({ hunks, truncated }: { hunks: Hunks; truncated: boolean }) {
   );
 }
 
-/** Reads a text file from this computer or a server. */
-function readText(ref: CompareRef) {
-  return ref.side === 'local' ? backend.localReadText(ref.path) : backend.remoteReadText(ref.serverId, ref.path);
-}
-
 /** "Dateien vergleichen": any two text files, each on this computer or a server. */
 export function CompareFilesDialog({ a, b }: { a: CompareRef; b: CompareRef }) {
   const [data, setData] = useState<{ a: string; b: string; truncated: boolean } | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
-    if (!LIVE) {
-      setData({ a: DEMO_SERVER, b: DEMO_LOCAL, truncated: false });
-      return;
-    }
     let cancelled = false;
-    Promise.all([readText(a), readText(b)])
+    Promise.all([readText(a.side, a.serverId, a.path), readText(b.side, b.serverId, b.path)])
       .then(([x, y]) => {
         if (!cancelled) setData({ a: x.text, b: y.text, truncated: x.truncated || y.truncated });
       })

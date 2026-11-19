@@ -29,5 +29,8 @@ export * from './servers';
 export * from './serverConnections';
 export * from './settings';
 export * from './fileTools';
+export * from './sshKeys';
+export * from './fileContent';
 export * from './rules';
+export * from './importServers';
 export * from './simulation';

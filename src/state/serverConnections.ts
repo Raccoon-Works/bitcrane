@@ -3,7 +3,10 @@
  * connections no tab or watch uses any more.
  */
 import * as live from './live';
+import type { KnownHost } from '../backend/api';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { PaneSide, Tab } from '../backend/types';
+import { DEMO_KNOWN_HOSTS } from './demoData';
 import { $t } from '../i18n';
 import { setState, showToast, LIVE, activeTab, paneLoc, getState, emptySelection } from './core';
 import { updateTab, setLeftServer } from './tabs';
@@ -90,4 +93,23 @@ export function closePaneServer(side: PaneSide) {
     }));
   }
   if (!serverStillUsed(sid)) disconnect(sid);
+}
+
+/** The prototype's stored fingerprints, so "Vergessen" can take them away. */
+let demoKnownHosts = DEMO_KNOWN_HOSTS;
+
+/** Stored host key fingerprints ("host:port"). */
+export function knownHosts(): Promise<KnownHost[]> {
+  return LIVE ? backend.knownHostsList() : Promise.resolve(demoKnownHosts);
+}
+
+/** Forgets a stored fingerprint: the next connection to that host asks again. */
+export async function forgetKnownHost(host: string) {
+  if (LIVE) await backend.knownHostsRemove(host);
+  else demoKnownHosts = demoKnownHosts.filter((x) => x.host !== host);
+}
+
+/** Answers the questions of a keyboard-interactive login (null: cancelled). */
+export function answerAuthPrompt(id: string, answers: string[] | null) {
+  void backend.authPromptAnswer(id, answers);
 }

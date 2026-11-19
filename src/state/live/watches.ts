@@ -205,7 +205,7 @@ function askServerDeletes(w: Watch, targets: string[]) {
       serverDeletes: s.serverDeletes.map((d) => (d === open ? { ...d, targets: [...d.targets, ...added] } : d)),
     };
   });
-  void import('../../util/appWindow').then((m) => m.showWindow());
+  void import('../appWindow').then((m) => m.showWindow());
 }
 
 /** "Auf dem Server löschen" in the question for files deleted on this computer. */

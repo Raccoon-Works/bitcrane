@@ -4,7 +4,7 @@
 import { tauriBackend as backend } from '../../backend/tauriBackend';
 import { $t } from '../../i18n';
 import { type PaneSide } from '../../backend/types';
-import { invalidate, bump } from './listing';
+import { invalidate, bump, readFolder, statEntry } from './listing';
 import { showToast, serverById, getState } from '../core';
 import { addLog } from '../log';
 import { toBackendError, type WalkItem } from '../../backend/api';
@@ -161,11 +161,8 @@ export function removeEntries(side: PaneSide, serverId: string, dir: string, nam
 export async function removeIfEmpty(side: PaneSide, serverId: string, dir: string, name: string): Promise<boolean> {
   const path = join(dir, name);
   try {
-    const entry = side === 'local' ? await backend.localStat(path) : await backend.remoteStat(serverId, path);
-    const empty =
-      entry.kind === 'dir'
-        ? (side === 'local' ? await backend.localList(path) : await backend.remoteList(serverId, path)).length === 0
-        : entry.size === 0;
+    const entry = await statEntry(side, serverId, path);
+    const empty = entry.kind === 'dir' ? (await readFolder(side, serverId, path)).length === 0 : entry.size === 0;
     if (!empty) {
       showToast($t('„{0}“ ist nicht mehr leer und bleibt erhalten.', name));
       return false;

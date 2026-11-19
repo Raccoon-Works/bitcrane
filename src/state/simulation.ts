@@ -3,19 +3,16 @@
  * that moves transfers, watches and connection drops along (never runs in the app).
  */
 
-import { type ImportedServer, type WalkItem } from '../backend/api';
+import { type WalkItem } from '../backend/api';
 import * as fs from '../backend/mockFs';
 import * as live from './live';
-import type { Server, Transfer } from '../backend/types';
-
+import type { Transfer } from '../backend/types';
 import { formatSize } from '../util/format';
 import * as paths from '../util/paths';
 import { DEMO_CLIP, DEMO_THEME, listenForDemoMessages } from '../util/demo';
 import { $t } from '../i18n';
-import { emptyTab, setState, initialState, subscribeStore, showToast, uid, activeTab, LIVE, getState } from './core';
-import { openServerIn } from './tabs';
+import { emptyTab, setState, initialState, subscribeStore, showToast, uid, LIVE, getState } from './core';
 import { detectTheme } from './defaults';
-import { sampleServers } from './demoData';
 import { openDialog } from './panels';
 import { offerCloudPlaces } from './places';
 import { forced } from './transfers';
@@ -58,89 +55,6 @@ export function resetPrototype() {
   pendingDemoCommand.clear();
   setState({ ...initialState(), platform: getState().platform, theme: getState().theme });
   showToast($t('Beispieldaten wiederhergestellt.'));
-}
-
-/** Two letters for the server tile: initials of two words, else the first two letters. */
-export function monoFor(name: string): string {
-  const words = name
-    .replace(/[^A-Za-z0-9ÄÖÜäöüß ]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  const m = words.length >= 2 ? words[0][0] + words[1][0] : (words[0] ?? name).slice(0, 2);
-  return (m || 'SV').toUpperCase();
-}
-
-/** Adds servers found in other programs (from the import window). */
-export function importServers(list: ImportedServer[]) {
-  // No colour (it is optional, see ServerTile); servers already there, or twice in the list, are skipped.
-  // Same server = same protocol, user, host, port and key file (two entries with different keys are kept).
-  const keyOf = (x: { host: string; port: number; user: string; protocol?: string; keyPath?: string; auth?: string }) =>
-    `${x.protocol ?? 'sftp'}|${x.user.toLowerCase()}@${x.host.toLowerCase()}:${x.port}|${x.auth === 'key' ? (x.keyPath ?? '') : ''}`;
-  const seen = new Set(
-    getState()
-      .servers.filter((x) => !x.temporary)
-      .map(keyOf),
-  );
-  list = list.filter((s) => {
-    const k = keyOf(s);
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-  if (!list.length) {
-    setState({ dialog: null });
-    showToast($t('Diese Server sind schon vorhanden.'));
-    return;
-  }
-  const created: Server[] = list.map((s) => ({
-    id: uid('srv'),
-    name: s.name,
-    mono: monoFor(s.name),
-    color: 'gray',
-    host: s.host,
-    port: s.port,
-    user: s.user,
-    auth: s.protocol === 'sftp' ? s.auth : 'password',
-    keyPath: s.keyPath ?? '~/.ssh/id_ed25519',
-    group: s.group,
-    localStart: s.localDir ?? '~',
-    remoteStart: s.remoteDir ?? '',
-    online: false,
-    protocol: s.protocol,
-    implicitTls: s.implicitTls || undefined,
-    // WebDAV from Cyberduck: plain http only on port 80.
-    ...(s.protocol === 'webdav' ? { davHttps: s.port !== 80 } : {}),
-  }));
-  // ProxyJump names refer to other entries of the SSH configuration.
-  const all = [...getState().servers, ...created];
-  list.forEach((s, i) => {
-    if (!s.jump) return;
-    const j = all.find((x) => x.name === s.jump || x.host === s.jump);
-    if (j && j.id !== created[i].id) created[i].jumpServerId = j.id;
-  });
-  // Offered on the first start: the servers only go into the list; connecting stays the user's choice.
-  const dialog = getState().dialog;
-  const firstStart = dialog?.type === 'import' && !!dialog.firstStart;
-  setState((st) => ({ servers: [...st.servers, ...created], dialog: null, firstRun: false }));
-  showToast(
-    created.length === 1 ? $t('„{0}“ übernommen.', created[0].name) : $t('{0} Server übernommen.', created.length),
-    'ok',
-  );
-  const t = activeTab();
-  if (!firstStart && (!t || !t.serverId) && created[0]) openServerIn('remote', created[0].id);
-}
-
-/** Adds the SSH-config servers on the welcome screen. */
-export function importSshConfig() {
-  if (LIVE) {
-    openDialog({ type: 'import' });
-    return;
-  }
-  const servers = sampleServers()
-    .slice(0, 3)
-    .map((x) => ({ ...x, online: false }));
-  setState({ servers, firstRun: false });
-  showToast($t('3 Server aus der SSH-Konfiguration übernommen.'), 'ok');
 }
 
 /* ------------------------------------------------------------------------ */

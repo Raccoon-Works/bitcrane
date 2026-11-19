@@ -295,6 +295,11 @@ export function linkedStart(srv: Server, remoteStart: string): Tab['syncBrowse']
 /** True when the pane shows a server (the right half, or the left one in server-to-server mode). */
 export const paneOnServer = (side: PaneSide, t: Tab | undefined = activeTab()) => paneLoc(side, t)[0] === 'remote';
 
+/** Reads a folder now, past the listing cache: for choosers that browse on their own. */
+export function readEntries(side: PaneSide, serverId: string, path: string): Promise<FileEntry[]> {
+  return LIVE ? live.readFolder(side, serverId, path) : Promise.resolve(fs.list(side, serverId, path));
+}
+
 /** Folder listing: mock file system, or the live listing cache (undefined until loaded). */
 export function listEntries(side: PaneSide, serverId: string, path: string): FileEntry[] | undefined {
   return LIVE ? live.cachedList(side, serverId, path) : fs.list(side, serverId, path);

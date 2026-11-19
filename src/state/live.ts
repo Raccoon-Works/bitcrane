@@ -12,7 +12,15 @@
  * Only what the rest of the interface uses is exported here; the modules in
  * live/ share the rest among themselves.
  */
-export { cachedList, cachedStat, invalidate, listingStatus, refreshVisible, requestListing } from './live/listing';
+export {
+  cachedList,
+  cachedStat,
+  invalidate,
+  listingStatus,
+  readFolder,
+  refreshVisible,
+  requestListing,
+} from './live/listing';
 export {
   autoConnect,
   autoConnectPair,

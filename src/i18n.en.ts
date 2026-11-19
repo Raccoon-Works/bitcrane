@@ -764,7 +764,6 @@ export const EN: Record<string, string> = {
   'Zum Umsortieren ziehen': 'Drag to reorder',
   'Liste leeren': 'Clear list',
   'Keine Übertragungen.': 'No transfers.',
-  '„{0}“ lief ohne Fehler (Prototyp, simuliert).': '“{0}” ran without errors (prototype, simulated).',
   'Lief ohne Fehler.': 'Ran without errors.',
   'Endete mit Code {0}.': 'Ended with code {0}.',
   'Lokalen Ordner wählen': 'Choose local folder',
@@ -1297,7 +1296,6 @@ export const EN: Record<string, string> = {
   'Web-Projekt': 'Web project',
   ' um {0}': ' at {0}',
   'Protokoll#protocol': 'Protocol',
-  'ED25519 · Passphrase {0} gespeichert': 'ED25519 · passphrase saved {0}',
   'Bitcrane verwendet freie Software. Die Lizenztexte liegen den jeweiligen Paketen bei.':
     'Bitcrane uses free software. The license texts are included with each package.',
   '{0} Pakete': '{0} packages',

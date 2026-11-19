@@ -6,10 +6,10 @@
  */
 import { useEffect, useState } from 'react';
 import { Check, Trash2 } from '../../glyphs';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { isCloudProtocol, type Protocol, type Server } from '../../../backend/types';
-import { proxyRef, testServer } from '../../../state/live';
 import {
+  storeProxyPassword,
+  testServerSettings,
   askRemoveServer,
   closeDialog,
   getState,
@@ -168,22 +168,8 @@ export function ServerEdit({
     }
     const name = draft.name.trim() || draft.host.trim();
     const mono = draft.mono || monoFor(name);
-    // In the app an empty start folder means the user's home folder on the server.
-    // The proxy password goes to the keychain only.
-    if (LIVE && draft.proxy?.user && proxyPassword)
-      void backend
-        .secretStore(proxyRef(draft.proxy), proxyPassword)
-        .catch(() => showToast($t('Proxy-Passwort konnte nicht gespeichert werden.'), 'error'));
-    saveServer(
-      {
-        ...draft,
-        name,
-        mono,
-        proxy: draft.proxy?.host ? draft.proxy : undefined,
-        remoteStart: draft.remoteStart || (LIVE ? '' : `/home/${draft.user}`),
-      },
-      connect,
-    );
+    if (draft.proxy?.user && proxyPassword) storeProxyPassword(draft.proxy, proxyPassword);
+    saveServer({ ...draft, name, mono, proxy: draft.proxy?.host ? draft.proxy : undefined }, connect);
   };
 
   const runTest = () => {
@@ -192,20 +178,10 @@ export function ServerEdit({
       return;
     }
     setTest('running');
-    if (LIVE) {
-      void testServer({ ...draft, host: draft.host.trim(), user: draft.user.trim() }).then((r) => {
-        setTest(r.ok ? 'ok' : 'fail');
-        setTestText(r.text);
-      });
-      return;
-    }
-    window.setTimeout(() => {
-      const ok = !draft.host.includes('fehler');
-      setTest(ok ? 'ok' : 'fail');
-      setTestText(
-        ok ? $t('Erreichbar, Anmeldung erfolgreich') : $t('Server nicht erreichbar. Adresse und Port prüfen.'),
-      );
-    }, 900);
+    void testServerSettings({ ...draft, host: draft.host.trim(), user: draft.user.trim() }).then((r) => {
+      setTest(r.ok ? 'ok' : 'fail');
+      setTestText(r.text);
+    });
   };
 
   const footer = (

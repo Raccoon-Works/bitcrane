@@ -24,7 +24,7 @@ import {
 } from './connections';
 import { removeEntries } from './fileOps';
 import { editUploaded } from './editing';
-import { invalidate, bump } from './listing';
+import { invalidate, bump, readFolder, statEntry } from './listing';
 
 /** Left out by the general "auslassen" settings or by the server's transfer rule. */
 function skippedByRules(relative: string, size: number, serverId = ''): boolean {
@@ -546,7 +546,7 @@ function stopWatchOnError(tr: Transfer, message: string) {
 
 async function statOrNull(side: PaneSide, serverId: string, path: string): Promise<FileEntry | null> {
   try {
-    return side === 'local' ? await backend.localStat(path) : await backend.remoteStat(serverId, path);
+    return await statEntry(side, serverId, path);
   } catch {
     return null;
   }
@@ -624,13 +624,7 @@ async function preflight(tr: Transfer): Promise<boolean> {
   if (rule === 'keepBoth') {
     // Keep the existing file and store this one next to it under a free name.
     const names = new Set(
-      (
-        await (
-          targetSide === 'local'
-            ? backend.localList(parent(tr.target))
-            : backend.remoteList(tr.serverId, parent(tr.target))
-        ).catch(() => [])
-      ).map((e) => e.name),
+      (await readFolder(targetSide, tr.serverId, parent(tr.target)).catch(() => [])).map((e) => e.name),
     );
     const dot = tr.name.lastIndexOf('.');
     const [stem, ext] = dot > 0 ? [tr.name.slice(0, dot), tr.name.slice(dot)] : [tr.name, ''];

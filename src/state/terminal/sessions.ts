@@ -15,6 +15,7 @@ import { activeTab, getState, LIVE, serverById, setState, showToast, subscribeSt
 import { applySettings, live, makeTerminal } from './instances';
 import { startPreviewSession } from './preview';
 import { terminalSettings } from './settings';
+import { DEMO_SHELLS } from '../demoData';
 import type { TabTerminal } from '../../backend/types';
 import type { TermSession } from './types';
 
@@ -87,11 +88,11 @@ export function newTerminal(where?: 'local' | 'server', full = false, shell?: st
   patchTab(t.id, { open: true, active: session.id, full: full || t.terminal?.full });
 }
 
-/** Shells this computer offers (term_shells), asked once; the prototype has none. */
+/** Shells this computer offers (term_shells), asked once; the prototype's depend on its system. */
 let shellList: LocalShell[] | null = null;
 export async function localShells(): Promise<LocalShell[]> {
+  if (!LIVE) return DEMO_SHELLS[getState().platform];
   if (shellList) return shellList;
-  if (!LIVE) return [];
   shellList = await backend.termShells();
   return shellList;
 }

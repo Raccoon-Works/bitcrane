@@ -4,17 +4,16 @@
  */
 import { Plus, SquareTerminal, Zap } from './glyphs';
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../backend/tauriBackend';
-import { importSshConfig, LIVE, openDialog } from '../state/store';
+import { findImportable, importSshConfig, openDialog } from '../state/store';
 import { BMark } from './icons';
 import { Button, WithWordmark } from './ui';
 import { $t } from '../i18n';
 
 /** No servers yet: the first steps (the old welcome screen, now inside the half). */
 export function Welcome({ onQuick }: { onQuick: () => void }) {
-  const [found, setFound] = useState(LIVE ? 0 : 3);
+  const [found, setFound] = useState(0);
   useEffect(() => {
-    if (LIVE) void backend.importFind().then((r) => setFound(r.servers.length));
+    void findImportable().then((r) => setFound(r.servers.length));
   }, []);
   return (
     <div className="server-welcome">

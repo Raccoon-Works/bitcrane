@@ -3,9 +3,8 @@
  * the user for, with their state and a way to the System Settings.
  */
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { showError } from '../../../state/errors';
-import { LIVE, useStore } from '../../../state/store';
+import { fullDiskAccess, notificationsAllowed, openMacSettings, useStore } from '../../../state/store';
 import { Button } from '../../ui';
 import { $t } from '../../../i18n';
 import { Group, Row } from './parts';
@@ -21,11 +20,9 @@ export function MacPermissions() {
   const [notify, setNotify] = useState<boolean | null>(null);
   const startAtLogin = useStore((st) => st.settings.startAtLogin);
   useEffect(() => {
-    if (!LIVE) return;
     const read = () => {
-      void backend.macFullDiskAccess().then(setFullDisk);
-      void import('@tauri-apps/plugin-notification')
-        .then((m) => m.isPermissionGranted())
+      void fullDiskAccess().then(setFullDisk);
+      void notificationsAllowed()
         .then(setNotify)
         .catch(() => setNotify(null));
     };
@@ -33,7 +30,7 @@ export function MacPermissions() {
     window.addEventListener('focus', read);
     return () => window.removeEventListener('focus', read);
   }, []);
-  const open = (page: string) => void backend.openMacSettings(page).catch((e) => showError(e));
+  const open = (page: string) => void openMacSettings(page).catch((e) => showError(e));
   const state = (ok: boolean | null) =>
     ok === null ? null : ok ? (
       <span className="small tone-ok perm-state">{$t('erlaubt')}</span>

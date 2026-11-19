@@ -4,8 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { Server } from '../../../backend/types';
-import { hasSecret, proxyRef } from '../../../state/live';
-import { LIVE, useStore } from '../../../state/store';
+import { proxyPasswordStored, useStore } from '../../../state/store';
 import { Select, TextField } from '../../ui';
 import { $t } from '../../../i18n';
 import { keychainShort, type SetField } from './model';
@@ -26,11 +25,11 @@ export function ProxyField({
   const [proxyStored, setProxyStored] = useState(false);
   useEffect(() => {
     const p = draft.proxy;
-    if (!LIVE || !p?.user || !p.host) {
+    if (!p?.user || !p.host) {
       setProxyStored(false);
       return;
     }
-    void hasSecret(proxyRef(p)).then(setProxyStored);
+    void proxyPasswordStored(p).then(setProxyStored);
   }, [draft.proxy]);
 
   return (

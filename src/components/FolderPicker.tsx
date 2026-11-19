@@ -7,23 +7,16 @@
  */
 import { ChevronRight, CornerLeftUp, Loader2 } from './glyphs';
 import { useEffect, useState } from 'react';
-import * as fs from '../backend/mockFs';
-import { tauriBackend as backend } from '../backend/tauriBackend';
 import { toBackendError } from '../backend/api';
 import type { FileEntry, PaneSide } from '../backend/types';
-import { LIVE } from '../state/store';
+import { readEntries } from '../state/store';
 import { crumbs, join, parent } from '../util/paths';
 import { FolderGlyph } from './icons';
 import { Button, Checkbox } from './ui';
 import { $t } from '../i18n';
 
 async function listFolders(side: PaneSide, serverId: string, path: string): Promise<FileEntry[]> {
-  const all = LIVE
-    ? side === 'local'
-      ? await backend.localList(path)
-      : await backend.remoteList(serverId, path)
-    : fs.list(side, serverId, path);
-  return all.filter((e) => e.kind === 'dir');
+  return (await readEntries(side, serverId, path)).filter((e) => e.kind === 'dir');
 }
 
 export function FolderPicker({

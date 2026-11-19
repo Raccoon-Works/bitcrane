@@ -25,6 +25,14 @@ interface Listing {
 
 export const listings = new Map<string, Listing>();
 
+/** Reads a folder on this computer (`serverId` unused) or on a server, without the cache. */
+export const readFolder = (side: PaneSide, serverId: string, path: string): Promise<FileEntry[]> =>
+  side === 'local' ? backend.localList(path) : backend.remoteList(serverId, path);
+
+/** Reads one entry on this computer (`serverId` unused) or on a server. */
+export const statEntry = (side: PaneSide, serverId: string, path: string): Promise<FileEntry> =>
+  side === 'local' ? backend.localStat(path) : backend.remoteStat(serverId, path);
+
 function key(side: PaneSide, serverId: string, path: string): string {
   return side === 'local' ? `L|${path}` : `R|${serverId}|${path}`;
 }
@@ -71,7 +79,7 @@ async function load(side: PaneSide, serverId: string, path: string) {
   const current = () => listings.get(k) === mine;
   try {
     const t0 = Date.now();
-    const entries = side === 'local' ? await backend.localList(path) : await backend.remoteList(serverId, path);
+    const entries = await readFolder(side, serverId, path);
     if (!current()) return;
     listings.set(k, { entries, loading: false });
     if (side === 'remote')

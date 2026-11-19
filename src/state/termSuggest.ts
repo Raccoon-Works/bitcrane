@@ -22,9 +22,8 @@
 import type { Terminal } from '@xterm/xterm';
 import type { Snippet } from './terminal';
 import { $t } from '../i18n';
-import { tauriBackend as backend } from '../backend/tauriBackend';
 import { homeOf } from './live';
-import { LIVE } from './store';
+import { readEntries } from './core';
 import { COMMAND_CATALOG, PATH_COMMANDS } from './termCatalog';
 
 const STORAGE_KEY = 'bitcrane.termHistory';
@@ -288,17 +287,7 @@ export class Suggester {
     if (hit && Date.now() - hit.at < 60_000) return hit.names;
     if (!hit) {
       dirCache.set(key, { at: 0, names: [] });
-      const read = !LIVE
-        ? Promise.resolve([
-            { name: 'logs', kind: 'dir' },
-            { name: 'routes', kind: 'dir' },
-            { name: 'app.py', kind: 'file' },
-            { name: 'config.py', kind: 'file' },
-          ])
-        : this.serverId
-          ? backend.remoteList(this.serverId, dir)
-          : backend.localList(dir);
-      void read
+      void readEntries(this.serverId ? 'remote' : 'local', this.serverId, dir)
         .then((entries) => {
           dirCache.set(key, {
             at: Date.now(),

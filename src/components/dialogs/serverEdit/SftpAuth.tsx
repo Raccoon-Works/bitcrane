@@ -3,13 +3,10 @@
  * file with its type and whether its passphrase is stored.
  */
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, KeyRound } from '../../glyphs';
-import type { KeyInfo } from '../../../backend/api';
+import { AlertTriangle, KeyRound } from '../../glyphs';
 import type { AuthMethod, Server } from '../../../backend/types';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { chooseFile } from '../../../backend/dialogs';
-import { hasSecret, passphraseRef } from '../../../state/live';
-import { LIVE, useStore } from '../../../state/store';
+import { keyDetails, LIVE, useStore, type KeyDetails } from '../../../state/store';
 import { KeyPanel } from '../../KeyPanel';
 import { Button, Segmented, TextField } from '../../ui';
 import { $t } from '../../../i18n';
@@ -18,20 +15,16 @@ import { keychainLong, keychainShort, type SetField } from './model';
 export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
   const platform = useStore((s) => s.platform);
   const store = keychainShort(platform);
-  const [keyInfo, setKeyInfo] = useState<KeyInfo | null>(null);
+  const [key, setKey] = useState<KeyDetails | null>(null);
   const [keyPanel, setKeyPanel] = useState(false);
-  const [secretStored, setSecretStored] = useState(false);
 
-  // Key type and whether its passphrase is in the keychain (desktop app only).
+  // Key type and whether its passphrase is in the keychain, once typing pauses.
   useEffect(() => {
-    if (!LIVE || (draft.auth !== 'key' && draft.auth !== 'auto')) return;
+    if (draft.auth !== 'key' && draft.auth !== 'auto') return;
     let cancelled = false;
     const t = window.setTimeout(() => {
-      void backend.keyInfo(draft.keyPath).then((k) => {
-        if (!cancelled) setKeyInfo(k);
-      });
-      void hasSecret(passphraseRef(draft.keyPath)).then((v) => {
-        if (!cancelled) setSecretStored(v);
+      void keyDetails(draft.keyPath).then((k) => {
+        if (!cancelled) setKey(k);
       });
     }, 250);
     return () => {
@@ -39,6 +32,8 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
       window.clearTimeout(t);
     };
   }, [draft.keyPath, draft.auth]);
+
+  const keyInfo = key?.info;
 
   const chooseKey = async () => {
     const picked = await chooseFile($t('SSH-Schlüssel wählen'));
@@ -86,15 +81,8 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
             {keyPanel && (
               <KeyPanel server={draft} onCreated={(p) => set('keyPath', p)} onClose={() => setKeyPanel(false)} />
             )}
-            {!LIVE && (
-              <span className="small tone-ok row-inline">
-                <Check size={12} strokeWidth={2.2} aria-hidden="true" />
-                {$t('ED25519 · Passphrase {0} gespeichert', store)}
-              </span>
-            )}
             {/* "Automatisch" only tries the key; a missing one is normal there (agent or password follow). */}
-            {LIVE &&
-              keyInfo &&
+            {keyInfo &&
               !keyInfo.exists &&
               (draft.auth === 'auto' ? (
                 <span className="small muted">
@@ -106,19 +94,19 @@ export function SftpAuth({ draft, set }: { draft: Server; set: SetField }) {
                   {$t('Datei nicht gefunden')}
                 </span>
               ))}
-            {LIVE && keyInfo?.invalid && (
+            {keyInfo?.invalid && (
               <span className="small tone-danger row-inline">
                 <AlertTriangle size={12} strokeWidth={2} aria-hidden="true" />
                 {$t('Das ist kein privater SSH-Schlüssel')}
               </span>
             )}
-            {LIVE && keyInfo?.exists && !keyInfo.invalid && (
+            {keyInfo?.exists && !keyInfo.invalid && (
               <span className="small muted row-inline">
                 <KeyRound size={12} strokeWidth={1.75} aria-hidden="true" />
                 {[
                   keyInfo.algorithm,
                   keyInfo.encrypted
-                    ? secretStored
+                    ? key?.passphraseStored
                       ? $t('Passphrase {0} gespeichert', store)
                       : $t('mit Passphrase, wird beim Verbinden abgefragt')
                     : $t('ohne Passphrase'),

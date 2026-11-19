@@ -369,7 +369,7 @@ export default function App() {
     startApp();
     if (LIVE) {
       void import('./state/shell').then((m) => m.startShell());
-      void import('./util/dragDrop').then((m) => m.startNativeDrop());
+      void import('./state/dragDrop').then((m) => m.startNativeDrop());
     }
   }, []);
   // Window zoom (Strg + Plus/Minus, Einstellungen > Darstellung): the app zooms its web view

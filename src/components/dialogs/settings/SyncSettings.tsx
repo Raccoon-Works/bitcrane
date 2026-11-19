@@ -3,11 +3,10 @@
  * optional sync password (see state/sync.ts).
  */
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { chooseFolder } from '../../../backend/dialogs';
 import type { CloudPlace } from '../../../backend/api';
 import { runSync, setSyncFolder, setSyncPassword, syncStatus } from '../../../state/sync';
-import { LIVE, useStore } from '../../../state/store';
+import { findCloudPlaces, LIVE, useStore } from '../../../state/store';
 import { Button, TextField } from '../../ui';
 import { $t } from '../../../i18n';
 import { Group, Row } from './parts';
@@ -23,7 +22,7 @@ export function SyncSettings() {
   const [pw, setPw] = useState('');
   // Cloud folders of this computer as quick choices (the same detection as for the places bar).
   useEffect(() => {
-    if (LIVE) void backend.localCloudPlaces().then((l) => setFound(l.filter((c) => c.service !== 'other')));
+    void findCloudPlaces().then((l) => setFound(l.filter((c) => c.service !== 'other')));
   }, []);
   const choose = async () => {
     const picked = await chooseFolder($t('Ordner für den Abgleich'));

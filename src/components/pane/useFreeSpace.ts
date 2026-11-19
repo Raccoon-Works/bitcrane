@@ -3,8 +3,7 @@
  * of a half.
  */
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { LIVE } from '../../state/store';
+import { freeSpace } from '../../state/store';
 import { LOCALE } from '../../i18n';
 
 /** Free space of the disk that holds a folder of this computer, refreshed when files change. */
@@ -15,13 +14,9 @@ export function useFreeSpace(path: string, enabled: boolean, rev: number): numbe
       setFree(null);
       return;
     }
-    if (!LIVE) {
-      setFree(86.2e9);
-      return;
-    }
     let live = true;
     const t = window.setTimeout(() => {
-      void backend.localFreeSpace(path).then((v) => {
+      void freeSpace(path).then((v) => {
         if (live) setFree(v ?? null);
       });
     }, 300);

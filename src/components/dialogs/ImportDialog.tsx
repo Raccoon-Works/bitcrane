@@ -7,70 +7,34 @@ import { showError } from '../../state/errors';
 import { Loader2 } from '../glyphs';
 import { useEffect, useState } from 'react';
 import type { ImportedServer } from '../../backend/api';
-import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { chooseFile } from '../../backend/dialogs';
-import { closeDialog, getState, importServers, LIVE, useStore } from '../../state/store';
+import {
+  closeDialog,
+  findImportable,
+  getState,
+  importServers,
+  readImportFile,
+  serverKey,
+  useStore,
+} from '../../state/store';
 import { Button, Checkbox } from '../ui';
 import { Dialog } from './Dialog';
 import { $t } from '../../i18n';
 
-const DEMO: ImportedServer[] = [
-  {
-    source: 'SSH-Konfiguration',
-    name: 'shop',
-    group: '',
-    host: 'shop.example',
-    port: 22,
-    user: 'deploy',
-    protocol: 'sftp',
-    implicitTls: false,
-    auth: 'key',
-    keyPath: '~/.ssh/shop_ed25519',
-  },
-  {
-    source: 'FileZilla',
-    name: 'Portfolio',
-    group: 'Websites',
-    host: 'portfolio.example',
-    port: 21,
-    user: 'web',
-    protocol: 'ftps',
-    implicitTls: false,
-    auth: 'password',
-  },
-  {
-    source: 'WinSCP',
-    name: 'NAS',
-    group: 'Privat',
-    host: 'nas.local',
-    port: 22,
-    user: 'admin',
-    protocol: 'sftp',
-    implicitTls: false,
-    auth: 'password',
-  },
-];
-
 const protoLabel = (s: ImportedServer) =>
   s.protocol === 'ftps' ? (s.implicitTls ? $t('FTPS (implizit)') : 'FTPS') : s.protocol.toUpperCase();
-// Same server = same protocol, user, host, port and key file; host and user without regard to case.
-const keyOf = (s: { host: string; port: number; user: string; protocol?: string; keyPath?: string; auth?: string }) =>
-  `${s.protocol ?? 'sftp'}|${s.user.toLowerCase()}@${s.host.toLowerCase()}:${s.port}|${s.auth === 'key' ? (s.keyPath ?? '') : ''}`;
 
 /** Index of the first entry with the same server (protocol, user, host, port). */
-const firstIndex = (list: ImportedServer[], s: ImportedServer) => list.findIndex((x) => keyOf(x) === keyOf(s));
+const firstIndex = (list: ImportedServer[], s: ImportedServer) => list.findIndex((x) => serverKey(x) === serverKey(s));
 
 export function ImportDialog() {
-  const [found, setFound] = useState<{ servers: ImportedServer[]; sources: string[] } | null>(
-    LIVE ? null : { servers: DEMO, sources: ['SSH-Konfiguration', 'FileZilla', 'WinSCP'] },
-  );
+  const [found, setFound] = useState<{ servers: ImportedServer[]; sources: string[] } | null>(null);
   // The saved servers when the dialog opened: what is new is ticked and marked against these.
   const [existing] = useState(
     () =>
       new Set(
         getState()
           .servers.filter((x) => !x.temporary)
-          .map(keyOf),
+          .map(serverKey),
       ),
   );
   const [picked, setPicked] = useState<Set<number>>(new Set());
@@ -78,7 +42,7 @@ export function ImportDialog() {
   const firstStart = useStore((s) => s.dialog?.type === 'import' && !!s.dialog.firstStart);
 
   useEffect(() => {
-    if (LIVE) void backend.importFind().then(setFound);
+    void findImportable().then(setFound);
   }, []);
   useEffect(() => {
     // Preselect each new server once; the same server from a second program stays unticked.
@@ -87,7 +51,7 @@ export function ImportDialog() {
         new Set(
           found.servers
             .map((s, i) => [s, i] as const)
-            .filter(([s, i]) => !existing.has(keyOf(s)) && firstIndex(found.servers, s) === i)
+            .filter(([s, i]) => !existing.has(serverKey(s)) && firstIndex(found.servers, s) === i)
             .map(([, i]) => i),
         ),
       );
@@ -95,35 +59,9 @@ export function ImportDialog() {
 
   const [fileNote, setFileNote] = useState('');
   const fromFile = async () => {
-    if (!LIVE) {
-      setFound((f) => ({
-        servers: [
-          ...(f?.servers ?? []),
-          {
-            source: 'Transmit',
-            name: 'Webseite',
-            group: '',
-            host: 'ftp.example',
-            port: 21,
-            user: 'web',
-            protocol: 'ftps',
-            implicitTls: false,
-            auth: 'password',
-          },
-        ],
-        sources: f?.sources ?? [],
-      }));
-      return;
-    }
-    const path = await chooseFile($t('Exportierte Server wählen'), {
-      filters: [
-        { name: $t('Server-Export'), extensions: ['transmitservers', 'xml', 'ini', 'duck', 'json'] },
-        { name: $t('Alle Dateien'), extensions: ['*'] },
-      ],
-    });
-    if (!path) return;
     try {
-      const list = await backend.importFile(path);
+      const list = await readImportFile();
+      if (!list) return;
       if (!list.length) {
         setFileNote(
           $t(
@@ -136,7 +74,9 @@ export function ImportDialog() {
       setFound((f) => ({
         servers: [
           ...(f?.servers ?? []),
-          ...list.filter((s) => !(f?.servers ?? []).some((x) => x.source === s.source && keyOf(x) === keyOf(s))),
+          ...list.filter(
+            (s) => !(f?.servers ?? []).some((x) => x.source === s.source && serverKey(x) === serverKey(s)),
+          ),
         ],
         sources: f?.sources ?? [],
       }));
@@ -210,7 +150,7 @@ export function ImportDialog() {
               <div className="import-list">
                 {found.servers.map((s, i) =>
                   s.source !== src ? null : (
-                    <label key={i} className={`import-row${existing.has(keyOf(s)) ? ' is-known' : ''}`}>
+                    <label key={i} className={`import-row${existing.has(serverKey(s)) ? ' is-known' : ''}`}>
                       <Checkbox checked={picked.has(i)} onChange={() => toggle(i)} label="" />
                       <span className="col-text min-w-0">
                         <span className="strong-500 ellipsis">
@@ -233,7 +173,7 @@ export function ImportDialog() {
                               ? $t('Automatisch')
                               : $t('Passwort')}
                       </span>
-                      {existing.has(keyOf(s)) ? (
+                      {existing.has(serverKey(s)) ? (
                         <span className="tag">{$t('schon vorhanden')}</span>
                       ) : (
                         firstIndex(found.servers, s) !== i && <span className="tag">{$t('doppelt')}</span>

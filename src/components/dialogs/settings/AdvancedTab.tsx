@@ -3,9 +3,8 @@
  * the system (sftp links, SSH configuration).
  */
 import { Plus, Radio, X } from '../../glyphs';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import { showError } from '../../../state/errors';
-import { LIVE, openDialog, updateSettings, useStore, type CustomCommand } from '../../../state/store';
+import { LIVE, openDialog, revealLogFile, updateSettings, useStore, type CustomCommand } from '../../../state/store';
 import { newCommandId } from '../../../state/tools';
 import { Button, IconButton, Switch, TextField } from '../../ui';
 import { $t } from '../../../i18n';
@@ -96,16 +95,7 @@ export function AdvancedSettings() {
         >
           <span className="row-inline">
             {LIVE && s.writeLog && (
-              <Button
-                small
-                variant="ghost"
-                onClick={() =>
-                  void backend
-                    .logPath()
-                    .then((p) => backend.localReveal(p))
-                    .catch((e) => showError(e))
-                }
-              >
+              <Button small variant="ghost" onClick={() => void revealLogFile().catch((e) => showError(e))}>
                 {$t('Datei zeigen')}
               </Button>
             )}

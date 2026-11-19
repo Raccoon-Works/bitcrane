@@ -11,7 +11,7 @@ import { ChevronRight } from './glyphs';
 import { GearSix, List } from '@phosphor-icons/react';
 import { useRef, useState } from 'react';
 import { newTab, openDialog, setState, useStore } from '../state/store';
-import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../util/appWindow';
+import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../state/appWindow';
 import { formatTime } from '../util/format';
 import { BMark } from './icons';
 import { Tooltip } from './ui';

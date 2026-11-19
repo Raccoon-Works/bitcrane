@@ -3,9 +3,8 @@
  * fingerprints.
  */
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import type { KnownHost } from '../../../backend/api';
-import { LIVE, updateSettings, useStore } from '../../../state/store';
+import { forgetKnownHost, knownHosts, updateSettings, useStore } from '../../../state/store';
 import { Button, Switch } from '../../ui';
 import { $t } from '../../../i18n';
 import { showError } from '../../../state/errors';
@@ -13,26 +12,13 @@ import { Group, Row } from './parts';
 
 /** Stored host key fingerprints with "Vergessen" (the next connection asks again). */
 function KnownHostsList() {
-  const [hosts, setHosts] = useState<KnownHost[] | null>(
-    LIVE
-      ? null
-      : [
-          { host: 'shop.example:22', fingerprint: 'SHA256:U2hvcC1leGFtcGxlLWZpbmdlcnByaW50AA' },
-          { host: 'portfolio.example:22', fingerprint: 'SHA256:UG9ydGZvbGlvLWV4YW1wbGUtZmluZ2Vy' },
-        ],
-  );
-  const load = () => {
-    if (LIVE) void backend.knownHostsList().then(setHosts);
-  };
+  const [hosts, setHosts] = useState<KnownHost[] | null>(null);
+  const load = () => void knownHosts().then(setHosts);
   useEffect(load, []);
-  const forget = (host: string) => {
-    if (LIVE)
-      void backend
-        .knownHostsRemove(host)
-        .catch((e) => showError(e))
-        .then(load);
-    else setHosts((h) => (h ?? []).filter((x) => x.host !== host));
-  };
+  const forget = (host: string) =>
+    void forgetKnownHost(host)
+      .catch((e) => showError(e))
+      .then(load);
   if (!hosts) return <Row label={$t('Wird geladen …')} />;
   if (!hosts.length)
     return (

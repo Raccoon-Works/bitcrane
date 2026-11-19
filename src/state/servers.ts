@@ -4,7 +4,8 @@
 
 import * as live from './live';
 import type { PaneSide, Server } from '../backend/types';
-import { isCloudProtocol } from '../backend/types';
+import { isCloudProtocol, type ServerProxy } from '../backend/types';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import { $t } from '../i18n';
 import { setState, LIVE, showToast, serverById, uid, activeTab, watchForLocal, panePath, getState } from './core';
 import type { AppState } from './appState';
@@ -17,6 +18,9 @@ import { normalizeSshAddress, splitAddress } from '../util/serverAddress';
 import { isSftp } from '../util/protocols';
 
 export function saveServer(server: Server, connect: boolean) {
+  // In the app an empty start folder means the user's home folder on the server; the prototype names it.
+  if (!LIVE && !server.remoteStart && !isCloudProtocol(server.protocol))
+    server = { ...server, remoteStart: `/home/${server.user}` };
   const exists = getState().servers.some((x) => x.id === server.id);
   setState((s) => ({
     servers: exists ? s.servers.map((x) => (x.id === server.id ? server : x)) : [...s.servers, server],
@@ -344,4 +348,39 @@ export function simulateChangedHostKey() {
       previous: fakeFingerprint(srv.host),
     },
   });
+}
+
+/** Two letters for the server tile: initials of two words, else the first two letters. */
+export function monoFor(name: string): string {
+  const words = name
+    .replace(/[^A-Za-z0-9ÄÖÜäöüß ]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const m = words.length >= 2 ? words[0][0] + words[1][0] : (words[0] ?? name).slice(0, 2);
+  return (m || 'SV').toUpperCase();
+}
+
+/** Whether the password of a proxy is in the keychain (the prototype keeps none). */
+export function proxyPasswordStored(proxy: ServerProxy): Promise<boolean> {
+  return LIVE ? live.hasSecret(live.proxyRef(proxy)) : Promise.resolve(false);
+}
+
+/** Puts a proxy password into the keychain, never into the server list. */
+export function storeProxyPassword(proxy: ServerProxy, password: string) {
+  if (!LIVE) return;
+  void backend
+    .secretStore(live.proxyRef(proxy), password)
+    .catch(() => showToast($t('Proxy-Passwort konnte nicht gespeichert werden.'), 'error'));
+}
+
+/**
+ * "Verbindung testen" in the server window: logs in once and closes again. The
+ * prototype fails for host names containing "fehler", to show the error case.
+ */
+export async function testServerSettings(srv: Server): Promise<{ ok: boolean; text: string }> {
+  if (LIVE) return live.testServer(srv);
+  await new Promise((done) => window.setTimeout(done, 900));
+  return srv.host.includes('fehler')
+    ? { ok: false, text: $t('Server nicht erreichbar. Adresse und Port prüfen.') }
+    : { ok: true, text: $t('Erreichbar, Anmeldung erfolgreich') };
 }

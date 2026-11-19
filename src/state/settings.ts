@@ -2,6 +2,7 @@
  * Settings, toolbar and the look of the app (design, zoom).
  */
 
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Platform, Theme } from '../backend/types';
 
 import { $t, rememberLanguage } from '../i18n';
@@ -76,3 +77,30 @@ export const togglePermsColumn = () =>
 
 export const toggleSwapSides = () =>
   setState((s) => ({ settings: { ...s.settings, swapSides: !s.settings.swapSides } }));
+
+/** Where the program lives, for `bitcrane upload …` in scripts; empty in the prototype. */
+export function cliPath(): Promise<string> {
+  return LIVE ? backend.cliPath() : Promise.resolve('');
+}
+
+/** Shows the log file in the Finder or Explorer. */
+export async function revealLogFile() {
+  await backend.localReveal(await backend.logPath());
+}
+
+/** Whether macOS lets Bitcrane read every folder; null when it cannot be told (prototype). */
+export function fullDiskAccess(): Promise<boolean | null> {
+  return LIVE ? backend.macFullDiskAccess() : Promise.resolve(null);
+}
+
+/** Opens a page of the macOS System Settings ("fullDisk", "notifications", ...). */
+export function openMacSettings(page: string): Promise<void> {
+  return backend.openMacSettings(page);
+}
+
+/** Whether the system lets Bitcrane show notifications; null when it cannot be told (prototype). */
+export async function notificationsAllowed(): Promise<boolean | null> {
+  if (!LIVE) return null;
+  const m = await import('@tauri-apps/plugin-notification');
+  return m.isPermissionGranted();
+}

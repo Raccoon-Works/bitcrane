@@ -7,15 +7,15 @@
  */
 import { ArrowRight, Eye } from '../glyphs';
 import { useState } from 'react';
-import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { chooseFolder } from '../../backend/dialogs';
 import {
   activeTab,
   askDeleteWatch,
+  chooseWatchFolder,
+  normaliseLocalPath,
+  testWatchCommand,
   BUILTIN_WATCH_TEMPLATES,
   closeDialog,
   getState,
-  LIVE,
   newWatchOptions,
   NO_RULES,
   panePath,
@@ -27,7 +27,6 @@ import {
 } from '../../state/store';
 import { explainError } from '../../state/errors';
 import { FolderPicker, SubfolderChooser } from '../FolderPicker';
-import { testCommand } from '../../state/live';
 import { WatchIcon } from '../icons';
 import { ServerTile } from '../ServerTile';
 import { Button, Select, TextField } from '../ui';
@@ -35,13 +34,6 @@ import { Dialog } from './Dialog';
 import { WatchBehaviour, WatchCommand, WatchExcludes, WatchMoreOptions } from './WatchFields';
 import { useWatchOptions } from './useWatchOptions';
 import { $t, LOCALE } from '../../i18n';
-
-/** Brings a typed folder into the form watch events use ("~/x", forward slashes, no trailing slash). */
-async function normaliseLocalPath(typed: string): Promise<string> {
-  let p = typed.trim().replace(/\\/g, '/');
-  if (LIVE) p = await backend.pathToUi(p);
-  return p.length > 1 && !/^[A-Za-z]:\/$/.test(p) ? p.replace(/\/+$/, '') : p;
-}
 
 export function WatchSetup({ editId }: { editId?: string }) {
   const platform = useStore((s) => s.platform);
@@ -96,12 +88,8 @@ export function WatchSetup({ editId }: { editId?: string }) {
   /** Runs the post-upload command once on the chosen server and shows its output. */
   const runCommandTest = async () => {
     const cmd = opts.command.trim();
-    if (!LIVE) {
-      setCmdTest({ ok: true, title: $t('„{0}“ lief ohne Fehler (Prototyp, simuliert).', cmd) });
-      return;
-    }
     setCmdTest('running');
-    const r = await testCommand(serverId, cmd);
+    const r = await testWatchCommand(serverId, cmd);
     if ('error' in r) setCmdTest({ ok: false, title: r.error });
     else
       setCmdTest({
@@ -113,13 +101,9 @@ export function WatchSetup({ editId }: { editId?: string }) {
   const homeName = useStore((s) => s.homeName);
   const userTemplates = useStore((s) => s.settings.watchTemplates);
 
-  /** "Auswählen …": the system's folder dialog in the app, the current folder in the prototype. */
+  /** "Auswählen …": the system's folder dialog. */
   const chooseLocal = async () => {
-    if (!LIVE) {
-      setLocalPath(panePath('local'));
-      return;
-    }
-    const picked = await chooseFolder($t('Lokalen Ordner wählen'));
+    const picked = await chooseWatchFolder();
     if (picked) setLocalPath(picked);
   };
 

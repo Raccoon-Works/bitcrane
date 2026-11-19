@@ -4,7 +4,7 @@
  */
 import { tauriBackend as backend } from '../backend/tauriBackend';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { LIVE, showToast } from '../state/store';
+import { LIVE, showToast } from './store';
 import { $t } from '../i18n';
 
 const win = () => getCurrentWindow();

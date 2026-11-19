@@ -153,7 +153,7 @@ async function decideStartWindow() {
   try {
     const atLogin = await backend.startInfo();
     if (atLogin && getState().settings.startHidden) setState({ startedHidden: true });
-    else if (atLogin) await (await import('../../util/appWindow')).showWindow();
+    else if (atLogin) await (await import('../appWindow')).showWindow();
     await backend.startDecided();
   } catch {
     // Rust shows the window by itself after a while.

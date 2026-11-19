@@ -4,6 +4,8 @@
 
 import * as fs from '../backend/mockFs';
 import * as live from './live';
+import { tauriBackend as backend } from '../backend/tauriBackend';
+import { chooseFolder } from '../backend/dialogs';
 import type { Server, Transfer, Watch, WatchOptions } from '../backend/types';
 
 import { matchesExclude } from '../util/format';
@@ -224,4 +226,21 @@ export function openWatchFolders(watchId: string) {
   if (t && t.serverId !== w.serverId) openServer(w.serverId, true);
   updateTab({ leftServerId: undefined, localPath: w.localPath, remotePath: w.remotePath });
   setState({ selection: clearSelection(), popoverOpen: false });
+}
+
+/** Brings a typed folder into the form watch events use ("~/x", forward slashes, no trailing slash). */
+export async function normaliseLocalPath(typed: string): Promise<string> {
+  let p = typed.trim().replace(/\\/g, '/');
+  if (LIVE) p = await backend.pathToUi(p);
+  return p.length > 1 && !/^[A-Za-z]:\/$/.test(p) ? p.replace(/\/+$/, '') : p;
+}
+
+/** The folder dialog for a watch's local folder; the prototype takes the folder of the left half. */
+export function chooseWatchFolder(): Promise<string | null> {
+  return LIVE ? chooseFolder($t('Lokalen Ordner wählen')) : Promise.resolve(panePath('local'));
+}
+
+/** "Jetzt testen": runs the command after uploads once on the server; the prototype always succeeds. */
+export function testWatchCommand(serverId: string, command: string) {
+  return LIVE ? live.testCommand(serverId, command) : Promise.resolve({ code: 0, output: '' });
 }

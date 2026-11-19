@@ -4,7 +4,7 @@
  */
 import { $t } from '../i18n';
 import { keyLabel } from './keys';
-import { quitApp } from '../util/appWindow';
+import { quitApp } from './appWindow';
 import {
   computeFolderSizes,
   newFolderWithSelection,

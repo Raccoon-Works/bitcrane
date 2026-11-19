@@ -20,6 +20,8 @@ import { $t } from '../i18n';
 import * as paths from '../util/paths';
 import { addLog } from './log';
 import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
+import { sampleText } from './demoData';
+import { chooseFiles } from '../backend/dialogs';
 import { isConnected, refreshVisible } from './live';
 import { toBackendError, type EditorEncoding, type EditorEol } from '../backend/api';
 
@@ -150,6 +152,12 @@ export function newDocument() {
     loading: false,
   };
   set({ docs: [...st.docs, doc], active: doc.id, open: true });
+}
+
+/** "Datei öffnen …": files of this computer chosen in the system dialog (the prototype opens app.py). */
+export async function openLocalFiles() {
+  const paths = LIVE ? await chooseFiles($t('Im Editor öffnen')) : ['~/Projekte/webshop/live/app.py'];
+  for (const path of paths) void openFile('', path);
 }
 
 /** Opens a file in the editor (or switches to it when it is open already). */
@@ -351,18 +359,6 @@ export function cancelClose() {
 /** Unsaved documents (asked about before quitting). */
 function unsavedDocs(): EditorDoc[] {
   return st.docs.filter((d) => d.dirty);
-}
-
-/** Example text for the browser prototype, which reads no real files. */
-function sampleText(name: string): string {
-  if (/\.py$/i.test(name))
-    return 'from flask import Blueprint, jsonify, request\n\nfrom .models import Cart, Product\n\ncart = Blueprint("cart", __name__)\n\n\n@cart.post("/cart/items")\ndef add_item():\n    """Adds a product to the cart of the visitor."""\n    data = request.get_json()\n    product = Product.query.get_or_404(data["id"])\n    Cart.current().add(product, qty=data.get("qty", 1))\n    return jsonify(ok=True)\n';
-  if (/\.(json)$/i.test(name))
-    return '{\n  "name": "webshop",\n  "version": "1.4.2",\n  "currency": "EUR",\n  "shipping": {\n    "free_from": 50,\n    "countries": ["DE", "AT", "CH"]\n  }\n}\n';
-  if (/\.(md)$/i.test(name))
-    return '# Webshop\n\nEin kleiner Shop mit Flask.\n\n## Start\n\n```bash\nflask --app app run\n```\n';
-  if (/^\.env$|\.ini$|\.conf$/i.test(name)) return 'SECRET_KEY=…\nDATABASE_URL=sqlite:///data.db\nLOG_LEVEL=info\n';
-  return `${name}\n`;
 }
 
 let warnedAt = 0;

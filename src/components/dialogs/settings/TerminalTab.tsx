@@ -3,10 +3,9 @@
  * suggestions and the snippets.
  */
 import { useEffect, useState } from 'react';
-import { tauriBackend as backend } from '../../../backend/tauriBackend';
 import type { LocalShell } from '../../../backend/api';
-import { getState, LIVE, updateSettings, useStore } from '../../../state/store';
-import { terminalSettings, type TerminalSettings } from '../../../state/terminal';
+import { getState, updateSettings, useStore } from '../../../state/store';
+import { localShells, terminalSettings, type TerminalSettings } from '../../../state/terminal';
 import { clearHistory, historyCount } from '../../../state/termSuggest';
 import { formatCombo, keysFor } from '../../../state/keys';
 import { Button, Select, Switch, TextField } from '../../ui';
@@ -24,24 +23,10 @@ export function TerminalSettingsPage() {
   const set = (patch: Partial<TerminalSettings>) =>
     updateSettings({ terminal: { ...getState().settings.terminal, ...patch } });
   const [historyN, setHistoryN] = useState(historyCount);
-  const [shells, setShells] = useState<LocalShell[]>(
-    LIVE
-      ? []
-      : platform === 'mac'
-        ? [
-            { id: 'zsh', name: 'zsh' },
-            { id: 'bash', name: 'bash' },
-          ]
-        : [
-            { id: 'pwsh', name: 'PowerShell 7' },
-            { id: 'powershell', name: 'Windows PowerShell' },
-            { id: 'cmd', name: 'Eingabeaufforderung (cmd)' },
-            { id: 'gitbash', name: 'Git Bash' },
-          ],
-  );
+  const [shells, setShells] = useState<LocalShell[]>([]);
   useEffect(() => {
-    if (LIVE) void backend.termShells().then(setShells);
-  }, []);
+    void localShells().then(setShells);
+  }, [platform]);
   return (
     <>
       <Group title={$t('Darstellung')}>

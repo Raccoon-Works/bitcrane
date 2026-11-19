@@ -3,8 +3,7 @@
  * keyboard-interactive questions of a server (for example a one-time code).
  */
 import { useState } from 'react';
-import { tauriBackend as backend } from '../../backend/tauriBackend';
-import { cancelSecret, closeDialog, serverById, submitSecret, useStore } from '../../state/store';
+import { answerAuthPrompt, cancelSecret, closeDialog, serverById, submitSecret, useStore } from '../../state/store';
 import { AlertTriangle, KeyRound } from '../glyphs';
 import { Button, Checkbox, TextField } from '../ui';
 import { Dialog } from './Dialog';
@@ -120,7 +119,7 @@ export function AuthPrompt({
   const [values, setValues] = useState<string[]>(prompts.map(() => ''));
   const answer = (answers: string[] | null) => {
     closeDialog();
-    void backend.authPromptAnswer(id, answers);
+    answerAuthPrompt(id, answers);
   };
   const submit = () => answer(values);
   return (

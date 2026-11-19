@@ -10,7 +10,7 @@ import { lazy, Suspense, useRef, type CSSProperties } from 'react';
 const CodeEditor = lazy(() => import('./CodeEditor').then((m) => ({ default: m.CodeEditor })));
 import { setState, updateSettings, useStore } from '../state/store';
 import { ResizeHandle } from './ResizeHandle';
-import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../util/appWindow';
+import { closeWindow, minimizeWindow, toggleMaximizeWindow } from '../state/appWindow';
 import { Activity } from './Activity';
 import { TerminalPanel } from './TerminalPanel';
 import { WinSystemMenu } from './AppMenu';

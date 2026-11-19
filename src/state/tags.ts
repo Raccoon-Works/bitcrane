@@ -6,7 +6,7 @@
  */
 import { showError } from './errors';
 import { tauriBackend as backend } from '../backend/tauriBackend';
-import type { Tag } from '../backend/api';
+import type { Tag, TaggedFile } from '../backend/api';
 import { useEffect, useState } from 'react';
 import { $t, LANG } from '../i18n';
 import { getState, LIVE, showToast } from './store';
@@ -67,4 +67,9 @@ export async function toggleTag(dir: string, names: string[], color: (typeof TAG
   const paths = names.map((n) => `${dir.replace(/\/$/, '')}/${n}`);
   await backend.localTag(paths, name, color.color, on).catch((e) => showError(e));
   await refreshTags(dir);
+}
+
+/** Files with the tag `name`, found through Spotlight; the prototype has none. */
+export function findTagged(name: string): Promise<TaggedFile[]> {
+  return LIVE ? backend.localTagFind(name) : Promise.resolve([]);
 }

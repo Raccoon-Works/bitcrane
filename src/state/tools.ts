@@ -356,7 +356,7 @@ export async function runAfterQueue(action: AfterQueue) {
     return;
   }
   if (action === 'quit') {
-    const { quitApp } = await import('../util/appWindow');
+    const { quitApp } = await import('./appWindow');
     quitApp();
     return;
   }

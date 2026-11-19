@@ -7,10 +7,8 @@
 import { showError } from '../state/errors';
 import { Check, Copy, KeyRound, Upload } from './glyphs';
 import { useState } from 'react';
-import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Server } from '../backend/types';
-import { installPublicKey, passphraseRef } from '../state/live';
-import { LIVE, showToast } from '../state/store';
+import { generateKey, installKey, showToast } from '../state/store';
 import { Button, Checkbox, TextField } from './ui';
 import { $t } from '../i18n';
 
@@ -40,19 +38,9 @@ export function KeyPanel({
 
   const create = async () => {
     if (mismatch) return;
-    if (!LIVE) {
-      setPublicKey(`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBitcranePrototypBeispielSchluessel ${comment}`);
-      onCreated(name);
-      return;
-    }
     setBusy(true);
     try {
-      const pub = await backend.keyGenerate(name, comment, pass || undefined);
-      if (pass && save)
-        await backend
-          .secretStore(passphraseRef(name), pass)
-          .catch(() => showToast($t('Die Passphrase konnte nicht im Schlüsselbund gesichert werden.'), 'error'));
-      setPublicKey(pub);
+      setPublicKey(await generateKey(name, comment, pass, save));
       onCreated(name);
       showToast($t('Neuer Schlüssel erzeugt.'), 'ok');
     } catch (e) {
@@ -67,13 +55,7 @@ export function KeyPanel({
       .writeText(publicKey)
       .then(() => showToast($t('Öffentlicher Schlüssel kopiert.'), 'ok'))
       .catch(() => showToast($t('Kopieren nicht möglich.'), 'error'));
-  const install = async () => {
-    if (!LIVE) {
-      setInstalled(null);
-      return;
-    }
-    setInstalled(await installPublicKey(server.id, publicKey));
-  };
+  const install = async () => setInstalled(await installKey(server.id, publicKey));
 
   return (
     <div className="key-panel">

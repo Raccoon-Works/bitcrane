@@ -14,14 +14,15 @@
  * - Hidden and shown with the View menu (Cmd+Ctrl+S on the Mac, Ctrl+B on Windows).
  */
 import { X, CaretDown, ClockCounterClockwise, Desktop, Network } from '@phosphor-icons/react';
-import { tauriBackend as backend } from '../backend/tauriBackend';
+
 import type { NetworkHost } from '../backend/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Place } from '../backend/types';
 import { $t } from '../i18n';
 import { formatFree } from './pane/useFreeSpace';
 import {
-  LIVE,
+  findNetworkHosts,
+  realPaths,
   removeRecent,
   activeTab,
   editLocalPlaces,
@@ -50,10 +51,10 @@ function useShownPlaces(places: Place[]): Array<{ place: Place; label: string }>
   // Resolved again only when the set of paths changes, not when a place is renamed.
   const key = places.map((p) => p.path).join('\n');
   useEffect(() => {
-    if (!LIVE || !key) return;
+    if (!key) return;
     const list = key.split('\n');
     let live = true;
-    void backend.localRealPaths(list).then((r) => {
+    void realPaths(list).then((r) => {
       if (live) setReal(Object.fromEntries(list.map((p, i) => [p, r[i] ?? p])));
     });
     return () => {
@@ -75,13 +76,9 @@ function useNetworkHosts(enabled: boolean): NetworkHost[] {
   const [hosts, setHosts] = useState<NetworkHost[]>([]);
   useEffect(() => {
     if (!enabled) return;
-    if (!LIVE) {
-      setHosts([{ name: 'NAS Keller', host: 'nas-keller.local' }]);
-      return;
-    }
     let live = true;
     const run = () =>
-      void backend.networkHosts().then((h) => {
+      void findNetworkHosts().then((h) => {
         if (live) setHosts(h);
       });
     run();

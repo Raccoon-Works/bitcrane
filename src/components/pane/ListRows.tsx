@@ -22,7 +22,7 @@ import {
 import { GIT_LABEL, gitMark } from '../../state/git';
 import { tagCss } from '../../state/tags';
 import type { CompareMark } from '../../state/tools';
-import { beginRowDrag } from '../../util/dragDrop';
+import { beginRowDrag } from '../../state/dragDrop';
 import { formatDate, formatSize, permsToText } from '../../util/format';
 import * as paths from '../../util/paths';
 import { typeIconFor } from '../fileTypes';

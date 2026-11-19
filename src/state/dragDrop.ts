@@ -9,7 +9,7 @@
  * The current drop target lives in the store (`dropHint`) so both panes can
  * highlight it.
  */
-import { showError } from '../state/errors';
+import { showError } from './errors';
 import type { PaneSide } from '../backend/types';
 import {
   getState,
@@ -29,9 +29,9 @@ import {
   moveIntoFolder,
   navigate,
   listEntries,
-} from '../state/store';
+} from './store';
 import { tauriBackend as backend } from '../backend/tauriBackend';
-import { join } from './paths';
+import { join } from '../util/paths';
 import { $t } from '../i18n';
 
 const THRESHOLD = 5;

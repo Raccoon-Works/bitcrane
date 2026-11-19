@@ -1,8 +1,12 @@
 /**
- * The sidebar's sections: their order, collapsed and hidden ones (Settings > Darstellung).
+ * The sidebar's sections: their order, collapsed and hidden ones (Settings > Darstellung),
+ * and what the favourites and shares need from the system.
  */
+import type { NetworkHost } from '../backend/api';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { AppState, SidebarSection } from './appState';
-import { getState, setState } from './core';
+import { getState, LIVE, setState } from './core';
+import { DEMO_NETWORK_HOSTS } from './demoData';
 import { updateSettings } from './settings';
 
 /** Sections of the sidebar in their default order. */
@@ -35,4 +39,14 @@ export function toggleSidebarHidden(id: SidebarSection) {
   const cur = getState().settings.sidebarHidden ?? [];
   updateSettings({ sidebarHidden: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
   setState({ contextMenu: null });
+}
+
+/** Real target of each folder (links resolved), in the same order; the prototype has no links. */
+export function realPaths(paths: string[]): Promise<string[]> {
+  return LIVE ? backend.localRealPaths(paths) : Promise.resolve(paths);
+}
+
+/** Computers in the network with file shares (Bonjour). */
+export function findNetworkHosts(): Promise<NetworkHost[]> {
+  return LIVE ? backend.networkHosts() : Promise.resolve(DEMO_NETWORK_HOSTS);
 }

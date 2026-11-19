@@ -21,7 +21,7 @@ import { tauriBackend as backend } from '../backend/tauriBackend';
 import type { Transfer } from '../backend/types';
 import { menuDefs } from './menus';
 import { playDoneSound, playErrorSound } from '../util/sounds';
-import { quitApp } from '../util/appWindow';
+import { quitApp } from './appWindow';
 import { isConfigLoaded } from './live';
 import {
   getState,

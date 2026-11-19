@@ -31,7 +31,8 @@ import { navigate, setLeftServer, setRightLocal } from './tabs';
 import { chooseFolder } from '../backend/dialogs';
 import { relFolder } from '../util/paths';
 import { enqueue } from './transfers';
-import { DEMO_DRIVES } from './demoData';
+import { DEMO_CLOUD_PLACES, DEMO_DRIVES, DEMO_FREE_SPACE } from './demoData';
+import { tauriBackend as backend } from '../backend/tauriBackend';
 
 /** Places bar of a half: favourite folders of this computer, or of the server it shows. */
 export function placesFor(side: PaneSide, s: AppState = getState(), t: Tab | undefined = activeTab(s)): Place[] {
@@ -128,13 +129,7 @@ export function movePlace(side: PaneSide, path: string, before: string | null) {
  * from the settings, so "nothing found" is reported too.
  */
 export async function offerCloudPlaces(manual: boolean) {
-  const found: CloudPlace[] = LIVE
-    ? await live.cloudPlaces()
-    : [
-        { name: 'Google Drive', path: '~/Library/CloudStorage/GoogleDrive', service: 'gdrive' },
-        { name: 'OneDrive', path: '~/Library/CloudStorage/OneDrive-Personal', service: 'onedrive' },
-        { name: 'iCloud Drive', path: '~/Library/Mobile Documents/com~apple~CloudDocs', service: 'icloud' },
-      ];
+  const found = await findCloudPlaces();
   if (!manual) updateSettings({ cloudAsked: true });
   const known = new Set(placesForComputer().map((p) => p.path));
   const fresh = found.filter((c) => !known.has(c.path));
@@ -326,4 +321,14 @@ export function removeRecent(path: string) {
 export function clearRecent() {
   updateSettings({ recentDirs: [] });
   setState({ contextMenu: null });
+}
+
+/** Cloud storage folders of this computer (Google Drive, OneDrive, iCloud Drive ...). */
+export function findCloudPlaces(): Promise<CloudPlace[]> {
+  return LIVE ? live.cloudPlaces() : Promise.resolve(DEMO_CLOUD_PLACES);
+}
+
+/** Free space of the disk that holds a folder of this computer; null when unknown. */
+export function freeSpace(path: string): Promise<number | null> {
+  return LIVE ? backend.localFreeSpace(path) : Promise.resolve(DEMO_FREE_SPACE);
 }
