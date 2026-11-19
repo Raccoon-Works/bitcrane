@@ -3,17 +3,12 @@
  */
 import * as live from './live';
 import type { PaneSide } from '../backend/types';
-
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
-import { setState, activeTab, showToast, panePath, LIVE, getState } from './core';
-
+import { setState, activeTab, showToast, panePath, LIVE, getState, placeOf } from './core';
 import { openDialog } from './panels';
-
 import { transferNames } from './transfers';
-
 import { moveIntoFolder, selectedNames } from './fileOps';
-import { placeOf } from './core';
 
 /** ⌘C on files: remembers them; ⌘V elsewhere copies or transfers them. */
 export function copySelection(side: PaneSide) {

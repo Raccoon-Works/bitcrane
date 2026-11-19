@@ -4,10 +4,8 @@
  */
 import * as live from './live';
 import type { PaneSide, Tab } from '../backend/types';
-
 import { $t } from '../i18n';
 import { setState, showToast, LIVE, activeTab, paneLoc, getState, emptySelection } from './core';
-
 import { updateTab, setLeftServer } from './tabs';
 
 export function reconnect(serverId = activeTab()?.serverId) {

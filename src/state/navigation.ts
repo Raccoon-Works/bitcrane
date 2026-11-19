@@ -2,7 +2,6 @@
  * Going to a folder: the path field of a half, a folder of this computer, the other half.
  */
 import type { PaneSide } from '../backend/types';
-
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import {
@@ -15,12 +14,10 @@ import {
   paneShowsServers,
   isDirEntry,
   getState,
+  placeOf,
 } from './core';
-
 import { navigate } from './tabs';
-
 import { selectedNames } from './fileOps';
-import { placeOf } from './core';
 
 /** ⌘L: turns the path above a file list into an input field. */
 export function editPath(side: PaneSide) {

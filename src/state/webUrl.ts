@@ -4,7 +4,6 @@
  */
 import * as live from './live';
 import type { PaneSide } from '../backend/types';
-
 import * as paths from '../util/paths';
 import { $t } from '../i18n';
 import { setState, activeTab, paneLoc, showToast, panePath, LIVE, serverById } from './core';

@@ -4,7 +4,7 @@
  * second tab "Schnell verbinden" with a small form. A double click (or Enter)
  * connects the server right in this half.
  */
-import { ArrowLeft, Plus, SquareTerminal, X, Zap } from './glyphs';
+import { ArrowLeft, X } from './glyphs';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowsClockwise,
@@ -21,20 +21,18 @@ import {
 } from '@phosphor-icons/react';
 import { isCloudProtocol, type PaneSide, type Protocol, type Server } from '../backend/types';
 import { addCloudService } from '../state/cloud';
-import { tauriBackend as backend } from '../backend/tauriBackend';
+
 import {
   activeTab,
   addServerGroup,
   getState,
   importSshConfig,
   LIVE,
-  moveServer,
   renameServerGroup,
   serverGroupNames,
   openDialog,
   openServerIn,
   openSyncFavorite,
-  quickConnect,
   setLeftServer,
   setPaneServerList,
   setRightLocal,
@@ -43,78 +41,17 @@ import {
   useStore,
 } from '../state/store';
 import { formatAgo } from '../util/format';
-import { BMark } from './icons';
+
 import { scheduleLabel } from '../state/scheduler';
 import { CloudServicesIcon, CloudTile, LocalTile, ServerTile, type CloudService } from './ServerTile';
 import { ResizeHandle } from './ResizeHandle';
-import { Button, IconButton, Select, TextField, WithWordmark } from './ui';
+import { IconButton } from './ui';
 import { $t } from '../i18n';
-import { addressOf, hostOf, parseQuickAddress, QUICK_SCHEMES, schemeProtocol } from '../util/serverAddress';
+import { addressOf, hostOf } from '../util/serverAddress';
 import { isSftp } from '../util/protocols';
-
-/**
- * Reordering servers by dragging. Dropping on the upper half of a server puts
- * the dragged one before it, on the lower half after it; it joins that group.
- */
-function useServerDrag() {
-  const [drag, setDrag] = useState<{ id: string; target: string | null; after: boolean; group: string } | null>(null);
-  const moved = useRef(false);
-  const begin = (e: React.PointerEvent, id: string) => {
-    if (e.button !== 0) return;
-    const startY = e.clientY;
-    moved.current = false;
-    let current: { target: string | null; after: boolean; group: string } | null = null;
-    const move = (ev: PointerEvent) => {
-      if (!moved.current && Math.abs(ev.clientY - startY) < 5) return;
-      moved.current = true;
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>(
-        '[data-server-id], [data-server-group]',
-      );
-      if (!el) {
-        current = null;
-        setDrag({ id, target: null, after: false, group: '\u0000' });
-        return;
-      }
-      if (el.dataset.serverId) {
-        const r = el.getBoundingClientRect();
-        current = {
-          target: el.dataset.serverId,
-          after: ev.clientY > r.top + r.height / 2,
-          group: el.dataset.group ?? '',
-        };
-      } else current = { target: null, after: true, group: el.dataset.serverGroup ?? '' };
-      setDrag({ id, ...current });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      document.body.classList.remove('is-dragging-server');
-      const c = current;
-      if (moved.current && c) {
-        const servers = getState().servers.filter(
-          (x) => !x.temporary && x.group.trim() === c.group.trim() && x.id !== id,
-        );
-        let before: string | null = c.target;
-        if (c.target && c.after) {
-          const i = servers.findIndex((x) => x.id === c.target);
-          before = servers[i + 1]?.id ?? null;
-        }
-        moveServer(id, before, c.group);
-      }
-      setDrag(null);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    document.body.classList.add('is-dragging-server');
-  };
-  /** True right after a drag, so the click that ends it does not select. */
-  const wasDrag = () => {
-    const m = moved.current;
-    moved.current = false;
-    return m;
-  };
-  return { drag, begin, wasDrag };
-}
+import { QuickForm } from './QuickForm';
+import { Welcome } from './ServerListWelcome';
+import { useServerDrag } from './useServerDrag';
 
 export function ServerList({ side }: { side: PaneSide }) {
   const [tab, setTab] = useState<'servers' | 'quick'>('servers');
@@ -546,193 +483,4 @@ function ServerFoot() {
       </IconButton>
     </div>
   );
-}
-
-/** No servers yet: the first steps (the old welcome screen, now inside the half). */
-function Welcome({ onQuick }: { onQuick: () => void }) {
-  const [found, setFound] = useState(LIVE ? 0 : 3);
-  useEffect(() => {
-    if (LIVE) void backend.importFind().then((r) => setFound(r.servers.length));
-  }, []);
-  return (
-    <div className="server-welcome">
-      <BMark variant="brand" size={72} />
-      <h2 className="headline">
-        <WithWordmark text={$t('Willkommen bei {0}', '\u0000')} />
-      </h2>
-      <p className="muted center">
-        {$t('Verbinde dich mit einem Server. Danach kannst du einen Ordner überwachen lassen.')}
-      </p>
-      <div className="server-welcome-actions">
-        <Button variant="primary" onClick={() => openDialog({ type: 'serverEdit' })}>
-          <Plus size={14} strokeWidth={2} aria-hidden="true" />
-          {$t('Server hinzufügen')}
-        </Button>
-        <Button onClick={onQuick}>
-          <Zap size={14} strokeWidth={1.75} aria-hidden="true" />
-          {$t('Schnell verbinden')}
-        </Button>
-        {/* The number of servers found elsewhere is a small badge, so the label stays short. */}
-        <Button
-          onClick={importSshConfig}
-          title={
-            found > 0
-              ? found === 1
-                ? $t('1 Server aus anderen Programmen übernehmen')
-                : $t('{0} Server aus anderen Programmen übernehmen', found)
-              : undefined
-          }
-        >
-          <SquareTerminal size={14} strokeWidth={1.75} aria-hidden="true" />
-          {$t('Aus anderen Programmen')}
-          {found > 0 && (
-            <span
-              className="count-badge"
-              aria-label={found === 1 ? $t('1 Server gefunden') : $t('{0} Server gefunden', found)}
-            >
-              {found}
-            </span>
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-type QuickProtocol = (typeof QUICK_SCHEMES)[number];
-
-/**
- * "Schnell verbinden" (Transmit's Quick Connect): protocol, address, user,
- * password and start folder. For SFTP an empty password means SSH agent or key.
- */
-function QuickForm({ side }: { side: PaneSide }) {
-  const [protocol, setProtocol] = useState<QuickProtocol>('sftp');
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('');
-  const [user, setUser] = useState('');
-  const [password, setPassword] = useState('');
-  const platform = useStore((s) => s.platform);
-  const [path, setPath] = useState('');
-  const recent = useStore((s) => s.settings.recentAddresses);
-  const address = () => {
-    const h = host.trim();
-    if (!h) return '';
-    const p = port.trim() && Number(port) !== schemeProtocol(protocol).defaultPort ? `:${port.trim()}` : '';
-    const dir = path.trim() ? (path.trim().startsWith('/') ? path.trim() : `/${path.trim()}`) : '';
-    return `${protocol}://${user.trim() ? `${user.trim()}@` : ''}${h}${p}${dir}`;
-  };
-  const go = (save: boolean, terminal = false) => {
-    const a = address();
-    if (!a) return;
-    quickConnect(a, save, 'auto', side, password || undefined, terminal ? 'terminal' : undefined);
-  };
-  // A recent address fills the form again (read like any typed address: the last "@" ends the user).
-  const fill = (a: string) => {
-    const q = parseQuickAddress(a);
-    if (!q) return;
-    setProtocol((QUICK_SCHEMES as readonly string[]).includes(q.scheme) ? (q.scheme as QuickProtocol) : 'sftp');
-    setUser(q.user ?? '');
-    setHost(q.host.includes(':') ? `[${q.host}]` : q.host);
-    setPort(q.port ? String(q.port) : '');
-    setPath(q.path ?? '');
-  };
-  return (
-    <form
-      className="quick-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        go(false);
-      }}
-    >
-      <span className="quick-icon">
-        <Lightning size={34} weight="fill" />
-      </span>
-      <h2 className="headline">{$t('Verbinden über {0}', protocolLabel(protocol))}</h2>
-      <div className="quick-grid">
-        <label htmlFor="q-proto">{$t('Protokoll#protocol')}</label>
-        <Select
-          id="q-proto"
-          value={protocol}
-          onChange={(v) => setProtocol(v as QuickProtocol)}
-          label={$t('Protokoll#protocol')}
-          options={QUICK_SCHEMES.map((p) => ({ value: p, label: protocolLabel(p) }))}
-        />
-        <label htmlFor="q-host">{$t('Adresse')}</label>
-        <span className="quick-host">
-          <TextField id="q-host" value={host} onChange={setHost} placeholder="server.example" mono autoFocus />
-          <TextField
-            value={port}
-            onChange={(v) => setPort(v.replace(/\D/g, ''))}
-            placeholder={String(schemeProtocol(protocol).defaultPort)}
-            mono
-            className="quick-port"
-            label={$t('Port')}
-          />
-        </span>
-        <label htmlFor="q-user">{$t('Benutzer')}</label>
-        <TextField id="q-user" value={user} onChange={setUser} placeholder={protocol === 'sftp' ? 'ubuntu' : ''} mono />
-        <label htmlFor="q-pass">{$t('Passwort')}</label>
-        <TextField
-          id="q-pass"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          placeholder={protocol === 'sftp' ? $t('Leer: SSH-Schlüssel oder Agent') : ''}
-        />
-        <label htmlFor="q-path">{$t('Startordner')}</label>
-        <TextField
-          id="q-path"
-          value={path}
-          onChange={setPath}
-          placeholder={protocol === 'smb' ? '/daten/ordner' : '/var/www'}
-          mono
-        />
-      </div>
-      <p className="small muted quick-note">
-        {platform === 'mac'
-          ? $t(
-              'Das Passwort gilt nur für diese Verbindung. Mit „Zu Servern hinzufügen“ wird es im Schlüsselbund gesichert.',
-            )
-          : $t(
-              'Das Passwort gilt nur für diese Verbindung. Mit „Zu Servern hinzufügen“ wird es in der Windows-Anmeldeinformationsverwaltung gesichert.',
-            )}
-      </p>
-      <div className="quick-buttons">
-        <Button onClick={() => go(true)} disabled={!host.trim()}>
-          {$t('Zu Servern hinzufügen')}
-        </Button>
-        {/* SSH only: straight into a terminal tab, without the file view. */}
-        {protocol === 'sftp' && (
-          <Button onClick={() => go(false, true)} disabled={!host.trim()}>
-            {$t('Terminal')}
-          </Button>
-        )}
-        <Button variant="primary" type="submit" className="btn-go" disabled={!host.trim()}>
-          {$t('Verbinden')}
-        </Button>
-      </div>
-      {recent.length > 0 && (
-        <div className="quick-recent">
-          <span className="caption-strong">{$t('Zuletzt eingegeben')}</span>
-          {recent.slice(0, 5).map((a) => (
-            <button key={a} type="button" className="link small mono" onClick={() => fill(a)}>
-              {a}
-            </button>
-          ))}
-        </div>
-      )}
-    </form>
-  );
-}
-
-function protocolLabel(p: QuickProtocol): string {
-  return {
-    sftp: 'SFTP / SSH',
-    ftp: 'FTP',
-    ftpes: $t('FTPS (explizit)'),
-    ftps: $t('FTPS (implizit)'),
-    davs: 'WebDAV (HTTPS)',
-    dav: 'WebDAV (HTTP)',
-    smb: $t('SMB (Windows-Freigabe, NAS)'),
-  }[p];
 }
