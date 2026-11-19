@@ -5,8 +5,8 @@
  * that kind opens), line numbers, folding, matching brackets, several cursors
  * (⌥-click, ⌘D for the next match), search and replace with regular
  * expressions, go to line, word completion, comment toggling, line moving,
- * automatic indentation detection, and the file's own line endings and byte
- * order mark kept on saving. Each document keeps its own undo history and
+ * automatic indentation detection, and the file's own line endings (also
+ * mixed ones), encoding (UTF-8 or Latin-1) and byte order mark kept on saving. Each document keeps its own undo history and
  * cursor while switching between them.
  *
  * Deliberately left out (they would make Bitcrane noticeably larger or slower
@@ -301,10 +301,14 @@ export function CodeEditor() {
         }
       }),
     ];
+    // A file with mixed line endings keeps its "\r" characters in the lines (shown as special
+    // characters), so saving writes every line back with its own ending.
+    const mixed = ed.docs.find((d) => d.id === id)?.eol === 'mixed';
+    if (mixed) extensions.push(EditorState.lineSeparator.of('\n'));
     const state = EditorState.create({ doc: text, extensions });
     // The reference for "unsaved changes" is the text as read or last saved, not edits kept from before.
     const ref = ed.docs.find((d) => d.id === id)?.initial;
-    saved.current.set(id, ref !== undefined && ref !== text ? Text.of(ref.split(/\r?\n/)) : state.doc);
+    saved.current.set(id, ref !== undefined && ref !== text ? Text.of(ref.split(mixed ? '\n' : /\r?\n/)) : state.doc);
     setIndentText(unit === '\t' ? $t('Tabs') : $t('{0} Leerzeichen', unit.length));
     return state;
   };
@@ -601,9 +605,9 @@ export function CodeEditor() {
               title={$t('Zeilenende umschalten')}
               onClick={() => setEol(doc.id, doc.eol === '\n' ? '\r\n' : '\n')}
             >
-              {doc.eol === '\n' ? 'LF' : 'CRLF'}
+              {doc.eol === 'mixed' ? $t('LF/CRLF gemischt') : doc.eol === '\n' ? 'LF' : 'CRLF'}
             </button>
-            <span>{doc.bom ? 'UTF-8 BOM' : 'UTF-8'}</span>
+            <span>{doc.encoding === 'latin1' ? 'Latin-1' : doc.bom ? 'UTF-8 BOM' : 'UTF-8'}</span>
           </>
         ) : (
           <span className="flex-1" />

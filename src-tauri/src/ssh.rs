@@ -1172,15 +1172,20 @@ impl Connection {
             let name = crate::local::copy_name(|n| taken.contains(n), &remote_name(from), words);
             let to = remote_join(dest_dir, &name);
             let quoted = |p: &str| format!("'{}'", p.replace('\'', "'\\''"));
-            let via_cp = match self.exec(&format!("cp -Rp -- {} {}", quoted(from), quoted(&to))).await {
-                Ok((0, _)) => true,
-                // A real cp error (no space, no permission); other failures mean commands are not allowed.
-                Ok((_, output)) if output.trim_start().starts_with("cp:") => {
-                    return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.")
-                        .with_detail(output.trim().to_string()));
-                }
-                _ => false,
-            };
+            let via_cp =
+                match run_command(&self.handle, &format!("cp -Rp -- {} {}", quoted(from), quoted(&to)), EXEC_LIMIT)
+                    .await
+                {
+                    Ok(o) if o.code == 0 => true,
+                    // A real cp error (no space, no permission); another exit code means no cp there.
+                    Ok(o) if String::from_utf8_lossy(&o.all).trim_start().starts_with("cp:") => {
+                        return Err(AppError::other("Kopieren auf dem Server fehlgeschlagen.")
+                            .with_detail(String::from_utf8_lossy(&o.all).trim().to_string()));
+                    }
+                    Ok(_) | Err(ExecFailure::Refused(_)) => false,
+                    // cp may still be copying: copying again through this connection would make a second copy.
+                    Err(ExecFailure::Unfinished(e)) => return Err(e),
+                };
             if !via_cp {
                 Box::pin(self.copy_stream(from, &to)).await?;
             }
@@ -1232,26 +1237,80 @@ impl Connection {
 
     /// Runs a command on the server and returns exit code and combined output.
     pub async fn exec(&self, command: &str) -> AppResult<(u32, String)> {
-        let mut channel = self.handle.channel_open_session().await?;
-        channel.exec(true, command).await?;
-        let mut output = Vec::new();
-        let mut code = 0u32;
-        let read = async {
-            while let Some(msg) = channel.wait().await {
-                match msg {
-                    russh::ChannelMsg::Data { data } => output.extend_from_slice(&data),
-                    russh::ChannelMsg::ExtendedData { data, .. } => output.extend_from_slice(&data),
-                    russh::ChannelMsg::ExitStatus { exit_status } => code = exit_status,
-                    // Ended by a signal (killed): no exit code, but certainly not success.
-                    russh::ChannelMsg::ExitSignal { .. } => code = 128,
-                    _ => {}
-                }
-            }
-        };
-        if tokio::time::timeout(Duration::from_secs(120), read).await.is_err() {
-            return Err(AppError::other("Der Befehl läuft länger als 2 Minuten und wurde abgebrochen."));
+        let o = run_command(&self.handle, command, EXEC_LIMIT).await?;
+        Ok((o.code, String::from_utf8_lossy(&o.all).into_owned()))
+    }
+}
+
+/// How long a command started by Bitcrane (own commands, `cp` on the server) may take.
+const EXEC_LIMIT: Duration = Duration::from_secs(120);
+
+/// What a command on the server printed, and its exit code.
+pub(crate) struct ExecOutput {
+    pub code: u32,
+    pub out: Vec<u8>,
+    pub err: Vec<u8>,
+    /// Output and error output as they came.
+    pub all: Vec<u8>,
+}
+
+/// Why a command gave no result: the server refused to start it (commands not allowed), or it
+/// started and did not finish (the connection ended, or it ran too long and may still be running,
+/// as a command without a terminal is not stopped when Bitcrane stops waiting).
+pub(crate) enum ExecFailure {
+    Refused(AppError),
+    Unfinished(AppError),
+}
+
+impl From<ExecFailure> for AppError {
+    fn from(f: ExecFailure) -> Self {
+        match f {
+            ExecFailure::Refused(e) | ExecFailure::Unfinished(e) => e,
         }
-        Ok((code, String::from_utf8_lossy(&output).into_owned()))
+    }
+}
+
+/// Runs `command` in a new session channel and waits up to `limit` for its exit code.
+pub(crate) async fn run_command(
+    handle: &client::Handle<Handler>,
+    command: &str,
+    limit: Duration,
+) -> Result<ExecOutput, ExecFailure> {
+    let refused = |e: russh::Error| ExecFailure::Refused(e.into());
+    let mut channel = handle.channel_open_session().await.map_err(refused)?;
+    channel.exec(true, command).await.map_err(refused)?;
+    let (mut out, mut err, mut all) = (Vec::new(), Vec::new(), Vec::new());
+    let mut code = None;
+    let read = async {
+        while let Some(msg) = channel.wait().await {
+            match msg {
+                russh::ChannelMsg::Data { data } => {
+                    out.extend_from_slice(&data);
+                    all.extend_from_slice(&data);
+                }
+                russh::ChannelMsg::ExtendedData { data, .. } => {
+                    err.extend_from_slice(&data);
+                    all.extend_from_slice(&data);
+                }
+                russh::ChannelMsg::ExitStatus { exit_status } => code = Some(exit_status),
+                // Ended by a signal (killed): no exit code, but certainly not success.
+                russh::ChannelMsg::ExitSignal { .. } => code = Some(128),
+                _ => {}
+            }
+        }
+    };
+    if tokio::time::timeout(limit, read).await.is_err() {
+        return Err(ExecFailure::Unfinished(
+            AppError::other("Der Befehl lief nach {0} Minuten noch; Bitcrane wartet nicht länger auf ihn.")
+                .param((limit.as_secs() / 60).to_string()),
+        ));
+    }
+    match code {
+        Some(code) => Ok(ExecOutput { code, out, err, all }),
+        None => Err(ExecFailure::Unfinished(AppError::new(
+            ErrorKind::ConnectionLost,
+            "Die Verbindung endete, bevor der Befehl fertig war.",
+        ))),
     }
 }
 
@@ -1262,8 +1321,7 @@ impl Connection {
 mod integration {
     use super::*;
     use crate::error::ErrorKind;
-    use crate::transfer::{TransferOptions, PAUSE, RUN};
-    use std::sync::atomic::AtomicU8;
+    use crate::transfer::{TransferOptions, PAUSE};
 
     struct Env {
         host: String,
@@ -1412,7 +1470,7 @@ mod integration {
             &format!("{base}/a/bot.py"),
             &TransferOptions::default(),
             &progress,
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -1437,7 +1495,7 @@ mod integration {
             &back,
             &TransferOptions::default(),
             &|_, _| {},
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -1453,12 +1511,12 @@ mod integration {
         std::fs::write(&big, &data).unwrap();
         let big_ui = big.to_string_lossy().replace('\\', "/");
         let target = format!("{base}/big.bin");
-        let flag = Arc::new(AtomicU8::new(RUN));
+        let flag = crate::transfer::Control::new();
         let slow = TransferOptions { limit_kbps: 2048, ..Default::default() };
         let f2 = flag.clone();
         let stopper = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            f2.store(PAUSE, std::sync::atomic::Ordering::Relaxed);
+            f2.stop(PAUSE);
         });
         let paused = crate::transfer::upload(&conn, &big_ui, &target, &slow, &|_, _| {}, flag).await;
         stopper.await.unwrap();
@@ -1475,7 +1533,7 @@ mod integration {
             &target,
             &TransferOptions::default(),
             &resumed,
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -1487,7 +1545,7 @@ mod integration {
             &back_big.to_string_lossy().replace('\\', "/"),
             &TransferOptions::default(),
             &|_, _| {},
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -1503,7 +1561,7 @@ mod integration {
                 &format!("{base}/v.py"),
                 &keep,
                 &|_, _| {},
-                Arc::new(AtomicU8::new(RUN)),
+                crate::transfer::Control::new(),
             )
             .await
             .unwrap();
@@ -1568,7 +1626,7 @@ mod integration {
             &format!("{}/rootdir/x.py", conn.home()),
             &TransferOptions::default(),
             &|_, _| {},
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await;
         assert_eq!(denied.err().map(|e| e.kind), Some(ErrorKind::PermissionDenied));

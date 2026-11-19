@@ -232,12 +232,18 @@ export interface NetworkHost {
   host: string;
 }
 
-/** A file opened in the built-in editor; `eol` and `bom` are kept when it is saved. */
+/** Line ending of an editor document; "mixed" keeps every "\r" in the text and saves it as edited. */
+export type EditorEol = '\n' | '\r\n' | 'mixed';
+/** Encoding of an editor document: UTF-8, or Latin-1 for a file that is not valid UTF-8. */
+export type EditorEncoding = 'utf8' | 'latin1';
+
+/** A file opened in the built-in editor; `eol`, `bom` and `encoding` are kept when it is saved. */
 export interface EditorFile {
   text: string;
   mtime: number;
-  eol: string;
+  eol: EditorEol;
   bom: boolean;
+  encoding: EditorEncoding;
 }
 
 /** The part of a tunnel the backend needs to run it. */
@@ -294,7 +300,14 @@ export interface Backend {
   /** Modification time in ms; `serverId` null for a file of this computer. */
   editorMtime(serverId: string | null, path: string): Promise<number>;
   /** Saves the text with the given line ending; returns the new modification time. */
-  editorWrite(serverId: string | null, path: string, text: string, eol: string, bom: boolean): Promise<number>;
+  editorWrite(
+    serverId: string | null,
+    path: string,
+    text: string,
+    eol: EditorEol,
+    bom: boolean,
+    encoding: EditorEncoding,
+  ): Promise<number>;
 
   termShells(): Promise<LocalShell[]>;
   termOpen(params: TermOpenParams): Promise<void>;

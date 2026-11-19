@@ -28,9 +28,8 @@ use crate::remote::Remote;
 use crate::secrets::Keychain;
 use crate::serverconfig::{Config, Server};
 use crate::ssh::KnownHosts;
-use crate::transfer::{TransferOptions, RUN};
+use crate::transfer::TransferOptions;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
 
 const COMMANDS: [&str; 6] = ["servers", "ls", "upload", "download", "help", "--help"];
@@ -269,8 +268,15 @@ async fn upload(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
         let ui = to_ui(&abs);
         for item in crate::local::walk(&ui)? {
             let target = remote_join(&dest, &item.relative);
-            match crate::transfer::upload(&conn, &item.path, &target, &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN)))
-                .await
+            match crate::transfer::upload(
+                &conn,
+                &item.path,
+                &target,
+                &opts,
+                &|_, _| {},
+                crate::transfer::Control::new(),
+            )
+            .await
             {
                 Ok(n) => {
                     if !ctx.quiet {
@@ -325,7 +331,7 @@ async fn download(ctx: &Ctx, mut args: Vec<String>) -> AppResult<()> {
                 &target,
                 &options(ctx),
                 &|_, _| {},
-                Arc::new(AtomicU8::new(RUN)),
+                crate::transfer::Control::new(),
             )
             .await
             {

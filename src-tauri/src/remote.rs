@@ -877,8 +877,7 @@ impl AsyncWrite for RemoteWriter {
 #[cfg(test)]
 pub(crate) mod integration {
     use super::*;
-    use crate::transfer::{TransferOptions, PAUSE, RUN};
-    use std::sync::atomic::AtomicU8;
+    use crate::transfer::{TransferOptions, PAUSE};
 
     pub(crate) async fn check(conn: Remote, home: String) {
         let dir = tempfile::tempdir().unwrap();
@@ -890,11 +889,11 @@ pub(crate) mod integration {
         let target = format!("{base}/sub/big.bin");
 
         // Paused upload, then continued (where the protocol can append).
-        let flag = Arc::new(AtomicU8::new(RUN));
+        let flag = crate::transfer::Control::new();
         let f2 = flag.clone();
         let stopper = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-            f2.store(PAUSE, std::sync::atomic::Ordering::Relaxed);
+            f2.stop(PAUSE);
         });
         let slow = TransferOptions { limit_kbps: 1024, ..Default::default() };
         let paused = crate::transfer::upload(&conn, &local_ui, &target, &slow, &|_, _| {}, flag).await;
@@ -910,7 +909,7 @@ pub(crate) mod integration {
             &target,
             &TransferOptions::default(),
             &seen,
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -928,7 +927,7 @@ pub(crate) mod integration {
             &back.to_string_lossy().replace('\\', "/"),
             &TransferOptions::default(),
             &|_, _| {},
-            Arc::new(AtomicU8::new(RUN)),
+            crate::transfer::Control::new(),
         )
         .await
         .unwrap();
@@ -1094,7 +1093,7 @@ pub(crate) mod integration {
         let tag = uuid::Uuid::new_v4().simple().to_string();
         let on_ftp = remote_join(&ftp_home, &format!("bitcrane-x-{tag}.bin"));
         let on_dav = format!("/bitcrane-x-{tag}/copy.bin");
-        let run = || Arc::new(AtomicU8::new(RUN));
+        let run = || crate::transfer::Control::new();
         crate::transfer::upload(
             &ftp,
             &local.to_string_lossy(),

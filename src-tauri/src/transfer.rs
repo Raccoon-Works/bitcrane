@@ -11,10 +11,12 @@ use crate::error::{AppError, AppResult, ErrorKind};
 use crate::paths::{remote_join, remote_name, remote_parent, to_native};
 use crate::remote::Remote;
 use serde::Deserialize;
+use std::future::Future;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::sync::Notify;
 
 const CHUNK: usize = 256 * 1024;
 const REPORT_EVERY: Duration = Duration::from_millis(120);
@@ -24,7 +26,7 @@ pub const VERSIONS_DIR: &str = ".bitcrane-versions";
 /// Progress callback: (bytes done, total bytes).
 pub type Progress<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
 
-/// Control flag of a running transfer.
+/// State of a running transfer ([`Control`]).
 pub const RUN: u8 = 0;
 /// Stop and keep the partial file (pause, or app quits).
 pub const PAUSE: u8 = 1;
@@ -65,11 +67,67 @@ impl Default for TransferOptions {
     }
 }
 
-fn stopped(flag: &AtomicU8) -> Option<AppError> {
-    match flag.load(Ordering::Relaxed) {
-        RUN => None,
-        _ => Some(AppError::new(ErrorKind::Cancelled, "Abgebrochen.")),
+/// Longest wait for one block from or to the other side; after that the transfer counts as broken
+/// (an FTP data connection, for one, has no timeout of its own).
+const IDLE: Duration = Duration::from_secs(120);
+
+/// Pause and remove of one transfer: [`RUN`], [`PAUSE`] or [`DISCARD`], and a wake-up for the
+/// transfer, so a stop takes effect at once and not only after the block being read or written.
+pub struct Control {
+    state: AtomicU8,
+    changed: Notify,
+}
+
+impl Control {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self { state: AtomicU8::new(RUN), changed: Notify::new() })
     }
+
+    /// Stops the transfer: [`PAUSE`] keeps its partial file, [`DISCARD`] deletes it.
+    pub fn stop(&self, how: u8) {
+        self.state.store(how, Ordering::Relaxed);
+        self.changed.notify_waiters();
+    }
+
+    pub fn state(&self) -> u8 {
+        self.state.load(Ordering::Relaxed)
+    }
+
+    /// Resolves once the transfer is stopped.
+    async fn stopped(&self) {
+        let changed = self.changed.notified();
+        tokio::pin!(changed);
+        // Registered before the check, so a stop between the check and the wait is not missed.
+        changed.as_mut().enable();
+        if self.state() == RUN {
+            changed.await;
+        }
+    }
+}
+
+fn cancelled() -> AppError {
+    AppError::new(ErrorKind::Cancelled, "Abgebrochen.")
+}
+
+/// Runs `work` unless the transfer is stopped first.
+pub(crate) async fn until_stopped<T>(control: &Control, work: impl Future<Output = AppResult<T>>) -> AppResult<T> {
+    tokio::select! {
+        biased;
+        () = control.stopped() => Err(cancelled()),
+        r = work => r,
+    }
+}
+
+/// One block read or written: ends at once when the transfer is stopped, and with an error when the
+/// other side stays silent for [`IDLE`].
+async fn block<T>(control: &Control, work: impl Future<Output = AppResult<T>>) -> AppResult<T> {
+    until_stopped(control, async {
+        tokio::time::timeout(IDLE, work).await.unwrap_or_else(|_| {
+            Err(AppError::new(ErrorKind::ConnectionLost, "Der Server antwortet nicht mehr.")
+                .with_detail(format!("{} s ohne Daten", IDLE.as_secs())))
+        })
+    })
+    .await
 }
 
 /// Name of the partial file of an upload.
@@ -174,7 +232,7 @@ pub async fn upload(
     remote_path: &str,
     opts: &TransferOptions,
     progress: Progress<'_>,
-    flag: Arc<AtomicU8>,
+    control: Arc<Control>,
 ) -> AppResult<u64> {
     let native = to_native(local_path);
     let meta = tokio::fs::metadata(&native).await?;
@@ -222,16 +280,17 @@ pub async fn upload(
     progress(done, total);
     let result: AppResult<()> = async {
         loop {
-            if let Some(e) = stopped(&flag) {
-                return Err(e);
-            }
-            let n = src.read(&mut buf).await?;
+            let n = block(&control, async { Ok(src.read(&mut buf).await?) }).await?;
             if n == 0 {
                 break;
             }
-            dst.write_all(&buf[..n]).await.map_err(write_err)?;
+            block(&control, async { dst.write_all(&buf[..n]).await.map_err(write_err) }).await?;
             done += n as u64;
-            throttle.add(n).await;
+            until_stopped(&control, async {
+                throttle.add(n).await;
+                Ok(())
+            })
+            .await?;
             if last.elapsed() >= REPORT_EVERY {
                 progress(done, total);
                 last = Instant::now();
@@ -251,7 +310,7 @@ pub async fn upload(
     if let Err(e) = result {
         // Keep the partial file for resuming unless the user threw the transfer away.
         // Without a temp name the target is the real file: it is never deleted.
-        if use_temp && (flag.load(Ordering::Relaxed) == DISCARD || !conn.can_append(remote_path)) {
+        if use_temp && (control.state() == DISCARD || !conn.can_append(remote_path)) {
             let _ = conn.remove_file(&target).await;
         }
         return Err(e);
@@ -276,7 +335,7 @@ pub async fn download(
     local_path: &str,
     opts: &TransferOptions,
     progress: Progress<'_>,
-    flag: Arc<AtomicU8>,
+    control: Arc<Control>,
 ) -> AppResult<u64> {
     let meta = conn.meta(remote_path).await.ok_or_else(|| {
         AppError::new(ErrorKind::NotFound, "„{0}“ gibt es auf dem Server nicht.").param(remote_name(remote_path))
@@ -317,16 +376,17 @@ pub async fn download(
     progress(done, total);
     let result: AppResult<()> = async {
         loop {
-            if let Some(e) = stopped(&flag) {
-                return Err(e);
-            }
-            let n = src.read(&mut buf).await.map_err(read_err)?;
+            let n = block(&control, async { src.read(&mut buf).await.map_err(read_err) }).await?;
             if n == 0 {
                 break;
             }
-            dst.write_all(&buf[..n]).await?;
+            block(&control, async { Ok(dst.write_all(&buf[..n]).await?) }).await?;
             done += n as u64;
-            throttle.add(n).await;
+            until_stopped(&control, async {
+                throttle.add(n).await;
+                Ok(())
+            })
+            .await?;
             if last.elapsed() >= REPORT_EVERY {
                 progress(done, total);
                 last = Instant::now();
@@ -348,7 +408,7 @@ pub async fn download(
         }
     });
     if let Err(e) = result {
-        if flag.load(Ordering::Relaxed) == DISCARD {
+        if control.state() == DISCARD {
             let _ = tokio::fs::remove_file(&tmp).await;
         }
         return Err(e);
@@ -375,7 +435,7 @@ pub async fn cross(
     dst_path: &str,
     opts: &TransferOptions,
     progress: Progress<'_>,
-    flag: Arc<AtomicU8>,
+    control: Arc<Control>,
 ) -> AppResult<u64> {
     let meta = src.meta(src_path).await.ok_or_else(|| {
         AppError::new(ErrorKind::NotFound, "„{0}“ gibt es auf dem Quell-Server nicht.").param(remote_name(src_path))
@@ -407,16 +467,17 @@ pub async fn cross(
     progress(0, total);
     let copied: AppResult<()> = async {
         loop {
-            if let Some(e) = stopped(&flag) {
-                return Err(e);
-            }
-            let n = reader.read(&mut buf).await.map_err(read_err)?;
+            let n = block(&control, async { reader.read(&mut buf).await.map_err(read_err) }).await?;
             if n == 0 {
                 break;
             }
-            writer.write_all(&buf[..n]).await.map_err(write_err)?;
+            block(&control, async { writer.write_all(&buf[..n]).await.map_err(write_err) }).await?;
             done += n as u64;
-            throttle.add(n).await;
+            until_stopped(&control, async {
+                throttle.add(n).await;
+                Ok(())
+            })
+            .await?;
             if last.elapsed() >= REPORT_EVERY {
                 progress(done, total);
                 last = Instant::now();
@@ -477,5 +538,37 @@ mod version_tests {
         assert!(!is_version_of(".env.example.2026-10-27_18-51-02", ".env"));
         assert!(!is_version_of(".env.2026-10-27", ".env"));
         assert!(!is_version_of("bot.py", ".env"));
+    }
+}
+
+#[cfg(test)]
+mod control_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_stop_ends_a_long_wait_at_once() {
+        let control = Control::new();
+        let c2 = control.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            c2.stop(PAUSE);
+        });
+        let t = Instant::now();
+        let r = until_stopped(&control, async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            Ok(())
+        })
+        .await;
+        assert_eq!(r.err().map(|e| e.kind), Some(ErrorKind::Cancelled));
+        assert!(t.elapsed() < Duration::from_secs(5));
+        assert_eq!(control.state(), PAUSE);
+    }
+
+    #[tokio::test]
+    async fn a_stop_before_the_start_counts() {
+        let control = Control::new();
+        control.stop(DISCARD);
+        let r = until_stopped(&control, async { Ok(1) }).await;
+        assert_eq!(r.err().map(|e| e.kind), Some(ErrorKind::Cancelled));
     }
 }

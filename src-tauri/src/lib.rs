@@ -70,7 +70,7 @@ use error::{AppError, AppResult, ErrorKind};
 use ssh::KnownHosts;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 #[cfg(any(target_os = "macos", windows))]
 use tauri::Emitter;
@@ -98,7 +98,7 @@ pub struct AppState {
     mounts: mount_win::Mounts,
     known_hosts: Arc<KnownHosts>,
     watches: watcher::Watches,
-    cancels: Mutex<HashMap<String, Arc<AtomicU8>>>,
+    cancels: Mutex<HashMap<String, Arc<transfer::Control>>>,
     /// Open questions of servers during login, waiting for the user's answers.
     prompts: PendingPrompts,
     config_dir: PathBuf,

@@ -11,9 +11,9 @@ use crate::error::ErrorKind;
 use crate::paths::remote_join;
 use crate::remote::Remote;
 use crate::ssh::{AuthParams, ConnectParams, KnownHosts};
-use crate::transfer::{TransferOptions, PAUSE, RUN};
+use crate::transfer::{TransferOptions, PAUSE};
 use std::io::{Seek, SeekFrom, Write};
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -61,7 +61,7 @@ async fn many_files(conn: &Remote, base: &str, count: usize) {
         let failed = &failed;
         async move {
             if let Err(e) =
-                crate::transfer::upload(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await
+                crate::transfer::upload(conn, &src, &dst, opts, &|_, _| {}, crate::transfer::Control::new()).await
             {
                 eprintln!("upload {dst}: {e:?}");
                 failed.fetch_add(1, Ordering::Relaxed);
@@ -90,7 +90,7 @@ async fn many_files(conn: &Remote, base: &str, count: usize) {
         let failed = &failed;
         async move {
             if let Err(e) =
-                crate::transfer::download(conn, &src, &dst, opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN))).await
+                crate::transfer::download(conn, &src, &dst, opts, &|_, _| {}, crate::transfer::Control::new()).await
             {
                 eprintln!("download {src}: {e:?}");
                 failed.fetch_add(1, Ordering::Relaxed);
@@ -146,7 +146,7 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
     let opts = TransferOptions::default();
 
     // Pause at about a third, then continue.
-    let flag = Arc::new(AtomicU8::new(RUN));
+    let flag = crate::transfer::Control::new();
     let f2 = flag.clone();
     let t = Instant::now();
     let pause_at = size / 3;
@@ -157,7 +157,7 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
         &opts,
         &move |d, _| {
             if d >= pause_at {
-                f2.store(PAUSE, Ordering::Relaxed)
+                f2.stop(PAUSE)
             }
         },
         flag,
@@ -173,7 +173,7 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
         &|d, _| {
             let _ = first.compare_exchange(u64::MAX, d, Ordering::Relaxed, Ordering::Relaxed);
         },
-        Arc::new(AtomicU8::new(RUN)),
+        crate::transfer::Control::new(),
     )
     .await
     .unwrap();
@@ -190,7 +190,7 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
 
     // Download, also paused once (downloads continue where the partial file ends).
     let back = dir.path().join("zurueck.bin");
-    let flag = Arc::new(AtomicU8::new(RUN));
+    let flag = crate::transfer::Control::new();
     let f2 = flag.clone();
     let t = Instant::now();
     let pause_at = size / 2;
@@ -201,14 +201,14 @@ async fn big_transfer(conn: &Remote, base: &str, gb: u64) {
         &opts,
         &move |d, _| {
             if d >= pause_at {
-                f2.store(PAUSE, Ordering::Relaxed)
+                f2.stop(PAUSE)
             }
         },
         flag,
     )
     .await;
     assert_eq!(paused.err().map(|e| e.kind), Some(ErrorKind::Cancelled), "{}: download paused", conn.protocol());
-    crate::transfer::download(conn, &target, &ui(&back), &opts, &|_, _| {}, Arc::new(AtomicU8::new(RUN)))
+    crate::transfer::download(conn, &target, &ui(&back), &opts, &|_, _| {}, crate::transfer::Control::new())
         .await
         .unwrap();
     let down = t.elapsed();

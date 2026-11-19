@@ -4,9 +4,30 @@ use crate::error::{AppError, AppResult, ErrorKind};
 use crate::{paths, transfer, AppState, LockExt};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use tauri::{Emitter, State};
+
+/// A running transfer's control, findable by `transfer_cancel` under the transfer's id from the very
+/// start (also while the connection is still being waited for), and removed when the transfer ends.
+struct Registered<'a> {
+    state: &'a AppState,
+    id: String,
+    control: Arc<transfer::Control>,
+}
+
+impl<'a> Registered<'a> {
+    fn new(state: &'a AppState, id: &str) -> Self {
+        let control = transfer::Control::new();
+        state.cancels.locked().insert(id.to_string(), control.clone());
+        Self { state, id: id.to_string(), control }
+    }
+}
+
+impl Drop for Registered<'_> {
+    fn drop(&mut self) {
+        self.state.cancels.locked().remove(&self.id);
+    }
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,16 +48,14 @@ pub(crate) async fn transfer_upload(
     remote_path: String,
     options: Option<transfer::TransferOptions>,
 ) -> AppResult<u64> {
-    let conn = state.conn(&server_id).await?;
-    let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.locked().insert(id.clone(), flag.clone());
+    let run = Registered::new(&state, &id);
+    let conn = transfer::until_stopped(&run.control, state.conn(&server_id)).await?;
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
-    let result = transfer::upload(&conn, &local_path, &remote_path, &opts, &progress, flag).await;
-    state.cancels.locked().remove(&id);
+    let result = transfer::upload(&conn, &local_path, &remote_path, &opts, &progress, run.control.clone()).await;
     match result {
         Ok(v) => Ok(v),
         Err(e) => Err(state.check_lost(&server_id, e).await),
@@ -56,17 +75,15 @@ pub(crate) async fn transfer_cross(
     remote_path: String,
     options: Option<transfer::TransferOptions>,
 ) -> AppResult<u64> {
-    let src = state.conn(&from_server_id).await?;
-    let dst = state.conn(&server_id).await?;
-    let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.locked().insert(id.clone(), flag.clone());
+    let run = Registered::new(&state, &id);
+    let src = transfer::until_stopped(&run.control, state.conn(&from_server_id)).await?;
+    let dst = transfer::until_stopped(&run.control, state.conn(&server_id)).await?;
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
-    let result = transfer::cross(&src, &from_path, &dst, &remote_path, &opts, &progress, flag).await;
-    state.cancels.locked().remove(&id);
+    let result = transfer::cross(&src, &from_path, &dst, &remote_path, &opts, &progress, run.control.clone()).await;
     match result {
         Ok(v) => Ok(v),
         Err(e) => {
@@ -87,16 +104,14 @@ pub(crate) async fn transfer_download(
     local_path: String,
     options: Option<transfer::TransferOptions>,
 ) -> AppResult<u64> {
-    let conn = state.conn(&server_id).await?;
-    let flag = Arc::new(AtomicU8::new(transfer::RUN));
-    state.cancels.locked().insert(id.clone(), flag.clone());
+    let run = Registered::new(&state, &id);
+    let conn = transfer::until_stopped(&run.control, state.conn(&server_id)).await?;
     let emit_id = id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit("transfer-progress", ProgressEvent { id: emit_id.clone(), done, total });
     };
     let opts = options.unwrap_or_default();
-    let result = transfer::download(&conn, &remote_path, &local_path, &opts, &progress, flag).await;
-    state.cancels.locked().remove(&id);
+    let result = transfer::download(&conn, &remote_path, &local_path, &opts, &progress, run.control.clone()).await;
     match result {
         Ok(v) => Ok(v),
         Err(e) => Err(state.check_lost(&server_id, e).await),
@@ -107,8 +122,8 @@ pub(crate) async fn transfer_download(
 /// stays so the transfer can continue later.
 #[tauri::command]
 pub(crate) fn transfer_cancel(state: State<'_, AppState>, id: String, discard: Option<bool>) {
-    if let Some(flag) = state.cancels.locked().get(&id) {
-        flag.store(if discard.unwrap_or(false) { transfer::DISCARD } else { transfer::PAUSE }, Ordering::Relaxed);
+    if let Some(control) = state.cancels.locked().get(&id) {
+        control.stop(if discard.unwrap_or(false) { transfer::DISCARD } else { transfer::PAUSE });
     }
 }
 

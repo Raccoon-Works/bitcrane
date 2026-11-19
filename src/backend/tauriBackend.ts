@@ -46,7 +46,8 @@ export const tauriBackend: Backend = {
 
   editorRead: (serverId, path) => invoke('editor_read', { serverId, path }),
   editorMtime: (serverId, path) => invoke('editor_mtime', { serverId, path }),
-  editorWrite: (serverId, path, text, eol, bom) => invoke('editor_write', { serverId, path, text, eol, bom }),
+  editorWrite: (serverId, path, text, eol, bom, encoding) =>
+    invoke('editor_write', { serverId, path, text, eol, bom, encoding }),
 
   termShells: () => invoke('term_shells'),
   termOpen: (params) => invoke('term_open', { ...params }),

@@ -65,6 +65,20 @@ pub fn build_excludes(patterns: &[String]) -> AppResult<GlobSet> {
     b.build().map_err(|e| AppError::other("Ausschlüsse ungültig.").with_detail(e.to_string()))
 }
 
+/// Drops paths that lie in another reported path: a new folder is uploaded as a whole, so the
+/// files created in it in the same moment are not listed twice.
+fn without_nested(paths: BTreeSet<String>) -> BTreeSet<String> {
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    // Sorted, a folder comes before everything in it ("a" < "a/b"); "a b" sorts between, so the
+    // check is for "a/" exactly.
+    for p in paths {
+        if !out.iter().any(|d| p.starts_with(&format!("{d}/"))) {
+            out.insert(p);
+        }
+    }
+    out
+}
+
 /// True if any component of `path` below `root` matches the exclude set.
 pub fn is_excluded(root: &Path, path: &Path, excludes: &GlobSet) -> bool {
     let rel = path.strip_prefix(root).unwrap_or(path);
@@ -110,7 +124,7 @@ impl Watches {
                             if !from_ex {
                                 removed.insert(to_ui(from));
                             }
-                            if !to_ex && to.is_file() {
+                            if !to_ex && (to.is_file() || to.is_dir()) {
                                 changed.insert(to_ui(to));
                             }
                             continue;
@@ -123,6 +137,13 @@ impl Watches {
                         match ev.kind {
                             EventKind::Remove(_) => {
                                 removed.insert(to_ui(p));
+                            }
+                            // A folder that appeared (created, moved or copied in): the interface uploads
+                            // its files. Other changes of a folder (its time, a file inside) are not
+                            // reported for the folder itself.
+                            EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(_)) if p.is_dir() => {
+                                changed.insert(to_ui(p));
+                                removed.remove(&to_ui(p));
                             }
                             EventKind::Create(_) | EventKind::Modify(_) => {
                                 if p.is_file() {
@@ -142,6 +163,7 @@ impl Watches {
                     removed.remove(from);
                     removed.remove(to);
                 }
+                let changed = without_nested(changed);
                 if !changed.is_empty() || !removed.is_empty() || !renamed.is_empty() {
                     let watched = |path: String| {
                         let native = to_native(&path);
@@ -240,5 +262,35 @@ mod tests {
         assert_eq!((from.real.as_str(), to.real.as_str()), ("bot.py", "main.py"));
         assert!(batch.removed.is_empty() && batch.changed.is_empty(), "{batch:?}");
         w.stop("r");
+    }
+
+    #[test]
+    fn a_folder_moved_in_is_reported_once() {
+        let outside = tempfile::tempdir().unwrap();
+        let assets = outside.path().join("assets");
+        std::fs::create_dir_all(assets.join("img")).unwrap();
+        std::fs::write(assets.join("img/logo.png"), "png").unwrap();
+        std::fs::write(assets.join("site.css"), "css").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let w = Watches::default();
+        let (tx, rx) = mpsc::channel();
+        let path = dir.path().to_string_lossy().replace('\\', "/");
+        w.start("d".into(), &path, true, &[], 300, move |b| {
+            let _ = tx.send(b);
+        })
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        // Same file system (both temporary folders), so this is a move, which reports only the folder.
+        std::fs::rename(&assets, dir.path().join("assets")).unwrap();
+        let batch = rx.recv_timeout(Duration::from_secs(5)).expect("no batch");
+        assert!(batch.changed.iter().any(|f| f.path.ends_with("/assets") && f.real == "assets"), "{batch:?}");
+        assert!(!batch.changed.iter().any(|f| f.path.contains("/assets/")), "{batch:?}");
+        w.stop("d");
+    }
+
+    #[test]
+    fn nested_paths_go_with_their_folder() {
+        let set: BTreeSet<String> = ["a", "a b", "a/x", "a/y/z", "ab"].map(String::from).into();
+        assert_eq!(without_nested(set).into_iter().collect::<Vec<_>>(), ["a", "a b", "ab"]);
     }
 }

@@ -1113,7 +1113,6 @@
   "Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?": "Geen SSH-agent gevonden. Is de agent actief (bijv. ingeschakeld in Bitwarden)?",
   "Im SSH-Agent ist kein Schlüssel geladen.": "Er is geen sleutel geladen in de SSH-agent.",
   "Kein SSH-Agent mit Schlüssel gefunden. Läuft der Agent (Windows-Dienst „OpenSSH Authentication Agent“, Bitwarden oder Pageant)?": "Geen SSH-agent met een sleutel gevonden. Is de agent actief (Windows-service “OpenSSH Authentication Agent”, Bitwarden of Pageant)?",
-  "Der Befehl läuft länger als 2 Minuten und wurde abgebrochen.": "De opdracht liep langer dan 2 minuten en is gestopt.",
   "„{0}“ gibt es auf dem Server nicht.": "“{0}” bestaat niet op de server.",
   "Alle Überwachungen fortsetzen": "Alle bewakingen hervatten",
   "Ungültiges Muster „{0}“.": "Ongeldig patroon “{0}”.",

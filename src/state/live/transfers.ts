@@ -436,6 +436,13 @@ async function start(tr: Transfer) {
       return;
     }
     if (await preflight(tr)) return;
+    // Paused or removed while the checks above ran: the core had no transfer to stop then, so it
+    // is not started now.
+    const now = getState().transfers.find((x) => x.id === tr.id);
+    if (now?.state !== 'running') {
+      addLog('info', now ? $t('Pausiert: {0}', tr.target) : $t('Abgebrochen: {0}', tr.target), tr.serverId);
+      return;
+    }
     addLog(
       'debug',
       `${tr.direction === 'up' ? $t('Lade hoch') : tr.direction === 'cross' ? $t('Übertrage von {0}', serverById(tr.sourceServerId ?? '')?.name ?? '') : $t('Lade herunter')}: ${tr.source} → ${tr.target}`,

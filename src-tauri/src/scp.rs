@@ -9,11 +9,12 @@
 use crate::error::{AppError, AppResult, ErrorKind, Message};
 use crate::model::{EntryKind, FileEntry, WalkItem};
 use crate::paths::{quoted_name, remote_join, remote_name};
-use crate::ssh::{Handler, Session};
+use crate::ssh::{run_command, Handler, Session};
 use chrono::{Datelike, Local, NaiveDate, TimeZone};
 use russh::client;
+use std::collections::HashMap;
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 pub struct ScpConn {
     handle: client::Handle<Handler>,
@@ -120,9 +121,10 @@ pub fn parse_ls_line(line: &str, now: chrono::DateTime<Local>) -> Option<FileEnt
     let (mtime, used) = parse_time(&rest, now)?;
     let name_start = tokens.get(5 + used)?.0;
     let mut name = line[name_start..].trim_end_matches(['\r', '\n']).to_string();
-    let is_link = perms.starts_with('l');
-    if is_link {
+    let mut link = None;
+    if perms.starts_with('l') {
         if let Some(i) = name.find(" -> ") {
+            link = Some(name[i + 4..].to_string());
             name.truncate(i);
         }
     }
@@ -138,7 +140,7 @@ pub fn parse_ls_line(line: &str, now: chrono::DateTime<Local>) -> Option<FileEnt
         perms: perms_octal(perms),
         owner: owner.to_string(),
         group: group.to_string(),
-        link: None,
+        link,
         hidden: 0,
     })
 }
@@ -170,11 +172,36 @@ fn perms_octal(p: &str) -> String {
     }
 }
 
-/// Listing commands: GNU first (exact seconds), then plain `ls` (busybox, BSD).
-fn ls_command(path: &str, single: bool) -> String {
-    let flags = if single { "-ladL" } else { "-laL" };
+/// Listing commands: GNU first (exact seconds), then plain `ls` (busybox, BSD). `-L` describes
+/// what links point to.
+fn ls_command(path: &str, flags: &str) -> String {
     let p = quote(path);
     format!("LC_ALL=C ls {flags} --time-style=+%s -- {p} 2>/dev/null || LC_ALL=C ls {flags} -- {p}")
+}
+
+/// Line between the two parts of [`list_command`]'s output.
+const RESOLVED: &str = "--bitcrane-resolved--";
+
+/// A folder listing in one round trip: the entries as they are (which ones are links, and to
+/// what), then what each points to. The second part gives kind and size as SFTP reports them;
+/// the first marks links, so walking a folder does not follow them (a link to "." would never end).
+fn list_command(path: &str) -> String {
+    format!("{}; echo {RESOLVED}; {}", ls_command(path, "-la"), ls_command(path, "-laL"))
+}
+
+/// Parses [`list_command`]'s output.
+fn parse_listing(text: &str, now: chrono::DateTime<Local>) -> Vec<FileEntry> {
+    let (plain, resolved) = text.split_once(&format!("{RESOLVED}\n")).unwrap_or(("", text));
+    let links: HashMap<String, String> =
+        plain.lines().filter_map(|l| parse_ls_line(l, now)).filter_map(|e| Some((e.name, e.link?))).collect();
+    resolved
+        .lines()
+        .filter_map(|l| parse_ls_line(l, now))
+        .map(|mut e| {
+            e.link = links.get(&e.name).cloned();
+            e
+        })
+        .collect()
 }
 
 impl ScpConn {
@@ -211,26 +238,8 @@ impl ScpConn {
 
     /// Runs a command; stdout and stderr separately.
     async fn run(&self, command: &str) -> AppResult<Output> {
-        let mut channel = self.handle.channel_open_session().await?;
-        channel.exec(true, command).await?;
-        let mut out = Output { code: 0, out: Vec::new(), err: String::new() };
-        let mut err = Vec::new();
-        let read = async {
-            while let Some(msg) = channel.wait().await {
-                match msg {
-                    russh::ChannelMsg::Data { data } => out.out.extend_from_slice(&data),
-                    russh::ChannelMsg::ExtendedData { data, .. } => err.extend_from_slice(&data),
-                    russh::ChannelMsg::ExitStatus { exit_status } => out.code = exit_status,
-                    russh::ChannelMsg::ExitSignal { .. } => out.code = 128,
-                    _ => {}
-                }
-            }
-        };
-        if tokio::time::timeout(Duration::from_secs(300), read).await.is_err() {
-            return Err(AppError::new(ErrorKind::ConnectionLost, "Der Server antwortet nicht mehr."));
-        }
-        out.err = String::from_utf8_lossy(&err).into_owned();
-        Ok(out)
+        let o = run_command(&self.handle, command, Duration::from_secs(300)).await?;
+        Ok(Output { code: o.code, out: o.out, err: String::from_utf8_lossy(&o.err).into_owned() })
     }
 
     async fn ok(&self, command: &str, what: &Message) -> AppResult<Vec<u8>> {
@@ -238,16 +247,14 @@ impl ScpConn {
     }
 
     pub async fn list(&self, path: &str) -> AppResult<Vec<FileEntry>> {
-        let out = self.ok(&ls_command(path, false), &quoted_name(path)).await?;
-        let now = Local::now();
-        let mut list: Vec<FileEntry> =
-            String::from_utf8_lossy(&out).lines().filter_map(|l| parse_ls_line(l, now)).collect();
+        let out = self.ok(&list_command(path), &quoted_name(path)).await?;
+        let mut list = parse_listing(&String::from_utf8_lossy(&out), Local::now());
         crate::model::sort_listing(&mut list);
         Ok(list)
     }
 
     pub async fn stat(&self, path: &str) -> AppResult<FileEntry> {
-        let out = self.ok(&ls_command(path, true), &quoted_name(path)).await?;
+        let out = self.ok(&ls_command(path, "-ladL"), &quoted_name(path)).await?;
         let line = String::from_utf8_lossy(&out).lines().next().unwrap_or_default().to_string();
         // The name in the line is the path as given; the entry gets the plain name.
         let mut e = parse_ls_line(&line, Local::now())
@@ -364,18 +371,33 @@ impl ScpConn {
         };
         let mut channel = self.handle.channel_open_session().await?;
         channel.exec(true, command).await?;
-        let (mut w, r) = tokio::io::duplex(512 * 1024);
+        // The data goes through a small queue that can also carry an error: a file that cannot be
+        // read ends the stream with cat's message instead of looking like an empty or short file.
+        let (tx, rx) = tokio::sync::mpsc::channel::<std::io::Result<bytes::Bytes>>(8);
         tokio::spawn(async move {
+            let mut err = Vec::new();
+            let mut code = None;
             while let Some(msg) = channel.wait().await {
-                if let russh::ChannelMsg::Data { data } = msg {
-                    if w.write_all(&data).await.is_err() {
-                        break; // reader dropped (pause or error)
+                match msg {
+                    russh::ChannelMsg::Data { data } => {
+                        if tx.send(Ok(bytes::Bytes::copy_from_slice(&data))).await.is_err() {
+                            return; // reader dropped (pause or error)
+                        }
                     }
+                    russh::ChannelMsg::ExtendedData { data, .. } => err.extend_from_slice(&data),
+                    russh::ChannelMsg::ExitStatus { exit_status } => code = Some(exit_status),
+                    russh::ChannelMsg::ExitSignal { .. } => code = Some(128),
+                    _ => {}
                 }
             }
-            let _ = w.shutdown().await;
+            if code != Some(0) {
+                let why = String::from_utf8_lossy(&err).trim().to_string();
+                let why = if why.is_empty() { format!("exit status {code:?}") } else { why };
+                let _ = tx.send(Err(std::io::Error::other(why))).await;
+            }
         });
-        Ok(Box::new(r))
+        let stream = futures_util::stream::unfold(rx, |mut rx| async move { rx.recv().await.map(|item| (item, rx)) });
+        Ok(Box::new(tokio_util::io::StreamReader::new(Box::pin(stream))))
     }
 
     /// Writes a file with `cat`; `offset > 0` appends to a partial file of
@@ -427,6 +449,23 @@ mod tests {
 
     fn now() -> chrono::DateTime<Local> {
         Local.with_ymd_and_hms(2026, 10, 29, 18, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn links_are_marked_but_described_by_their_target() {
+        let text = "total 8\n\
+drwxr-xr-x 2 u g 4096 1793289000 .\n\
+lrwxrwxrwx 1 u g 1 1793289000 current -> .\n\
+-rw-r--r-- 1 u g 5 1793289000 a.txt\n\
+--bitcrane-resolved--\n\
+total 8\n\
+drwxr-xr-x 2 u g 4096 1793289000 .\n\
+drwxr-xr-x 2 u g 4096 1793289000 current\n\
+-rw-r--r-- 1 u g 5 1793289000 a.txt\n";
+        let list = parse_listing(text, now());
+        let current = list.iter().find(|e| e.name == "current").unwrap();
+        assert_eq!((current.kind, current.link.as_deref()), (EntryKind::Dir, Some(".")));
+        assert!(list.iter().find(|e| e.name == "a.txt").unwrap().link.is_none());
     }
 
     #[test]

@@ -21,7 +21,7 @@ import * as paths from '../util/paths';
 import { addLog } from './log';
 import { LIVE, getState, serverById, setState, showToast, updateSettings } from './store';
 import { isConnected, refreshVisible } from './live';
-import { toBackendError } from '../backend/api';
+import { toBackendError, type EditorEncoding, type EditorEol } from '../backend/api';
 
 /** Editor settings with their standard values (CodeEditor.tsx and Settings › Allgemein). */
 interface EditorPrefs {
@@ -42,8 +42,9 @@ interface EditorDoc {
   /** The text as edited, kept while the editor is closed (the editor view keeps it otherwise). */
   text?: string;
   mtime: number;
-  eol: '\n' | '\r\n';
+  eol: EditorEol;
   bom: boolean;
+  encoding: EditorEncoding;
   dirty: boolean;
   loading: boolean;
   error?: string;
@@ -144,6 +145,7 @@ export function newDocument() {
     mtime: 0,
     eol: '\n',
     bom: false,
+    encoding: 'utf8',
     dirty: false,
     loading: false,
   };
@@ -173,6 +175,7 @@ export async function openFile(serverId: string, path: string) {
     mtime: 0,
     eol: '\n',
     bom: false,
+    encoding: 'utf8',
     dirty: false,
     loading: true,
   };
@@ -189,8 +192,9 @@ export async function openFile(serverId: string, path: string) {
       loading: false,
       initial: f.text,
       mtime: f.mtime,
-      eol: f.eol === '\r\n' ? '\r\n' : '\n',
+      eol: f.eol,
       bom: f.bom,
+      encoding: f.encoding,
     });
     if (serverId) addLog('info', $t('Im Editor geöffnet: {0}', path), serverId);
   } catch (e) {
@@ -207,7 +211,7 @@ export function markDirty(id: string, dirty: boolean) {
   if (d && d.dirty !== dirty) patchDoc(id, { dirty });
 }
 
-export function setEol(id: string, eol: '\n' | '\r\n') {
+export function setEol(id: string, eol: EditorEol) {
   patchDoc(id, { eol, dirty: true });
 }
 
@@ -245,7 +249,7 @@ export async function saveDoc(id: string, force = false): Promise<boolean> {
       }
     }
     const text = get();
-    const mtime = await backend.editorWrite(serverId, d.path, text, d.eol, d.bom);
+    const mtime = await backend.editorWrite(serverId, d.path, text, d.eol, d.bom, d.encoding);
     // The saved text is the new reference; the editor shows it again after being closed and reopened.
     patchDoc(id, { dirty: false, conflict: false, mtime, initial: text, text: undefined });
     if (serverId) addLog('ok', $t('Gesichert und hochgeladen: {0}', d.path), serverId);
@@ -277,7 +281,7 @@ export async function saveAs(id: string): Promise<boolean> {
   if (!path) return false;
   try {
     const text = get();
-    const mtime = await backend.editorWrite(null, path, text, d.eol, d.bom);
+    const mtime = await backend.editorWrite(null, path, text, d.eol, d.bom, d.encoding);
     patchDoc(id, {
       serverId: '',
       path,

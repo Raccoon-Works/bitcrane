@@ -1113,7 +1113,6 @@
   "Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?": "Nie znaleziono agenta SSH. Czy agent działa (np. włączony w Bitwarden)?",
   "Im SSH-Agent ist kein Schlüssel geladen.": "W agencie SSH nie załadowano żadnego klucza.",
   "Kein SSH-Agent mit Schlüssel gefunden. Läuft der Agent (Windows-Dienst „OpenSSH Authentication Agent“, Bitwarden oder Pageant)?": "Nie znaleziono agenta SSH z kluczem. Czy agent działa (usługa Windows „OpenSSH Authentication Agent”, Bitwarden lub Pageant)?",
-  "Der Befehl läuft länger als 2 Minuten und wurde abgebrochen.": "Polecenie działało dłużej niż 2 minuty i zostało przerwane.",
   "„{0}“ gibt es auf dem Server nicht.": "„{0}” nie istnieje na serwerze.",
   "Alle Überwachungen fortsetzen": "Wznów wszystkie obserwacje",
   "Ungültiges Muster „{0}“.": "Nieprawidłowy wzorzec „{0}”.",

@@ -1113,7 +1113,6 @@
   "Kein SSH-Agent gefunden. Läuft der Agent (z. B. in Bitwarden aktiviert)?": "Aucun agent SSH trouvé. L’agent est-il en cours d’exécution (p. ex. activé dans Bitwarden) ?",
   "Im SSH-Agent ist kein Schlüssel geladen.": "Aucune clé n’est chargée dans l’agent SSH.",
   "Kein SSH-Agent mit Schlüssel gefunden. Läuft der Agent (Windows-Dienst „OpenSSH Authentication Agent“, Bitwarden oder Pageant)?": "Aucun agent SSH avec une clé trouvé. L’agent est-il en cours d’exécution (service Windows « OpenSSH Authentication Agent », Bitwarden ou Pageant) ?",
-  "Der Befehl läuft länger als 2 Minuten und wurde abgebrochen.": "La commande a duré plus de 2 minutes et a été arrêtée.",
   "„{0}“ gibt es auf dem Server nicht.": "« {0} » n’existe pas sur le serveur.",
   "Alle Überwachungen fortsetzen": "Reprendre toutes les surveillances",
   "Ungültiges Muster „{0}“.": "Motif non valide « {0} ».",

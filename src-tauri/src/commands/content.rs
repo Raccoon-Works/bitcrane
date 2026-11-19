@@ -74,10 +74,48 @@ pub(crate) struct EditorFile {
     text: String,
     /// Modification time when read (ms), to notice changes by others before saving.
     mtime: i64,
-    /// Line ending found in the file ("\r\n" or "\n"), kept when saving.
+    /// Line ending found in the file, kept when saving: "\r\n", "\n", or "mixed", in which case
+    /// `text` keeps every "\r" and is written back exactly as edited.
     eol: String,
     /// The file started with a UTF-8 byte order mark, kept when saving.
     bom: bool,
+    /// "utf8", or "latin1" for a file that is not valid UTF-8; saved in the same encoding.
+    encoding: &'static str,
+}
+
+/// The line ending of a text: "\r\n" or "\n" when all breaks agree, else "mixed".
+fn line_ending(text: &str) -> &'static str {
+    let crlf = text.matches("\r\n").count();
+    match (crlf, text.matches('\n').count()) {
+        (0, _) => "\n",
+        (c, n) if c == n => "\r\n",
+        _ => "mixed",
+    }
+}
+
+/// The bytes the editor saves: the text with the file's line ending, encoding and byte order mark.
+fn editor_bytes(text: &str, eol: &str, bom: bool, encoding: &str) -> AppResult<Vec<u8>> {
+    let body = match eol {
+        "mixed" => text.to_string(),
+        "\r\n" => text.replace("\r\n", "\n").replace('\n', "\r\n"),
+        _ => text.replace("\r\n", "\n"),
+    };
+    let mut bytes = Vec::with_capacity(body.len() + 3);
+    if bom {
+        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+    }
+    if encoding == "latin1" {
+        for c in body.chars() {
+            let b = u8::try_from(u32::from(c)).map_err(|_| {
+                AppError::other("Die Datei ist in Latin-1 gespeichert; „{0}“ lässt sich darin nicht speichern.")
+                    .param(c.to_string())
+            })?;
+            bytes.push(b);
+        }
+    } else {
+        bytes.extend_from_slice(body.as_bytes());
+    }
+    Ok(bytes)
 }
 
 fn editor_text(mut bytes: Vec<u8>, mtime: i64) -> AppResult<EditorFile> {
@@ -92,13 +130,14 @@ fn editor_text(mut bytes: Vec<u8>, mtime: i64) -> AppResult<EditorFile> {
     if bom {
         bytes.drain(..3);
     }
-    let text = match String::from_utf8(bytes) {
-        Ok(t) => t,
-        // Not UTF-8: read as Latin-1 (Windows-1252 is close enough for old configuration files).
-        Err(e) => e.into_bytes().iter().map(|&b| b as char).collect(),
+    let (text, encoding) = match String::from_utf8(bytes) {
+        Ok(t) => (t, "utf8"),
+        // Not UTF-8: read as Latin-1 (every byte is one character), and saved the same way.
+        Err(e) => (e.into_bytes().iter().map(|&b| b as char).collect(), "latin1"),
     };
-    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
-    Ok(EditorFile { text: text.replace("\r\n", "\n"), mtime, eol, bom })
+    let eol = line_ending(&text);
+    let text = if eol == "mixed" { text } else { text.replace("\r\n", "\n") };
+    Ok(EditorFile { text, mtime, eol: eol.to_string(), bom, encoding })
 }
 
 /// Reads a file for the built-in editor: of this computer (no server) or of a server.
@@ -155,9 +194,9 @@ pub(crate) async fn editor_mtime(
     }
 }
 
-/// Saves the editor's text, with the file's own line ending and byte order mark,
-/// and returns the new modification time. Writes in place, so permissions and
-/// owner of a server file stay as they were.
+/// Saves the editor's text, with the file's own line ending, encoding and byte
+/// order mark, and returns the new modification time. Writes in place, so
+/// permissions and owner of a server file stay as they were.
 #[tauri::command]
 pub(crate) async fn editor_write(
     state: State<'_, AppState>,
@@ -166,14 +205,10 @@ pub(crate) async fn editor_write(
     text: String,
     eol: String,
     bom: bool,
+    encoding: String,
 ) -> AppResult<i64> {
     use tokio::io::AsyncWriteExt;
-    let body = if eol == "\r\n" { text.replace('\n', "\r\n") } else { text };
-    let mut bytes = Vec::with_capacity(body.len() + 3);
-    if bom {
-        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
-    }
-    bytes.extend_from_slice(body.as_bytes());
+    let bytes = editor_bytes(&text, &eol, bom, &encoding)?;
     match server_id.filter(|s| !s.is_empty()) {
         None => {
             let native = paths::to_native(&path);
@@ -289,4 +324,56 @@ pub(crate) async fn remote_preview(state: State<'_, AppState>, server_id: String
     let limit = if local::image_mime(&path).is_some() { IMAGE_LIMIT } else { PREVIEW_TEXT_LIMIT };
     let bytes = remote!(state, server_id, |c| c.read_head(&path, limit + 1))?;
     Ok(make_preview(&path, bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What the editor opens and saves unchanged must give back the same bytes.
+    fn round_trip(bytes: &[u8]) -> Vec<u8> {
+        let f = editor_text(bytes.to_vec(), 0).unwrap();
+        editor_bytes(&f.text, &f.eol, f.bom, f.encoding).unwrap()
+    }
+
+    #[test]
+    fn saving_keeps_line_endings_encoding_and_bom() {
+        for bytes in [
+            &b"a\nb\n"[..],
+            b"a\r\nb\r\n",
+            b"a\nb\r\nc\n",
+            b"\xEF\xBB\xBFa\r\nb",
+            b"Gr\xFC\xDFe\r\nende",
+            "Grüße\n".as_bytes(),
+        ] {
+            assert_eq!(round_trip(bytes), bytes, "{bytes:?}");
+        }
+    }
+
+    #[test]
+    fn line_endings_are_read_as_they_are() {
+        let lf = editor_text(b"a\nb".to_vec(), 0).unwrap();
+        let crlf = editor_text(b"a\r\nb".to_vec(), 0).unwrap();
+        let mixed = editor_text(b"a\nb\r\nc".to_vec(), 0).unwrap();
+        assert_eq!((lf.eol.as_str(), crlf.eol.as_str(), crlf.text.as_str()), ("\n", "\r\n", "a\nb"));
+        assert_eq!((mixed.eol.as_str(), mixed.text.as_str()), ("mixed", "a\nb\r\nc"));
+        // Switching a mixed file to one ending normalises every line.
+        assert_eq!(editor_bytes("a\nb\r\nc", "\r\n", false, "utf8").unwrap(), b"a\r\nb\r\nc");
+        assert_eq!(editor_bytes("a\nb\r\nc", "\n", false, "utf8").unwrap(), b"a\nb\nc");
+    }
+
+    #[test]
+    fn latin1_files_stay_latin1() {
+        let f = editor_text(b"caf\xE9".to_vec(), 0).unwrap();
+        assert_eq!((f.text.as_str(), f.encoding), ("café", "latin1"));
+        assert!(editor_bytes("5 €", "\n", false, "latin1").is_err(), "€ has no Latin-1 byte");
+    }
+
+    #[test]
+    fn previews_refuse_binary_and_mark_long_texts() {
+        assert!(bytes_to_text(b"a\0b".to_vec()).is_err());
+        let long = bytes_to_text(vec![b'x'; TEXT_LIMIT + 1]).unwrap();
+        assert!(long.truncated && long.text.len() == TEXT_LIMIT);
+        assert!(editor_text(b"\0".to_vec(), 0).is_err());
+    }
 }

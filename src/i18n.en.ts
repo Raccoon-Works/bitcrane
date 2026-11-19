@@ -1294,8 +1294,6 @@ export const EN: Record<string, string> = {
   'Im SSH-Agent ist kein Schlüssel geladen.': 'No key is loaded in the SSH agent.',
   'Kein SSH-Agent mit Schlüssel gefunden. Läuft der Agent (Windows-Dienst „OpenSSH Authentication Agent“, Bitwarden oder Pageant)?':
     'No SSH agent with a key found. Is the agent running (Windows service “OpenSSH Authentication Agent”, Bitwarden or Pageant)?',
-  'Der Befehl läuft länger als 2 Minuten und wurde abgebrochen.':
-    'The command ran for more than 2 minutes and was stopped.',
   '„{0}“ gibt es auf dem Server nicht.': '“{0}” does not exist on the server.',
   'Alle Überwachungen fortsetzen': 'Resume all watches',
   'Ungültiges Muster „{0}“.': 'Invalid pattern “{0}”.',
@@ -1870,6 +1868,12 @@ export const EN: Record<string, string> = {
     'The sign-in to the service is no longer valid. Please sign in again.',
   'Unerwartete Antwort des Anmeldedienstes.': 'Unexpected response from the sign-in service.',
   'OpenSSH ist auf diesem Computer nicht installiert.': 'OpenSSH is not installed on this computer.',
+  'Die Datei ist in Latin-1 gespeichert; „{0}“ lässt sich darin nicht speichern.':
+    'The file is stored in Latin-1; “{0}” cannot be saved in it.',
+  'LF/CRLF gemischt': 'LF/CRLF mixed',
+  'Der Befehl lief nach {0} Minuten noch; Bitcrane wartet nicht länger auf ihn.':
+    'The command was still running after {0} minutes; Bitcrane stopped waiting for it.',
+  'Die Verbindung endete, bevor der Befehl fertig war.': 'The connection ended before the command finished.',
   'Die Verbindung konnte nicht vorbereitet werden.': 'The connection could not be prepared.',
   'Diesen Cloud-Dienst kennt Bitcrane noch nicht.': 'Bitcrane does not support this cloud service yet.',
   'Cloud-Dienst': 'Cloud service',
