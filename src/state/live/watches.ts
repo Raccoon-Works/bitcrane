@@ -15,6 +15,7 @@ import { isExcluded } from '../syncPlan';
 import { connected, connectNow, autoConnect, timeTolerance, connectServer } from './connections';
 import { invalidate, bump } from './listing';
 import { toBackendError, type WalkItem, type WatchBatch, type WatchedFile } from '../../backend/api';
+import { isOwnDownload } from './ownDownloads';
 import { enqueueForCommand } from './transfers';
 import { enqueue } from '../transfers';
 
@@ -126,10 +127,15 @@ async function onWatchBatch(b: WatchBatch) {
   const items: Transfer[] = [];
   const addFile = async (file: WatchedFile) => {
     if (!inSelection(w, relOf(w, file.path))) return;
-    // Skip files that are already waiting in the queue.
-    if (getState().transfers.some((x) => x.source === file.path && x.state === 'queued')) return;
+    // Skip files that are already waiting in the queue, and those Bitcrane is downloading right now.
+    const busy = (x: Transfer) =>
+      (x.source === file.path && x.state === 'queued') ||
+      (x.direction === 'down' && x.target === file.path && x.state === 'running');
+    if (getState().transfers.some(busy)) return;
     try {
       const st = await backend.localStat(file.path);
+      // Just downloaded by Bitcrane and unchanged since: it comes from the server, so it is not sent back.
+      if (st.kind === 'file' && isOwnDownload(file.path, st)) return;
       if (st.kind === 'file') items.push(watchTransfer(w, file, st.size));
       else if (st.kind === 'dir') {
         // A whole folder appeared (moved in or renamed): upload its files.

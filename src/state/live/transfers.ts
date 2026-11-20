@@ -26,6 +26,7 @@ import { removeEntries } from './fileOps';
 import { editUploaded } from './editing';
 import { invalidate, bump, readFolder, statEntry } from './listing';
 import { existingDecision, watchDecision } from '../preflight';
+import { noteDownloaded } from './ownDownloads';
 
 /** Left out by the general "auslassen" settings or by the server's transfer rule. */
 function skippedByRules(relative: string, size: number, serverId = ''): boolean {
@@ -459,6 +460,13 @@ async function start(queued: Transfer) {
         : tr.direction === 'cross'
           ? await backend.cross(tr.id, tr.sourceServerId ?? '', tr.source, tr.serverId, tr.target, opts, onProgress)
           : await backend.download(tr.id, tr.serverId, tr.source, tr.target, opts, onProgress);
+    // Noted before the transfer counts as done, so a watch on the folder never sees it unnoted.
+    // The download itself succeeded; without the note a watch merely uploads the file once more.
+    if (tr.direction === 'down')
+      await backend.localStat(tr.target).then(
+        (st) => noteDownloaded(tr.target, st),
+        () => undefined,
+      );
     patchTransfer(tr.id, { state: 'done', done: size, size, finishedAt: Date.now() });
     addLog('ok', `${verb(tr)}: ${tr.target}`, tr.serverId);
     if (tr.editMtime !== undefined) editUploaded(tr);
